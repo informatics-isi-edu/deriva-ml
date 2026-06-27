@@ -1,0 +1,2768 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/audits/2026-05-22-engineer-audit-feature/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Engineer audit — feature subsystem (v1.37.1) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#engineer-audit-feature-subsystem-v1371" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Engineer audit — feature subsystem (v1.37.1)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-by-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings by module
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Findings by module">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlfeaturepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/feature.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/feature.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#f-1-p1-select_majority_votecolumnnone-auto-detect-indexes-a-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-1 [P1] select_majority_vote(column=None) auto-detect indexes a set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-2-p2-select_majority_vote_selector-indexerrors-on-empty-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-2 [P2] select_majority_vote._selector IndexErrors on empty records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-3-p2-map_type-return-type-annotation-drops-bool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-3 [P2] map_type return-type annotation drops bool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-4-p3-class-docstring-header-lists-select_by_execution-as-classmethod" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-4 [P3] Class-docstring header lists select_by_execution as classmethod
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-5-p2-feature_model-is-an-internal-attribute-with-no-leading-underscore-in-__init__-docstring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-5 [P2] Feature._model is an internal attribute with no leading underscore in __init__ docstring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-6-p1-no-test-exercises-fk-classification-asset_columns-term_columns-value_columns-on-a-real-feature-from-the-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-6 [P1] No test exercises FK classification (asset_columns / term_columns / value_columns) on a real Feature from the catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlcoremixinsfeaturepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/core/mixins/feature.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/core/mixins/feature.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#f-7-p1-select_by_workflow-docstring-example-passes-a-workflow-object-where-the-signature-requires-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-7 [P1] select_by_workflow docstring example passes a Workflow object where the signature requires str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-8-p1-feature_values-and-datasetfeature_values-and-datasetbagfeature_values-each-re-implement-the-same-group-by-rid-and-apply-selector-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-8 [P1] feature_values and Dataset.feature_values and DatasetBag.feature_values each re-implement the same group-by-RID-and-apply-selector pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-9-p2-delete_feature-swallows-underlying-failures-behind-false" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-9 [P2] delete_feature swallows underlying failures behind False
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-10-p2-find_features-return-type-drift-iterable-in-interfacespy-list-in-mixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-10 [P2] find_features return-type drift: Iterable in interfaces.py, list in mixin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-11-p2-lookup_feature-not-found-type-is-documented-inconsistently-across-containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-11 [P2] lookup_feature not-found type is documented inconsistently across containers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-12-p3-list_workflow_executions-docstring-claims-entries-are-unique-by-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-12 [P3] list_workflow_executions docstring claims "Entries are unique by construction"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetdatasetpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/dataset.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/dataset.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#f-13-p1-datasetfeature_values-documents-materialize_limit-as-forwarding-to-the-upstream-but-the-upstreams-check-fires-on-the-unfiltered-row-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-13 [P1] Dataset.feature_values documents materialize_limit as forwarding to the upstream, but the upstream's check fires on the unfiltered row count
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetdataset_bagpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/dataset_bag.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/dataset_bag.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#f-14-p0-datasetbagfind_featuresnone-returns-duplicate-feature-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-14 [P0] DatasetBag.find_features(None) returns duplicate Feature objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-15-p0-no-regression-test-covers-datasetbagfind_featuresnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-15 [P0] No regression test covers DatasetBag.find_features(None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-16-p2-datasetbagfeature_values-materialize_limit-semantics-differ-from-the-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-16 [P2] DatasetBag.feature_values materialize_limit semantics differ from the catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-17-p2-datasetbagfeature_values-swallows-exception-when-probing-get_table_contentstarget_col" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-17 [P2] DatasetBag.feature_values swallows Exception when probing get_table_contents(target_col)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-18-p2-bagfeaturecache_ensure_cache_populated-does-not-handle-a-partially-populated-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-18 [P2] BagFeatureCache._ensure_cache_populated does not handle a partially-populated cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetbag_feature_cachepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/bag_feature_cache.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/bag_feature_cache.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#f-19-p3-cache-table-column-types-are-uniformly-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-19 [P3] Cache table column types are uniformly Text
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests-testsfeature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests (tests/feature/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tests (tests/feature/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#f-20-p1-select_majority_vote-test-coverage-misses-the-auto-detect-happy-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-20 [P1] select_majority_vote test coverage misses the auto-detect happy path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-21-p2-test_feature_record_column_methods-uses-mocks-rather-than-a-real-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-21 [P2] test_feature_record_column_methods uses mocks rather than a real Feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f-22-p3-test_create_feature-test_featurespy106-129-doesnt-assert-value_columns-count-for-image_quality_feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F-22 [P3] test_create_feature (test_features.py:106-129) doesn't assert value_columns count for image_quality_feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-module-coverage-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-module coverage gaps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-module-duplication-candidates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-module duplication candidates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="engineer-audit-feature-subsystem-v1371">Engineer audit — feature subsystem (v1.37.1)</h1>
+<p><strong>Date:</strong> 2026-05-22
+<strong>Scope:</strong></p>
+<ul>
+<li><code>src/deriva_ml/feature.py</code> — <code>Feature</code>, <code>FeatureRecord</code>, selectors</li>
+<li><code>src/deriva_ml/core/mixins/feature.py</code> — <code>FeatureMixin</code> (CRUD + reads)</li>
+<li><code>src/deriva_ml/dataset/dataset.py</code> — <code>Dataset.feature_values</code>, <code>Dataset.find_features</code>, <code>Dataset.lookup_feature</code></li>
+<li><code>src/deriva_ml/dataset/dataset_bag.py</code> — <code>DatasetBag.feature_values</code>, <code>DatasetBag.find_features</code>, <code>DatasetBag.lookup_feature</code>, <code>DatasetBag.list_workflow_executions</code></li>
+<li><code>src/deriva_ml/dataset/bag_feature_cache.py</code> — bag denormalization read path</li>
+<li><code>src/deriva_ml/model/catalog.py</code> — <code>DerivaModel.find_features</code>, <code>DerivaModel.lookup_feature</code></li>
+<li><code>src/deriva_ml/model/deriva_ml_bag_view.py</code> — bag-view <code>find_features</code></li>
+<li><code>tests/feature/</code> — entire test directory</li>
+</ul>
+<h2 id="summary">Summary</h2>
+<p>Smaller, recently-refactored subsystem with reasonably tight test coverage of the unit-level
+selector contract and the three-container symmetry suite. Two real correctness issues stand
+out:</p>
+<ul>
+<li><strong>P0 — <code>DatasetBag.find_features(None)</code> will return duplicate <code>Feature</code> objects</strong> because it
+  bypasses the dedup logic the catalog model added for the no-arg branch.</li>
+<li><strong>P1 — <code>FeatureRecord.select_majority_vote(column=None)</code> indexes a <code>set</code></strong> when auto-detecting
+  the single term column, which raises <code>TypeError</code> instead of returning a record. No test covers
+  the auto-detect happy path, so this latent bug isn't caught.</li>
+</ul>
+<p>The rest is largely polish: three parallel implementations of the
+"group-by-target-RID-then-apply-selector" pattern, a few docstring/annotation inconsistencies,
+and several coverage gaps around the multi-target dedup story, edge cases of the selectors, and
+the FK-walk classification in <code>Feature.__init__</code>.</p>
+<p>Total findings: <strong>21</strong> (3 × P0, 7 × P1, 8 × P2, 3 × P3).</p>
+<hr />
+<h2 id="findings-by-module">Findings by module</h2>
+<h3 id="srcderiva_mlfeaturepy"><code>src/deriva_ml/feature.py</code></h3>
+<h4 id="f-1-p1-select_majority_votecolumnnone-auto-detect-indexes-a-set">F-1 [P1] <code>select_majority_vote(column=None)</code> auto-detect indexes a set</h4>
+<p><code>feature.py:354-355</code></p>
+<pre><code class="language-python">if len(record_cls.feature.term_columns) == 1:
+    col = record_cls.feature.term_columns[0].name
+</code></pre>
+<p><code>Feature.term_columns</code> is a <code>set[Column]</code> (constructed via a set comprehension in
+<code>Feature.__init__</code> at line 552). Subscripting a set raises <code>TypeError</code>. The only existing test
+that exercises <code>column=None</code> (<code>test_select_majority_vote_raises_without_column_when_no_metadata</code>)
+hits the <em>no</em> metadata branch and never reaches line 355, so this is uncovered. Replace with
+<code>next(iter(record_cls.feature.term_columns)).name</code> (or sort by name for deterministic output).</p>
+<h4 id="f-2-p2-select_majority_vote_selector-indexerrors-on-empty-records">F-2 [P2] <code>select_majority_vote._selector</code> IndexErrors on empty <code>records</code></h4>
+<p><code>feature.py:352</code> (<code>record_cls = type(records[0])</code>) and <code>feature.py:368</code>
+(<code>max_count = max(counts.values())</code>). Both <code>records[0]</code> and <code>max(empty)</code> raise on
+<code>records == []</code>. Other selectors return <code>None</code> for empty input (see
+<code>test_select_by_workflow_returns_none_on_empty_records</code>,
+<code>test_select_by_execution_returns_none_on_empty_records</code>); <code>select_majority_vote</code> silently
+breaks the symmetry. Guard at the top with <code>if not records: return None</code> and update the return
+annotation to <code>FeatureRecord | None</code>.</p>
+<h4 id="f-3-p2-map_type-return-type-annotation-drops-bool">F-3 [P2] <code>map_type</code> return-type annotation drops <code>bool</code></h4>
+<p><code>feature.py:596</code> annotates the return as
+<code>UnionType | Type[str] | Type[int] | Type[float]</code>, but line 628 returns <code>bool</code>. Docstring
+line 611 says "str for all other types" but <code>bool</code> is a distinct branch. Add <code>Type[bool]</code> to
+the annotation and correct the docstring.</p>
+<h4 id="f-4-p3-class-docstring-header-lists-select_by_execution-as-classmethod">F-4 [P3] Class-docstring header lists <code>select_by_execution</code> as classmethod</h4>
+<p><code>feature.py:21</code> describes <code>select_by_execution(execution_rid)</code> next to
+<code>select_by_workflow(workflow, *, container)</code>, but the implementation at line 132 is
+<code>@staticmethod</code>. The asymmetry is harmless but visible — <code>select_by_execution</code> should either be
+a classmethod for consistency with <code>select_by_workflow</code> / <code>select_majority_vote</code>, or the docs
+shouldn't suggest classmethod symmetry.</p>
+<h4 id="f-5-p2-feature_model-is-an-internal-attribute-with-no-leading-underscore-in-__init__-docstring">F-5 [P2] <code>Feature._model</code> is an internal attribute with no leading underscore in <code>__init__</code> docstring</h4>
+<p><code>feature.py:523</code> stores <code>self._model = model</code>. The <code>__init__</code> Args block uses <code>model</code> (no
+underscore) and the rest of the class doesn't otherwise touch <code>_model</code> — it's used inside
+<code>__init__</code> only. The instance attribute can be dropped entirely (assign into a local, drop the
+<code>self._model = model</code> line). Saves one strong reference per Feature.</p>
+<h4 id="f-6-p1-no-test-exercises-fk-classification-asset_columns-term_columns-value_columns-on-a-real-feature-from-the-catalog">F-6 [P1] No test exercises FK classification (<code>asset_columns</code> / <code>term_columns</code> / <code>value_columns</code>) on a real <code>Feature</code> from the catalog</h4>
+<p>The classification logic at <code>feature.py:546-558</code> is the heart of <code>Feature.__init__</code>. Existing
+tests only assert <em>counts</em> on demo features (<code>test_create_feature</code>,
+<code>test_create_feature_with_non_asset_table_raises</code>) without ever inspecting which specific
+columns landed in which bucket, and <code>TestFeatureRecord.test_feature_record_column_methods</code> uses
+fully mocked columns that never run <code>Feature.__init__</code>. Add a test that:
+1. Creates a feature with a known mix of asset/term/value/metadata columns.
+2. Inspects each bucket by column name (not just <code>len</code>).
+3. Verifies the structural FKs (<code>Execution</code>, <code>Feature_Name</code>, target table FK) are NOT in any
+   bucket — this is the <code>assoc_fkeys</code> subtraction the comment at line 537 warns against.</p>
+<hr />
+<h3 id="srcderiva_mlcoremixinsfeaturepy"><code>src/deriva_ml/core/mixins/feature.py</code></h3>
+<h4 id="f-7-p1-select_by_workflow-docstring-example-passes-a-workflow-object-where-the-signature-requires-str">F-7 [P1] <code>select_by_workflow</code> docstring example passes a <code>Workflow</code> object where the signature requires <code>str</code></h4>
+<p><code>core/mixins/feature.py:459-460</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; workflow = ml.lookup_workflow(&quot;Glaucoma_Training_v2&quot;)  # doctest: +SKIP
+&gt;&gt;&gt; sel = FeatureRecord.select_by_workflow(workflow, container=ml)  # doctest: +SKIP
+</code></pre>
+<p><code>FeatureRecord.select_by_workflow(workflow: str, ...)</code> calls
+<code>container.list_workflow_executions(workflow)</code> which is <code>@validate_call</code>'d to <code>str</code> — passing
+the <code>Workflow</code> object would fail Pydantic validation. The example is misleading. Use either
+<code>"Glaucoma_Training_v2"</code> directly (Workflow_Type name) or <code>workflow.rid</code>. The same correction
+applies to the module-header example in <code>feature.py:21</code> if it's ever materialized.</p>
+<h4 id="f-8-p1-feature_values-and-datasetfeature_values-and-datasetbagfeature_values-each-re-implement-the-same-group-by-rid-and-apply-selector-pattern">F-8 [P1] <code>feature_values</code> and <code>Dataset.feature_values</code> and <code>DatasetBag.feature_values</code> each re-implement the same group-by-RID-and-apply-selector pattern</h4>
+<p>Three near-identical blocks:
+- <code>core/mixins/feature.py:513-523</code>
+- <code>dataset/dataset.py:594-604</code>
+- <code>dataset/dataset_bag.py:641-652</code></p>
+<pre><code class="language-python">grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+for rec in records:
+    target_rid = getattr(rec, target_col, None)
+    if target_rid is not None:
+        grouped[target_rid].append(rec)
+for group in grouped.values():
+    chosen = selector(group)
+    if chosen is not None:
+        yield chosen
+</code></pre>
+<p>Extract once into a module-level helper (e.g. <code>feature._reduce_with_selector(records, target_col,
+selector)</code>), then call from all three sites. Three places drift independently as more selector
+options accumulate. The bag's import of <code>defaultdict</code> at line 591 inside the method (lazy) and
+the dataset's at the top (eager) is an existing inconsistency that hints at this duplication
+being intentional but unaudited.</p>
+<h4 id="f-9-p2-delete_feature-swallows-underlying-failures-behind-false">F-9 [P2] <code>delete_feature</code> swallows underlying failures behind <code>False</code></h4>
+<p><code>core/mixins/feature.py:269-277</code>:</p>
+<pre><code class="language-python">try:
+    feature = next(f for f in self.model.find_features(table) if f.feature_name == feature_name)
+    feature.feature_table.drop()
+    return True
+except StopIteration:
+    return False
+</code></pre>
+<p>Only <code>StopIteration</code> from the <code>next(...)</code> becomes <code>False</code>. Any catalog-side error during
+<code>feature.feature_table.drop()</code> propagates — fine in principle, but the docstring's
+<code>Raises: DerivaMLException</code> says "If deletion fails due to constraints or permissions" which
+implies wrapped errors. Either: (a) wrap the drop in a try-except that converts to
+<code>DerivaMLException</code> with the table name in context, or (b) reword the docstring to admit that
+non-existence is <code>False</code> and any other failure is the raw underlying exception (deriva-py's
+<code>HTTPError</code> etc.).</p>
+<h4 id="f-10-p2-find_features-return-type-drift-iterable-in-interfacespy-list-in-mixin">F-10 [P2] <code>find_features</code> return-type drift: <code>Iterable</code> in <code>interfaces.py</code>, <code>list</code> in mixin</h4>
+<p><code>interfaces.py:215</code> declares <code>find_features(...) -&gt; Iterable[Feature]</code> (and the same for
+Dataset / DatasetBag in interfaces.py:763), but <code>core/mixins/feature.py:328</code> and <code>:355</code> return
+<code>list[Feature]</code>. <code>DatasetBag.find_features</code> is a generator (yields), so it really is an
+<code>Iterable</code> — meaning callers cannot assume <code>len(...)</code> or random-access on the result.
+<code>tests/feature/test_features.py:221</code> does <code>len(list(subject_features)) + len(list(image_features))</code>,
+which works defensively but the rest of the codebase consumes via comprehension — the
+inconsistency hasn't bitten yet. Either pin the protocol to <code>list</code> (and make the bag eager) or
+pin all three to <code>Iterable</code> and stop returning a <code>list</code> in the mixin. Picking <code>Iterable</code> keeps
+the bag streaming.</p>
+<h4 id="f-11-p2-lookup_feature-not-found-type-is-documented-inconsistently-across-containers">F-11 [P2] <code>lookup_feature</code> not-found type is documented inconsistently across containers</h4>
+<ul>
+<li><code>mixins/feature.py:316-317</code>: <code>Raises: DerivaMLFeatureNotFound</code></li>
+<li><code>dataset/dataset.py:621</code>: <code>Raises: DerivaMLException</code> (parent class)</li>
+<li><code>dataset/dataset_bag.py:709</code>: <code>Raises: DerivaMLException</code></li>
+<li><code>model/catalog.py:664-666</code> (actual implementation): raises <code>DerivaMLFeatureNotFound</code></li>
+</ul>
+<p>All three containers delegate to the same <code>model.lookup_feature</code>, so they all raise the same
+exception. Pin the docstrings to <code>DerivaMLFeatureNotFound</code> everywhere (sibling of
+<code>DerivaMLException</code>, so existing <code>except DerivaMLException</code> callers still work) — otherwise
+users writing precise <code>except</code> blocks against the bag/dataset surface won't know they can use
+the narrower type.</p>
+<h4 id="f-12-p3-list_workflow_executions-docstring-claims-entries-are-unique-by-construction">F-12 [P3] <code>list_workflow_executions</code> docstring claims "Entries are unique by construction"</h4>
+<p><code>mixins/feature.py:578-579</code>. True today (each execution runs one workflow), but the live
+<code>Dataset.list_workflow_executions</code> pass-through (<code>dataset.py:629</code>) explicitly documents that
+dataset scoping is deferred. If the dataset path is ever changed to union per-member-execution
+contributions, uniqueness could break. The "unique by construction" claim is a load-bearing
+invariant for <code>select_by_workflow</code>'s <code>set(...)</code> conversion — pin it with a regression test
+asserting <code>len(rids) == len(set(rids))</code> on a multi-execution workflow. Test
+<code>test_list_workflow_executions_returns_matching_rids</code> at <code>test_features.py:498</code> does assert
+uniqueness, so this is well-covered for the catalog path; the dataset/bag paths are not.</p>
+<hr />
+<h3 id="srcderiva_mldatasetdatasetpy"><code>src/deriva_ml/dataset/dataset.py</code></h3>
+<h4 id="f-13-p1-datasetfeature_values-documents-materialize_limit-as-forwarding-to-the-upstream-but-the-upstreams-check-fires-on-the-unfiltered-row-count">F-13 [P1] <code>Dataset.feature_values</code> documents <code>materialize_limit</code> as forwarding to the upstream, but the upstream's check fires on the <strong>unfiltered</strong> row count</h4>
+<p><code>dataset/dataset.py:579-589</code>: the dataset filters <code>raw_in_scope</code> after fetching from
+<code>self._ml_instance.feature_values(...)</code>. If <code>materialize_limit=N</code> and the feature has 10N rows
+in the catalog but only N/2 dataset members, the upstream raises <em>before</em> the dataset filter
+even sees the rows. The docstring (lines 545-548) says "forwarded to <code>DerivaML.feature_values</code>;
+raises <code>DerivaMLMaterializeLimitExceeded</code> if exceeded" — accurate, but a user reading
+"materialize_limit caps the number of rows" naturally expects the post-filter count to be the
+gate. Clarify the docstring: the cap applies to the <strong>catalog query</strong>, not the
+dataset-filtered result.</p>
+<hr />
+<h3 id="srcderiva_mldatasetdataset_bagpy"><code>src/deriva_ml/dataset/dataset_bag.py</code></h3>
+<h4 id="f-14-p0-datasetbagfind_featuresnone-returns-duplicate-feature-objects">F-14 [P0] <code>DatasetBag.find_features(None)</code> returns duplicate <code>Feature</code> objects</h4>
+<p><code>dataset/dataset_bag.py:522-530</code>:</p>
+<pre><code class="language-python">if table is None:
+    for schema in sorted(self.model.schemas):
+        for t in sorted(self.model.schemas[schema].tables):
+            yield from self.model.find_features(t)
+    return
+yield from self.model.find_features(table)
+</code></pre>
+<p>This deliberately walks every table and calls the <code>table-specific</code> branch of
+<code>model.find_features</code>, which <strong>does not</strong> apply the dedup logic that the no-arg branch added
+(<code>catalog.py:603-645</code>). Each feature association is reachable from multiple FK targets (target
+table, <code>Execution</code>, <code>Feature_Name</code> vocab, every term vocab the feature references), so a feature
+on <code>Image</code> with two term columns produces ~4 duplicate <code>Feature</code> objects from the bag walk.</p>
+<p>This is the same bug <code>docs/bugs/2026-05-19-find-features-duplicates.md</code> calls out for the
+catalog path; the bag path was not similarly fixed. Replace the no-arg branch with a single
+call to <code>self.model.find_features(None)</code> (which the bag-view model inherits from <code>DerivaModel</code>),
+or apply the same <code>seen_feature_tables</code> dedup inline.</p>
+<h4 id="f-15-p0-no-regression-test-covers-datasetbagfind_featuresnone">F-15 [P0] No regression test covers <code>DatasetBag.find_features(None)</code></h4>
+<p>The catalog's dedup test (<code>test_features.py:198-216</code>) only exercises <code>ml_instance.find_features()</code>.
+The three-container symmetry suite (<code>test_feature_values.py:379-383</code>) always calls
+<code>find_features(target_table)</code> with a specific table, so the bag's no-arg branch is uncovered.
+Add a <code>test_bag_find_features_no_arg_dedups</code> test that asserts uniqueness on
+<code>bag.find_features()</code> and matches the catalog's invariants in <code>test_find_features</code>.</p>
+<h4 id="f-16-p2-datasetbagfeature_values-materialize_limit-semantics-differ-from-the-catalog">F-16 [P2] <code>DatasetBag.feature_values</code> materialize_limit semantics differ from the catalog</h4>
+<p><code>dataset/dataset_bag.py:629-635</code> checks the limit <em>after</em> fetching from the bag cache and
+applying the in-bag target/execution filters (lines 614-624). The catalog backend checks
+<em>before</em> record construction (<code>mixins/feature.py:497-501</code>). For symmetric API expectations this
+should fire before filtering, or the docstring (line 562-565: "mainly for API parity") should
+be more explicit that the bag enforces the cap on the <strong>post-filter</strong> count, not the source
+row count.</p>
+<h4 id="f-17-p2-datasetbagfeature_values-swallows-exception-when-probing-get_table_contentstarget_col">F-17 [P2] <code>DatasetBag.feature_values</code> swallows <code>Exception</code> when probing <code>get_table_contents(target_col)</code></h4>
+<p><code>dataset/dataset_bag.py:607-613</code>:</p>
+<pre><code class="language-python">try:
+    target_rids = {r[&quot;RID&quot;] for r in self.model.get_table_contents(target_col)}
+except Exception:
+    target_rids = None
+</code></pre>
+<p>Bare <code>except Exception</code> is over-broad. The comment claims "If the target table is missing from
+the bag entirely, fall through with the unfiltered set" — but a <code>KeyError</code> / <code>DerivaMLTableNotFound</code>
+is the only legitimate signal here. Tighten to the specific exception class so genuine bag-IO
+failures (sqlite locked, corrupt row) aren't silently masked as "target table missing".</p>
+<h4 id="f-18-p2-bagfeaturecache_ensure_cache_populated-does-not-handle-a-partially-populated-cache">F-18 [P2] <code>BagFeatureCache._ensure_cache_populated</code> does not handle a partially-populated cache</h4>
+<p><code>dataset/bag_feature_cache.py:140-180</code>: the existence check at line 141 returns the existing
+cache table. If a prior call crashed midway through the insert loop at lines 173-177, the next
+caller sees the partially-populated table and silently returns short data. Bags are immutable
+<em>after</em> materialization, but the cache is built on demand inside the running process. Either
+build inside a single <code>BEGIN ... COMMIT</code> (so a crash leaves the table empty and the existence
+check fails) or write a sentinel row that the existence check inspects.</p>
+<hr />
+<h3 id="srcderiva_mldatasetbag_feature_cachepy"><code>src/deriva_ml/dataset/bag_feature_cache.py</code></h3>
+<h4 id="f-19-p3-cache-table-column-types-are-uniformly-text">F-19 [P3] Cache table column types are uniformly <code>Text</code></h4>
+<p><code>bag_feature_cache.py:160-163</code> stores every field as <code>Text</code> ("Pydantic reifies types at
+FeatureRecord construction time"). This is fine but loses SQL-side filtering capability — a
+future enhancement that lets <code>bag.feature_values</code> push <code>execution_rids</code> into a SQL <code>WHERE</code>
+clause (instead of the Python-side filter at <code>dataset_bag.py:620-624</code>) would benefit from a
+properly-typed <code>Execution</code> column. Not blocking for v1.37.1; flag for the cache-design review.</p>
+<hr />
+<h3 id="tests-testsfeature">Tests (<code>tests/feature/</code>)</h3>
+<h4 id="f-20-p1-select_majority_vote-test-coverage-misses-the-auto-detect-happy-path">F-20 [P1] <code>select_majority_vote</code> test coverage misses the auto-detect happy path</h4>
+<p><code>tests/feature/test_select_majority_vote.py</code> covers (a) explicit-column, (b) no-metadata raise,
+and (c) explicit-overrides-auto-detect. Missing:
+1. Auto-detect from a real <code>feature_record_class()</code> with <strong>exactly one</strong> term column —
+   exercises <code>feature.py:354-355</code> (the set-indexing bug F-1).
+2. Auto-detect raise when the feature has <strong>multiple</strong> term columns —
+   exercises <code>feature.py:356-361</code>.
+3. Empty <code>records</code> input — exercises F-2.</p>
+<h4 id="f-21-p2-test_feature_record_column_methods-uses-mocks-rather-than-a-real-feature">F-21 [P2] <code>test_feature_record_column_methods</code> uses mocks rather than a real <code>Feature</code></h4>
+<p><code>tests/feature/test_features.py:60-90</code> builds the <code>FeatureRecord.feature</code> attribute from
+<code>mocker.Mock()</code> objects. This pins the classmethod <em>call-through</em> (does <code>cls.feature_columns()</code>
+return <code>cls.feature.feature_columns</code>?) but not the <em>construction</em> — the actual classification
+into <code>asset_columns</code> / <code>term_columns</code> / <code>value_columns</code> is never exercised by this test. See
+F-6 — the same gap applies in two layers (Feature construction and classmethod readback).</p>
+<h4 id="f-22-p3-test_create_feature-test_featurespy106-129-doesnt-assert-value_columns-count-for-image_quality_feature">F-22 [P3] <code>test_create_feature</code> (<code>test_features.py:106-129</code>) doesn't assert <code>value_columns</code> count for <code>image_quality_feature</code></h4>
+<p>Line 129 stops after <code>feature_columns()</code>. Add <code>assert len(image_quality_feature.value_columns()) == 0</code>
+for parity with the other two assertions in the same test.</p>
+<hr />
+<h2 id="cross-module-coverage-gaps">Cross-module coverage gaps</h2>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>P</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DatasetBag.find_features(None)</code> dedup (F-14/F-15)</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><code>Feature.__init__</code> FK classification — no test inspects which specific columns land in <code>asset_columns</code> / <code>term_columns</code> / <code>value_columns</code> from a real catalog Feature (F-6, F-21)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><code>select_majority_vote</code> auto-detect happy path + multi-term raise (F-20)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>Empty-records behavior of <code>select_majority_vote</code> (F-2)</td>
+<td>P2</td>
+</tr>
+<tr>
+<td><code>materialize_limit</code> interaction with <code>Dataset.feature_values</code>'s post-fetch member filter — no test verifies what the cap counts (F-13)</td>
+<td>P2</td>
+</tr>
+<tr>
+<td><code>Dataset.list_workflow_executions</code> uniqueness invariant (F-12)</td>
+<td>P3</td>
+</tr>
+</tbody>
+</table>
+<h2 id="cross-module-duplication-candidates">Cross-module duplication candidates</h2>
+<table>
+<thead>
+<tr>
+<th>Sites</th>
+<th>Pattern</th>
+<th>P</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mixins/feature.py:513-523</code>, <code>dataset/dataset.py:594-604</code>, <code>dataset/dataset_bag.py:641-652</code></td>
+<td>Group-by-target-RID + apply-selector + drop-None survivors (F-8)</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><code>mixins/feature.py:482-483</code>, <code>dataset/dataset.py:579-589</code>, <code>dataset/dataset_bag.py:620-624</code></td>
+<td><code>execution_rids</code> empty-list short-circuit + non-empty filter</td>
+<td>P2</td>
+</tr>
+<tr>
+<td><code>dataset/dataset_bag.py:489-530</code> walking schemas/tables manually vs <code>catalog.py:625-645</code> dedup walk — both want "every feature in the model" (F-14)</td>
+<td>P0</td>
+<td></td>
+</tr>
+<tr>
+<td><code>mixins/feature.py:560-626</code> (catalog <code>list_workflow_executions</code>) and <code>dataset/dataset_bag.py:720-781</code> (bag <code>list_workflow_executions</code>) — same two-phase RID-then-type resolution implemented twice against different storage layers</td>
+<td>P3</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="notes">Notes</h2>
+<ul>
+<li><code>delete_feature_term</code> does not exist in this codebase. The audit prompt mentioned it; the
+  closest is <code>VocabularyMixin.delete_term</code> (<code>mixins/vocabulary.py:395</code>), which is out of scope
+  for this audit.</li>
+<li><code>add_features</code> on <code>DerivaML</code> is intentionally retired (raises with pointer to
+  <code>exe.add_features</code>). Tests in <code>test_retired_apis.py</code> pin the retirement contract; nothing to
+  flag.</li>
+<li>The selector docstrings are otherwise in good shape and the unit-test coverage for the pure-
+  Python selectors (<code>select_newest</code>, <code>select_first</code>, <code>select_latest</code>, <code>select_by_execution</code>,
+  <code>select_by_workflow</code>) is solid — the None-on-no-match contract is pinned in three places
+  (test_select_by_execution.py, test_select_by_workflow.py, conftest of the symmetry suite).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

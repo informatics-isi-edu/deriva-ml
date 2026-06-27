@@ -1,0 +1,5156 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase3-core/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml audit 2026-05 — Phase 3: core/ - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-audit-2026-05-phase-3-core" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml audit 2026-05 — Phase 3: core/
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-1-dead-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 1 — Dead code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 1 — Dead code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-corevalidationvalidate_vocabulary_terms-is-dead-and-broken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 core/validation.validate_vocabulary_terms is dead AND broken
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-reconcile_pending_leases-call-sites-are-now-ceremony-around-a-no-op" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 reconcile_pending_leases call sites are now ceremony around a no-op
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-five-module-level-helpers-in-coreupload_layoutpy-are-dead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Five module-level helpers in core/upload_layout.py are dead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-datasetmixin_dataset_table-raise-notimplementederror-property-is-dead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 DatasetMixin._dataset_table raise-NotImplementedError property is dead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-executionasset_file_path-docstring-drift-in-coremixinsassetpy443" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 Execution.asset_file_path docstring drift in core/mixins/asset.py:443
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-corevalidationvalidationresult__repr__-uses-unicode-emojis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6 core/validation.ValidationResult.__repr__ uses Unicode emojis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-2-deriva-py-interface-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 2 — deriva-py interface usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 2 — deriva-py interface usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-core-mostly-uses-the-datapath-api-correctly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 core/ mostly uses the datapath API correctly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-coremixinsvocabularypylookup_term-uses-three-tier-server-side-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 core/mixins/vocabulary.py::lookup_term uses three-tier server-side fallback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-coremixinsworkflowpy_find_workflow_rid_by_url-walks-every-workflow-row" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 core/mixins/workflow.py::_find_workflow_rid_by_url walks every workflow row
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-coremixinsassetpylookup_asset-issues-two-filtered-fetches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 core/mixins/asset.py::lookup_asset issues two filtered fetches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-coremixinsworkflowpyfind_workflows-correctly-pre-fetches-association-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 core/mixins/workflow.py::find_workflows correctly pre-fetches association rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-coremixinsassetpylist_assets-pre-fetches-asset_type-associations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 core/mixins/asset.py::list_assets pre-fetches asset_type associations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-4-inconsistencies-duplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 4 — Inconsistencies / duplication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 4 — Inconsistencies / duplication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-_dataset_table-defined-in-both-derivaml-and-datasetmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 _dataset_table defined in both DerivaML and DatasetMixin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-the-mixin-host-class-contract-pattern-is-inconsistent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 The mixin "host class contract" pattern is inconsistent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-derivamlfrom_context-uses-different-docstring-example-syntax-than-other-derivaml-constructors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 DerivaML.from_context uses different docstring example syntax than other DerivaML constructors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-derivamlworkspace-uses-lazy-_workspace-initialization-nothing-else-in-basepy-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 DerivaML.workspace uses lazy _workspace initialization; nothing else in base.py does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-per-mixin-docstring-drift-on-domain_schema-vs-domain_schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Per-mixin docstring drift on domain_schema vs. domain_schemas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-derivaml__init__-accepts-domain_schemas-str-setstr-none-but-stores-frozensetstr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 DerivaML.__init__ accepts domain_schemas: str | set[str] | None but stores frozenset[str]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-execution_from_registry-is-private-but-is-the-canonical-re-hydration-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 Execution._from_registry is "private" but is the canonical re-hydration entry point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#48-coremixinsworkflowpylookup_workflow_by_url-linear-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.8 core/mixins/workflow.py::lookup_workflow_by_url linear scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-5-simplification-opportunities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 5 — Simplification opportunities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 5 — Simplification opportunities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-delete-corevalidationvalidate_vocabulary_terms-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Delete core/validation.validate_vocabulary_terms (§1.1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-delete-reconcile_pending_leases-call-sites-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Delete reconcile_pending_leases call sites (§1.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-delete-dead-coreupload_layoutpy-helpers-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Delete dead core/upload_layout.py helpers (§1.3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-fix-domain_schema-domain_schemas-in-mixin-docstrings-45" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Fix domain_schema → domain_schemas in mixin docstrings (§4.5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-delete-_dataset_table-stub-property-in-datasetmixin-14-42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Delete _dataset_table stub property in DatasetMixin (§1.4 + §4.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-server-side-filter-in-_find_workflow_rid_by_url-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 Server-side filter in _find_workflow_rid_by_url (§2.3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-use-rid_infodatapath-in-lookup_asset-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 Use rid_info.datapath in lookup_asset (§2.4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#58-corevalidationvalidationresult-should-be-pydantic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.8 core/validation.ValidationResult should be Pydantic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#59-move-lazy-workspace-import-in-derivamlworkspace-44" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.9 Move lazy Workspace import in DerivaML.workspace (§4.4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#510-add-__all__-to-core-modules-that-lack-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.10 Add __all__ to core/ modules that lack it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#511-rename-execution_from_registry-executionfrom_registry-47" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.11 Rename Execution._from_registry → Execution.from_registry (§4.7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-6-maintainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 6 — Maintainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 6 — Maintainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-derivaml__init__-is-the-long-pole" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 DerivaML.__init__ is the long pole
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-the-import-deriva-via-importlib-pattern-is-dense" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 The "import deriva via importlib" pattern is dense
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-docstring-quality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Docstring quality
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-__all__-discipline-covered-in-510" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 __all__ discipline (covered in §5.10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-logger-usage-is-consistent-good" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Logger usage is consistent — good
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-corevalidationpy-__all__-lists-a-broken-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 core/validation.py __all__ lists a broken function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#67-coreupload_layoutpy-is-large-and-partly-dead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.7 core/upload_layout.py is large and partly dead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#68-naming-_workspace-private-cached-vs-workspace-property-domain_schemas-plural-attribute-_mode-private-mode-public-property" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.8 Naming: _workspace (private cached) vs. workspace (property), domain_schemas (plural attribute), _mode (private), mode (public property)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-a-legacy-user-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens A — Legacy-user removal
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens A — Legacy-user removal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a1-coreermrestpy-legacy-aliases-keep-external-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.1 core/ermrest.py legacy aliases — KEEP (external consumers)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a2-coreenumsbuiltintypes-keep-same-as-a1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.2 core/enums.BuiltinTypes — KEEP, same as A.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a3-the-status-was-deleted-in-phase-2-subsystem-1a-comment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.3 The "Status was deleted in Phase 2 Subsystem 1a" comment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a4-execution_from_registry-47-not-legacy-but-private-named" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.4 Execution._from_registry (§4.7) — not legacy, but private-named
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a5-validate_vocabulary_terms-11-broken-no-consumers-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.5 validate_vocabulary_terms (§1.1) — broken, no consumers, delete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a6-reconcile_pending_leases-call-sites-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.6 reconcile_pending_leases call sites (§1.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a7-corebasepy1059-comment-resolve_rid-retrieve_rid-moved-to-ridresolutionmixin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.7 core/base.py:1059 comment "resolve_rid, retrieve_rid moved to RidResolutionMixin"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a8-corebasepy1059-pathbuilder-domain_path-table_path-moved-to-pathbuildermixin-comment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.8 core/base.py:1059 pathBuilder, domain_path, table_path moved to PathBuilderMixin comment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-b-privatization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens B — Privatization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens B — Privatization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#b1-batchridresult-mixinsrid_resolutionpy34-48-keep-public" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.1 BatchRidResult (mixins/rid_resolution.py:34-48) — keep public
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b2-strict_preallocated_rid_tag-constant-mixinsannotationpy45" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.2 STRICT_PREALLOCATED_RID_TAG constant (mixins/annotation.py:45)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b3-display_tag-visible_columns_tag-visible_foreign_keys_tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.3 DISPLAY_TAG, VISIBLE_COLUMNS_TAG, VISIBLE_FOREIGN_KEYS_TAG,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b4-vocabularytermhandle-ermrestpy249-326-keep-public" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.4 VocabularyTermHandle (ermrest.py:249-326) — keep public
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b5-validationresult-validationpy90-168-keep-public" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.5 ValidationResult (validation.py:90-168) — keep public
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b6-validate_rids-validate_vocabulary_terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.6 validate_rids, validate_vocabulary_terms,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b7-pinstatus-schema_cachepy39-58-keep-public" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.7 PinStatus (schema_cache.py:39-58) — keep public
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b8-schemacache-schema_cachepy61-204-keep-public" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.8 SchemaCache (schema_cache.py:61-204) — keep public
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b9-schemadiff-and-the-addedtable-removedtable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.9 SchemaDiff and the AddedTable / RemovedTable /
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b10-_compute_diff-schema_diffpy204-310-already-private" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.10 _compute_diff (schema_diff.py:204-310) — already private
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b11-catalogstub-catalog_stubpy25-41-keep-public" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.11 CatalogStub (catalog_stub.py:25-41) — keep public
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b12-connectionmode-connection_modepy12-32-keep-public" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.12 ConnectionMode (connection_mode.py:12-32) — keep public
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b13-_is_system_schema-_get_domain_schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.13 _is_system_schema, _get_domain_schemas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b14-dry_run_rid-constantspy47" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.14 DRY_RUN_RID (constants.py:47)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b15-mltable-enum-enumspy101-127" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.15 MLTable enum (enums.py:101-127)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b16-logger_name-logging_configpy35-public-constant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.16 LOGGER_NAME (logging_config.py:35) — public constant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b17-_apply_logger_overrides-logging_configpy202-213-already-private" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.17 _apply_logger_overrides (logging_config.py:202-213) — already private
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b18-is_hydra_initialized-logging_configpy57-77" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.18 is_hydra_initialized (logging_config.py:57-77)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b19-_table_path-_domain_path-mixinspath_builderpy75-98-already-private" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.19 _table_path, _domain_path (mixins/path_builder.py:75, 98) — already private
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b20-builtintypes-alias-enumspy22-27-keep-external-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.20 BuiltinTypes alias (enums.py:22-27) — KEEP, external consumers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b21-rid_part-snapshot_part-rid_regex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.21 rid_part, snapshot_part, rid_regex
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lens-b-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens B summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-c-test-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens C — Test coverage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens C — Test coverage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-file-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-file posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coverage-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage gaps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-leakage-warning-load-bearing-finding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State-leakage warning (load-bearing finding)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-trade-off-per-test-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost trade-off per test file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamlining-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streamlining recommendations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-d-docsspecadrdocstring-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens D — Docs/spec/ADR/docstring sync
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens D — Docs/spec/ADR/docstring sync">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#d1-mixin-docstrings-say-domain_schema-singular-attribute-is-domain_schemas-plural" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.1 Mixin docstrings say domain_schema (singular); attribute is domain_schemas (plural)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d2-workspace-level-claudemd-mentions-loggermixin-that-doesnt-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.2 Workspace-level CLAUDE.md mentions LoggerMixin that doesn't exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d3-skill-plugins-reference-deleted-status-enum" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.3 Skill plugins reference deleted Status enum
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d4-corevalidationpy-docstring-example-for-validate_vocabulary_terms-would-crash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.4 core/validation.py docstring example for validate_vocabulary_terms would crash
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d5-corebasepy-carries-an-out-of-date-docstring-referring-to-domain_schema-str-as-an-attribute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.5 core/base.py carries an out-of-date docstring referring to "domain_schema (str)" as an attribute
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d6-core__init__py-docstring-example-shows-non-existent-default-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.6 core/__init__.py docstring example shows non-existent default catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d7-adr-0006-bag-pipeline-accurately-describes-the-production-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.7 ADR-0006 (bag pipeline) accurately describes the production path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d8-adr-0007-annotation-builders-public-api-is-consistent-with-coremixinsannotationpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.8 ADR-0007 (annotation builders public API) is consistent with core/mixins/annotation.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d9-adr-0008-estimate_bag_size-opt-out-not-relevant-to-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.9 ADR-0008 (estimate_bag_size opt-out) — not relevant to core/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d10-docsuser-guideexploringmd-is-accurate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.10 docs/user-guide/exploring.md is accurate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d11-docsconfigurationoverviewmd-is-accurate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.11 docs/configuration/overview.md is accurate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d12-corevalidationpyvalidationresult__repr__-uses-emojis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.12 core/validation.py::ValidationResult.__repr__ uses emojis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d13-coremixinspath_builderpypathbuilder-return-type-docstring-mismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.13 core/mixins/path_builder.py::pathBuilder return type docstring mismatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persona-summaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persona summaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Persona summaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#senior-software-engineer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Senior software engineer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing-engineer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing engineer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical writer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-developer-user-the-workflow-author" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ML-developer user (the workflow author)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DBA
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-actions-1n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions (1–N)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#follow-up-scope-phase-4-candidates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Follow-up scope (Phase 4 candidates)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Follow-up scope (Phase 4 candidates)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#4a-corebasepy-structural-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.A core/base.py structural split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4b-coreupload_layoutpy-is-in-the-wrong-subsystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.B core/upload_layout.py is in the wrong subsystem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4c-the-mixin-host-class-contract-is-implicit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.C The mixin "host class contract" is implicit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4d-cross-workspace-status-migration-in-legacy-deriva-mcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.D Cross-workspace Status migration in legacy deriva-mcp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4e-workspace-schemacache-concurrency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.E Workspace SchemaCache concurrency
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-audit-2026-05-phase-3-core">deriva-ml audit 2026-05 — Phase 3: core/</h1>
+<p>Reviewed <code>/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/core/</code>
+(11 577 LoC across 30 Python files, including 10 mixins and the
+<code>DerivaML</code> class) and the corresponding test suite
+<code>/Users/carl/GitHub/DerivaML/deriva-ml/tests/core/</code> (2 748 LoC,
+19 test files, ~120 tests) at the tip of
+<code>fix/catalog-manager-state-guards</code> (HEAD <code>4442f82</code>). Cross-workspace
+references were grepped against
+<code>/Users/carl/GitHub/DerivaML/{deriva-mcp,deriva-mcp-core,deriva-ml-mcp,deriva-ml-model-template,deriva-skills,deriva-ml-skills}/</code>.</p>
+<p><code>core/</code> is the foundation. <code>core/base.py</code> (1 718 LoC) defines
+<code>DerivaML</code>, which is the user's primary entry point. The mixins under
+<code>core/mixins/</code> (5 100 LoC across 10 files) compose <code>DerivaML</code>'s
+surface — every <code>create_*</code>, <code>find_*</code>, <code>lookup_*</code>, <code>list_*</code>,
+<code>add_*</code>, and <code>delete_*</code> a user calls is in either <code>base.py</code> or a
+mixin. This makes <code>core/</code> the highest-leverage uncovered surface
+after the Phase 3 execution sweep — and unlike <code>execution/</code> it does
+not carry an unfinished cutover. The dragging tail here is
+different: <strong><code>core/</code> is mostly load-bearing, but pre-cutover legacy
+aliases, stale docstrings, dead helpers in <code>upload_layout.py</code>,
+and a thin layer of post-Phase-3 follow-ups (now-stub callsites,
+stale CLAUDE.md references) accumulate around an otherwise healthy
+foundation.</strong></p>
+<h2 id="executive-summary">Executive summary</h2>
+<p>Overall posture: <strong>healthy with three concentrated cleanups
+available.</strong> <code>core/base.py</code>, <code>core/mixins/*.py</code>, <code>core/schema_cache.py</code>,
+<code>core/schema_diff.py</code>, <code>core/catalog_stub.py</code>, <code>core/connection_mode.py</code>,
+<code>core/sort.py</code>, and <code>core/exceptions.py</code> are all in good shape. The
+liabilities are concentrated in three places: (1) the explicit
+"backwards compatibility" alias surface in <code>core/ermrest.py</code> and
+<code>core/enums.py</code>, (2) ~150 LoC of dead helpers in <code>core/upload_layout.py</code>,
+and (3) post-Phase-3 follow-ups where the <code>reconcile_pending_leases</code>
+stub callsites in <code>base.py</code> / <code>mixins/execution.py</code> and the
+<code>validate_vocabulary_terms</code> broken helper in <code>core/validation.py</code> should
+have been pulled along with the stub.</p>
+<p>Top themes ranked by impact:</p>
+<ol>
+<li>
+<p><strong><code>core/validation.validate_vocabulary_terms</code> is broken.</strong> At
+   <code>core/validation.py:374</code> it calls <code>ml.list_terms(vocabulary_name)</code>
+   — but <code>list_terms</code> does not exist on <code>DerivaML</code>. The real method
+   is <code>list_vocabulary_terms</code>. The function is exported in
+   <code>__all__</code> (line 74) and documented with a docstring example
+   that would crash on first use. No production callers. Cross-
+   workspace grep returns zero hits. The function is dead and
+   buggy; either fix the method name or delete the function.</p>
+</li>
+<li>
+<p><strong>Three callsites still invoke the retired <code>reconcile_pending_leases</code>
+   stub.</strong> <code>core/base.py:364-379</code> and <code>core/mixins/execution.py:478-491</code>
+   continue to import and call <code>reconcile_pending_leases</code> from
+   <code>execution/lease_orchestrator.py</code>, which after Phase 3 audit #2 is
+   a documented no-op (<code>lease_orchestrator.py:32-52</code>). The
+   <code>reconcile_pending_leases</code> body is literally <code>return</code>. The
+   import + try/except machinery around it is now ~30 LoC of
+   ceremony around a no-op. The audit closing inventory called out
+   "Phase-4 candidate" cleanups for this; these specific callsites
+   are mechanical to remove.</p>
+</li>
+<li>
+<p><strong><code>core/upload_layout.py</code> carries ~150 LoC of dead helpers.</strong>
+   <code>asset_file_path</code> (the function at line 595), <code>upload_asset</code>
+   (line 535), <code>upload_directory</code> (line 343), <code>upload_staging_root</code>
+   (line 196), <code>normalize_asset_dir</code> (line 105) have zero callers in
+   <code>src/</code>, <code>tests/</code>, or any of the six sibling workspaces. The names
+   <code>asset_file_path</code> and <code>upload_directory</code> survive in docstrings and
+   external docs but the function-form <code>asset_file_path</code> is dead —
+   <code>Execution.asset_file_path</code> is the live entry point and uses
+   different logic (manifest-based, not directory-based). Deleting
+   the module-level versions removes 150+ LoC of "looks-alive"
+   bait that doesn't ship.</p>
+</li>
+<li>
+<p><strong>Mixin docstrings describe a singular <code>domain_schema</code> attribute
+   that doesn't exist.</strong> Five mixins
+   (<code>asset.py:44</code>, <code>dataset.py:47</code>, <code>feature.py:40</code>, <code>file.py:34</code>,
+   <code>path_builder.py:37</code>) list "<code>domain_schema</code>: str - name of the
+   domain schema" in their "This mixin requires the host class to
+   have:" section. The real attribute is <code>domain_schemas:
+   frozenset[str]</code> (plural), declared in <code>DerivaML</code> at <code>base.py:120</code>
+   and accessed via <code>for s in self.domain_schemas: ...</code>. The
+   singular form predates the multi-schema cutover (PR #100 introduced
+   <code>domain_schemas</code>); the docstring carries the legacy convention.</p>
+</li>
+<li>
+<p><strong><code>core/ermrest.py</code> and <code>core/enums.py</code> are full of "backwards
+   compatibility" aliases that have no external consumer.</strong>
+   <code>ColumnDefinition</code>, <code>KeyDefinition</code>, <code>ForeignKeyDefinition</code>,
+   <code>TableDefinition</code> aliases at <code>ermrest.py:86-112</code> (annotated
+   "Alias for ColumnDef from deriva.core.typed. This maintains
+   backwards compatibility with existing DerivaML code. New code
+   should use ColumnDef directly."). Cross-workspace grep confirms
+   <code>deriva-ml-model-template/src/scripts/_cifar10_schema.py</code> and
+   <code>deriva-mcp/src/deriva_mcp/tools/schema.py</code> both still import
+   the legacy names. The aliases are <strong>load-bearing for external
+   consumers</strong> — not delete candidates, but the "new code should
+   use ColumnDef directly" docstring needs to flip: external code
+   does not migrate when the library prefers it, so deriva-ml's
+   own internal code (e.g. <code>core/mixins/dataset.py:25</code>,
+   <code>core/mixins/asset.py:28</code>) should standardize on the alias the
+   external world uses. Similar story for <code>enums.BuiltinTypes</code> →
+   <code>deriva.core.typed.BuiltinType</code> (line 22).</p>
+</li>
+<li>
+<p><strong><code>DatasetMixin._dataset_table</code> is a dead <code>raise NotImplementedError</code>
+   property.</strong> <code>core/mixins/dataset.py:73-75</code> declares
+   <code>_dataset_table</code> as a property that raises NotImplementedError,
+   with a docstring saying "Must be provided by host class". The
+   host class (<code>DerivaML</code>) does provide it (<code>base.py:778-780</code>), so
+   the mixin's raise-NotImplementedError property is structurally
+   dead: it would only fire if someone instantiated <code>DatasetMixin</code>
+   alone, which is impossible because the mixin demands too many
+   other host attributes. The pattern is over-engineered — the
+   real "host class must have this" contract is enforced by class
+   annotation, not by a stub property.</p>
+</li>
+<li>
+<p><strong><code>Execution._from_registry</code> is a private method, called by
+   <code>core/mixins/execution.py:495</code> — the Phase 3 audit nearly
+   deleted it.</strong> The Phase 3 execution audit (§1.3, ranked action
+   #3) initially proposed deleting <code>Execution._from_registry</code>. The
+   closing inventory rejected the action ("§1.3 — proposed
+   <code>Execution._from_registry</code> deletion — rejected after re-verification.
+   The audit claimed zero callers, but <code>core/mixins/execution.py:495</code>
+   (<code>resume_execution</code>) clearly calls it"). The caller is in this
+   subsystem; the lesson is that <code>core/</code>'s use of cross-module
+   private API surfaces (<code>Execution._from_registry</code>) is one of the
+   reasons grep-based audits can miss callers. Worth flagging that
+   <code>_from_registry</code> should probably be renamed to a non-underscore
+   name (or <code>resume_execution</code> should inline the body) so the
+   "private + cross-module" pattern doesn't recur.</p>
+</li>
+</ol>
+<p>Worst-offending modules within <code>core/</code>:</p>
+<ol>
+<li>
+<p><strong><code>base.py</code></strong> (1 718 LoC). <code>DerivaML.__init__</code> carries 100+
+   lines of branching for online/offline init; the lifecycle is
+   correct but the file is the largest single source of
+   maintenance friction. The <code>__del__</code> cleanup, <code>mode</code> property,
+   <code>workspace</code> lazy-init, <code>cache_table</code>/<code>_cache_features</code>,
+   <code>clear_cache</code>/<code>clean_execution_dirs</code>/<code>get_storage_summary</code> (the
+   "storage management" trio, ~250 LoC), and <code>validate_schema</code>
+   are all single-call entry points layered onto a class that
+   already inherits from 10 mixins.</p>
+</li>
+<li>
+<p><strong><code>validation.py</code></strong> (468 LoC). Healthy <code>VALIDATION_CONFIG</code> /
+   <code>STRICT_VALIDATION_CONFIG</code> constants at the top. <code>ValidationResult</code>
+   is a <code>@dataclass</code> that uses emojis in <code>__repr__</code> (✓/✗/⚠) — a
+   user-facing class that should be Pydantic per CLAUDE.md's
+   "Class idiom choice" guidance. <code>validate_rids</code> is healthy and
+   externally consumed; <code>validate_vocabulary_terms</code> is broken
+   (theme 1); <code>validate_execution_config</code> is shallow sugar around
+   <code>validate_rids</code>.</p>
+</li>
+<li>
+<p><strong><code>upload_layout.py</code></strong> (649 LoC). The biggest LoC concentration
+   of dead module-level helpers (theme 3). <code>bulk_upload_configuration</code>
+   and <code>asset_table_upload_spec</code> are the live ones — everything
+   else has zero callers or only docstring callers.</p>
+</li>
+<li>
+<p><strong><code>mixins/annotation.py</code></strong> (977 LoC). 17 methods, all live.
+   Healthy. The <code>STRICT_PREALLOCATED_RID_TAG</code> constant for Bug E.2
+   lives here without an <code>__all__</code>.</p>
+</li>
+<li>
+<p><strong><code>mixins/execution.py</code></strong> (1 262 LoC). Healthy. <code>lookup_lineage</code>
+   and its helpers (<code>_classify_rid</code>, <code>_producer_of_dataset</code>,
+   <code>_producer_of_asset</code>, <code>_walk_node</code> — ~280 LoC) is the bulk;
+   the rest is the create/list/find/resume surface.</p>
+</li>
+</ol>
+<hr />
+<h2 id="subsystem-inventory">Subsystem inventory</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">LoC</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__.py</code></td>
+<td style="text-align: right;">67</td>
+<td>Re-exports + explicit <code>__all__</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>async_helpers.py</code></td>
+<td style="text-align: right;">71</td>
+<td><code>run_async</code> for notebook/non-notebook async bridge. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>base.py</code></td>
+<td style="text-align: right;">1 718</td>
+<td><code>DerivaML</code> class. Lifecycle correct; <code>__init__</code> carries 100+ lines of mode branching. Three Phase-3 leftovers: dead <code>reconcile_pending_leases</code> call (theme 2), one stale-task docstring, one private cross-module method (<code>Execution._from_registry</code>).</td>
+</tr>
+<tr>
+<td><code>catalog_stub.py</code></td>
+<td style="text-align: right;">41</td>
+<td>Offline-mode stand-in for <code>ErmrestCatalog</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>config.py</code></td>
+<td style="text-align: right;">233</td>
+<td><code>DerivaMLConfig</code> Pydantic model + hydra-zen integration. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>connection_mode.py</code></td>
+<td style="text-align: right;">32</td>
+<td><code>ConnectionMode</code> StrEnum. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>constants.py</code></td>
+<td style="text-align: right;">142</td>
+<td><code>RID</code>, <code>ML_SCHEMA</code>, RID regex, system schema helpers. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>definitions.py</code></td>
+<td style="text-align: right;">181</td>
+<td>Pure re-export module. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>enums.py</code></td>
+<td style="text-align: right;">171</td>
+<td><code>UploadState</code>, <code>MLVocab</code>, <code>MLAsset</code>, <code>MLTable</code>, <code>ExecMetadataType</code>, <code>ExecAssetType</code>. <code>BuiltinTypes</code> is a legacy alias for <code>BuiltinType</code> (theme 5). <strong>Healthy</strong> but the alias purpose is muddy.</td>
+</tr>
+<tr>
+<td><code>ermrest.py</code></td>
+<td style="text-align: right;">325</td>
+<td><code>ColumnDef</code>/<code>KeyDef</code>/<code>ForeignKeyDef</code>/<code>TableDef</code> re-exports + legacy aliases (theme 5). <code>VocabularyTerm</code>, <code>VocabularyTermHandle</code>. Uses <code>warnings.filterwarnings</code> at module load to silence pydantic. <strong>Healthy</strong> with documented compat concerns.</td>
+</tr>
+<tr>
+<td><code>exceptions.py</code></td>
+<td style="text-align: right;">645</td>
+<td>The full exception hierarchy. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>filespec.py</code></td>
+<td style="text-align: right;">187</td>
+<td><code>FileSpec</code> Pydantic model with hash computation. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>logging_config.py</code></td>
+<td style="text-align: right;">221</td>
+<td><code>get_logger</code>, <code>configure_logging</code>, <code>is_hydra_initialized</code>. <strong>Healthy.</strong> CLAUDE.md references a non-existent <code>LoggerMixin</code> (D.2).</td>
+</tr>
+<tr>
+<td><code>pd_utils.py</code></td>
+<td style="text-align: right;">36</td>
+<td><code>rows_to_dataframe</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>schema_cache.py</code></td>
+<td style="text-align: right;">204</td>
+<td>Workspace cache + <code>PinStatus</code>. Atomic writes via <code>os.replace</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>schema_diff.py</code></td>
+<td style="text-align: right;">309</td>
+<td><code>SchemaDiff</code> Pydantic + <code>_compute_diff</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>sort.py</code></td>
+<td style="text-align: right;">94</td>
+<td><code>resolve_sort</code> helper. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>upload_layout.py</code></td>
+<td style="text-align: right;">649</td>
+<td>Mix of live (<code>asset_table_upload_spec</code>, <code>bulk_upload_configuration</code>, <code>execution_root</code>, <code>flat_asset_dir</code>, <code>manifest_path</code>, <code>asset_root</code>, <code>asset_type_path</code>, <code>table_path</code>) and dead helpers (theme 3: <code>asset_file_path</code>, <code>upload_asset</code>, <code>upload_directory</code>, <code>upload_staging_root</code>, <code>normalize_asset_dir</code>).</td>
+</tr>
+<tr>
+<td><code>validation.py</code></td>
+<td style="text-align: right;">468</td>
+<td><code>VALIDATION_CONFIG</code> constants + <code>validate_rids</code> (used externally) + <code>validate_vocabulary_terms</code> (broken, theme 1) + <code>validate_execution_config</code> (sugar). <code>ValidationResult</code> is a dataclass that ought to be Pydantic.</td>
+</tr>
+<tr>
+<td><code>mixins/__init__.py</code></td>
+<td style="text-align: right;">42</td>
+<td>Re-exports the 10 mixins. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>mixins/annotation.py</code></td>
+<td style="text-align: right;">977</td>
+<td>17 methods for table/column display annotations. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>mixins/asset.py</code></td>
+<td style="text-align: right;">447</td>
+<td><code>create_asset</code>, <code>list_assets</code>, <code>find_assets</code>, <code>lookup_asset</code>, etc. <strong>Healthy.</strong> Mixin docstring says singular <code>domain_schema</code> (theme 4).</td>
+</tr>
+<tr>
+<td><code>mixins/dataset.py</code></td>
+<td style="text-align: right;">953</td>
+<td><code>find_datasets</code>, <code>lookup_dataset</code>, <code>validate_dataset_specs</code>, denorm helpers. Dead <code>_dataset_table</code> stub property (theme 6).</td>
+</tr>
+<tr>
+<td><code>mixins/execution.py</code></td>
+<td style="text-align: right;">1 262</td>
+<td><code>create_execution</code>, <code>lookup_execution</code>, <code>list_executions</code>, <code>find_executions</code>, <code>resume_execution</code>, <code>gc_executions</code>, <code>upload_pending</code>, <code>lookup_lineage</code>. Dead <code>reconcile_pending_leases</code> import (theme 2).</td>
+</tr>
+<tr>
+<td><code>mixins/feature.py</code></td>
+<td style="text-align: right;">636</td>
+<td><code>create_feature</code>, <code>lookup_feature</code>, <code>feature_values</code>. Three "Retired —" stubs that raise (<code>add_features</code>, <code>fetch_table_features</code>, <code>list_feature_values</code>, <code>select_by_workflow</code>) — kept as redirect points; legitimate.</td>
+</tr>
+<tr>
+<td><code>mixins/file.py</code></td>
+<td style="text-align: right;">265</td>
+<td><code>add_files</code>, <code>list_files</code>, <code>_bootstrap_versions</code>, <code>_synchronize_dataset_versions</code>, <code>_set_version_snapshot</code>. <strong>Healthy</strong> but the three private versioning helpers look like they belong in <code>DatasetMixin</code>.</td>
+</tr>
+<tr>
+<td><code>mixins/path_builder.py</code></td>
+<td style="text-align: right;">162</td>
+<td><code>pathBuilder</code>, <code>_domain_path</code>, <code>_table_path</code>, <code>get_table_as_dataframe</code>, <code>get_table_as_dict</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>mixins/rid_resolution.py</code></td>
+<td style="text-align: right;">207</td>
+<td><code>resolve_rid</code>, <code>resolve_rids</code>, <code>_retrieve_rid</code> + <code>BatchRidResult</code> dataclass. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>mixins/vocabulary.py</code></td>
+<td style="text-align: right;">430</td>
+<td><code>add_term</code>, <code>lookup_term</code>, <code>list_vocabulary_terms</code>, <code>delete_term</code>, vocabulary cache machinery. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>mixins/workflow.py</code></td>
+<td style="text-align: right;">402</td>
+<td><code>find_workflows</code>, <code>lookup_workflow</code>, <code>lookup_workflow_by_url</code>, <code>create_workflow</code>, <code>_add_workflow</code>. <strong>Healthy.</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Cross-module dependencies worth naming:</p>
+<ul>
+<li>
+<p><code>DerivaML.__init__</code> (<code>base.py:218-379</code>) is the single
+  construction entry point. After init, every mixin reads
+  <code>self.model</code>, <code>self.catalog</code>, <code>self.ml_schema</code>,
+  <code>self.domain_schemas</code>, <code>self.default_schema</code>, <code>self.working_dir</code>,
+  <code>self.cache_dir</code>, and <code>self._mode</code>. The mixins <strong>type-hint these
+  as class attributes</strong> in their bodies (e.g.
+  <code>mixins/dataset.py:64-70</code>), but only as documentation —
+  Python's typing system doesn't enforce that the host class
+  provides them.</p>
+</li>
+<li>
+<p><code>ExecutionMixin</code> reads <code>self.workspace</code> (a lazy property on
+  <code>DerivaML</code>) and <code>self._mode</code> (a <code>__init__</code> attribute). The mixin
+  does not type-hint either — <code>self.workspace</code> is not declared in
+  <code>ExecutionMixin</code>'s class body. This works today because
+  <code>DerivaML</code> inherits from the mixin and provides both, but a
+  reader of <code>ExecutionMixin</code> alone has no signal that <code>workspace</code>
+  is required. Same for <code>self._mode</code> (the mixin reads it at line
+  166 and 458 without a declaration).</p>
+</li>
+<li>
+<p><code>AssetMixin.create_asset</code> calls <code>self.add_term(...)</code> (line 127)
+  — depends on <code>VocabularyMixin</code>. <code>WorkflowMixin._add_workflow</code>
+  calls <code>self.lookup_term(...)</code> (line 204) — depends on
+  <code>VocabularyMixin</code>. <code>WorkflowMixin.create_workflow</code> calls
+  <code>self.lookup_term</code> (line 399) — same. <code>FileMixin.add_files</code>
+  calls <code>self.lookup_term</code>, <code>self.list_vocabulary_terms</code>,
+  <code>self.resolve_rid</code> — depends on <code>VocabularyMixin</code> and
+  <code>RidResolutionMixin</code>. The mixin web has clear precedence:
+  <code>VocabularyMixin</code> ⊂ <code>RidResolutionMixin</code> ⊂ <code>PathBuilderMixin</code>,
+  with <code>AssetMixin</code>/<code>WorkflowMixin</code>/<code>FileMixin</code>/<code>DatasetMixin</code>/
+  <code>FeatureMixin</code>/<code>ExecutionMixin</code> all depending on the lower
+  three.</p>
+</li>
+<li>
+<p><code>core/base.py:364-379</code> and <code>core/mixins/execution.py:478-491</code>
+  import <code>reconcile_pending_leases</code> from
+  <code>execution/lease_orchestrator.py</code>. After Phase 3 retirement that
+  function is a no-op stub.</p>
+</li>
+<li>
+<p><code>core/upload_layout.py</code> is imported from <code>execution/execution.py</code>
+  (5 helpers), <code>execution/bag_commit.py</code> (2 helpers), <code>core/base.py</code>
+  (1 helper <code>upload_root</code>), <code>core/mixins/path_builder.py</code> (1 helper
+  <code>table_path</code>), <code>asset/null_sentinel_processor.py</code> (1 constant),
+  and <code>schema/annotations.py</code> (1 helper). Of the 30 module-level
+  names defined in <code>upload_layout.py</code>, only 12 have callers.</p>
+</li>
+</ul>
+<hr />
+<h2 id="lens-1-dead-code">Lens 1 — Dead code</h2>
+<h3 id="11-corevalidationvalidate_vocabulary_terms-is-dead-and-broken">1.1 <code>core/validation.validate_vocabulary_terms</code> is dead AND broken</h3>
+<p><code>core/validation.py:350-391</code> declares the function. At line 374:</p>
+<pre><code class="language-python">existing_terms = ml.list_terms(vocabulary_name)
+</code></pre>
+<p><code>ml.list_terms</code> does not exist on <code>DerivaML</code>. Grep across the
+workspace shows the only declarations of a similar name are
+<code>VocabularyMixin.list_vocabulary_terms</code> (<code>mixins/vocabulary.py:295</code>).
+Calling <code>validate_vocabulary_terms(ml, "Dataset_Type", [...])</code> per
+the docstring example (line 366) would raise <code>AttributeError</code> on
+first attempt.</p>
+<p>Cross-workspace grep:</p>
+<pre><code>$ grep -rn &quot;validate_vocabulary_terms&quot; /Users/carl/GitHub/DerivaML
+deriva-ml/tests/schema/test_validation.py:130   # tests schema/validation._validate_vocabulary_terms (different)
+deriva-ml/src/deriva_ml/core/validation.py:74   # __all__ export
+deriva-ml/src/deriva_ml/core/validation.py:350  # def
+deriva-ml/src/deriva_ml/core/validation.py:366  # docstring
+deriva-ml/src/deriva_ml/schema/validation.py:400  # different method (_validate_vocabulary_terms)
+deriva-ml/src/deriva_ml/schema/validation.py:540  # ditto
+</code></pre>
+<p>Zero callers anywhere. The function is exported in
+<code>__all__</code> (<code>validation.py:74</code>) so it advertises an external surface
+it cannot deliver.</p>
+<p><strong>Fix:</strong> delete the function plus its <code>__all__</code> entry. <strong>Risk:
+trivial.</strong> No callers. <strong>LoC: −42.</strong> <strong>Severity: medium</strong> — the
+function is a tripwire if any user reads the export list and tries
+to use it.</p>
+<h3 id="12-reconcile_pending_leases-call-sites-are-now-ceremony-around-a-no-op">1.2 <code>reconcile_pending_leases</code> call sites are now ceremony around a no-op</h3>
+<p><code>core/base.py:364-379</code>:</p>
+<pre><code class="language-python">if self._mode is ConnectionMode.online:
+    from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+
+    try:
+        reconcile_pending_leases(
+            store=self.workspace.execution_state_store(),
+            catalog=self.catalog,
+            execution_rid=None,
+        )
+    except Exception as exc:
+        # Best-effort. If reconciliation itself fails, log and
+        # move on — the user's operation can still proceed;
+        # the next acquire_leases call will retry.
+        logger.warning(
+            &quot;startup lease reconciliation failed (%s); continuing&quot;,
+            exc,
+        )
+</code></pre>
+<p><code>core/mixins/execution.py:478-491</code> — same pattern, scoped per
+execution at <code>resume_execution</code>.</p>
+<p>Both call <code>reconcile_pending_leases</code>, which (per
+<code>execution/lease_orchestrator.py:32-52</code>) is documented as a no-op:</p>
+<pre><code class="language-python">def reconcile_pending_leases(*, store, catalog, execution_rid=None) -&gt; None:
+    &quot;&quot;&quot;No-op crash-recovery stub. Retained for call-site stability.
+    ...
+    &quot;&quot;&quot;
+    # Intentional no-op — see module docstring.
+    return
+</code></pre>
+<p>So 16 LoC at <code>base.py</code> and 13 LoC at <code>mixins/execution.py</code> are
+calling a function whose entire body is <code>return</code>. The try/except
+wrapper around it adds further overhead.</p>
+<p><strong>Fix:</strong> delete the imports and call sites. Optionally retire
+<code>lease_orchestrator.py</code> itself (after deletion, nothing imports
+from it). <strong>Risk: low</strong> — verified the no-op semantics with a
+direct read of the stub. <strong>LoC: −30 src</strong> + <code>lease_orchestrator.py</code>
+(53 LoC) becomes removable. <strong>Severity: medium</strong> — the ceremony is
+ten times the size of the function it wraps.</p>
+<h3 id="13-five-module-level-helpers-in-coreupload_layoutpy-are-dead">1.3 Five module-level helpers in <code>core/upload_layout.py</code> are dead</h3>
+<p>Per <code>grep -rn</code> across all six sibling workspaces plus <code>src/</code> and
+<code>tests/</code>:</p>
+<ul>
+<li><code>asset_file_path(prefix, exec_rid, asset_table, file_name,
+  metadata)</code> (<code>upload_layout.py:595-633</code>) — zero callers. The
+  live method with the same name is <code>Execution.asset_file_path</code>
+  (<code>execution/execution.py:1638</code>) which has different signature
+  and behavior (manifest-based, not directory-segment-based).</li>
+<li><code>upload_asset(model, file, table, **kwargs)</code>
+  (<code>upload_layout.py:535-592</code>) — zero callers. Predates the
+  bag-commit pipeline.</li>
+<li><code>upload_directory(model, directory, progress_callback, ...)</code>
+  (<code>upload_layout.py:343-531</code>) — zero callers. Predates the
+  bag-commit pipeline. The Phase 3 audit closing summary says
+  "One asset-upload path (<code>bag_commit</code> via
+  <code>Execution._bag_commit_upload</code>)" — this module-level function is
+  not on the live path.</li>
+<li><code>upload_staging_root(prefix, exec_rid)</code>
+  (<code>upload_layout.py:196-205</code>) — zero callers. The doc says
+  "ephemeral upload-staging directory, created at upload time
+  only" — but no current caller creates it.</li>
+<li><code>normalize_asset_dir(path)</code> (<code>upload_layout.py:105-117</code>) —
+  zero callers.</li>
+</ul>
+<p>Live module-level helpers in <code>upload_layout.py</code> (kept):
+<code>upload_root</code>, <code>execution_rids</code> (function form, used by base.py),
+<code>execution_root</code>, <code>asset_root</code>, <code>flat_asset_dir</code>, <code>manifest_path</code>,
+<code>table_path</code>, <code>asset_table_upload_spec</code>,
+<code>bulk_upload_configuration</code>, <code>asset_type_path</code>, the
+<code>NULL_SENTINEL</code> constant, the various regex constants.</p>
+<p><strong>Fix:</strong> delete the five dead helpers. The remaining 12 live
+helpers stay. <strong>Risk: low.</strong> <strong>LoC: ~−260</strong> (including their
+docstrings). <strong>Severity: medium</strong> — biggest single LoC liability
+in <code>core/</code>; the names mislead users to think there's an alternate
+public-function path to upload assets, when the live path is
+<code>Execution.asset_file_path()</code> + <code>upload_execution_outputs()</code>.</p>
+<h3 id="14-datasetmixin_dataset_table-raise-notimplementederror-property-is-dead">1.4 <code>DatasetMixin._dataset_table</code> raise-NotImplementedError property is dead</h3>
+<p><code>mixins/dataset.py:72-75</code>:</p>
+<pre><code class="language-python">@property
+def _dataset_table(self) -&gt; Table:
+    &quot;&quot;&quot;Get the Dataset table. Must be provided by host class.&quot;&quot;&quot;
+    raise NotImplementedError
+</code></pre>
+<p><code>DerivaML.__init__</code> inherits <code>DatasetMixin</code>, but <code>DerivaML</code> also
+defines <code>_dataset_table</code> as a real property in <code>base.py:778-780</code>:</p>
+<pre><code class="language-python">@property
+def _dataset_table(self) -&gt; Table:
+    return self.model.schemas[self.model.ml_schema].tables[&quot;Dataset&quot;]
+</code></pre>
+<p>The mixin's NotImplementedError property fires only if someone
+constructs a class that inherits from <code>DatasetMixin</code> but not from
+<code>DerivaML</code> — which is impossible in practice because the mixin
+demands <code>self.model</code>, <code>self.ml_schema</code>, <code>self.pathBuilder</code>,
+<code>self.s3_bucket</code>, <code>self.use_minid</code>, none of which are init'd by
+the mixin. The pattern was meant to advertise the "host class
+must provide" contract, but the body never fires.</p>
+<p><strong>Fix:</strong> delete the property body, keep only the class-body
+type annotation <code>_dataset_table: Table</code> if a static signal is
+wanted (matches the pattern used in the same file for <code>model</code>,
+<code>ml_schema</code>, etc. at lines 64-70). <strong>Risk: trivial.</strong> <strong>LoC: −5.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="15-executionasset_file_path-docstring-drift-in-coremixinsassetpy443">1.5 <code>Execution.asset_file_path</code> docstring drift in <code>core/mixins/asset.py:443</code></h3>
+<p><code>asset_record_class</code>'s docstring example at line 443:</p>
+<pre><code class="language-python">&gt;&gt;&gt; path = exe.asset_file_path(&quot;Image&quot;, &quot;scan.jpg&quot;, metadata=record)  # doctest: +SKIP
+</code></pre>
+<p>This is a docstring example, not a function call — the function
+itself is fine. It references a method that exists. <strong>No fix.</strong>
+Listed for completeness.</p>
+<h3 id="16-corevalidationvalidationresult__repr__-uses-unicode-emojis">1.6 <code>core/validation.ValidationResult.__repr__</code> uses Unicode emojis</h3>
+<p><code>core/validation.py:147, 150, 162</code> — <code>__repr__</code> and <code>__str__</code>
+include the emojis <code>✓</code>, <code>✗</code>, <code>⚠</code>. Per workspace CLAUDE.md ("Only
+use emojis if the user explicitly requests it"), these should be
+plain text characters or ASCII equivalents.</p>
+<p><strong>Fix:</strong> swap to <code>OK / FAIL / WARNING</code> strings or similar. <strong>Risk:
+trivial</strong> (only affects <code>__repr__</code> output). <strong>LoC: ±0.</strong>
+<strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-2-deriva-py-interface-usage">Lens 2 — deriva-py interface usage</h2>
+<h3 id="21-core-mostly-uses-the-datapath-api-correctly">2.1 <code>core/</code> mostly uses the datapath API correctly</h3>
+<p>Every mixin uses <code>pb = self.pathBuilder(); pb.schemas[schema].tables[table]</code>
+consistently. No raw ERMrest URL building in <code>core/</code> (unlike
+<code>execution/state_machine.reconcile_with_catalog</code> flagged in Phase
+3 §2.2 — which is in <code>execution/</code>, not <code>core/</code>). <strong>Healthy.</strong></p>
+<h3 id="22-coremixinsvocabularypylookup_term-uses-three-tier-server-side-fallback">2.2 <code>core/mixins/vocabulary.py::lookup_term</code> uses three-tier server-side fallback</h3>
+<p><code>vocabulary.py:243-268</code> — when a term isn't cached, the method
+does:</p>
+<ol>
+<li>Server-side filtered query for the name (<code>_server_lookup_term</code>,
+   line 270-293).</li>
+<li>If found, populate the full cache and return.</li>
+<li>If not found, populate the full cache and check synonyms.</li>
+<li>If still not found, raise.</li>
+</ol>
+<p>This is correct shape — the server-side filter avoids materializing
+the whole vocabulary when a single term is needed. <strong>Healthy.</strong></p>
+<h3 id="23-coremixinsworkflowpy_find_workflow_rid_by_url-walks-every-workflow-row">2.3 <code>core/mixins/workflow.py::_find_workflow_rid_by_url</code> walks every workflow row</h3>
+<p><code>workflow.py:278-295</code>:</p>
+<pre><code class="language-python">for w in workflow_path.path.entities().fetch():
+    if w[&quot;URL&quot;] == url_or_checksum or w[&quot;Checksum&quot;] == url_or_checksum:
+        workflow_rid = w[&quot;RID&quot;]
+        break
+</code></pre>
+<p>A linear scan of every Workflow row. For catalogs with hundreds
+of workflows this is the same N+1-style cost the audit flagged in
+Phase 2 dataset. The fix is server-side filter:</p>
+<pre><code class="language-python">matches = list(
+    workflow_path.filter(
+        (workflow_path.URL == url_or_checksum) |
+        (workflow_path.Checksum == url_or_checksum)
+    ).entities().fetch()
+)
+</code></pre>
+<p><strong>Fix:</strong> server-side filter. <strong>Risk: low</strong> (the catalog filter
+syntax is well-trod). <strong>LoC: −5.</strong> <strong>Severity: low</strong> but compounds
+when called per execution at <code>create_execution</code> time.</p>
+<h3 id="24-coremixinsassetpylookup_asset-issues-two-filtered-fetches">2.4 <code>core/mixins/asset.py::lookup_asset</code> issues two filtered fetches</h3>
+<p><code>asset.py:299-359</code> — for each asset lookup:
+1. <code>resolve_rid(asset_rid)</code> → server round-trip
+2. <code>filter(RID == asset_rid).fetch()</code> → second round-trip
+3. Look up association table for asset_type → third round-trip</p>
+<p><code>resolve_rid</code> already returns <code>ResolveRidResult</code> with a <code>datapath</code>
+attribute that points at the entity; the second fetch is
+redundant. Compare to <code>lookup_dataset</code> which uses <code>find_datasets()</code>
+(also imperfect but at least one less round-trip).</p>
+<p><strong>Fix:</strong> use <code>rid_info.datapath.entities().fetch()</code> instead of a
+new filter. <strong>Risk: low.</strong> <strong>LoC: −3.</strong> <strong>Severity: low.</strong></p>
+<h3 id="25-coremixinsworkflowpyfind_workflows-correctly-pre-fetches-association-rows">2.5 <code>core/mixins/workflow.py::find_workflows</code> correctly pre-fetches association rows</h3>
+<p><code>workflow.py:123-148</code> — pre-fetches the full
+<code>Workflow_Workflow_Type</code> table once via
+<code>_get_workflow_types_index</code> (line 59-76) to avoid an N+1 pattern.
+This is the right shape; called out as <strong>well-shaped</strong> for the
+audit record.</p>
+<h3 id="26-coremixinsassetpylist_assets-pre-fetches-asset_type-associations">2.6 <code>core/mixins/asset.py::list_assets</code> pre-fetches asset_type associations</h3>
+<p><code>asset.py:220-244</code> — uses one <code>attributes()</code> call to pre-fetch
+the <code>{asset_rid → [type_name, ...]}</code> map, then a single asset
+fetch, then in-memory join. <strong>Healthy.</strong></p>
+<hr />
+<h2 id="lens-4-inconsistencies-duplication">Lens 4 — Inconsistencies / duplication</h2>
+<h3 id="41-_dataset_table-defined-in-both-derivaml-and-datasetmixin">4.1 <code>_dataset_table</code> defined in both <code>DerivaML</code> and <code>DatasetMixin</code></h3>
+<p>Covered in §1.4. The mixin defines a raise-NotImplementedError
+stub; <code>DerivaML</code> overrides it with a real property. Mostly a
+double-definition issue.</p>
+<h3 id="42-the-mixin-host-class-contract-pattern-is-inconsistent">4.2 The mixin "host class contract" pattern is inconsistent</h3>
+<p><code>DatasetMixin</code> (<code>mixins/dataset.py:72-75</code>) defines <code>_dataset_table</code>
+as <code>raise NotImplementedError</code>. Every other mixin uses class-body
+type annotations only:</p>
+<pre><code class="language-python">class AssetMixin:
+    model: &quot;DerivaModel&quot;
+    ml_schema: str
+    domain_schemas: frozenset[str]
+    default_schema: str | None
+    pathBuilder: Callable[[], Any]
+    add_term: Callable[..., VocabularyTerm]
+    apply_catalog_annotations: Callable[[], None]
+</code></pre>
+<p>Either pattern works in Python — the annotations are not enforced
+at runtime, the <code>NotImplementedError</code> only fires when called.
+Mixing the two patterns within the same subsystem is confusing.
+The annotation form is lighter and more consistent.</p>
+<p><strong>Fix:</strong> drop the <code>_dataset_table</code> stub property, keep only the
+annotation <code>_dataset_table: Table</code> in the class body. <strong>LoC: −5.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="43-derivamlfrom_context-uses-different-docstring-example-syntax-than-other-derivaml-constructors">4.3 <code>DerivaML.from_context</code> uses different docstring example syntax than other DerivaML constructors</h3>
+<p><code>core/base.py:174-216</code> (<code>from_context</code>) uses a <code>Example::</code> block
+with literal-block syntax (indented code block, no <code>&gt;&gt;&gt;</code>
+prompts):</p>
+<pre><code class="language-python">        Example::
+
+            # In a script generated by Claude:
+            from deriva_ml import DerivaML
+            ml = DerivaML.from_context()
+</code></pre>
+<p>while every other method on <code>DerivaML</code> uses Google-style <code>Example:</code>
++ <code>&gt;&gt;&gt;</code> doctest blocks (which the project runs via
+<code>--doctest-modules</code>). The literal-block form is a different
+restructured-text directive and doctest cannot collect it.</p>
+<p><strong>Fix:</strong> convert to the <code>Example: &gt;&gt;&gt; ...</code> doctest form
+(catalog-dependent → <code># doctest: +SKIP</code>). <strong>LoC: ±0.</strong> <strong>Severity: low.</strong></p>
+<h3 id="44-derivamlworkspace-uses-lazy-_workspace-initialization-nothing-else-in-basepy-does">4.4 <code>DerivaML.workspace</code> uses lazy <code>_workspace</code> initialization; nothing else in <code>base.py</code> does</h3>
+<p><code>core/base.py:802-859</code> — <code>workspace</code> is a property that lazily
+constructs a <code>Workspace</code> instance on first access. Everything else
+in <code>__init__</code> (catalog, model, cache_dir, working_dir) is set
+eagerly. The lazy pattern is appropriate (workspace construction
+touches SQLite and builds a local schema), but the asymmetry isn't
+documented in the class docstring. The lazy import on line 818
+re-imports <code>Workspace</code> on every property access — a minor cost,
+but unnecessary.</p>
+<p><strong>Fix:</strong> move <code>from deriva_ml.local_db.workspace import Workspace</code>
+to module top (or class-level), guarded by <code>TYPE_CHECKING</code> for the
+forward reference. <strong>LoC: ±0.</strong> <strong>Severity: low.</strong></p>
+<h3 id="45-per-mixin-docstring-drift-on-domain_schema-vs-domain_schemas">4.5 Per-mixin docstring drift on <code>domain_schema</code> vs. <code>domain_schemas</code></h3>
+<p>Five mixins say "<code>domain_schema</code>: str - name of the domain schema"
+in their "This mixin requires the host class to have:" block:</p>
+<ul>
+<li><code>mixins/asset.py:44</code></li>
+<li><code>mixins/dataset.py:47</code></li>
+<li><code>mixins/feature.py:40</code></li>
+<li><code>mixins/file.py:34</code></li>
+<li><code>mixins/path_builder.py:37</code></li>
+</ul>
+<p>The actual attribute is <code>domain_schemas: frozenset[str]</code> (plural,
+declared in <code>DerivaML</code> at <code>base.py:120</code> and in each mixin's class
+body at the corresponding <code>frozenset[str]</code> annotation). The
+singular form is documentation drift from a pre-multi-schema era.</p>
+<p><strong>Fix:</strong> rewrite to "<code>domain_schemas</code>: frozenset[str] - names of
+the domain schemas" in all five mixins. <strong>LoC: ±0.</strong> <strong>Severity:
+low.</strong></p>
+<h3 id="46-derivaml__init__-accepts-domain_schemas-str-setstr-none-but-stores-frozensetstr">4.6 <code>DerivaML.__init__</code> accepts <code>domain_schemas: str | set[str] | None</code> but stores <code>frozenset[str]</code></h3>
+<p><code>base.py:222</code> — parameter is <code>str | set[str] | None</code>. After
+<code>__init__</code> the attribute is <code>frozenset[str]</code> (assigned at line 354
+via <code>self.model.domain_schemas</code>). The conversion happens inside
+<code>DerivaModel.from_cached</code> (see <code>model/catalog.py</code>). The mixin
+class-body annotation matches the stored type (frozenset). This
+isn't drift, just a clear param-vs-attribute type difference; the
+docstring at line 246 describes the input shape only. Worth
+explicit doc: "Stored as <code>frozenset[str]</code>. Use <code>ml.domain_schemas</code>
+to read."</p>
+<p><strong>Severity: low.</strong></p>
+<h3 id="47-execution_from_registry-is-private-but-is-the-canonical-re-hydration-entry-point">4.7 <code>Execution._from_registry</code> is "private" but is the canonical re-hydration entry point</h3>
+<p><code>core/mixins/execution.py:495</code>:</p>
+<pre><code class="language-python">return Execution._from_registry(
+    ml_object=self,
+    execution_rid=execution_rid,
+)
+</code></pre>
+<p><code>Execution._from_registry</code> is the canonical way to rebuild an
+<code>Execution</code> from the SQLite registry. The underscore prefix
+suggests private, but the only caller is in a different module
+(<code>core/mixins/execution.py</code> calling <code>execution/execution.py</code>).
+Phase 3 audit §1.3 nearly deleted the method assuming it had no
+callers (the audit closing inventory notes the bug:
+"§1.3 — rejected after re-verification").</p>
+<p>This is a private cross-module method whose name violates the
+"private API stays in its module" convention. The name should be
+either:</p>
+<ul>
+<li><code>Execution.from_registry</code> (no underscore, declares cross-module
+  contract), or</li>
+<li><code>Execution._resume_helper</code> (keeps the underscore but renames
+  to something less generic), or</li>
+<li>inline the body into <code>resume_execution</code>.</li>
+</ul>
+<p><strong>Fix:</strong> rename to <code>from_registry</code> and document as the canonical
+re-hydration entry point. <strong>Risk: low</strong> (rename only).
+<strong>LoC: ±0.</strong> <strong>Severity: medium</strong> — the false-negative that
+escaped the Phase 3 audit was specifically caused by this naming
+choice.</p>
+<h3 id="48-coremixinsworkflowpylookup_workflow_by_url-linear-scan">4.8 <code>core/mixins/workflow.py::lookup_workflow_by_url</code> linear scan</h3>
+<p>Covered in §2.3.</p>
+<hr />
+<h2 id="lens-5-simplification-opportunities">Lens 5 — Simplification opportunities</h2>
+<h3 id="51-delete-corevalidationvalidate_vocabulary_terms-11">5.1 Delete <code>core/validation.validate_vocabulary_terms</code> (§1.1)</h3>
+<p>Net: <strong>−42 LoC</strong>.</p>
+<h3 id="52-delete-reconcile_pending_leases-call-sites-12">5.2 Delete <code>reconcile_pending_leases</code> call sites (§1.2)</h3>
+<p>Net: <strong>−30 LoC src</strong> + <code>execution/lease_orchestrator.py</code> (53 LoC)
+becomes deletable.</p>
+<h3 id="53-delete-dead-coreupload_layoutpy-helpers-13">5.3 Delete dead <code>core/upload_layout.py</code> helpers (§1.3)</h3>
+<p>Net: <strong>~−260 LoC</strong>. Five module-level functions whose names
+overlap with live methods on <code>Execution</code>. Removes a tripwire
+without affecting any live path.</p>
+<h3 id="54-fix-domain_schema-domain_schemas-in-mixin-docstrings-45">5.4 Fix <code>domain_schema</code> → <code>domain_schemas</code> in mixin docstrings (§4.5)</h3>
+<p>Net: <strong>±0 LoC</strong>, doc-only. Five files touched.</p>
+<h3 id="55-delete-_dataset_table-stub-property-in-datasetmixin-14-42">5.5 Delete <code>_dataset_table</code> stub property in <code>DatasetMixin</code> (§1.4 + §4.2)</h3>
+<p>Net: <strong>−5 LoC</strong>.</p>
+<h3 id="56-server-side-filter-in-_find_workflow_rid_by_url-23">5.6 Server-side filter in <code>_find_workflow_rid_by_url</code> (§2.3)</h3>
+<p>Net: <strong>−5 LoC</strong>, performance win.</p>
+<h3 id="57-use-rid_infodatapath-in-lookup_asset-24">5.7 Use <code>rid_info.datapath</code> in <code>lookup_asset</code> (§2.4)</h3>
+<p>Net: <strong>−3 LoC</strong>, one fewer catalog round-trip per asset lookup.</p>
+<h3 id="58-corevalidationvalidationresult-should-be-pydantic">5.8 <code>core/validation.ValidationResult</code> should be Pydantic</h3>
+<p><code>core/validation.py:90-168</code> declares <code>ValidationResult</code> as a
+<code>@dataclass</code>. Per CLAUDE.md ("Class idiom choice"), classes that
+are returned from user-facing methods (<code>validate_rids</code>) and that
+might cross a serialization boundary (logged, printed) should be
+Pydantic. The dataclass works today, but a future caller that
+wants <code>result.model_dump()</code> for JSON output won't find it; the
+current <code>__repr__</code> uses <code>print()</code>-friendly emojis but
+<code>json.dumps(result.__dict__)</code> ignores the lists' types.</p>
+<p><strong>Fix:</strong> rewrite as <code>BaseModel</code> with the same field set. <strong>LoC: ±0
+to +5.</strong> <strong>Severity: low</strong> but improves consistency with the rest
+of the codebase.</p>
+<h3 id="59-move-lazy-workspace-import-in-derivamlworkspace-44">5.9 Move lazy <code>Workspace</code> import in <code>DerivaML.workspace</code> (§4.4)</h3>
+<p>Net: <strong>±0 LoC</strong>, microscopic perf win.</p>
+<h3 id="510-add-__all__-to-core-modules-that-lack-it">5.10 Add <code>__all__</code> to <code>core/</code> modules that lack it</h3>
+<p>Currently with <code>__all__</code>:
+- <code>core/__init__.py</code>, <code>core/mixins/__init__.py</code>
+- <code>core/definitions.py</code>, <code>core/ermrest.py</code>, <code>core/logging_config.py</code>
+- <code>core/validation.py</code></p>
+<p>Lacking <code>__all__</code>:
+- <code>core/base.py</code>, <code>core/config.py</code>, <code>core/connection_mode.py</code>,
+  <code>core/constants.py</code>, <code>core/enums.py</code>, <code>core/exceptions.py</code>,
+  <code>core/filespec.py</code>, <code>core/schema_cache.py</code>, <code>core/schema_diff.py</code>,
+  <code>core/sort.py</code>, <code>core/upload_layout.py</code>, <code>core/async_helpers.py</code>,
+  <code>core/pd_utils.py</code>, <code>core/catalog_stub.py</code>
+- All 10 mixins under <code>core/mixins/</code></p>
+<p><strong>Recommendation:</strong> add explicit <code>__all__</code> so <code>from
+deriva_ml.core.X import *</code> is predictable. <strong>LoC: +180</strong> roughly.
+<strong>Severity: low</strong> — quality-of-life win.</p>
+<h3 id="511-rename-execution_from_registry-executionfrom_registry-47">5.11 Rename <code>Execution._from_registry</code> → <code>Execution.from_registry</code> (§4.7)</h3>
+<p>Net: <strong>±0 LoC</strong>, ergonomics + audit safety win.</p>
+<hr />
+<h2 id="lens-6-maintainability">Lens 6 — Maintainability</h2>
+<h3 id="61-derivaml__init__-is-the-long-pole">6.1 <code>DerivaML.__init__</code> is the long pole</h3>
+<p><code>core/base.py:218-379</code> — 161 LoC, two private branches
+(<code>_init_online</code>, <code>_init_offline</code>), 13 instance attributes set.
+The class is correctly designed; the file is large because it
+houses every method <code>DerivaML</code> adds beyond the mixins. Worth
+splitting <code>apply_catalog_annotations</code>, <code>create_vocabulary</code>,
+<code>create_table</code>, <code>define_association</code>, <code>chaise_url</code>, <code>cite</code>,
+<code>refresh_schema</code>/<code>pin_schema</code>/<code>unpin_schema</code>/<code>pin_status</code>/
+<code>diff_schema</code>, <code>clear_cache</code>/<code>get_cache_size</code>/<code>list_execution_dirs</code>/
+<code>clean_execution_dirs</code>/<code>get_storage_summary</code>, and <code>validate_schema</code>
+out of <code>base.py</code>.</p>
+<p>The cleanest split would be:</p>
+<ul>
+<li><code>core/schema_management.py</code> (new) — <code>refresh_schema</code>,
+  <code>pin_schema</code>, <code>unpin_schema</code>, <code>pin_status</code>, <code>diff_schema</code>.
+  These five methods are tightly coupled to <code>SchemaCache</code> and
+  <code>SchemaDiff</code>; today they live in <code>base.py</code> because they need
+  <code>self.catalog</code> / <code>self.working_dir</code> / <code>self._mode</code>. Either move
+  them to a new mixin (<code>SchemaCacheMixin</code>) or to a sibling file
+  imported into <code>base.py</code>.</li>
+<li><code>core/storage_management.py</code> (new) — <code>clear_cache</code>,
+  <code>get_cache_size</code>, <code>list_execution_dirs</code>, <code>clean_execution_dirs</code>,
+  <code>get_storage_summary</code>. Same shape.</li>
+</ul>
+<p>This isn't urgent; flagged as Phase 4 candidate. <strong>Severity:
+medium</strong> (file size, not correctness).</p>
+<h3 id="62-the-import-deriva-via-importlib-pattern-is-dense">6.2 The "import deriva via importlib" pattern is dense</h3>
+<p><code>core/base.py:25-40</code> and <code>core/upload_layout.py:48-60</code> and four
+mixin files use:</p>
+<pre><code class="language-python">import importlib
+_deriva_core = importlib.import_module(&quot;deriva.core&quot;)
+_deriva_server = importlib.import_module(&quot;deriva.core.deriva_server&quot;)
+DerivaServer = _deriva_server.DerivaServer
+...
+</code></pre>
+<p>instead of the normal <code>from deriva.core import DerivaServer</code>. The
+comment at <code>base.py:25</code> explains: "use importlib to avoid
+shadowing by local 'deriva.py' files". The motivation is real
+(a stray <code>deriva.py</code> in the user's project would shadow), but the
+pattern produces 8-12 lines of import ceremony per file and a
+private <code>_deriva_core</code> underscore-prefixed module-level name that
+isn't a constant. Worth factoring into a single
+<code>deriva_ml.core.deriva_imports</code> module that does the importlib
+dance once and re-exports the names normally.</p>
+<p><strong>Fix:</strong> consolidate into one helper module. <strong>LoC: −60 across
+the six files.</strong> <strong>Risk: low.</strong> <strong>Severity: low.</strong></p>
+<h3 id="63-docstring-quality">6.3 Docstring quality</h3>
+<p>Sampled 30 public methods across <code>DerivaML</code>, the 10 mixins, and the
+data classes. The Google-format skeleton is consistently filled
+in; <code>Example:</code> blocks are correctly marked <code># doctest: +SKIP</code> for
+catalog-dependent paths. <strong>Healthy overall.</strong> Specific issues:</p>
+<ul>
+<li><strong><code>DerivaML.from_context</code> uses <code>Example::</code> literal-block
+  instead of <code>Example:</code> + doctest syntax</strong> (§4.3). One-off drift.</li>
+<li><strong><code>AssetMixin.list_asset_executions</code>'s <code>asset_role</code> parameter
+  accepts arbitrary string, not enum</strong> (<code>mixins/asset.py:247</code>).
+  The legal values are <code>"Input"</code> and <code>"Output"</code> (per
+  <code>MLVocab.asset_role</code>'s rows in the catalog). Passing
+  <code>"Output"</code> works; passing <code>"output"</code> silently returns zero
+  records. Worth declaring as <code>Literal["Input", "Output"] | None</code>
+  in the type hint.</li>
+<li><strong><code>AssetMixin.list_assets</code> docstring says "Asset types are
+  pre-fetched in a single query"</strong> (line 184). True; this is one
+  of the well-shaped methods. <strong>No drift.</strong></li>
+<li><strong><code>DatasetMixin._dataset_table.NotImplementedError</code> lies</strong> —
+  covered in §1.4.</li>
+<li><strong><code>core/exceptions.py</code> docstrings carry <code>&gt;&gt;&gt; raise X(...)
+  # doctest: +SKIP</code> patterns</strong> (lines 65, 86, 98, etc.). These
+  doctest-skip the raise statement but the surrounding text and
+  Args sections are accurate.</li>
+</ul>
+<h3 id="64-__all__-discipline-covered-in-510">6.4 <code>__all__</code> discipline (covered in §5.10)</h3>
+<p>Only 4 of 30 <code>core/</code> modules have <code>__all__</code>.</p>
+<h3 id="65-logger-usage-is-consistent-good">6.5 Logger usage is consistent — good</h3>
+<p>Every <code>core/</code> module uses <code>get_logger(__name__)</code> or imports
+<code>logger</code> from a module-level <code>get_logger</code> call. <strong>Healthy.</strong></p>
+<h3 id="66-corevalidationpy-__all__-lists-a-broken-function">6.6 <code>core/validation.py</code> <code>__all__</code> lists a broken function</h3>
+<p><code>validation.py:68-77</code> exports <code>validate_vocabulary_terms</code> which
+is dead and buggy (§1.1). Removing it removes a tripwire.</p>
+<h3 id="67-coreupload_layoutpy-is-large-and-partly-dead">6.7 <code>core/upload_layout.py</code> is large and partly dead</h3>
+<p>649 LoC; ~30% of the surface is the dead module-level functions
+(§1.3). The live surface (12 helpers) is healthy. <strong>Severity:
+medium</strong> (covered under §1.3 / §5.3).</p>
+<h3 id="68-naming-_workspace-private-cached-vs-workspace-property-domain_schemas-plural-attribute-_mode-private-mode-public-property">6.8 Naming: <code>_workspace</code> (private cached) vs. <code>workspace</code> (property), <code>domain_schemas</code> (plural attribute), <code>_mode</code> (private), <code>mode</code> (public property)</h3>
+<p>The base class consistently uses the pattern
+<code>_x</code> (internal) + <code>x</code> (public property). <code>_mode</code>/<code>mode</code>,
+<code>_workspace</code>/<code>workspace</code>, <code>_execution</code>/<code>&lt;no public form&gt;</code>. The
+mixins read <code>_mode</code> directly (e.g.
+<code>mixins/execution.py:166, 458</code>) without going through the
+public property — minor inconsistency but harmless.</p>
+<p><strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-a-legacy-user-removal">Lens A — Legacy-user removal</h2>
+<h3 id="a1-coreermrestpy-legacy-aliases-keep-external-consumers">A.1 <code>core/ermrest.py</code> legacy aliases — KEEP (external consumers)</h3>
+<p><code>core/ermrest.py:86-112</code> — <code>ColumnDefinition</code>, <code>KeyDefinition</code>,
+<code>ForeignKeyDefinition</code>, <code>TableDefinition</code>. Each carries a "Alias
+for ... from deriva.core.typed. This maintains backwards
+compatibility with existing DerivaML code. New code should use
+ColumnDef directly." docstring.</p>
+<p>Cross-workspace grep confirms external consumers exist:</p>
+<ul>
+<li><code>deriva-mcp/src/deriva_mcp/tools/schema.py:84, 195, 223</code> —
+  imports <code>ColumnDefinition</code>, <code>ForeignKeyDefinition</code>,
+  <code>TableDefinition</code> from <code>deriva_ml</code>.</li>
+<li><code>deriva-ml-model-template/src/scripts/_cifar10_schema.py:45-46</code>
+  imports <code>ColumnDefinition</code>, <code>BuiltinTypes</code>.</li>
+<li><code>deriva-ml-model-template/src/scripts/_cifar10_assets.py:46</code>
+  imports <code>UploadProgress</code>.</li>
+</ul>
+<p>So the <strong>aliases must remain</strong>. But the "new code should use
+ColumnDef directly" advice in the docstrings is misleading —
+external code does not migrate, and <code>deriva-ml</code>'s own internal
+files (<code>core/mixins/asset.py:28</code>, <code>core/mixins/dataset.py:38</code>,
+<code>core/mixins/feature.py:25</code>) use <code>ColumnDefinition</code> consistently.
+The aliases are the canonical names from external code's
+perspective.</p>
+<p><strong>Recommendation:</strong> flip the docstrings to read "Canonical name
+for <code>ColumnDef</code> in <code>deriva-ml</code>'s public API. External code uses
+this name; internal <code>deriva-ml</code> code uses it via
+<code>deriva_ml.core.definitions.ColumnDefinition</code>. <code>deriva.core.typed.ColumnDef</code>
+remains the underlying ERMrest type for advanced/typed use."
+<strong>LoC: ±0.</strong> <strong>Severity: low</strong> (purely cosmetic, but reduces
+confusion for someone reading the alias section).</p>
+<h3 id="a2-coreenumsbuiltintypes-keep-same-as-a1">A.2 <code>core/enums.BuiltinTypes</code> — KEEP, same as A.1</h3>
+<p><code>core/enums.py:22-27</code> — <code>BuiltinTypes = BuiltinType</code>. Same
+"backwards compatibility" justification, same external consumers.
+Same recommended docstring flip.</p>
+<h3 id="a3-the-status-was-deleted-in-phase-2-subsystem-1a-comment">A.3 The "Status was deleted in Phase 2 Subsystem 1a" comment</h3>
+<p><code>core/enums.py:56-60</code> — a docstring-comment block:</p>
+<pre><code class="language-python"># Note: the legacy `Status` StrEnum was deleted in Phase 2 Subsystem 1a.
+# Use `deriva_ml.execution.state_store.ExecutionStatus` instead — it carries
+# the canonical 7-state lifecycle (Created, Running, Stopped, Failed,
+# Pending_Upload, Uploaded, Aborted) with title-case values that match the
+# catalog Execution.Status column directly.
+</code></pre>
+<p>This is a legitimate "removed; here's where to go" marker. It
+guides anyone grepping for <code>Status</code> in the codebase. But it's also
+a smell that external code (specifically
+<code>deriva-mcp/src/deriva_mcp/tools/execution.py:194</code> and
+<code>deriva-ml-skills/skills/troubleshoot-execution/references/execution-lifecycle.md:310</code>)
+still tries to <code>from deriva_ml.core.definitions import Status</code> and
+will fail at import time.</p>
+<p><strong>Recommendation:</strong> the comment itself is fine. Phase 4 work item:
+update <code>deriva-mcp/src/deriva_mcp/tools/execution.py</code> to use
+<code>ExecutionStatus</code> (or accept that legacy <code>deriva-mcp</code> is being
+phased out per CLAUDE.md). <strong>Severity: low</strong> (out of audit scope
+for <code>deriva-ml</code>).</p>
+<h3 id="a4-execution_from_registry-47-not-legacy-but-private-named">A.4 <code>Execution._from_registry</code> (§4.7) — not legacy, but private-named</h3>
+<p>The Phase 3 audit closing inventory called this out: the underscore
+suggests "private and deletable" but the method is the canonical
+cross-module re-hydration entry. Recommend rename to a public name.</p>
+<h3 id="a5-validate_vocabulary_terms-11-broken-no-consumers-delete">A.5 <code>validate_vocabulary_terms</code> (§1.1) — broken, no consumers, delete</h3>
+<p>Per §1.1, this is exported-but-broken-but-unused. Delete.</p>
+<h3 id="a6-reconcile_pending_leases-call-sites-12">A.6 <code>reconcile_pending_leases</code> call sites (§1.2)</h3>
+<p>The stub itself is a legitimate Phase 3 retirement-with-marker.
+The two call sites are now ceremony. Delete them.</p>
+<h3 id="a7-corebasepy1059-comment-resolve_rid-retrieve_rid-moved-to-ridresolutionmixin">A.7 <code>core/base.py:1059</code> comment "resolve_rid, retrieve_rid moved to RidResolutionMixin"</h3>
+<p>A comment marker noting that two methods moved out of the file.
+Useful archaeology, but the empty marker line "<code># resolve_rid,
+retrieve_rid moved to RidResolutionMixin</code>" plus the "Methods moved
+to mixins:" block at <code>base.py:1677-1683</code> are accumulated
+breadcrumbs from the original mixin extraction. Worth pruning once
+the codebase has stabilized.</p>
+<p><strong>Recommendation:</strong> delete the trailing marker comments at
+<code>base.py:1059, 1677-1683, 782</code>. <strong>LoC: −10.</strong> <strong>Severity: trivial.</strong></p>
+<h3 id="a8-corebasepy1059-pathbuilder-domain_path-table_path-moved-to-pathbuildermixin-comment">A.8 <code>core/base.py:1059</code> <code>pathBuilder, domain_path, table_path moved to PathBuilderMixin</code> comment</h3>
+<p>Same shape as A.7. <strong>LoC: counted above.</strong></p>
+<hr />
+<h2 id="lens-b-privatization">Lens B — Privatization</h2>
+<p>Cross-workspace grep performed against
+<code>/Users/carl/GitHub/DerivaML/{deriva-mcp,deriva-mcp-core,deriva-ml-mcp,deriva-ml-model-template,deriva-skills,deriva-ml-skills}/</code>.</p>
+<h3 id="b1-batchridresult-mixinsrid_resolutionpy34-48-keep-public">B.1 <code>BatchRidResult</code> (<code>mixins/rid_resolution.py:34-48</code>) — keep public</h3>
+<p>Used in <code>tests/core/test_rid_resolution.py</code> and re-exported via
+<code>interfaces.py:81</code>. External grep: zero hits. Return type of
+public <code>resolve_rids</code> method. <strong>Keep public.</strong></p>
+<h3 id="b2-strict_preallocated_rid_tag-constant-mixinsannotationpy45">B.2 <code>STRICT_PREALLOCATED_RID_TAG</code> constant (<code>mixins/annotation.py:45</code>)</h3>
+<p>Tested directly (<code>tests/core/test_strict_preallocated_rid.py:11</code>).
+External grep: zero. The constant is what the Bug E.2 annotation
+machinery uses to flag asset tables. It is the annotation tag URI
+— a string constant that's part of the catalog metadata wire
+format. <strong>Keep public</strong> (annotation tag URIs are documented
+external constants).</p>
+<h3 id="b3-display_tag-visible_columns_tag-visible_foreign_keys_tag">B.3 <code>DISPLAY_TAG</code>, <code>VISIBLE_COLUMNS_TAG</code>, <code>VISIBLE_FOREIGN_KEYS_TAG</code>,</h3>
+<p><code>TABLE_DISPLAY_TAG</code>, <code>COLUMN_DISPLAY_TAG</code> (<code>mixins/annotation.py:35-39</code>)</p>
+<p>Same shape as B.2 — annotation tag URIs. Used internally by the
+mixin. External grep: zero. The annotation builders in
+<code>model/annotations.py</code> (ADR-0007) re-export these. <strong>Keep public.</strong></p>
+<h3 id="b4-vocabularytermhandle-ermrestpy249-326-keep-public">B.4 <code>VocabularyTermHandle</code> (<code>ermrest.py:249-326</code>) — keep public</h3>
+<p>Used as a return type from public <code>lookup_term</code> / <code>add_term</code>
+methods. External grep: zero, but the type is a public return.
+<strong>Keep public.</strong></p>
+<h3 id="b5-validationresult-validationpy90-168-keep-public">B.5 <code>ValidationResult</code> (<code>validation.py:90-168</code>) — keep public</h3>
+<p>Return type of public <code>validate_rids</code>. Cross-workspace grep: zero
+in src code. <strong>Keep public</strong> but covered under §5.8 (should be
+Pydantic).</p>
+<h3 id="b6-validate_rids-validate_vocabulary_terms">B.6 <code>validate_rids</code>, <code>validate_vocabulary_terms</code>,</h3>
+<p><code>validate_execution_config</code> (<code>validation.py:171, 350, 394</code>) —
+mixed</p>
+<ul>
+<li><code>validate_rids</code> — external consumer at
+  <code>deriva-mcp/src/deriva_mcp/tools/catalog.py:716</code>. <strong>Keep
+  public.</strong></li>
+<li><code>validate_vocabulary_terms</code> — broken (§1.1), zero consumers.
+  <strong>Delete.</strong></li>
+<li><code>validate_execution_config</code> — used by <code>execution/runner.py</code> and
+  <code>execution/base_config.py</code>. <strong>Keep public</strong> (internal use, but
+  imported across subsystems).</li>
+</ul>
+<h3 id="b7-pinstatus-schema_cachepy39-58-keep-public">B.7 <code>PinStatus</code> (<code>schema_cache.py:39-58</code>) — keep public</h3>
+<p>Return type of public <code>pin_status</code> method on <code>DerivaML</code>. External
+grep: zero. <strong>Keep public.</strong></p>
+<h3 id="b8-schemacache-schema_cachepy61-204-keep-public">B.8 <code>SchemaCache</code> (<code>schema_cache.py:61-204</code>) — keep public</h3>
+<p>Constructed in <code>core/base.py:303</code> (online init), <code>core/base.py:551</code>
+(<code>refresh_schema</code>), <code>core/base.py:627</code> (<code>pin_schema</code>),
+<code>core/base.py:697</code> (<code>diff_schema</code>), and <code>core/base.py:654</code>
+(<code>unpin_schema</code>). Also constructed in <code>tests/core/test_offline_init.py</code>
+and <code>tests/core/test_schema_pin.py</code>. External grep: zero outside
+deriva-ml. <strong>Keep public</strong> — its construction signature
+(<code>SchemaCache(workspace_root: Path)</code>) is a clean API that
+consumers might want.</p>
+<h3 id="b9-schemadiff-and-the-addedtable-removedtable">B.9 <code>SchemaDiff</code> and the <code>AddedTable</code> / <code>RemovedTable</code> /</h3>
+<p><code>AddedColumn</code> / <code>RemovedColumn</code> / <code>ColumnTypeChange</code> /
+<code>AddedForeignKey</code> / <code>RemovedForeignKey</code> Pydantic models
+(<code>schema_diff.py:18-160</code>) — keep public</p>
+<p>Return type of public <code>diff_schema</code> and <code>pin_schema</code>. Tested
+in <code>tests/core/test_schema_diff.py</code>. External grep: zero.
+<strong>Keep public.</strong></p>
+<h3 id="b10-_compute_diff-schema_diffpy204-310-already-private">B.10 <code>_compute_diff</code> (<code>schema_diff.py:204-310</code>) — already private</h3>
+<p>Underscore-prefixed. Used by <code>pin_schema</code> and <code>diff_schema</code> in
+<code>base.py</code>. <strong>Correct.</strong></p>
+<h3 id="b11-catalogstub-catalog_stubpy25-41-keep-public">B.11 <code>CatalogStub</code> (<code>catalog_stub.py:25-41</code>) — keep public</h3>
+<p>Tested directly. Replaces <code>ErmrestCatalog</code> in offline mode. External
+grep: zero. The class is a public no-op stand-in; users may
+<code>isinstance(ml.catalog, CatalogStub)</code> check it. <strong>Keep public.</strong></p>
+<h3 id="b12-connectionmode-connection_modepy12-32-keep-public">B.12 <code>ConnectionMode</code> (<code>connection_mode.py:12-32</code>) — keep public</h3>
+<p>Re-exported from <code>deriva_ml.__init__</code>. Public param of
+<code>DerivaML.__init__</code>. <strong>Keep public.</strong></p>
+<h3 id="b13-_is_system_schema-_get_domain_schemas">B.13 <code>_is_system_schema</code>, <code>_get_domain_schemas</code></h3>
+<p>(<code>constants.py:54-96</code>) — already private</p>
+<p>Underscore-prefixed. <strong>Correct.</strong></p>
+<h3 id="b14-dry_run_rid-constantspy47">B.14 <code>DRY_RUN_RID</code> (<code>constants.py:47</code>)</h3>
+<p>Used by <code>run_notebook.py:61</code> and internally. External grep: zero.
+<strong>Keep public</strong> (it's a meaningful sentinel value).</p>
+<h3 id="b15-mltable-enum-enumspy101-127">B.15 <code>MLTable</code> enum (<code>enums.py:101-127</code>)</h3>
+<p>Used internally in <code>core/mixins/file.py:127</code>. External grep: zero
+in any of the six sibling workspaces; only <code>tools/validate_schema_doc.py</code>
+imports it.</p>
+<p><strong>Recommendation:</strong> consider <code>_MLTable</code> (underscore-prefix) — it
+is purely an internal enum. <strong>Risk: low</strong> (only one internal
+caller). <strong>LoC: ±0.</strong> <strong>Severity: low.</strong></p>
+<h3 id="b16-logger_name-logging_configpy35-public-constant">B.16 <code>LOGGER_NAME</code> (<code>logging_config.py:35</code>) — public constant</h3>
+<p>Listed in <code>__all__</code>. External grep: zero. <strong>Keep public</strong> (it's a
+documented value, even if not externally consumed today).</p>
+<h3 id="b17-_apply_logger_overrides-logging_configpy202-213-already-private">B.17 <code>_apply_logger_overrides</code> (<code>logging_config.py:202-213</code>) — already private</h3>
+<p>Underscore-prefixed. Used by <code>core/base.py:346</code>. <strong>Correct.</strong></p>
+<h3 id="b18-is_hydra_initialized-logging_configpy57-77">B.18 <code>is_hydra_initialized</code> (<code>logging_config.py:57-77</code>)</h3>
+<p>Listed in <code>__all__</code>. External grep: zero. Used internally by
+<code>configure_logging</code>. The function is genuinely useful as a
+condition predicate.</p>
+<p><strong>Recommendation:</strong> Keep public; it's a meaningful public predicate.</p>
+<h3 id="b19-_table_path-_domain_path-mixinspath_builderpy75-98-already-private">B.19 <code>_table_path</code>, <code>_domain_path</code> (<code>mixins/path_builder.py:75, 98</code>) — already private</h3>
+<p>Underscore-prefixed. <strong>Correct.</strong></p>
+<h3 id="b20-builtintypes-alias-enumspy22-27-keep-external-consumers">B.20 <code>BuiltinTypes</code> alias (<code>enums.py:22-27</code>) — KEEP, external consumers</h3>
+<p>External consumers in <code>deriva-mcp/src/deriva_mcp/tools/schema.py</code>
+and <code>deriva-ml-model-template/src/scripts/_cifar10_schema.py</code>.
+<strong>Keep public.</strong></p>
+<h3 id="b21-rid_part-snapshot_part-rid_regex">B.21 <code>rid_part</code>, <code>snapshot_part</code>, <code>rid_regex</code></h3>
+<p>(<code>constants.py:105-112</code>) — module-level regex constants</p>
+<p>External grep: zero. Used internally by <code>RID</code> type validation.</p>
+<p><strong>Recommendation:</strong> keep public — they are reusable regex
+constants for anyone parsing RID strings. <strong>LoC: ±0.</strong></p>
+<h3 id="lens-b-summary">Lens B summary</h3>
+<p>Privatization candidates with concrete impact:</p>
+<ul>
+<li><code>MLTable</code> enum (<code>enums.py:101</code>) → <code>_MLTable</code> (one internal
+  caller, no external).</li>
+</ul>
+<p>Everything else in <code>core/</code> is either already private or has
+external consumers (or a strong "Keep public" signal as the return
+type of a public method).</p>
+<p><strong>Severity overall: low.</strong> No external consumer of any privatized
+symbol; the cleanup is mechanical.</p>
+<hr />
+<h2 id="lens-c-test-coverage">Lens C — Test coverage</h2>
+<h3 id="per-file-posture">Per-file posture</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">LoC</th>
+<th style="text-align: right;"># tests</th>
+<th>Posture</th>
+<th>State-leakage risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_hydra_zen_config.py</code></td>
+<td style="text-align: right;">538</td>
+<td style="text-align: right;">~30</td>
+<td>Pure unit + mocks (Hydra config patched).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_vocabulary.py</code></td>
+<td style="text-align: right;">289</td>
+<td style="text-align: right;">~13</td>
+<td>Live-catalog; 24 <code>test_ml</code> refs.</td>
+<td>Medium.</td>
+</tr>
+<tr>
+<td><code>test_schema_cache.py</code></td>
+<td style="text-align: right;">217</td>
+<td style="text-align: right;">14</td>
+<td>Pure unit (uses <code>tmp_path</code>).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_file.py</code></td>
+<td style="text-align: right;">199</td>
+<td style="text-align: right;">5</td>
+<td>Live-catalog. Uses <code>deriva_catalog</code> fixture.</td>
+<td>High (creates File rows, no fixture-level cleanup).</td>
+</tr>
+<tr>
+<td><code>test_schema_pin.py</code></td>
+<td style="text-align: right;">195</td>
+<td style="text-align: right;">8</td>
+<td>Mix: 4 offline + 4 live.</td>
+<td>Low (offline) / Medium (live).</td>
+</tr>
+<tr>
+<td><code>test_offline_init.py</code></td>
+<td style="text-align: right;">197</td>
+<td style="text-align: right;">5</td>
+<td>Mix: 2 offline + 3 live.</td>
+<td>Low / Medium.</td>
+</tr>
+<tr>
+<td><code>test_catalog_annotations.py</code></td>
+<td style="text-align: right;">186</td>
+<td style="text-align: right;">8</td>
+<td>Live-catalog; 16 <code>test_ml</code> refs. Idempotent.</td>
+<td>Low — annotations replace cleanly.</td>
+</tr>
+<tr>
+<td><code>test_schema_diff.py</code></td>
+<td style="text-align: right;">190</td>
+<td style="text-align: right;">11</td>
+<td>Pure unit. No catalog.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_connection_mode.py</code></td>
+<td style="text-align: right;">133</td>
+<td style="text-align: right;">7</td>
+<td>Mix: 4 pure unit + 3 live (catalog_manager.reset).</td>
+<td>Low.</td>
+</tr>
+<tr>
+<td><code>test_rid_resolution.py</code></td>
+<td style="text-align: right;">107</td>
+<td style="text-align: right;">4</td>
+<td>Live-catalog (uses <code>catalog_with_datasets</code>).</td>
+<td>Low (read-only).</td>
+</tr>
+<tr>
+<td><code>test_del_no_abort_terminal.py</code></td>
+<td style="text-align: right;">89</td>
+<td style="text-align: right;">5</td>
+<td>Pure unit (SimpleNamespace mocks).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_sort.py</code></td>
+<td style="text-align: right;">88</td>
+<td style="text-align: right;">7</td>
+<td>Pure unit.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_offline_mode_smoke.py</code></td>
+<td style="text-align: right;">84</td>
+<td style="text-align: right;">1</td>
+<td>Live smoke.</td>
+<td>Low.</td>
+</tr>
+<tr>
+<td><code>test_strict_preallocated_rid.py</code></td>
+<td style="text-align: right;">76</td>
+<td style="text-align: right;">7</td>
+<td>Live-catalog. Self-cleaning.</td>
+<td>Low.</td>
+</tr>
+<tr>
+<td><code>test_enums_modernize.py</code></td>
+<td style="text-align: right;">70</td>
+<td style="text-align: right;">9</td>
+<td>Pure unit.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_catalog_stub.py</code></td>
+<td style="text-align: right;">42</td>
+<td style="text-align: right;">4</td>
+<td>Pure unit.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_exceptions.py</code></td>
+<td style="text-align: right;">34</td>
+<td style="text-align: right;">3</td>
+<td>Pure unit.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_basic_tables.py</code></td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">1</td>
+<td>Live-catalog. One assertion.</td>
+<td>Low.</td>
+</tr>
+<tr>
+<td><code>__init__.py</code></td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">—</td>
+<td>Empty.</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Mock-vs-live mix per module:</strong></p>
+<ul>
+<li><strong>Pure unit:</strong> <code>schema_cache.py</code>, <code>schema_diff.py</code>, <code>enums.py</code>,
+  <code>exceptions.py</code>, <code>sort.py</code>, <code>catalog_stub.py</code>, <code>del_no_abort_terminal</code>.
+  All in <code>tests/core/</code>. <strong>Excellent.</strong></li>
+<li><strong>Live catalog smoke:</strong> <code>connection_mode.py</code>, <code>offline_init.py</code>
+  (some), <code>offline_mode_smoke.py</code>, <code>schema_pin.py</code> (some).
+  <strong>Healthy.</strong></li>
+<li><strong>Live catalog full:</strong> <code>vocabulary.py</code>, <code>file.py</code>,
+  <code>catalog_annotations.py</code>, <code>rid_resolution.py</code>,
+  <code>strict_preallocated_rid.py</code>, <code>basic_tables.py</code>. <strong>Healthy.</strong></li>
+<li><strong>Hydra-zen config:</strong> <code>test_hydra_zen_config.py</code> is dense and
+  covers config integration without a real catalog.</li>
+</ul>
+<h3 id="coverage-gaps">Coverage gaps</h3>
+<p><strong>C.1 <code>core/base.py</code>'s <code>clean_execution_dirs</code> / <code>clear_cache</code> /
+<code>list_execution_dirs</code> / <code>get_storage_summary</code> have no tests.</strong></p>
+<p>These four storage-management methods (256 LoC, <code>base.py:1355-1609</code>)
+have zero test coverage. The methods walk the local filesystem and
+call <code>shutil.rmtree</code> (destructive). The lack of coverage is a real
+gap — a bug in <code>clean_execution_dirs(older_than_days=30)</code> could
+silently delete data.</p>
+<p><strong>Recommendation:</strong> add <code>tests/core/test_storage_management.py</code>
+with <code>tmp_path</code> fixtures covering happy path, exclude_rids,
+older_than_days filter, and the error path (PermissionError on
+unlink). <strong>LoC: +200 tests.</strong> <strong>Severity: medium</strong> — destructive
+operations with zero test coverage.</p>
+<p><strong>C.2 <code>DerivaML.from_context</code> has no tests.</strong></p>
+<p><code>base.py:172-216</code> reads a <code>.deriva-context.json</code> file. The
+<code>_find_context_file</code> helper at <code>base.py:1693-1718</code> walks parent
+directories. The "no context file found" error path is reachable
+but untested.</p>
+<p><strong>Recommendation:</strong> add unit tests in <code>tests/core/test_base.py</code>
+(currently absent) — happy path with <code>tmp_path</code> planted JSON,
+walking-up-parents behavior, FileNotFoundError. <strong>LoC: +60.</strong>
+<strong>Severity: low.</strong></p>
+<p><strong>C.3 <code>DerivaML.cite</code> and <code>DerivaML.chaise_url</code> have no tests.</strong></p>
+<p><code>base.py:950-1031</code> — URL construction methods. The
+<code>isinstance(entity, str) and entity.startswith(...)</code> short-circuit
+at line 1017 is non-obvious. The URL replacement logic at line 976
+(<code>replace("ermrest/catalog/", "chaise/recordset/#")</code>) is brittle.</p>
+<p><strong>Recommendation:</strong> add unit tests with a mocked <code>catalog</code>
+returning a known <code>server_uri</code>. <strong>LoC: +40.</strong> <strong>Severity: low.</strong></p>
+<p><strong>C.4 <code>core/mixins/feature.py::feature_values</code> <code>materialize_limit</code>
+exception path has tests at <code>tests/feature/test_feature_values.py</code></strong></p>
+<p>Spot-checked the test file (not in <code>tests/core/</code>, but in the
+sibling subsystem tests). Coverage exists. <strong>No gap.</strong></p>
+<p><strong>C.5 <code>core/mixins/asset.py::find_assets</code> is barely tested.</strong></p>
+<p>The function (<code>asset.py:380-422</code>) has zero direct tests in
+<code>tests/core/test_basic_tables.py</code> (the asset-related core test
+file). Coverage may live in <code>tests/asset/</code>. Spot-check:</p>
+<pre><code>$ grep -rn &quot;find_assets&quot; tests/
+tests/asset/...
+</code></pre>
+<p>Confirmed coverage in <code>tests/asset/</code>. <strong>No gap in core, but the
+gap-checking exercise found the <code>tests/core/test_basic_tables.py</code>
+file has only </strong>1 test** for the entire asset/feature/file
+surface that <code>tests/core/</code> is supposed to cover.</p>
+<p><strong>Recommendation:</strong> rename <code>tests/core/test_basic_tables.py</code> to
+something narrower (it covers only <code>create_asset</code>), or expand it
+to cover the rest of the mixin surface that lives in
+<code>tests/asset/</code>, <code>tests/feature/</code>, <code>tests/dataset/</code>. <strong>LoC: ±0</strong>
+(rename or move).</p>
+<h3 id="state-leakage-warning-load-bearing-finding">State-leakage warning (load-bearing finding)</h3>
+<p><strong>The <code>tests/core/</code> suite's risk profile:</strong></p>
+<p><code>tests/core/</code> has <strong>no <code>conftest.py</code></strong>. All fixtures come from
+the root <code>tests/conftest.py</code>. This is fine — the fixtures
+(<code>test_ml</code>, <code>catalog_manager</code>, etc.) are session-scoped and the
+existence-guard pattern added in PR #99 (the parent of this
+branch) catches state-stale issues.</p>
+<p><strong>Risks specific to <code>tests/core/</code>:</strong></p>
+<p>(a) <strong><code>test_vocabulary.py</code> adds vocabularies named <code>CV1</code>, <code>CV2</code>,
+<code>CV3</code>, <code>CV_Cache</code>, <code>CV_Syn</code>, <code>CV_RemSyn</code>, <code>CV_Handle</code>, etc. without
+cleanup.</strong> Each test calls <code>ml_instance.create_vocabulary(...)</code>
+and creates 5-10 terms. The test_ml fixture resets the catalog
+between tests via <code>catalog_manager.reset()</code>, so the vocabs are
+gone — but if <code>reset()</code> ever fails to clear the new vocabularies
+(they're in the domain schema, not the ML schema), the next test
+sees them. The existence guards in <code>catalog_manager.ensure_*</code>
+catch the case where the ML schema's tables are empty, but they
+don't catch leftover domain-schema vocabulary tables.</p>
+<p><strong>Recommendation:</strong> add an autouse fixture in <code>tests/core/conftest.py</code>
+that calls <code>catalog_manager.reset()</code> between tests in
+<code>test_vocabulary.py</code>, or move to a per-test catalog reset. The
+existence-guard system was added precisely for this kind of
+"cleanup might fail silently" case. <strong>LoC: +20.</strong> <strong>Severity:
+medium</strong> — the leakage risk is real if <code>reset()</code> ever has a bug.</p>
+<p>(b) <strong><code>test_catalog_annotations.py</code> mutates the catalog-level
+annotation surface on the test catalog.</strong> Each test calls
+<code>ml.apply_catalog_annotations(...)</code>. The annotations replace
+cleanly, so test ordering doesn't matter — but the <strong>test catalog
+is left with a different <code>chaise_config</code> than a fresh catalog
+would have.</strong> Subsequent test files using <code>test_ml</code> see the
+modified annotations. The existence-guard pattern doesn't track
+annotation state.</p>
+<p><strong>Recommendation:</strong> unlikely to bite, but worth a comment in
+the test file noting "annotations are session-state; this file
+runs late in the test order intentionally." <strong>LoC: ±0</strong> (comment
+only).</p>
+<p>(c) <strong><code>test_file.py</code> creates File rows and asset types without
+cleanup-on-failure.</strong> The <code>file_table_setup</code> fixture has a
+<code>clean_up()</code> method that does <code>tables["File"].delete()</code> — but if
+that itself fails (DataPathException), the exception is caught
+and printed. The catalog has stale File rows after a failed
+cleanup; the next test sees them.</p>
+<p><strong>Recommendation:</strong> strengthen <code>file_table_setup</code> cleanup to
+explicitly reset the catalog manager on cleanup failure. <strong>LoC:
++5.</strong> <strong>Severity: low</strong> (rare to hit in CI, but it does happen).</p>
+<h3 id="cost-trade-off-per-test-file">Cost trade-off per test file</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Choice</th>
+<th>Cost</th>
+<th>Right?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_schema_cache.py</code> (14 tests, tmp_path)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_schema_diff.py</code> (11 tests, no catalog)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_enums_modernize.py</code> (9 tests, pure)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_sort.py</code> (7 tests, pure)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_catalog_stub.py</code> (4 tests, pure)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_exceptions.py</code> (3 tests, pure)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_del_no_abort_terminal.py</code> (5 tests, mocked)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_hydra_zen_config.py</code> (~30 tests, mocked)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_basic_tables.py</code> (1 test, live)</td>
+<td>Live</td>
+<td>&lt; 10s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_connection_mode.py</code> (7 tests, mix)</td>
+<td>Mix</td>
+<td>&lt; 10s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_offline_init.py</code> (5 tests, mix)</td>
+<td>Mix</td>
+<td>&lt; 10s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_offline_mode_smoke.py</code> (1 test, live)</td>
+<td>Live smoke</td>
+<td>&lt; 10s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_schema_pin.py</code> (8 tests, mix)</td>
+<td>Mix</td>
+<td>&lt; 10s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_rid_resolution.py</code> (4 tests, live)</td>
+<td>Live</td>
+<td>&lt; 10s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_strict_preallocated_rid.py</code> (7 tests, live)</td>
+<td>Live</td>
+<td>&lt; 30s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_catalog_annotations.py</code> (8 tests, live)</td>
+<td>Live</td>
+<td>&lt; 30s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_vocabulary.py</code> (~13 tests, live)</td>
+<td>Live</td>
+<td>30s-60s</td>
+<td>Yes — but uses many vocabs (a)</td>
+</tr>
+<tr>
+<td><code>test_file.py</code> (5 tests, live)</td>
+<td>Live</td>
+<td>30s-60s</td>
+<td>Yes — but cleanup-on-fail issue (c)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Test-runtime headline:</strong> <code>tests/core/</code> is overall <strong>fast</strong> —
+~70% of the test files run without a live catalog. The
+state-leakage risks are limited to four files and are tractable.</p>
+<h3 id="streamlining-recommendations">Streamlining recommendations</h3>
+<p><strong>C.S1 Move <code>test_basic_tables.py</code> (only 1 test) into
+<code>tests/asset/</code> or <code>tests/core/test_asset_creation.py</code>.</strong> 14 LoC,
+1 test that arguably belongs in <code>tests/asset/</code>.</p>
+<p><strong>C.S2 Add <code>tests/core/conftest.py</code></strong> with autouse fixtures for
+vocabulary cleanup (a) and an explicit ordering hint for
+annotation-mutating tests (b). <strong>LoC: +30.</strong></p>
+<p><strong>C.S3 Add <code>tests/core/test_storage_management.py</code></strong> for the four
+storage-management methods (§C.1). <strong>LoC: +200.</strong></p>
+<p><strong>C.S4 Add <code>tests/core/test_base.py</code></strong> for <code>from_context</code>,
+<code>cite</code>, <code>chaise_url</code>. <strong>LoC: +100.</strong></p>
+<p><strong>Net test LoC delta from §C cleanups:</strong>
+- Add: ~+330 LoC of test coverage for currently-uncovered surface.
+- Move: ~−15 LoC (rename <code>test_basic_tables.py</code>).</p>
+<hr />
+<h2 id="lens-d-docsspecadrdocstring-sync">Lens D — Docs/spec/ADR/docstring sync</h2>
+<h3 id="d1-mixin-docstrings-say-domain_schema-singular-attribute-is-domain_schemas-plural">D.1 Mixin docstrings say <code>domain_schema</code> (singular); attribute is <code>domain_schemas</code> (plural)</h3>
+<p>Covered in §4.5. Five files. Pure doc drift.</p>
+<h3 id="d2-workspace-level-claudemd-mentions-loggermixin-that-doesnt-exist">D.2 Workspace-level <code>CLAUDE.md</code> mentions <code>LoggerMixin</code> that doesn't exist</h3>
+<p><code>deriva-ml/CLAUDE.md:234</code>:</p>
+<pre><code>- `LoggerMixin`: Mixin providing `_logger` attribute
+</code></pre>
+<p>Cross-check:</p>
+<pre><code>$ grep -rn &quot;class LoggerMixin\|LoggerMixin&quot; src/
+(no output)
+</code></pre>
+<p>The <code>LoggerMixin</code> class does not exist anywhere in the codebase.
+The convention is to use <code>get_logger(__name__)</code> at module level.
+The CLAUDE.md reference is stale documentation.</p>
+<p><strong>Fix:</strong> delete the <code>LoggerMixin</code> bullet from <code>CLAUDE.md</code>. <strong>LoC:
+−1.</strong> <strong>Severity: low</strong> (CLAUDE.md is meta-doc; a small lie there
+misleads only readers, not callers).</p>
+<h3 id="d3-skill-plugins-reference-deleted-status-enum">D.3 Skill plugins reference deleted <code>Status</code> enum</h3>
+<p>External documentation drift:
+- <code>deriva-ml-skills/skills/troubleshoot-execution/references/execution-lifecycle.md:310</code>
+  shows <code>from deriva_ml.core.definitions import Status</code>.
+- <code>deriva-mcp/src/deriva_mcp/tools/execution.py:194</code> does the
+  same import and accesses <code>Status.pending</code>, <code>Status.running</code>,
+  etc. — all non-existent.</p>
+<p>The <code>core/enums.py:56-60</code> comment block correctly points to
+<code>ExecutionStatus</code> as the replacement. The external skill plugins
+need to be updated.</p>
+<p><strong>Fix:</strong> out of scope for this <code>deriva-ml</code> audit; flag for the
+respective repositories (legacy <code>deriva-mcp</code> is being phased out
+per workspace <code>CLAUDE.md</code>). <strong>LoC: ±0 in deriva-ml.</strong>
+<strong>Severity: low</strong> (out of scope).</p>
+<h3 id="d4-corevalidationpy-docstring-example-for-validate_vocabulary_terms-would-crash">D.4 <code>core/validation.py</code> docstring example for <code>validate_vocabulary_terms</code> would crash</h3>
+<p>Covered in §1.1.</p>
+<h3 id="d5-corebasepy-carries-an-out-of-date-docstring-referring-to-domain_schema-str-as-an-attribute">D.5 <code>core/base.py</code> carries an out-of-date docstring referring to "domain_schema (str)" as an attribute</h3>
+<p><code>core/base.py:103</code>:</p>
+<pre><code>domain_schema (str): Schema name for domain-specific tables and relationships.
+</code></pre>
+<p>The actual attribute is <code>domain_schemas: frozenset[str]</code> (line
+120). Same drift pattern as the mixin docstrings (§4.5). The
+docstring at line 246 (the <code>__init__</code> Args section) does say
+"<code>domain_schemas</code>: Optional set of domain schema names" — but the
+<strong>class</strong> docstring at line 100-115 (under <code>Attributes:</code>) still
+says "<code>domain_schema (str)</code>".</p>
+<p><strong>Fix:</strong> update the class Attributes block to <code>domain_schemas</code>.
+<strong>LoC: ±0.</strong> <strong>Severity: low</strong> (consistency with mixin fix).</p>
+<h3 id="d6-core__init__py-docstring-example-shows-non-existent-default-catalog">D.6 <code>core/__init__.py</code> docstring example shows non-existent default catalog</h3>
+<p><code>core/__init__.py:14-16</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from deriva_ml.core import DerivaML, DerivaMLConfig
+&gt;&gt;&gt; ml = DerivaML('deriva.example.org', 'my_catalog')
+&gt;&gt;&gt; datasets = ml.find_datasets()
+</code></pre>
+<p>This <code>Example:</code> block isn't <code># doctest: +SKIP</code> marked — but
+catalog-construction can't succeed in doctest without
+network/auth. The example would fail if <code>pytest --doctest-modules</code>
+collected it. Check whether the module is excluded from doctest:</p>
+<pre><code>$ grep -n &quot;doctest&quot; pyproject.toml | head -10
+</code></pre>
+<p>The example needs <code># doctest: +SKIP</code> per workspace CLAUDE.md
+("Catalog-dependent examples must carry <code># doctest: +SKIP</code> on the
+first interactive line"). <strong>Fix.</strong> <strong>LoC: +3 (one annotation per
+line).</strong> <strong>Severity: low.</strong></p>
+<h3 id="d7-adr-0006-bag-pipeline-accurately-describes-the-production-path">D.7 ADR-0006 (bag pipeline) accurately describes the production path</h3>
+<p>ADR-0006 (<code>docs/adr/0006-bag-oriented-data-movement.md</code>) defines
+<code>BagCatalogLoader</code> as the unified producer. <code>core/</code> does not
+write to bags; it reads via <code>pathBuilder()</code>. <strong>No drift.</strong></p>
+<h3 id="d8-adr-0007-annotation-builders-public-api-is-consistent-with-coremixinsannotationpy">D.8 ADR-0007 (annotation builders public API) is consistent with <code>core/mixins/annotation.py</code></h3>
+<p><code>apply_annotations()</code> exists at <code>mixins/annotation.py:433-448</code> and
+takes no required args (per ADR-0007's pinned contract). <strong>No drift.</strong></p>
+<h3 id="d9-adr-0008-estimate_bag_size-opt-out-not-relevant-to-core">D.9 ADR-0008 (estimate_bag_size opt-out) — not relevant to core/</h3>
+<p>Skipping.</p>
+<h3 id="d10-docsuser-guideexploringmd-is-accurate">D.10 <code>docs/user-guide/exploring.md</code> is accurate</h3>
+<p>Spot-checked: it says <code>ml.domain_schemas</code> (plural) is a
+<code>frozenset[str]</code>. Matches code. <strong>No drift.</strong></p>
+<h3 id="d11-docsconfigurationoverviewmd-is-accurate">D.11 <code>docs/configuration/overview.md</code> is accurate</h3>
+<p>Says <code>domain_schemas</code> (plural). Matches code. <strong>No drift.</strong></p>
+<h3 id="d12-corevalidationpyvalidationresult__repr__-uses-emojis">D.12 <code>core/validation.py::ValidationResult.__repr__</code> uses emojis</h3>
+<p>Covered in §1.6. CLAUDE.md ("Only use emojis if the user
+explicitly requests it") drift; the file violates the project
+convention.</p>
+<h3 id="d13-coremixinspath_builderpypathbuilder-return-type-docstring-mismatch">D.13 <code>core/mixins/path_builder.py::pathBuilder</code> return type docstring mismatch</h3>
+<p><code>mixins/path_builder.py:62-63</code>:</p>
+<pre><code>Returns:
+    datapath._CatalogWrapper: A new instance of the catalog path builder.
+</code></pre>
+<p>The annotated return type is <code>SchemaWrapper</code> (line 56). The
+docstring says <code>_CatalogWrapper</code>. The actual return value is
+<code>self.catalog.getPathBuilder()</code> which returns <code>_CatalogWrapper</code>.
+The annotation lies; the docstring is correct. Fix the annotation
+to match.</p>
+<p><strong>Fix:</strong> annotation <code>-&gt; SchemaWrapper</code> → <code>-&gt; _CatalogWrapper</code>,
+or fix the import. <strong>LoC: −1 + 1.</strong> <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="persona-summaries">Persona summaries</h2>
+<h3 id="senior-software-engineer">Senior software engineer</h3>
+<p><code>core/</code> is healthy at its bones: the lifecycle of <code>DerivaML</code>,
+<code>SchemaCache</code>, <code>CatalogStub</code>, the mixin composition, the
+exception hierarchy, and <code>ConnectionMode</code> are all clean. The
+mixins compose correctly because every mixin reads only state
+that <code>DerivaML</code> initializes — there's no cross-mixin state
+mutation. The two real concerns are (1) the post-Phase-3
+follow-ups that should ride along with this audit (the
+<code>reconcile_pending_leases</code> ceremony, the broken
+<code>validate_vocabulary_terms</code>, the dead <code>upload_layout.py</code> helpers,
+the singular-vs-plural <code>domain_schema</code> docstrings) and (2) the
+size of <code>base.py</code> (1 718 LoC). The latter is a Phase 4
+candidate; the former is a single targeted PR.</p>
+<h3 id="testing-engineer">Testing engineer</h3>
+<p>Test posture is strong: 70% of <code>tests/core/</code> runs without a live
+catalog, the schema_cache / schema_diff / catalog_stub /
+connection_mode / sort / del_no_abort_terminal tests are all
+pure unit. The gaps are concentrated:
+<code>base.py::clean_execution_dirs</code> and friends (256 LoC) have zero
+coverage and do destructive filesystem operations; <code>from_context</code>,
+<code>cite</code>, <code>chaise_url</code> have zero direct unit tests. The state-leakage
+risk is small but real in <code>test_vocabulary.py</code> (creates many
+domain-schema vocabularies without explicit cleanup-on-failure).
+Adding a single <code>tests/core/conftest.py</code> with an autouse vocab
+cleanup fixture would close the leakage hole.</p>
+<h3 id="technical-writer">Technical writer</h3>
+<p>The big drift is in five mixin docstrings (<code>domain_schema</code> →
+<code>domain_schemas</code>) — singular survived a plural cutover. The
+workspace <code>CLAUDE.md</code> references a non-existent <code>LoggerMixin</code>.
+<code>core/__init__.py</code>'s doctest example needs <code># doctest: +SKIP</code>.
+The "Alias for ... New code should use ColumnDef directly"
+language in <code>core/ermrest.py</code> is misleading — external code uses
+the aliases as the canonical names, and internal <code>deriva-ml</code> code
+follows suit. The broken <code>validate_vocabulary_terms</code> docstring
+example would crash on first call.</p>
+<h3 id="ml-developer-user-the-workflow-author">ML-developer user (the workflow author)</h3>
+<p>The happy path discovers easily: <code>ml = DerivaML(host, cat)</code>,
+<code>ml.find_datasets()</code>, <code>ml.find_workflows()</code>, <code>ml.create_execution(...)</code>.
+Five <code>find_*</code> methods follow the same pattern (datasets,
+workflows, executions, features, assets) — discoverable, consistent.
+The <code>sort=</code> parameter is uniform across <code>find_*</code> per the
+<code>core/sort.py</code> helper. Method naming follows the
+<code>find_/lookup_/list_/create_/add_/delete_</code> convention without
+gaps — the audit's earlier worry about discoverability is
+unfounded; the mixins are well-named.</p>
+<p>Two annoyances: (a) the <code>from_context</code> constructor's docstring
+example uses different syntax than every other method's example
+(literal block vs. <code>&gt;&gt;&gt;</code> doctest); (b) the <code>ValidationResult.__repr__</code>
+returns emoji characters that don't render cleanly in non-UTF8
+terminals.</p>
+<h3 id="dba">DBA</h3>
+<p>The catalog interaction patterns in <code>core/</code> are clean: the
+datapath API is used everywhere, no raw ERMrest URL building
+(the one offender in <code>execution/state_machine.reconcile_with_catalog</code>
+is in a different subsystem). The <code>lookup_workflow_by_url</code> linear
+scan (§2.3) is the only place a server-side filter would clearly
+help — for catalogs with hundreds of workflows it's a real perf
+cost at every <code>create_execution</code> call. The schema-cache /
+schema-diff pin machinery is well-designed: atomic writes, drift
+detection, drained-workspace pre-condition for refresh, all
+testable. Concurrent-access safety is bounded by <code>SchemaCache</code>'s
+single-writer assumption (the file is per-workspace; one process
+per workspace is the deployed shape). The <code>reconcile_pending_leases</code>
+no-op stub is harmless after Phase 3 retirement but the
+unnecessary calls in <code>base.py</code> and <code>mixins/execution.py</code> could
+add a small per-Workspace.execution_state_store() cost on
+<code>DerivaML.__init__</code>.</p>
+<hr />
+<h2 id="ranked-actions-1n">Ranked actions (1–N)</h2>
+<p>Ranked by <code>(impact × confidence) / cost</code>.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Risk</th>
+<th style="text-align: right;">LoC</th>
+<th>Files</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>§1.1</strong> Delete <code>validate_vocabulary_terms</code> from <code>core/validation.py</code> + <code>__all__</code> entry. The function is exported, documented, broken (calls non-existent <code>ml.list_terms</code>), and has no callers.</td>
+<td>low</td>
+<td style="text-align: right;">−42</td>
+<td><code>core/validation.py</code></td>
+<td>Tripwire removal: any caller would hit AttributeError on first use.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>§1.2</strong> Delete the two <code>reconcile_pending_leases</code> call sites in <code>core/base.py:363-379</code> and <code>core/mixins/execution.py:478-491</code>. After Phase 3 audit closure, the function is documented as a no-op. The try/except ceremony around it is ten times the size of its body. Optionally delete <code>execution/lease_orchestrator.py</code> if no other callers remain.</td>
+<td>low</td>
+<td style="text-align: right;">−30 src, −53 if <code>lease_orchestrator.py</code> also goes</td>
+<td><code>core/base.py</code>, <code>core/mixins/execution.py</code>, optionally <code>execution/lease_orchestrator.py</code></td>
+<td>Post-Phase-3 follow-up; the stub exists to keep call sites compiling, but the call sites themselves are now dead weight.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>§1.3</strong> Delete the five dead module-level helpers in <code>core/upload_layout.py</code>: <code>asset_file_path</code> (function), <code>upload_asset</code>, <code>upload_directory</code>, <code>upload_staging_root</code>, <code>normalize_asset_dir</code>. All five have zero callers across all six workspaces. The names <code>asset_file_path</code> and <code>upload_directory</code> survive only in docstrings and external docs; they confuse users into thinking there's a function-form path to upload assets.</td>
+<td>low</td>
+<td style="text-align: right;">~−260</td>
+<td><code>core/upload_layout.py</code></td>
+<td>Biggest single LoC liability in <code>core/</code>; removes a name-collision tripwire.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>§4.5</strong> Fix the singular <code>domain_schema</code> → plural <code>domain_schemas</code> in five mixin docstrings (asset, dataset, feature, file, path_builder) and in <code>core/base.py:103</code> class-level Attributes docstring.</td>
+<td>low</td>
+<td style="text-align: right;">±0</td>
+<td>6 files</td>
+<td>High user-impact: every mixin reader sees this; the singular form is wrong since multi-schema support landed.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>§4.7</strong> Rename <code>Execution._from_registry</code> → <code>Execution.from_registry</code>. The underscore signals private; the only caller is cross-module in <code>core/mixins/execution.py:495</code>. The Phase 3 audit nearly deleted the method due to this naming.</td>
+<td>low</td>
+<td style="text-align: right;">±0</td>
+<td><code>execution/execution.py</code>, <code>core/mixins/execution.py</code></td>
+<td>Audit-safety improvement; reduces false-negative risk in future grep-based audits.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>§1.4 + §4.2</strong> Delete the <code>raise NotImplementedError</code> stub property <code>_dataset_table</code> in <code>DatasetMixin</code>. The base class provides the real property; the stub never fires. Standardize on the class-body annotation pattern used by every other mixin.</td>
+<td>trivial</td>
+<td style="text-align: right;">−5</td>
+<td><code>core/mixins/dataset.py</code></td>
+<td>Consistency cleanup.</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>§5.8</strong> Convert <code>ValidationResult</code> from <code>@dataclass</code> to Pydantic <code>BaseModel</code>. Provides <code>model_dump()</code> for JSON output and aligns with the CLAUDE.md "Class idiom choice" guidance for user-facing return types.</td>
+<td>low</td>
+<td style="text-align: right;">±0 to +5</td>
+<td><code>core/validation.py</code></td>
+<td>Quality-of-life consistency.</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>§1.6</strong> Remove the Unicode emojis (<code>✓</code>, <code>✗</code>, <code>⚠</code>) from <code>ValidationResult.__repr__</code>. Swap to plain text (<code>OK</code>, <code>FAIL</code>, <code>WARN</code>). Aligns with workspace CLAUDE.md "Only use emojis if the user explicitly requests it".</td>
+<td>trivial</td>
+<td style="text-align: right;">±0</td>
+<td><code>core/validation.py</code></td>
+<td>Project-convention compliance.</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>§5.10</strong> Add <code>__all__</code> declarations to the 26 <code>core/</code> modules that lack it. Currently only 4 of 30 modules declare an explicit export surface.</td>
+<td>trivial</td>
+<td style="text-align: right;">+180</td>
+<td>many</td>
+<td>Public-surface clarity.</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>§A.1 + §A.2</strong> Flip the "Alias for ColumnDef. New code should use ColumnDef directly." docstrings in <code>core/ermrest.py:86-112</code> and <code>core/enums.py:22-27</code> to clarify that the aliases ARE the canonical public API; external code uses them, and <code>deriva-ml</code>'s internal code follows suit.</td>
+<td>trivial</td>
+<td style="text-align: right;">±0</td>
+<td>2 files</td>
+<td>Docstring honesty about the surface external code depends on.</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>§C.1</strong> Add <code>tests/core/test_storage_management.py</code> covering <code>clear_cache</code>, <code>clean_execution_dirs</code>, <code>list_execution_dirs</code>, <code>get_storage_summary</code>. These are 256 LoC of destructive filesystem operations with zero coverage.</td>
+<td>low</td>
+<td style="text-align: right;">+200 tests</td>
+<td>new file</td>
+<td>Closes the biggest concrete coverage gap.</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>§D.2</strong> Delete the <code>LoggerMixin</code> line from workspace-level <code>CLAUDE.md</code>. The class doesn't exist; the line is stale documentation.</td>
+<td>trivial</td>
+<td style="text-align: right;">−1</td>
+<td><code>CLAUDE.md</code></td>
+<td>Meta-doc honesty.</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>§D.6</strong> Add <code># doctest: +SKIP</code> annotations to the catalog-construction example in <code>core/__init__.py:14-17</code>. The example references a network catalog and would fail if collected.</td>
+<td>trivial</td>
+<td style="text-align: right;">+3</td>
+<td><code>core/__init__.py</code></td>
+<td>Doctest-collection hygiene.</td>
+</tr>
+<tr>
+<td>14</td>
+<td><strong>§2.3</strong> Replace the linear scan in <code>WorkflowMixin._find_workflow_rid_by_url</code> with a server-side filter. For catalogs with hundreds of workflows this is a per-<code>create_execution</code> cost.</td>
+<td>low</td>
+<td style="text-align: right;">−5</td>
+<td><code>core/mixins/workflow.py</code></td>
+<td>Performance win; consistent with the well-shaped pattern in <code>find_workflows</code>.</td>
+</tr>
+<tr>
+<td>15</td>
+<td><strong>§2.4</strong> Replace <code>lookup_asset</code>'s second filter+fetch with <code>resolve_rid.datapath.entities().fetch()</code>. Saves one catalog round-trip per asset lookup.</td>
+<td>low</td>
+<td style="text-align: right;">−3</td>
+<td><code>core/mixins/asset.py</code></td>
+<td>Performance + consistency win.</td>
+</tr>
+<tr>
+<td>16</td>
+<td><strong>§C.S2</strong> Add <code>tests/core/conftest.py</code> with autouse vocabulary cleanup fixture (closes state-leakage risk in <code>test_vocabulary.py</code>).</td>
+<td>low</td>
+<td style="text-align: right;">+30 tests</td>
+<td>new file</td>
+<td>Closes a latent state-leakage hole.</td>
+</tr>
+<tr>
+<td>17</td>
+<td><strong>§C.4 + §C.2</strong> Add <code>tests/core/test_base.py</code> for the <code>DerivaML.from_context</code>, <code>cite</code>, <code>chaise_url</code>, <code>is_snapshot</code>, <code>catalog_snapshot</code> methods. Currently zero direct coverage.</td>
+<td>low</td>
+<td style="text-align: right;">+100 tests</td>
+<td>new file</td>
+<td>Coverage gap for the most-likely-called methods.</td>
+</tr>
+<tr>
+<td>18</td>
+<td><strong>§B.15</strong> Privatize <code>MLTable</code> enum (<code>core/enums.py:101</code>) → <code>_MLTable</code>. Only one internal caller (<code>core/mixins/file.py:127</code>); no external consumers.</td>
+<td>low</td>
+<td style="text-align: right;">±0</td>
+<td>2 files</td>
+<td>Surface-minimization cleanup.</td>
+</tr>
+<tr>
+<td>19</td>
+<td><strong>§6.2</strong> Factor the importlib-shadowing dance into a single <code>core/_deriva_imports.py</code> module that re-exports the deriva symbols. Currently the same 8-12 lines of import ceremony are copy-pasted across six <code>core/</code> files.</td>
+<td>medium</td>
+<td style="text-align: right;">−60</td>
+<td>6 files</td>
+<td>Reduces boilerplate; one place to maintain when deriva-py adds/removes symbols.</td>
+</tr>
+<tr>
+<td>20</td>
+<td><strong>§D.13</strong> Fix <code>pathBuilder</code> return-type annotation <code>-&gt; SchemaWrapper</code> vs. docstring <code>_CatalogWrapper</code> mismatch in <code>core/mixins/path_builder.py:56-73</code>.</td>
+<td>trivial</td>
+<td style="text-align: right;">±0</td>
+<td><code>core/mixins/path_builder.py</code></td>
+<td>Type-vs-docstring drift fix.</td>
+</tr>
+</tbody>
+</table>
+<p>Items 1+2+3 are the highest-leverage bundle — a single cleanup PR
+removing ~330 LoC of post-Phase-3 cruft plus dead helpers. Items
+4+5+6+7+8+10+12+13+20 are a single docstring/cosmetic PR. Item 9
+is mechanical. Items 11+16+17 should bundle into a "core
+test-strengthening" PR. Item 14, 15, 18 each warrant their own
+narrow PR with focused review. Item 19 is Phase-4-scope.</p>
+<hr />
+<h2 id="follow-up-scope-phase-4-candidates">Follow-up scope (Phase 4 candidates)</h2>
+<h3 id="4a-corebasepy-structural-split">4.A <code>core/base.py</code> structural split</h3>
+<p><code>DerivaML</code> is 1 718 LoC carrying 4 concerns: (a) construction and
+lifecycle (~400 LoC), (b) schema-cache management
+(<code>refresh_schema</code> / <code>pin_schema</code> / <code>unpin_schema</code> / <code>pin_status</code> /
+<code>diff_schema</code>, ~200 LoC), (c) storage management (<code>clear_cache</code> /
+<code>clean_execution_dirs</code> / <code>list_execution_dirs</code> /
+<code>get_storage_summary</code>, ~260 LoC), (d) catalog-level operations
+(<code>create_vocabulary</code> / <code>create_table</code> / <code>define_association</code> /
+<code>chaise_url</code> / <code>cite</code> / <code>apply_catalog_annotations</code> /
+<code>validate_schema</code>, ~500 LoC). After actions 1-3 trim post-Phase-3
+cruft, the natural split is into <code>core/base.py</code> (a), a new
+<code>SchemaCacheMixin</code> or <code>core/schema_management.py</code> (b), and a new
+<code>StorageManagementMixin</code> or <code>core/storage_management.py</code> (c).
+(d) probably stays in <code>base.py</code> because each method is small and
+the concern is narrow.</p>
+<h3 id="4b-coreupload_layoutpy-is-in-the-wrong-subsystem">4.B <code>core/upload_layout.py</code> is in the wrong subsystem</h3>
+<p>After deleting the five dead module-level helpers (§1.3), the
+remaining 12 live helpers in <code>upload_layout.py</code> are all consumed
+by <code>execution/</code> and <code>schema/</code>. The module belongs in <code>execution/</code>
+or in a new <code>upload/</code> subsystem. Moving it out of <code>core/</code> clarifies
+the "what is foundational vs. what is execution-specific"
+boundary.</p>
+<h3 id="4c-the-mixin-host-class-contract-is-implicit">4.C The mixin "host class contract" is implicit</h3>
+<p>Mixins declare class-body type annotations for the attributes
+and methods they expect the host class to provide (e.g.
+<code>mixins/asset.py:55-61</code>), but Python doesn't enforce the
+contract. A <code>Protocol</code> based on the
+existing <code>interfaces.DerivaMLCatalog</code> could be the canonical
+mixin contract — every mixin asserts
+<code>def __init_subclass__(cls): assert issubclass(host, DerivaMLCatalog)</code>
+or similar. This is Phase-4-scope (protocol-based mixin contracts
+need careful design).</p>
+<h3 id="4d-cross-workspace-status-migration-in-legacy-deriva-mcp">4.D Cross-workspace <code>Status</code> migration in legacy <code>deriva-mcp</code></h3>
+<p><code>deriva-mcp/src/deriva_mcp/tools/execution.py:194</code> imports
+<code>Status</code> from <code>deriva_ml.core.definitions</code>. The import fails
+because <code>Status</code> was deleted in Phase 2. The skill plugin
+<code>deriva-ml-skills/skills/troubleshoot-execution/references/execution-lifecycle.md:310</code>
+shows the same pattern in documentation. Legacy <code>deriva-mcp</code> is
+being phased out per workspace <code>CLAUDE.md</code>, so this is "wait for
+the cutover to complete" rather than a fix. Worth flagging
+explicitly so the migration doesn't ship broken.</p>
+<h3 id="4e-workspace-schemacache-concurrency">4.E Workspace SchemaCache concurrency</h3>
+<p><code>SchemaCache</code> writes are atomic via <code>os.replace</code> (good), but
+reads are not coordinated with writes. Two processes opening the
+same workspace simultaneously will both load whichever cache file
+exists at their respective <code>load()</code> time; a write between them
+isn't fatal (the loser's view is just stale), but the drift-warning
+log message may fire spuriously. The current single-writer
+assumption is documented; if multi-process workspace access is on
+the roadmap, the cache needs a lock or version stamp.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

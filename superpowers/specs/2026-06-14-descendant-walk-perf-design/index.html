@@ -1,0 +1,2451 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-06-14-descendant-walk-perf-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Fast descendant-tree walk for nested datasets — Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#fast-descendant-tree-walk-for-nested-datasets-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Fast descendant-tree walk for nested datasets — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem statement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Problem statement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#measured-breakdown-of-the-1543-gets-85-node-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measured breakdown of the ~1,543 GETs (85-node tree)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-fix-three-coordinated-changes-all-in-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The fix — three coordinated changes, all in deriva-ml
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The fix — three coordinated changes, all in deriva-ml">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#part-a-fetch-the-whole-tiny-nesting-dataset-tables-once-assemble-the-tree-client-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part A — fetch the whole (tiny) nesting + Dataset tables once, assemble the tree client-side
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#part-b-_exclude_empty_associations-aggregate-member-presence-not-per-descendant-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part B — _exclude_empty_associations: aggregate member-presence, not per-descendant lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#part-c-memoize-the-descendant-set-per-datasetbagbuilder-op" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part C — memoize the descendant set per DatasetBagBuilder op
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-scope-separate-follow-ups-not-this-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of scope (separate follow-ups, not this change)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-deliverables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Deliverables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-testing-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Testing / verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Testing / verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-correctness-identical-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Correctness — identical results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-get-count-regression-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 GET-count regression guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-live-re-measure-manual-recorded-in-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Live re-measure (manual, recorded in PR)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="fast-descendant-tree-walk-for-nested-datasets-design">Fast descendant-tree walk for nested datasets — Design</h1>
+<p><strong>Date:</strong> 2026-06-14
+<strong>Status:</strong> Approved in brainstorming; spec for implementation.
+<strong>Subproject:</strong> <code>deriva-ml</code></p>
+<h2 id="1-problem-statement">1. Problem statement</h2>
+<p><code>estimate_bag_size(2-277G)</code> takes ~464 s. The just-shipped <code>/schema</code> fix
+(model-built pathBuilder) cut <code>/schema</code> GETs 849 → 8 but barely moved
+wall-clock (510 s → 464 s) — proving <code>/schema</code> was <em>not</em> the time sink.</p>
+<p>Profiling the post-fix run (2026-06-14, live www.eye-ai.org, 2-277G, 84
+descendants / 85 anchors) shows the cost is <strong>client-side descendant-tree
+enumeration</strong>: 1,543 serial catalog GETs, ~0.3 s each.</p>
+<p><strong>Decisive comparison.</strong> <code>generate_dataset_download_spec(2-277G)</code> (the
+client-side work a <em>real</em> bag download does before handing the export to the
+server) costs <strong>1,529 GETs / 366 s</strong> — essentially identical to the estimate.
+So "knowing the bag size" costs ~as much as "preparing to build the bag," and
+the shared cost is the descendant walk via <code>DatasetBagBuilder.anchors_for</code>.
+<strong>Fixing the walk speeds up both <code>estimate_bag_size</code> and every real
+<code>download_dataset_bag</code> on a nested dataset.</strong></p>
+<h3 id="measured-breakdown-of-the-1543-gets-85-node-tree">Measured breakdown of the ~1,543 GETs (85-node tree)</h3>
+<p>Two redundancies plus one genuine-but-reducible cost:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>GETs</th>
+<th>Cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lookup_dataset</code> (total)</td>
+<td>592</td>
+<td>per-node, 4–7× over-called</td>
+</tr>
+<tr>
+<td><code>list_dataset_children</code></td>
+<td>170</td>
+<td>called per-node (manual re-recursion); <strong>each fetches the entire <code>Dataset_Dataset</code> table</strong></td>
+</tr>
+<tr>
+<td>per-descendant member scan</td>
+<td>~765</td>
+<td><code>_exclude_empty_associations</code> calls <code>list_dataset_members()</code> for each of 85 RIDs; each loops every Dataset association table (<code>85 × ~9 assoc</code>)</td>
+</tr>
+<tr>
+<td><code>/schema</code></td>
+<td>8</td>
+<td>already fixed</td>
+</tr>
+</tbody>
+</table>
+<p>Root structural facts (source-confirmed):</p>
+<ul>
+<li><strong><code>_iter_descendant_rids</code> (<code>bag_builder.py:892</code>) manually recurses</strong>,
+  calling <code>Dataset.list_dataset_children()</code> (non-recursive) <strong>once per node
+  (170×)</strong>. But <code>list_dataset_children(recurse=True)</code> <em>already</em> walks the whole
+  subtree from a <strong>single</strong> <code>Dataset_Dataset</code> fetch (<code>dataset.py:2391</code> fetches
+  the full table; <code>find_children</code> recurses in-memory). The manual re-recursion
+  throws that away → 170 full-table fetches instead of 1.</li>
+<li><strong><code>list_dataset_children</code> hydrates a <code>Dataset</code> per child</strong> via
+  <code>lookup_dataset</code> (<code>dataset.py:2405</code>) — one GET per descendant. The bag walk
+  only needs <strong>RIDs</strong>, not <code>Dataset</code> objects.</li>
+<li><strong>The whole walk runs twice</strong> — <code>anchors_for</code> and
+  <code>_exclude_empty_associations</code> each call <code>_iter_descendant_rids</code>.</li>
+<li><strong><code>_exclude_empty_associations</code> (<code>bag_builder.py:824</code>)</strong> then scans members
+  per-descendant: for each of 85 RIDs, <code>list_dataset_members()</code>
+  (<code>dataset.py:1602</code>) loops <code>dataset_table.find_associations()</code> and does a
+  filtered <code>.entities().fetch()</code> per association — <code>85 × ~9 ≈ 765</code> queries —
+  only to compute a <strong>boolean per element type</strong> ("does the tree contain any
+  member of type X?").</li>
+</ul>
+<h2 id="2-goals">2. Goals</h2>
+<ul>
+<li>Cut the <strong>descendant-enumeration</strong> cost from ~760 GETs / ~230 s to <strong>2
+  GETs</strong> (one <code>Dataset_Dataset</code> + one <code>Dataset</code> full-table fetch, ~0.2 s
+  total), and the <strong>member-presence scan</strong> from ~765 GETs to ~9 (Part B). The
+  remaining cost is the genuine per-table estimate queries. Target: drop
+  <code>estimate_bag_size(2-277G)</code> and the bag-download spec-gen from ~460 s to
+  <strong>well under a minute</strong> — re-measure to find the true floor; aim &lt; 30 s.</li>
+<li><strong>No change to results.</strong> Same anchor RID set, same <code>exclude_tables</code>
+  decisions, same estimate dict. Pure de-duplication / query-shape change.</li>
+<li>Benefit is <strong>shared</strong>: <code>estimate_bag_size</code> and <code>download_dataset_bag</code> both
+  improve (they share <code>anchors_for</code> / <code>build_policy</code>).</li>
+<li>The estimate stays <strong>version-pinned</strong> (it already takes <code>version</code> /
+  <code>DatasetSpec</code>); this change must not regress to current-catalog.</li>
+</ul>
+<h2 id="3-the-fix-three-coordinated-changes-all-in-deriva-ml">3. The fix — three coordinated changes, all in deriva-ml</h2>
+<h3 id="part-a-fetch-the-whole-tiny-nesting-dataset-tables-once-assemble-the-tree-client-side">Part A — fetch the whole (tiny) nesting + Dataset tables once, assemble the tree client-side</h3>
+<p><strong>Measured (2026-06-14, www.eye-ai.org):</strong> the <em>entire</em> <code>Dataset_Dataset</code>
+table is <strong>174 rows / 0.08 s</strong> to fetch, and the <em>entire</em> <code>Dataset</code> table is
+<strong>159 rows</strong>. These are dataset-<em>metadata</em> tables (datasets, not data rows), so
+they are inherently small catalog-wide. <strong>One full-table fetch of each replaces
+the ~760 per-node round-trips (~230 s)</strong> the current walk uses to enumerate
+descendants.</p>
+<p>So the right primitive is: <strong>fetch <code>Dataset_Dataset</code> once, build the nesting
+graph in memory, traverse from the root client-side.</strong> No per-node round-trips.</p>
+<ul>
+<li>Add a descendant-RID accessor that:</li>
+<li>fetches the full <code>Dataset_Dataset</code> table once (snapshot-scoped),</li>
+<li>builds <code>parent → [child]</code> adjacency in memory,</li>
+<li>traverses from the root RID (with a <code>visited</code> cycle guard) to produce the
+     full descendant-RID set.</li>
+<li><strong>A1 (recommended):</strong> a new <code>Dataset.list_dataset_children_rids(recurse=True,
+    version=...)</code> returning RIDs, built on this one-fetch-assemble approach.
+    Keeps the public <code>list_dataset_children</code> signature unchanged.</li>
+<li>(<code>list_dataset_children</code> itself can later be refactored to share this
+    one-fetch core and only hydrate <code>Dataset</code> objects when its caller actually
+    needs them — out of scope here, noted for follow-up.)</li>
+<li><code>_iter_descendant_rids</code> calls the RID accessor <strong>once</strong> and returns its set,
+  instead of manual per-node recursion.</li>
+<li><strong>Eliminate <code>lookup_dataset</code> round-trips in the walk:</strong> the walk needs RIDs,
+  not <code>Dataset</code> objects. Where a dataset row <em>is</em> needed (e.g. the root, or for
+  <code>_exclude_empty_associations</code>), resolve it from a <strong>single</strong> full <code>Dataset</code>
+  fetch built into a <code>{rid: row}</code> map, rather than one <code>lookup_dataset</code> GET per
+  RID. (159 rows / one fetch vs. ~592 GETs.)</li>
+</ul>
+<p>Effect: ~760 descendant-enumeration GETs → <strong>2</strong> (one <code>Dataset_Dataset</code>, one
+<code>Dataset</code>), independent of descendant count.</p>
+<blockquote>
+<p>Safety note: fetching the <em>whole</em> table is appropriate <strong>only because these
+specific tables are small</strong> (catalog-wide dataset metadata). Do NOT generalize
+"fetch whole table" to data tables (e.g. <code>Image</code>, 30k rows). The accessor
+documents this assumption; if a catalog ever had a pathological number of
+datasets the count is one cheap <code>cnt(RID)</code> away from a guard, but YAGNI until
+that appears.</p>
+</blockquote>
+<h3 id="part-b-_exclude_empty_associations-aggregate-member-presence-not-per-descendant-lists">Part B — <code>_exclude_empty_associations</code>: aggregate member-presence, not per-descendant lists</h3>
+<p>The method only needs, per Dataset association table <code>Dataset_X</code>, a <strong>boolean</strong>:
+"does any dataset in the tree (root + descendants) have ≥1 member of element
+type X?" It currently computes this by materializing every member of every
+association for every descendant (765 queries).</p>
+<p>Replace with <strong>one membership query per Dataset association table</strong>, scoped to
+the descendant-RID set:</p>
+<ul>
+<li>For each <code>assoc</code> in <code>dataset_table.find_associations()</code>, issue a single
+  query: "does <code>assoc.table</code> have any row whose <code>Dataset</code> FK is in
+  <code>{root} ∪ descendants</code>?" using <code>Dataset.in_(rid_set)</code> + a <code>limit=1</code> (or a
+  <code>cnt(RID)</code> aggregate). One round-trip per association table (~9), independent
+  of descendant count.</li>
+<li>Vocabulary-linked associations stay always-included (unchanged rule).</li>
+</ul>
+<p>Effect: ~765 per-descendant member queries → <strong>~9</strong> (one per Dataset
+association table). This is the <strong>largest</strong> single reduction.</p>
+<blockquote>
+<p>Correctness note: the existing logic adds an element type to
+<code>member_element_types</code> if <em>any</em> descendant has a member of it; the aggregate
+"any row with Dataset in rid_set" computes exactly the same set. The
+<code>limit=1</code>/<code>cnt</code> form returns presence, which is all the boolean needs.</p>
+</blockquote>
+<h3 id="part-c-memoize-the-descendant-set-per-datasetbagbuilder-op">Part C — memoize the descendant set per <code>DatasetBagBuilder</code> op</h3>
+<p><code>anchors_for</code> and <code>_exclude_empty_associations</code> both need the descendant-RID
+set. Compute it <strong>once</strong> and reuse:</p>
+<ul>
+<li>Memoize on the <code>DatasetBagBuilder</code> instance (constructed fresh per
+  <code>aggregate_queries</code> / <code>build</code> in <code>_catalog_bag_builder</code>, so lifetime = one
+  logical operation; no cross-session staleness). Key by <code>dataset.dataset_rid</code>.</li>
+<li><code>anchors_for</code> and <code>_exclude_empty_associations</code> both read the memoized set.</li>
+</ul>
+<p>Effect: the walk runs <strong>once</strong>, not twice.</p>
+<h3 id="out-of-scope-separate-follow-ups-not-this-change">Out of scope (separate follow-ups, not this change)</h3>
+<ul>
+<li><strong>Asset-size-fast estimate mode</strong> (the user's "primary use case is asset
+  size"): a future, separate path that skips exact metadata-row counts and uses
+  server-side <code>Sum(Length)</code> over asset tables. Recorded as a follow-up; the walk
+  fix lands first because it helps <em>every</em> nested-dataset operation, including
+  real downloads.</li>
+<li>Replacing the estimate's per-path RID-union <code>csv</code> queries with server-side
+  <code>cnt(RID)</code> aggregates (ADR-0008 territory; the walk is the dominant cost, not
+  these).</li>
+<li>The <code>list_dataset_children</code> full-table <code>Dataset_Dataset</code> fetch
+  (<code>dataset.py:2391</code>) — Part A reduces it to once per walk; making it a
+  filtered/recursive server query is a further optimization left for later.</li>
+</ul>
+<h2 id="4-deliverables">4. Deliverables</h2>
+<ul>
+<li><code>src/deriva_ml/dataset/dataset.py</code>:</li>
+<li>a descendant-RID accessor (Part A1) —
+    <code>list_dataset_children_rids(recurse=True, version=...)</code> — that fetches the
+    full <code>Dataset_Dataset</code> table once, assembles the nesting graph in memory,
+    and traverses from the root (cycle-guarded), returning RIDs with <strong>zero
+    per-node round-trips</strong>.</li>
+<li><code>src/deriva_ml/dataset/bag_builder.py</code>:</li>
+<li><code>_iter_descendant_rids</code> uses the recursive RID accessor once (Part A);</li>
+<li>a memoized descendant-set helper used by both <code>anchors_for</code> and
+    <code>_exclude_empty_associations</code> (Part C);</li>
+<li><code>_exclude_empty_associations</code> uses one aggregate membership query per
+    Dataset association table over the descendant-RID set (Part B).</li>
+<li>Tests (below).</li>
+<li>Patch/minor version bump after merge.</li>
+</ul>
+<h2 id="5-testing-verification">5. Testing / verification</h2>
+<h3 id="51-correctness-identical-results">5.1 Correctness — identical results</h3>
+<ul>
+<li>The descendant-RID set from the new RID-only accessor equals the set of
+  <code>.dataset_rid</code> from the existing <code>list_dataset_children(recurse=True)</code> on a
+  nested demo dataset.</li>
+<li><code>_exclude_empty_associations</code> returns the <strong>same</strong> excluded-set before and
+  after Part B (capture on a nested demo dataset, compare). This is the
+  load-bearing correctness pin.</li>
+<li><code>estimate_bag_size</code> returns an <strong>identical</strong> dict (total_rows,
+  total_asset_bytes, per-table) before and after, on a nested demo dataset.</li>
+<li><code>anchors_for</code> returns the same anchor list (same RIDs, order may be asserted
+  loosely as a set).</li>
+</ul>
+<h3 id="52-get-count-regression-guard">5.2 GET-count regression guard</h3>
+<p>On a nested demo dataset (≥2 descendants; skip with a clear message if the
+fixture isn't nested), count catalog GETs during <code>estimate_bag_size</code>:</p>
+<ul>
+<li>Assert <code>list_dataset_children</code> / its RID variant is invoked <strong>once</strong> (or a
+  small constant), <strong>not</strong> O(descendants).</li>
+<li>Assert the total catalog GET count does <strong>not scale linearly with descendant
+  count</strong> — compare a deeper-nested vs shallow dataset if the fixture supports
+  it, else assert an absolute small ceiling and document it.</li>
+<li>Specifically assert the per-descendant member-scan pattern is gone: the
+  number of <code>Dataset_X</code> association <code>.fetch()</code> calls is ~O(associations), not
+  O(descendants × associations).</li>
+</ul>
+<h3 id="53-live-re-measure-manual-recorded-in-pr">5.3 Live re-measure (manual, recorded in PR)</h3>
+<p>Re-run <code>estimate_bag_size(2-277G)</code> against www.eye-ai.org; record wall-clock +
+GET count (was 1,543 GETs / 464 s). Confirm totals unchanged (360756 rows /
+18.0 GB / 80 tables / incomplete False). Also re-measure
+<code>generate_dataset_download_spec(2-277G)</code> to confirm the real-download path
+improved too (was 1,529 GETs / 366 s).</p>
+<h2 id="6-risks">6. Risks</h2>
+<ul>
+<li><strong>Aggregate membership semantics (Part B):</strong> the <code>Dataset.in_(rid_set)</code> +
+  presence query must match the old "any descendant has a member" set exactly.
+  Guard: the §5.1 before/after equality test on <code>_exclude_empty_associations</code>.
+  Edge: a very large <code>rid_set</code> could make the URL long — for the catalogs in
+  scope (≤ low hundreds of descendants) this is fine; if a dataset had
+  thousands of descendants the <code>in_</code> list could need chunking (note it, don't
+  pre-build it — YAGNI until a real case appears).</li>
+<li><strong>RID-only accessor correctness (Part A):</strong> must produce the same RID set and
+  respect the version snapshot (it shares <code>find_children</code> + the snapshot
+  catalog, so it does). Guard: §5.1 set-equality test.</li>
+<li><strong>Cycle guard:</strong> <code>find_children</code> already tracks <code>_visited</code>; the RID-only path
+  must keep it (it shares the function).</li>
+<li><strong>Public API:</strong> prefer A1 (new method) over A2 (flag on the public
+  <code>list_dataset_children</code>) to avoid changing a documented signature; the plan
+  finalizes which, but defaults to A1.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2566 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-06-14-portable-bag-csv-contract/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Portable Bag — CSV Contract & Export-Spec Shape (Format B design) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#portable-bag-csv-contract-export-spec-shape-format-b-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Portable Bag — CSV Contract &amp; Export-Spec Shape (Format B design)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-document-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this document exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-1-csv-interpretation-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 1 — CSV interpretation rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 1 — CSV interpretation rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invariants-true-in-every-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invariants (true in every format)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format-a-per-fk-path-csvs-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format A — per-FK-path CSVs (TODAY)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format-b-one-clean-csv-per-table-proposed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format B — one clean CSV per table (PROPOSED)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-2-export-spec-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 2 — Export-spec shape
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 2 — Export-spec shape">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#format-a-export-spec-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format A — export spec TODAY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format-b-export-spec-proposed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format B — export spec PROPOSED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-the-url-limit-is-handled-not-hit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the URL limit is handled, not hit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chaise-relationship" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chaise relationship
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-for-the-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions for the design
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="portable-bag-csv-contract-export-spec-shape-format-b-design">Portable Bag — CSV Contract &amp; Export-Spec Shape (Format B design)</h1>
+<blockquote>
+<p><strong>Status:</strong> design artifact for the fast-estimate + portable-bag
+effort. Describes the <strong>proposed</strong> Format B (one clean CSV per table,
+produced by a RID-set query processor), contrasted against <strong>Format A</strong>
+(the per-FK-path CSVs deriva-py emits today). Grounded in the on-disk
+2-277G eye-ai bag (100 CSVs / ~80 tables, captured 2026-06-14) and the
+deriva-py <code>deriva/bag/catalog_builder.py</code> + <code>deriva/bag/loader.py</code>
+source. Nothing here ships until the deriva-py RID-set processor lands;
+this is the contract the design commits to.</p>
+</blockquote>
+<h2 id="why-this-document-exists">Why this document exists</h2>
+<p>The bag may be consumed three ways, and <strong>two of them are not
+deriva-ml</strong>:</p>
+<ol>
+<li><strong>deriva-ml's own loader</strong> (<code>BagDatabase</code> → SQLite) — tolerant; it
+   already unions multi-file tables by RID.</li>
+<li><strong>A plain <code>bdbag</code> CLI user</strong> — runs <code>bdbag --materialize</code>, then reads
+   <code>data/**/*.csv</code> with pandas / DuckDB / <code>csvkit</code>. Has <strong>no</strong> deriva-ml
+   union logic. This consumer is why the contract must be explicit.</li>
+<li><strong>Chaise</strong> — emits the <em>same export-spec format</em> from a catalog
+   <code>tag:isrd.isi.edu,2016:export</code> annotation (see
+   <a href="#chaise-relationship">§ Chaise relationship</a>). Anything we change in
+   the <code>csv</code> processor shape is a shape Chaise also generates.</li>
+</ol>
+<p>The CSV interpretation rules and the export-spec shape are one contract.
+This document states both, for Format A (today) and Format B (proposed).</p>
+<hr />
+<h2 id="part-1-csv-interpretation-rules">Part 1 — CSV interpretation rules</h2>
+<h3 id="invariants-true-in-every-format">Invariants (true in every format)</h3>
+<p>These are the BagIt / deriva-py engine guarantees. A consumer can rely
+on them regardless of which generation path produced the bag.</p>
+<ul>
+<li><strong>INV1 — One CSV is one RFC-4180 table.</strong> Header row + N data rows,
+  engine-quoted. Never hand-written. <code>[engine: deriva-py]</code></li>
+<li><strong>INV2 — Basename = catalog table name.</strong> <code>Image.csv</code> holds
+  <code>eye-ai:Image</code> rows. The mapping from file to table is the basename,
+  never the directory. <code>[engine: deriva-py]</code></li>
+<li><strong>INV3 — <code>RID</code> is the primary key.</strong> Declared in <code>data/schema.json</code>
+  (which the engine writes as a leading <code>json</code> processor). Every row is
+  uniquely identified by <code>RID</code> within its table. <code>[engine: deriva-py]</code></li>
+<li><strong>INV4 — Columns = the table's projected columns.</strong> <code>RID</code> + scalar
+  columns + FK columns. FK columns hold the <em>referenced</em> value — usually
+  the parent's <code>RID</code>, but for a vocabulary FK the referenced <code>Name</code>
+  (e.g. <code>Asset_Role</code> holds <code>"Input"</code>, not a RID). <code>data/schema.json</code>'s
+  FK definitions are authoritative for which column references what.
+  <code>[engine: deriva-py]</code></li>
+<li><strong>INV5 — Asset bytes are not inline.</strong> An asset table's CSV
+  (<code>Image.csv</code>) carries <code>URL / Length / Filename / MD5</code>; the bytes live
+  under <code>data/assets/...</code>, fetched from <code>fetch.txt</code>. To compute download
+  size without materializing, <code>sum(Length)</code> over the asset CSV. <code>[deriva-ml]</code></li>
+</ul>
+<h3 id="format-a-per-fk-path-csvs-today">Format A — per-FK-path CSVs (TODAY)</h3>
+<p>What's on disk now. Verified against the 2-277G bag: <strong>100 CSV files for
+~80 tables</strong>; <code>Execution.csv</code> and <code>Workflow.csv</code> each appear in <strong>10</strong>
+path-encoded directories, ~13 other tables in 2 each.</p>
+<blockquote>
+<p><strong>A1 — A table's rows may be split across multiple CSV files</strong> in
+different path-encoded directories
+(<code>data/{schema}/{path_chain}/{table}.csv</code>). There is no single
+<code>Image.csv</code>. <code>[engine: deriva-py]</code></p>
+<p><strong>A2 — To get the complete row set for table T, you MUST union and
+dedup:</strong>
+<code>glob   data/**/T.csv          # all files whose basename is T.csv
+concat all matches
+dedup  by RID                 # same RID recurs across FK routes</code>
+deriva-ml's loader does this via SQLite <code>ON CONFLICT</code> (loader.py:498).
+A plain <code>bdbag</code> consumer must implement it themselves. <code>[engine: deriva-py]</code></p>
+<p><strong>A3 — A single T.csv is a PARTIAL, path-scoped slice</strong> — only the rows
+reachable via <em>that</em> FK path. Reading one <code>Image.csv</code> in isolation
+silently undercounts. This is the dangerous-by-default case: it looks
+like it worked. <code>[engine: deriva-py]</code></p>
+<p><strong>A4 — The directory name is provenance, not semantics.</strong> The chain
+(e.g. <code>Dataset_Subject_Dataset_Subject_Observation_Image/</code>) records the
+FK route the engine walked. Do <strong>not</strong> parse it to reconstruct joins —
+use <code>schema.json</code>'s FK definitions. <code>[engine: deriva-py]</code></p>
+</blockquote>
+<p><strong>The portability tax:</strong> A2 + A3 mean a non-deriva-ml consumer who does
+<code>read_csv("data/eye-ai/Image.csv")</code> against <em>one</em> of the two <code>Image.csv</code>
+files gets a silently partial answer. The union contract is real but
+hidden.</p>
+<h3 id="format-b-one-clean-csv-per-table-proposed">Format B — one clean CSV per table (PROPOSED)</h3>
+<p>What the RID-set query processor produces. The rules collapse:</p>
+<blockquote>
+<p><strong>B-CSV1 — Exactly one CSV per table:</strong> <code>data/{schema}/{table}.csv</code>.
+<code>Image.csv</code> is THE complete reachable Image set. <code>[engine: deriva-py, new]</code></p>
+<p><strong>B-CSV2 — No union, no dedup, no glob.</strong> The file <em>is</em> the union,
+already RID-distinct. <code>read_csv("data/eye-ai/Image.csv")</code> is correct
+and complete by construction. <code>[engine: deriva-py, new]</code></p>
+<p><strong>B-CSV3 — Completeness in both directions.</strong> Every row in <code>T.csv</code> is
+reachable from the dataset; every reachable row of T is in <code>T.csv</code>. The
+file is the canonical reachable set for T, path-independent.
+<code>[engine: deriva-py, new]</code></p>
+<p><strong>B-CSV4 — Flat layout.</strong> <code>data/{schema}/{table}.csv</code> — directory is
+the schema namespace only, no path-encoded subdirectories. <code>[engine: deriva-py, new]</code></p>
+</blockquote>
+<p><strong>What B buys the plain consumer:</strong> the dangerous A3 case disappears.
+<code>read_csv</code> of any table file is correct. The bag is self-describing via
+<code>schema.json</code> (INV3/INV4) with no out-of-band union rule to know.</p>
+<h3 id="format-comparison">Format comparison</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Format A (today)</th>
+<th>Format B (proposed)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CSVs for 2-277G</td>
+<td>100 files</td>
+<td>~80 files</td>
+</tr>
+<tr>
+<td>Per table</td>
+<td>1..N files, path-encoded dirs</td>
+<td>exactly 1 file, flat</td>
+</tr>
+<tr>
+<td>Consumer post-processing</td>
+<td>glob + union + <strong>dedup by RID</strong></td>
+<td>none — read the file</td>
+</tr>
+<tr>
+<td>Reading one file in isolation</td>
+<td>silently partial (A3)</td>
+<td>correct (B-CSV2)</td>
+</tr>
+<tr>
+<td>Generation cost (2-277G)</td>
+<td>~280s (deep FK joins)</td>
+<td>~10–30s (RID-set fetches)</td>
+</tr>
+<tr>
+<td>Loader (<code>BagDatabase</code>)</td>
+<td>unions via <code>ON CONFLICT</code></td>
+<td>one file → one table, trivial</td>
+</tr>
+<tr>
+<td>deriva-py work</td>
+<td>none (documentation only)</td>
+<td>the RID-set processor</td>
+</tr>
+<tr>
+<td><code>schema.json</code> (RID = PK)</td>
+<td>required (enables A2 dedup)</td>
+<td>present (already distinct)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="part-2-export-spec-shape">Part 2 — Export-spec shape</h2>
+<p>The export spec is a <code>tag:isrd.isi.edu,2016:export</code>-format document: a
+<code>catalog</code> block with a list of <code>query_processors</code>. deriva-py's ERMrest
+export engine executes it. The shape is what changes between A and B.</p>
+<h3 id="format-a-export-spec-today">Format A — export spec TODAY</h3>
+<p>Per-FK-path emission (<code>catalog_builder.py:558-600</code>,
+<code>for fk_path in self._fk_paths_for(key)</code>). Shape:</p>
+<pre><code class="language-jsonc">{
+  &quot;catalog&quot;: {
+    &quot;query_processors&quot;: [
+      // 1. leading schema dump
+      { &quot;processor&quot;: &quot;json&quot;,
+        &quot;processor_params&quot;: { &quot;query_path&quot;: &quot;/schema&quot;,
+                              &quot;output_path&quot;: &quot;schema&quot; } },
+
+      // 2. anchor table — filtered on its RID list
+      { &quot;processor&quot;: &quot;csv&quot;,
+        &quot;processor_params&quot;: {
+          &quot;query_path&quot;:  &quot;/entity/deriva-ml:Dataset/RID=any(...)&quot;,
+          &quot;output_path&quot;: &quot;deriva-ml/Dataset&quot;,
+          &quot;paged_query&quot;: true } },
+
+      // 3. NON-anchor table reached via ONE FK path — a deep chained join.
+      //    ONE such processor PER FK ROUTE to the table. A table reachable
+      //    via 10 routes =&gt; 10 processors, 10 output_paths, 10 CSVs.
+      { &quot;processor&quot;: &quot;csv&quot;,
+        &quot;processor_params&quot;: {
+          &quot;query_path&quot;:  &quot;/entity/deriva-ml:Dataset/RID=any(...)/Dataset_Subject/Subject/Observation/Image&quot;,
+          &quot;output_path&quot;: &quot;eye-ai/Dataset_Subject_Dataset_Subject_Observation_Image/Image&quot;,
+          &quot;paged_query&quot;: true } },
+      // ... 9 more Image processors for the other 9 routes ...
+
+      // 4. full-vocabulary table — single unfiltered query (the exception)
+      { &quot;processor&quot;: &quot;csv&quot;,
+        &quot;processor_params&quot;: {
+          &quot;query_path&quot;:  &quot;/entity/deriva-ml:Asset_Role&quot;,
+          &quot;output_path&quot;: &quot;deriva-ml/Asset_Role&quot;,
+          &quot;paged_query&quot;: true } },
+
+      // 5. one fetch processor PER ASSET TABLE — reads URL/Length/Filename/MD5
+      { &quot;processor&quot;: &quot;fetch&quot;,
+        &quot;processor_params&quot;: {
+          &quot;query_path&quot;:  &quot;/attribute/eye-ai:Image/url:=URL,length:=Length,filename:=Filename,md5:=MD5,RID&quot;,
+          &quot;output_path&quot;: &quot;assets/Image&quot; } }
+    ]
+  }
+}
+</code></pre>
+<p><strong>The cost driver:</strong> processor #3's <code>query_path</code> is a multi-hop FK join
+the <em>server</em> evaluates — 16–60s each on 2-277G, ~477 of them. That's the
+~280s. The per-route fan-out is also what makes Format A's CSVs
+multi-file.</p>
+<h3 id="format-b-export-spec-proposed">Format B — export spec PROPOSED</h3>
+<p>One RID-set processor per table. deriva-ml's client-side reachability
+engine has already computed <code>{table: set(reachable_RIDs)}</code>, so the spec
+no longer asks the server to join — it asks for explicit RID sets:</p>
+<pre><code class="language-jsonc">{
+  &quot;catalog&quot;: {
+    &quot;query_processors&quot;: [
+      { &quot;processor&quot;: &quot;json&quot;,
+        &quot;processor_params&quot;: { &quot;query_path&quot;: &quot;/schema&quot;, &quot;output_path&quot;: &quot;schema&quot; } },
+
+      // ONE processor per reached table. No FK path in the query — just the
+      // table and its precomputed reachable RID set. The NEW processor mode
+      // chunks the RID list into URL-safe batches internally and APPENDS all
+      // batches to ONE output CSV.
+      { &quot;processor&quot;: &quot;csv-ridset&quot;,                  // &lt;-- new processor mode
+        &quot;processor_params&quot;: {
+          &quot;table&quot;:       &quot;eye-ai:Image&quot;,
+          &quot;rids&quot;:        [&quot;&lt;rid&gt;&quot;, &quot;&lt;rid&gt;&quot;, ...],    // engine chunks @ ~500
+          &quot;output_path&quot;: &quot;eye-ai/Image&quot;,             // ONE flat path
+          &quot;paged_query&quot;: true } },
+
+      // vocabulary full-export is unchanged — still a single unfiltered query
+      { &quot;processor&quot;: &quot;csv&quot;,
+        &quot;processor_params&quot;: { &quot;query_path&quot;:  &quot;/entity/deriva-ml:Asset_Role&quot;,
+                              &quot;output_path&quot;: &quot;deriva-ml/Asset_Role&quot;,
+                              &quot;paged_query&quot;: true } },
+
+      // fetch is UNCHANGED — asset rows come back from the RID-set query with
+      // URL/Length/Filename/MD5 exactly as from the join query
+      { &quot;processor&quot;: &quot;fetch&quot;,
+        &quot;processor_params&quot;: { &quot;query_path&quot;:  &quot;/attribute/eye-ai:Image/url:=URL,length:=Length,filename:=Filename,md5:=MD5,RID&quot;,
+                              &quot;output_path&quot;: &quot;assets/Image&quot; } }
+    ]
+  }
+}
+</code></pre>
+<p><strong>Three changes, scoped:</strong></p>
+<ol>
+<li>
+<p><strong>New <code>csv-ridset</code> processor mode</strong> (<code>base_query_processor.py</code>) —
+   takes <code>{table, rids}</code>, chunks <code>rids</code> into URL-safe batches (~500,
+   matching <code>rid_lease.py</code>'s <code>PENDING_ROWS_LEASE_CHUNK = 500</code>), fetches
+   <code>/entity/{table}/RID=any(batch)</code> per chunk, and <strong>appends every chunk
+   to one CSV</strong> reusing the existing per-page <code>first_page</code>-skips-header
+   append logic in <code>get_as_file</code> (<code>ermrest_catalog.py</code>). <em>This is the
+   only genuinely new machinery.</em> <code>[engine: deriva-py, new]</code></p>
+</li>
+<li>
+<p><strong><code>CatalogBagBuilder</code> emits one <code>csv-ridset</code> per table</strong> instead of
+   <code>for fk_path in self._fk_paths_for(key)</code>. FK-path <em>discovery</em> stays
+   (still need the reachable-table set); only query <em>emission</em> changes.
+   deriva-ml feeds the per-table RID sets. <code>[engine: deriva-py, new]</code> +
+   <code>[deriva-ml]</code> (supplies the RID sets)</p>
+</li>
+<li>
+<p><strong><code>fetch</code> and <code>json</code> processors unchanged.</strong> Verified: fetch reads
+   asset columns from the table directly — the RID-set query returns the
+   same columns as the join query. <code>[engine: deriva-py]</code></p>
+</li>
+</ol>
+<h3 id="why-the-url-limit-is-handled-not-hit">Why the URL limit is handled, not hit</h3>
+<p>A naive <code>RID=any(rid1,...,rid29000)</code> filter exceeds the URL length limit
+(ERMrest is GET-only — no POST-body query). The <code>csv-ridset</code> processor
+avoids this by chunking <em>inside</em> the processor and appending across
+chunks — the same way <code>get_as_file</code> already appends across <em>pages</em> of
+one paged query. The consumer sees one clean CSV; the URL-safety is an
+engine-internal concern. <code>[engine: deriva-py, new]</code></p>
+<hr />
+<h2 id="chaise-relationship">Chaise relationship</h2>
+<p><strong>The bag export spec and Chaise's export annotation are the same wire
+format.</strong> Both are <code>tag:isrd.isi.edu,2016:export</code> query-processor
+documents consumed by the same deriva-py download engine
+(<code>core_utils.py:772</code>). The difference is only the <em>source</em>:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Bag builder</th>
+<th>Chaise</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Spec source</td>
+<td>generated by <code>CatalogBagBuilder</code></td>
+<td>catalog <code>tag:isrd.isi.edu,2016:export</code> annotation</td>
+</tr>
+<tr>
+<td>Trigger</td>
+<td><code>download_dataset_bag</code> / <code>estimate_bag_size</code></td>
+<td>user clicks "Export → BDBag" in the UI</td>
+</tr>
+<tr>
+<td>Processor format</td>
+<td>identical</td>
+<td>identical</td>
+</tr>
+<tr>
+<td>Engine</td>
+<td>deriva-py ERMrest export engine</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Implication for Format B — two distinct surfaces, do not conflate:</strong></p>
+<ul>
+<li><strong>The new <code>csv-ridset</code> processor is opt-in.</strong> Adding a processor
+  <em>mode</em> to the engine does <strong>not</strong> change how existing <code>csv</code> (query_path)
+  processors behave. Chaise's hand-authored / annotation-driven export
+  specs use <code>query_path</code> and keep working unchanged. We are <em>adding</em> a
+  capability, not altering the existing one.</li>
+<li><strong>Chaise export annotations are author-controlled, RID-set is
+  programmatic.</strong> Chaise specs are written by a catalog admin to describe
+  "what a user can export from this table/row" — they don't have a
+  precomputed client-side reachability set, so they stay <code>query_path</code>.
+  The RID-set mode is for <em>programmatic</em> generation where the caller
+  (deriva-ml) already holds the reachable RIDs. The two coexist.</li>
+<li><strong>The new processor SHOULD be usable from a Chaise annotation too</strong> if
+  an author ever wants it, but that's not required for this work — and
+  an annotation author rarely has a RID set to inline. Treat
+  Chaise-annotation use of <code>csv-ridset</code> as out of scope for v1.</li>
+<li><strong><code>schema.json</code> / RID-PK / fetch.txt are shared guarantees.</strong> A Chaise
+  BDBag and a deriva-ml bag carry the same <code>data/schema.json</code> and the
+  same <code>fetch.txt</code> mechanics, so INV1–INV5 hold for both regardless of
+  format. A consumer's reading rules don't need to know which tool
+  produced the bag — only which <em>format</em> (A vs B) it's in, and that's
+  discoverable from the directory shape (path-encoded dirs ⇒ A; flat
+  one-per-table ⇒ B).</li>
+</ul>
+<p><strong>Net:</strong> Format B is additive at the engine layer. Chaise's existing
+export behavior is untouched; deriva-ml opts into the new processor mode
+for its programmatic bags. The cross-cutting risk ("we'd break Chaise
+exports") does not materialize because we add a mode rather than change
+the <code>csv</code> processor's contract.</p>
+<hr />
+<h2 id="open-questions-for-the-design">Open questions for the design</h2>
+<ol>
+<li><strong>Processor name.</strong> <code>csv-ridset</code> vs. extending <code>csv</code> with an optional
+   <code>rids</code> param (when <code>rids</code> present, switch to chunk-append mode). The
+   latter is fewer concepts; the former is clearer in a spec dump.
+   <em>Leaning: extend <code>csv</code> with optional <code>rids</code></em> — keeps one CSV processor,
+   the presence of <code>rids</code> selects the mode.</li>
+<li><strong>Chunk size.</strong> 500 (match <code>rid_lease.py</code>) vs. derive from a URL-length
+   budget. <em>Leaning: start at 500, make it a param.</em></li>
+<li><strong>Empty-table handling.</strong> A reached table with zero reachable RIDs —
+   emit an empty CSV (header only) or skip? Format A emits the file;
+   Format B should match (header-only CSV) so the table set is stable.</li>
+<li><strong>Migration window.</strong> Do existing cached Format-A bags need to be
+   re-fetched, or does the loader read both? The loader reads both today
+   (basename-keyed); a Format-B bag is a strict subset of what the loader
+   already handles. <em>Leaning: no migration needed; loader is
+   format-agnostic.</em></li>
+</ol>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><code>docs/reference/bag-export.md</code> — the shipped Format A behavior (rules
+  B1–B5). This document's Format A section is the consumer-facing
+  restatement of B4.</li>
+<li><code>docs/reference/fk-traversal.md</code> — the FK walk that discovers the
+  reachable-table set (unchanged by Format B; only query <em>emission</em>
+  changes).</li>
+<li><code>docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline.md</code> — the
+  estimate's deliberate bypass; the reachability engine generalizes this
+  bypass into a shared core that <em>also</em> feeds bag generation.</li>
+<li>deriva-py <code>deriva/bag/catalog_builder.py::_build_export_spec</code> — where
+  the per-table emission lives (the change site for Format B).</li>
+<li>deriva-py <code>deriva/transfer/download/processors/query/base_query_processor.py</code>
+  — where the <code>csv-ridset</code> chunk-append mode would live.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

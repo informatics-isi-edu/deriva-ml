@@ -1,0 +1,2593 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-06-02-find-executions-by-dataset-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Find Executions by Dataset — Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#find-executions-by-dataset-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Find Executions by Dataset — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-edge-types-two-sources-of-truth-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two edge types, two sources of truth (the model)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-what-produced-a-dataset-is-determined-precise-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How "what produced a dataset" is determined (precise definition)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layer-0-schema-one-nullable-fk-on-dataset_execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 0 — Schema: one nullable FK on Dataset_Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-1-write-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 1 — Write path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-2-library-extend-find_executions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 2 — Library: extend find_executions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-3-library-simplify-list_input_datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 3 — Library: simplify list_input_datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-4-plugin-two-tool-surfaces-over-one-library-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 4 — Plugin: two tool surfaces over one library method
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-5-plugin-response-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 5 — Plugin: response shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-change-to-call-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior change to call out
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-creation-update-fresh-catalogs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema creation update (fresh catalogs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catalog-deployment-old-data-remediation-existing-catalogs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catalog deployment &amp; old-data remediation (existing catalogs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#blast-radius-verified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Blast radius (verified)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unification-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unification notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-new-test-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing (new test cases)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation order
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="find-executions-by-dataset-design">Find Executions by Dataset — Design</h1>
+<p><strong>Date:</strong> 2026-06-02
+<strong>Status:</strong> Design — pending review (authorship-canonical model)
+<strong>Branch:</strong> <code>feature/find-executions-by-dataset</code>
+<strong>Repos touched:</strong> <code>deriva-ml</code> (library + schema), <code>deriva-ml-mcp-plugin</code> (MCP tools)</p>
+<h2 id="problem">Problem</h2>
+<p>There is no first-class way to answer <strong>"which executions used dataset
+X?"</strong> — neither in the <code>deriva-ml</code> Python library nor in the
+<code>deriva-ml-mcp-plugin</code> MCP surface.</p>
+<p>The existing execution-query surface filters by <strong>workflow</strong>,
+<strong>workflow type</strong>, or <strong>status</strong> only:</p>
+<ul>
+<li>Library: <code>DerivaML.find_executions(workflow, workflow_type, status, sort)</code>
+  — no dataset parameter.</li>
+<li>Plugin tools: <code>deriva_ml_list_executions</code>,
+  <code>deriva_ml_find_workflow_executions</code>, <code>deriva_ml_find_experiments</code>,
+  <code>deriva_ml_list_execution_{children,parents}</code>,
+  <code>deriva_ml_get_lineage</code> — none takes a dataset.</li>
+</ul>
+<p>Today the only way to get the answer is a hand-built ERMrest query
+against the <code>Dataset_Execution</code> association table — the
+"drop to <code>query_attribute</code>" anti-pattern the getting-started guide warns
+against. "Which experiments used this data?" is a headline provenance
+question for a reproducibility platform.</p>
+<h2 id="two-edge-types-two-sources-of-truth-the-model">Two edge types, two sources of truth (the model)</h2>
+<p>A dataset relates to an execution in exactly two ways, and the catalog
+<strong>already records each one in its own authoritative place</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Edge</th>
+<th>Meaning</th>
+<th>Sole source of truth</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Output</strong></td>
+<td>execution <em>produced</em> version V of the dataset</td>
+<td><code>Dataset_Version.Execution</code> — the per-version author FK</td>
+</tr>
+<tr>
+<td><strong>Input</strong></td>
+<td>execution <em>consumed</em> the dataset</td>
+<td><code>Dataset_Execution</code> association row</td>
+</tr>
+</tbody>
+</table>
+<p>This is the key design decision (resolving an earlier dual-source-of-truth
+concern): <strong>we keep these as two separate, non-overlapping sources rather
+than mirroring output edges into a <code>Role</code> column on <code>Dataset_Execution</code>.</strong></p>
+<ul>
+<li><code>Dataset_Version.Execution</code> stays the <strong>single</strong> source of truth for
+  "who produced version V." <code>get_lineage</code> already uses it
+  (<code>execution.py:865</code>); <code>_producer_of_dataset</code> already reads it
+  (<code>execution.py:1032</code>). The <code>DatasetHistory</code> value object
+  (<code>dataset/aux_classes.py:206</code>) already models it: <code>dataset_rid</code>,
+  <code>dataset_version</code>, <code>version_rid</code>, and <code>execution_rid</code> (nullable — <code>None</code>
+  when the version was created outside an execution, e.g. curated
+  datasets like <code>2-7P5P</code> whose 29 version rows are all null).</li>
+<li><code>Dataset_Execution</code> becomes <strong>input-only by definition.</strong> Every row is a
+  consume edge. It gains nothing but a nullable <code>Dataset_Version</code> FK to
+  record <em>which version</em> was consumed.</li>
+</ul>
+<p>No <code>Role</code> column. No overlap. No drift. No sync burden. The producer
+question is answered by version authorship; the consumer question by the
+association table; "any" is their union.</p>
+<p><strong>Principle:</strong> provenance is queryable catalog data, never reconstructed
+by parsing a config file. The <code>configuration.json</code> asset records what was
+<em>requested at launch</em>; it is not consulted on the read path. (It is read
+exactly once, at migration time, as a best-effort backfill source — see
+remediation.)</p>
+<h2 id="how-what-produced-a-dataset-is-determined-precise-definition">How "what produced a dataset" is determined (precise definition)</h2>
+<p><code>Dataset_Version</code> is a <strong>per-version</strong> table: one row per
+<code>(dataset, version)</code>, each row's <code>Execution</code> FK = <em>"RID of the execution
+that produced this version"</em> (nullable; <code>null</code> = produced outside an
+execution / curated / dev row).</p>
+<p>So "executions that produced dataset X" = the set of non-null
+<code>Dataset_Version.Execution</code> values across X's version history (read via
+<code>DatasetHistory</code>). It is naturally <strong>per-version</strong>:</p>
+<ul>
+<li><code>dataset_role="output"</code>, no version pin → <strong>every</strong> execution that
+  authored <strong>any</strong> version of X.</li>
+<li>version pinned (via <code>DatasetSpec</code>, below) → the execution that authored
+  <strong>that</strong> version.</li>
+</ul>
+<p><code>_producer_of_dataset</code>'s "highest-semver version" rule stays an internal
+convenience ("the current producer"); it is <strong>not</strong> the tool's output
+semantics.</p>
+<h2 id="design">Design</h2>
+<h3 id="layer-0-schema-one-nullable-fk-on-dataset_execution">Layer 0 — Schema: one nullable FK on <code>Dataset_Execution</code></h3>
+<p>Add a single column to <code>deriva-ml:Dataset_Execution</code>:</p>
+<ul>
+<li><strong><code>Dataset_Version</code></strong> — nullable FK to <code>Dataset_Version.RID</code>, recording
+  the exact version consumed by this input edge.</li>
+</ul>
+<p>The existing <code>Dataset</code> FK stays (version-agnostic "which dataset"). No
+<code>Role</code> column. In <code>schema/create_schema.py</code>, add the column + FK to the
+<code>Dataset_Execution</code> definition (near line 170); in <code>schema/annotations.py</code>
+(<code>visible_foreign_keys</code>, ~line 525) add the new FK so it renders in
+Chaise. <code>demo_catalog.py</code> inherits the change for tests.</p>
+<h3 id="layer-1-write-path">Layer 1 — Write path</h3>
+<ul>
+<li><strong><code>create_dataset</code></strong> (output): <strong>stops</strong> writing a <code>Dataset_Execution</code>
+  row (<code>dataset.py:347</code>). Output provenance is recorded <strong>only</strong> via
+  <code>Dataset_Version.Execution</code> (which <code>_insert_dataset_versions</code> already
+  writes). This removes the redundant write that caused the dual-source
+  concern. <em>(Implementation check: confirm no reader depends on output
+  datasets appearing in a <code>Dataset_Execution</code> scan — see Blast radius;
+  <code>Dataset.list_executions</code> is the one affected, and the change aligns it
+  with its own docstring.)</em></li>
+<li><strong><code>add_input_dataset(rid, version=…)</code></strong> (input): gains an optional
+  <code>version</code>; writes the <code>Dataset_Execution</code> row with the <code>Dataset_Version</code>
+  FK populated when known. <code>split_dataset</code> (the canonical caller) passes
+  the source version it already resolved.</li>
+<li><strong>Config-declared inputs</strong> (<code>ExecutionConfiguration.datasets</code>): the
+  required <code>DatasetSpec.version</code> is written to the <code>Dataset_Version</code> FK at
+  materialization time.</li>
+</ul>
+<p>Backward compatible: <code>add_input_dataset(rid)</code> still works, leaving
+<code>Dataset_Version=null</code>.</p>
+<h3 id="layer-2-library-extend-find_executions">Layer 2 — Library: extend <code>find_executions</code></h3>
+<p>Extend the existing <code>DerivaML.find_executions</code> (in
+<code>core/mixins/execution.py</code>) rather than adding a method — keeps the
+library minimal and the dataset filter composes with the existing ones.</p>
+<pre><code class="language-python">def find_executions(
+    self,
+    workflow=None,
+    workflow_type=None,
+    status=None,
+    dataset=None,            # NEW: RID | DatasetSpec
+    dataset_role=&quot;any&quot;,      # NEW: &quot;input&quot; | &quot;output&quot; | &quot;any&quot;
+    sort=None,
+) -&gt; Iterable[&quot;ExecutionRecord&quot;]
+</code></pre>
+<p><strong>The <code>dataset</code> argument is <code>RID | DatasetSpec</code></strong> — reusing the existing
+<code>DatasetSpec</code> value object (<code>dataset/aux_classes.py:312</code>) that
+<code>ExecutionConfiguration.datasets</code> already uses, so a spec from an
+execution config can be passed straight in:</p>
+<ul>
+<li><strong>bare RID</strong> → "this dataset, <strong>any</strong> version."</li>
+<li><strong><code>DatasetSpec</code></strong> → pins the version (<code>spec.rid</code> + <code>spec.version</code>). The
+  spec's bag-download fields (<code>materialize</code>, <code>timeout</code>, <code>exclude_tables</code>,
+  <code>fetch_concurrency</code>, <code>description</code>) are <strong>ignored</strong> by the filter; only
+  <code>rid</code> + <code>version</code> are read. Documented explicitly.</li>
+</ul>
+<p>There is <strong>no separate <code>dataset_version</code> scalar</strong> — version travels
+inside the <code>DatasetSpec</code>, eliminating incoherent scalar combinations.</p>
+<p><strong>Filter mechanics</strong> (pure relational reads — no role derivation, no
+config parsing):</p>
+<ol>
+<li>Resolve <code>dataset</code> to <code>(rid, version|None)</code>.</li>
+<li>By role:</li>
+<li><code>"input"</code> → <code>Dataset_Execution</code> rows where <code>Dataset == rid</code>
+     (and <code>Dataset_Version == version</code> when pinned).</li>
+<li><code>"output"</code> → executions from <code>Dataset_Version.Execution</code> across the
+     dataset's history (filtered to the pinned version when set) — read
+     via <code>DatasetHistory</code>.</li>
+<li><code>"any"</code> → union of the two.</li>
+<li>Intersect the resulting execution set with the other active filters
+   (<code>workflow</code> / <code>workflow_type</code> / <code>status</code>), same pattern as
+   <code>workflow_type</code> today.</li>
+</ol>
+<p><strong>Guardrails:</strong> <code>dataset_role</code> ≠ <code>"any"</code> without <code>dataset</code> → <code>ValueError</code>.</p>
+<h3 id="layer-3-library-simplify-list_input_datasets">Layer 3 — Library: simplify <code>list_input_datasets</code></h3>
+<p>With <code>Dataset_Execution</code> now input-only, <code>list_input_datasets()</code> no
+longer needs to <em>subtract</em> produced datasets (its current
+<code>_producer_of_dataset</code> exclusion) — every row is already an input. It
+becomes a plain read of <code>Dataset_Execution</code>. Public signature unchanged;
+internals simplified. (Legacy catalogs: the migration removes the stale
+output rows so this holds for historical data too — see remediation.)</p>
+<h3 id="layer-4-plugin-two-tool-surfaces-over-one-library-method">Layer 4 — Plugin: two tool surfaces over one library method</h3>
+<p>Mirrors the precedent where <code>deriva_ml_list_executions(workflow_rid=...)</code>
+and <code>deriva_ml_find_workflow_executions(...)</code> both wrap
+<code>ml.find_executions</code> via the shared <code>_list_executions_impl</code> helper yet
+exist as two tools — shaped by LLM intent, not 1:1 with methods.</p>
+<p>The MCP wire surface can't pass a Python <code>DatasetSpec</code>, so the tools take
+scalars and construct the spec internally:</p>
+<p><strong>A. Extend</strong> <code>deriva_ml_list_executions</code> with <code>dataset: str | None</code>,
+<code>dataset_role: str = "any"</code>, <code>dataset_version: str | None</code>. When
+<code>dataset_version</code> is set, the tool builds <code>DatasetSpec(rid=dataset,
+version=dataset_version)</code>; otherwise passes the bare RID. When <code>dataset</code>
+is <code>None</code>, behavior/shape are identical to today.</p>
+<p><strong>B. Add</strong> <code>deriva_ml_find_dataset_executions(dataset_rid,
+dataset_role="any", dataset_version=None, status=None, limit, after_rid,
+preflight_count, sort)</code>. Body shape identical to
+<code>find_workflow_executions</code>; constructs the spec and calls
+<code>_list_executions_impl</code>. Docstring opens with "Distinct from
+<code>deriva_ml_list_executions(dataset=...)</code>".</p>
+<p>Both share <code>_list_executions_impl</code>, so wire shapes cannot drift.</p>
+<p><em>(The scalar <code>dataset</code> + <code>dataset_version</code> on the MCP boundary is a
+transport concession — the typed <code>DatasetSpec</code> lives in the Python API.
+The tool layer immediately lifts the scalars into a spec, so the
+"incoherent scalar combination" risk is confined to one well-tested
+construction site, not spread across the API.)</em></p>
+<h3 id="layer-5-plugin-response-shape">Layer 5 — Plugin: response shape</h3>
+<p>Introduce <code>DatasetExecutionSummary</code> extending <code>ExecutionSummary</code> with two
+derived fields:</p>
+<ul>
+<li><code>dataset_role: "input" | "output"</code> — <strong>which source the edge came
+  from</strong> (input = <code>Dataset_Execution</code>; output = <code>Dataset_Version</code>
+  authorship), not a stored column.</li>
+<li><code>dataset_version: str | None</code> — the version. For input edges, read from
+  the <code>Dataset_Execution.Dataset_Version</code> FK (null for legacy/no-version
+  <code>add_input_dataset</code> links). For output edges, the authored version from
+  <code>DatasetHistory</code>. No extra catalog fetch beyond the rows already read.</li>
+</ul>
+<p>Used only on the dataset-scoped paths (<code>find_dataset_executions</code> always;
+<code>list_executions</code> only when <code>dataset</code> is set). Plain <code>ExecutionSummary</code>
+otherwise. Wire shape:</p>
+<pre><code class="language-json">{&quot;executions&quot;: [{&quot;rid&quot;: &quot;...&quot;, &quot;workflow_rid&quot;: &quot;...&quot;, &quot;status&quot;: &quot;...&quot;,
+  &quot;description&quot;: &quot;...&quot;, &quot;start_time&quot;: &quot;...&quot;, &quot;stop_time&quot;: &quot;...&quot;,
+  &quot;duration&quot;: &quot;...&quot;, &quot;dataset_role&quot;: &quot;input&quot;,
+  &quot;dataset_version&quot;: &quot;2.0.0&quot;}],
+ &quot;count&quot;: N, &quot;truncated&quot;: false, &quot;next_after_rid&quot;: null}
+</code></pre>
+<h2 id="behavior-change-to-call-out">Behavior change to call out</h2>
+<p><code>Dataset.list_executions</code> (<code>dataset.py:2426</code>) is documented as <em>"all
+executions that used this dataset as </em><em>input</em><em>"</em> but currently scans all
+<code>Dataset_Execution</code> rows — which today <strong>include</strong> the output rows
+<code>create_dataset</code> writes. Making the table input-only (Layer 1) <strong>fixes
+this method to match its own docstring</strong>: it stops returning the
+producing execution. This is an intentional, documented behavior change;
+callers wanting producers use the output side of <code>find_executions</code> /
+<code>get_lineage</code>.</p>
+<h2 id="schema-creation-update-fresh-catalogs">Schema creation update (fresh catalogs)</h2>
+<p><code>create_schema.py</code>: add the nullable <code>Dataset_Version</code> column + FK to the
+<code>Dataset_Execution</code> definition. <code>annotations.py</code>: add the FK to
+<code>visible_foreign_keys</code>. Fresh catalogs are version-aware with no
+migration; <code>demo_catalog.py</code> (test suite) inherits it.</p>
+<h2 id="catalog-deployment-old-data-remediation-existing-catalogs">Catalog deployment &amp; old-data remediation (existing catalogs)</h2>
+<p>No migration framework exists; changes are applied imperatively via
+standalone scripts in <code>scripts/</code>. Ship one idempotent script,
+<code>scripts/migrate_dataset_execution_version.py</code>, modeled on
+<code>scripts/migrate_workflow_types.py</code> (same shape: <code>(hostname, catalog_id)</code>
+args, <code>--dry-run</code>, <code>--schema</code>, <code>check_preconditions</code>, per-step <code>[SKIP]</code>
+guards, verification, "already complete" short-circuit).</p>
+<p>Steps:</p>
+<ol>
+<li><strong>Preconditions:</strong> report whether the <code>Dataset_Version</code> column/FK
+   exists and count rows. Short-circuit if migrated.</li>
+<li><strong>Add column + FK</strong> (idempotent, additive, nullable — no reader breaks
+   at this step).</li>
+<li><strong>Remove stale output rows</strong> — delete <code>Dataset_Execution</code> rows that
+   correspond to an <em>output</em> edge (the dataset has a <code>Dataset_Version</code>
+   authored by that execution). These are the redundant rows
+   <code>create_dataset</code> historically wrote; output provenance is preserved in
+   <code>Dataset_Version.Execution</code>, so deletion loses no information and
+   de-duplicates the model. <strong>This is the data-remediation core.</strong></li>
+<li><strong>Backfill input <code>Dataset_Version</code></strong> — best-effort for the remaining
+   (input) rows:</li>
+<li><strong>Config-declared inputs:</strong> resolve the consumed version from the
+     execution's <code>configuration.json</code> (<code>DatasetSpec.version</code>) — read
+     <strong>at migration time only</strong>, never on the steady-state read path.</li>
+<li><strong><code>add_input_dataset</code> links:</strong> <strong>irreducibly <code>null</code></strong> — no version
+     was ever recorded. Reported in the summary as the known gap.</li>
+<li><strong>Verify:</strong> no output rows remain in <code>Dataset_Execution</code>; report the
+   count of <code>Dataset_Version</code> nulls by cause (legacy <code>add_input_dataset</code>
+   vs. unreadable config) so the residual is visible, not silent.</li>
+</ol>
+<p><strong>Deployment order — dev first, then production:</strong></p>
+<ol>
+<li><code>--dry-run</code> on <strong><code>dev.eye-ai.org</code> / eye-ai</strong> (the catalog with the
+   48-link <code>2-7P5P</code> history we inspected); review.</li>
+<li>Real run on <strong>dev</strong>; validate end-to-end with the new tools
+   (<code>find_dataset_executions</code> on <code>2-7P5P</code>; confirm a <code>split_dataset</code>-origin
+   input row shows <code>dataset_version=null</code>; confirm no output rows linger).</li>
+<li><code>--dry-run</code> then real run on <strong>production</strong> (<code>eye.rosci.org</code> / prod
+   eye-ai) — same script, same idempotency.</li>
+<li>Re-runnable: the precondition short-circuit makes a second run a no-op.</li>
+</ol>
+<p><strong>Sequencing constraint:</strong> deploy schema + remediation <strong>before</strong> the
+library write-path upgrade on any client writing to these catalogs.
+Nullable column ⇒ un-upgraded writers stay compatible during rollout.</p>
+<p><strong>eye-ai-ml repo note:</strong> eye-ai keeps catalog migrations under
+<code>eye-ai-ml/scripts/catalog_management/</code>. The generic script lives in
+<code>deriva-ml/scripts/</code>; a thin eye-ai wrapper pinning the two hosts/catalogs
+may live in <code>catalog_management/</code> if the team prefers.</p>
+<h2 id="blast-radius-verified">Blast radius (verified)</h2>
+<ul>
+<li><strong>Writers (2):</strong> <code>create_dataset</code> (<code>dataset.py:347</code>) — <em>stops</em> writing
+  the output row; input path (<code>execution.py:658</code>, <code>add_input_dataset</code> at
+  <code>2007</code>) — writes the <code>Dataset_Version</code> FK.</li>
+<li><strong>Readers (4):</strong> <code>_helpers.list_input_datasets</code> (simplified — no more
+  authorship subtraction), <code>Dataset.list_executions</code> (<code>dataset.py:2426</code>,
+  now correctly input-only — see Behavior change), <code>DatasetBag.list_executions</code>
+  (<code>dataset_bag.py:906</code>, input-only offline mirror; unchanged query),
+  the new filter. None breaks on an added column.</li>
+<li><strong><code>get_lineage</code> / <code>_producer_of_dataset</code>:</strong> already read
+  <code>Dataset_Version.Execution</code> for producers — <strong>unaffected</strong> and now the
+  sole producer source, exactly as intended.</li>
+<li><strong>Bag export / offline ORM:</strong> whole-table FK traversal
+  (<code>dataset.py:2517</code>) + reflection-based SQLite ORM ⇒ new column
+  round-trips automatically.</li>
+<li><strong><code>catalog.py</code>:</strong> only <em>excludes</em> <code>Dataset_Execution</code> from asset-table
+  discovery — untouched.</li>
+</ul>
+<h2 id="unification-notes">Unification notes</h2>
+<ul>
+<li><strong>Input ↔ output datasets:</strong> unified at the <em>query</em> level —
+  <code>find_executions(dataset=, dataset_role=)</code> answers both from their
+  respective canonical sources, with <code>DatasetSpec</code> pinning version on
+  either side. Storage stays appropriately separate (authorship vs.
+  association).</li>
+<li><strong>Output datasets ↔ output assets:</strong> API-surface symmetry only (an
+  asset-keyed <code>find_executions(asset=…)</code> twin is the natural follow-on);
+  different entity kinds keep different tables. Deferred.</li>
+<li><strong><code>list_*</code> accessor unification:</strong> deferred (deliberate naming symmetry
+  with the dataset-hierarchy API; future ADR).</li>
+</ul>
+<h2 id="testing-new-test-cases">Testing (new test cases)</h2>
+<p><strong>Schema creation:</strong> fresh catalog's <code>Dataset_Execution</code> has the nullable
+<code>Dataset_Version</code> column + FK to <code>Dataset_Version</code>.</p>
+<p><strong>Write path:</strong>
+- <code>create_dataset</code> writes <strong>no</strong> <code>Dataset_Execution</code> row; output
+  provenance present only via <code>Dataset_Version.Execution</code>.
+- <code>add_input_dataset(rid, version=v)</code> writes the row with <code>Dataset_Version</code>
+  set; <code>add_input_dataset(rid)</code> leaves it null (back-compat).
+- <code>split_dataset</code> records its source input with the resolved version.</p>
+<p><strong>Library read path:</strong>
+- <code>find_executions(dataset=rid)</code> (any version) returns inputs + outputs
+  (union); <code>dataset_role="input"|"output"</code> each return the correct subset
+  from the correct source.
+- <code>find_executions(dataset=DatasetSpec(rid, version))</code> filters both sides
+  to that version; bag-download fields on the spec are ignored.
+- <code>ValueError</code> when <code>dataset_role</code> given without <code>dataset</code>.
+- Composition with <code>workflow_type</code> / <code>status</code>.
+- <code>list_input_datasets()</code> returns only inputs (regression: a dataset the
+  execution produced does <strong>not</strong> appear), via the simplified read.</p>
+<p><strong>Migration script</strong> (seeded demo catalog):
+- Idempotency (second run no-op); <code>--dry-run</code> makes no changes.
+- After run: <strong>no output rows remain</strong> in <code>Dataset_Execution</code>; input rows
+  from config have a <code>Dataset_Version</code>; an <code>add_input_dataset</code>-origin row
+  is null and counted in the residual summary.
+- Stale-output-row deletion targets exactly the authored-version rows and
+  leaves input rows intact.</p>
+<p><strong>Plugin:</strong>
+- Both surfaces share-shape via <code>_list_executions_impl</code>.
+- <code>DatasetExecutionSummary</code> carries <code>dataset_role</code> + <code>dataset_version</code>
+  with <strong>no extra catalog/Hatrac fetch</strong> (asserted).
+- Plain <code>ExecutionSummary</code> when <code>dataset</code> absent (existing-caller guard).
+- <code>dataset_version</code> scalar lifts into a <code>DatasetSpec</code> correctly; preflight;
+  <code>_error_envelope</code> on bad RID.</p>
+<h2 id="implementation-order">Implementation order</h2>
+<ol>
+<li><strong>Schema:</strong> <code>create_schema.py</code> + <code>annotations.py</code> add the
+   <code>Dataset_Version</code> column/FK. Schema-creation tests.</li>
+<li><strong>Migration script:</strong> <code>migrate_dataset_execution_version.py</code> (add FK →
+   delete stale output rows → backfill input version → verify),
+   <code>--dry-run</code>, idempotent. Migration tests.</li>
+<li><strong>Catalog deployment:</strong> dev dry-run → dev run → validate → production
+   dry-run → production run. (Before client write-path upgrade.)</li>
+<li><strong>Library write path:</strong> <code>create_dataset</code> stops writing the output row;
+   <code>add_input_dataset(version=…)</code> + config writer set the FK. Write tests.</li>
+<li><strong>Library read path:</strong> simplify <code>list_input_datasets</code>; extend
+   <code>find_executions</code> with <code>dataset: RID|DatasetSpec</code> + <code>dataset_role</code>.
+   Read tests.</li>
+<li><strong>Plugin:</strong> extend <code>_list_executions_impl</code>; <code>DatasetExecutionSummary</code>;
+   extend <code>deriva_ml_list_executions</code>; add
+   <code>deriva_ml_find_dataset_executions</code>. Plugin tests; update the
+   getting-started guide's tool menu.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

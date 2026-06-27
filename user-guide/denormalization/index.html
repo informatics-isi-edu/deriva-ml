@@ -1,0 +1,3593 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/user-guide/denormalization/">
+      
+      
+        <link rel="prev" href="../features/">
+      
+      
+        <link rel="next" href="../executions/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Denormalization - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#denormalization" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Denormalization
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-mental-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The mental model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The mental model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-row-per-leaf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One row per leaf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-membership-scopes-by-fk-reachability-not-by-direct-membership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset membership scopes by FK-reachability, not by direct membership
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#on-a-dataset-or-datasetbag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On a Dataset or DatasetBag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preview-without-fetching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview without fetching
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#arbitrary-rid-anchors-no-dataset-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arbitrary RID anchors (no dataset required)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#version-pinned-denormalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version-pinned denormalization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#include_tables-liststr-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        include_tables: list[str] — required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#row_per-str-none-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        row_per: str | None — optional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#via-liststr-none-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        via: list[str] | None — optional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignore_unrelated_anchors-bool-false" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ignore_unrelated_anchors: bool = False
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples-by-use-case" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples by use case
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples by use case">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i-want-subject-columns-on-each-image-row-hoist-upward" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I want Subject columns on each Image row" (hoist upward)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-want-all-diagnoses-for-each-subject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I want all diagnoses for each subject"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diamond-path-explicit-routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diamond path — explicit routing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-values-on-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature values on images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#heterogeneous-dataset-with-orphan-members" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heterogeneous dataset with orphan members
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#arbitrary-anchors-no-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arbitrary anchors (no dataset)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exploring-before-denormalizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exploring before denormalizing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-six-rules-for-when-you-need-to-reason-about-edge-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The six rules (for when you need to reason about edge cases)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The six rules (for when you need to reason about edge cases)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-behavior-every-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic behavior (every call)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constraints-cause-an-error-you-must-resolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints (cause an error you must resolve)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-disposition-what-happens-to-each-member" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor disposition (what happens to each member)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-set-definition-not-a-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor-set definition (not a rule)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-reach-for-feature_values-vs-denormalizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to reach for feature_values vs Denormalizer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitations-and-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations and pitfalls
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations and pitfalls">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#as_dict-is-not-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_dict is not streaming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stale-local-cache-cross-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stale local cache (cross-process)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from_rids-and-the-placeholder-dataset_rid-sc-02-tc-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_rids and the placeholder dataset_rid (SC-02 / TC-05)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#silent-fallback-to-sourcelocal-rb-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Silent fallback to source="local" (RB-05)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relationship-to-earlier-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to earlier APIs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#for-maintainers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For maintainers
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-mental-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The mental model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The mental model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-row-per-leaf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One row per leaf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-membership-scopes-by-fk-reachability-not-by-direct-membership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset membership scopes by FK-reachability, not by direct membership
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#on-a-dataset-or-datasetbag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On a Dataset or DatasetBag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preview-without-fetching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview without fetching
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#arbitrary-rid-anchors-no-dataset-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arbitrary RID anchors (no dataset required)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#version-pinned-denormalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version-pinned denormalization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#include_tables-liststr-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        include_tables: list[str] — required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#row_per-str-none-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        row_per: str | None — optional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#via-liststr-none-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        via: list[str] | None — optional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignore_unrelated_anchors-bool-false" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ignore_unrelated_anchors: bool = False
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples-by-use-case" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples by use case
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples by use case">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i-want-subject-columns-on-each-image-row-hoist-upward" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I want Subject columns on each Image row" (hoist upward)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-want-all-diagnoses-for-each-subject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I want all diagnoses for each subject"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diamond-path-explicit-routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diamond path — explicit routing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-values-on-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature values on images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#heterogeneous-dataset-with-orphan-members" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heterogeneous dataset with orphan members
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#arbitrary-anchors-no-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arbitrary anchors (no dataset)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exploring-before-denormalizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exploring before denormalizing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-six-rules-for-when-you-need-to-reason-about-edge-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The six rules (for when you need to reason about edge cases)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The six rules (for when you need to reason about edge cases)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-behavior-every-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic behavior (every call)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constraints-cause-an-error-you-must-resolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints (cause an error you must resolve)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-disposition-what-happens-to-each-member" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor disposition (what happens to each member)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-set-definition-not-a-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor-set definition (not a rule)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-reach-for-feature_values-vs-denormalizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to reach for feature_values vs Denormalizer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitations-and-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations and pitfalls
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations and pitfalls">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#as_dict-is-not-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_dict is not streaming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stale-local-cache-cross-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stale local cache (cross-process)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from_rids-and-the-placeholder-dataset_rid-sc-02-tc-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_rids and the placeholder dataset_rid (SC-02 / TC-05)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#silent-fallback-to-sourcelocal-rb-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Silent fallback to source="local" (RB-05)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relationship-to-earlier-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to earlier APIs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#for-maintainers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For maintainers
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="denormalization">Denormalization</h1>
+<p>Denormalization transforms normalized relational data into a single
+<strong>wide table</strong> (a pandas DataFrame or equivalent) where each row
+contains all related information for one observation, with columns
+from related tables joined side-by-side. This is the standard input
+format for machine-learning frameworks.</p>
+<p>DerivaML's denormalization is designed around one principle:</p>
+<blockquote>
+<p><strong>Give me a table where each row is one ML observation, with every
+column I asked for filled in from related rows via FK traversal.</strong></p>
+</blockquote>
+<p>!!! note "Looking for exact rules?"
+    This page is the example-led introduction. For the <strong>formal rules</strong>
+    — precise <code>row_per</code> / <code>via</code> / selector behavior and exact return
+    types — see the
+    <a href="../../reference/denormalization/">Denormalization Reference</a>. (The
+    "FK traversal" here means the local column-hoisting join over a
+    downloaded bag, which is a <em>different</em> operation from the
+    catalog-side <a href="../../reference/fk-traversal/">FK traversal</a> that
+    produces a bag.)</p>
+<p>The user names the tables they want columns from; DerivaML decides
+the shape of the output from the schema's FK graph.</p>
+<hr />
+<h2 id="the-mental-model">The mental model</h2>
+<h3 id="one-row-per-leaf">One row per leaf</h3>
+<p>If you request tables <code>[A, B, C]</code> where <code>C</code> has an FK to <code>B</code> and <code>B</code>
+has an FK to <code>A</code>, you get one row per <code>C</code> instance. <code>B</code> and <code>A</code>
+columns are <strong>hoisted</strong> from <code>C</code>'s foreign keys and repeated across
+rows that share the same <code>B</code> or <code>A</code>.</p>
+<p>This is <strong>star-schema denormalization</strong>: the table furthest
+downstream in the FK chain becomes the <code>row_per</code> table — the thing
+you get one row of each — and upstream context is duplicated across
+rows as needed.</p>
+<h3 id="example">Example</h3>
+<p>Schema: <code>Subject ← Observation ← Image</code> (Image has FK to
+Observation; Observation has FK to Subject).</p>
+<pre><code class="language-python">ds.get_denormalized_as_dataframe([&quot;Subject&quot;, &quot;Observation&quot;, &quot;Image&quot;])
+</code></pre>
+<p>Produces:</p>
+<table>
+<thead>
+<tr>
+<th>Subject.RID</th>
+<th>Subject.Name</th>
+<th>Observation.RID</th>
+<th>Observation.Date</th>
+<th>Image.RID</th>
+<th>Image.Filename</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td>Alice</td>
+<td>O1</td>
+<td>2024-01-01</td>
+<td>I1</td>
+<td>a.png</td>
+</tr>
+<tr>
+<td>S1</td>
+<td>Alice</td>
+<td>O1</td>
+<td>2024-01-01</td>
+<td>I2</td>
+<td>b.png</td>
+</tr>
+<tr>
+<td>S1</td>
+<td>Alice</td>
+<td>O2</td>
+<td>2024-02-01</td>
+<td>I3</td>
+<td>c.png</td>
+</tr>
+<tr>
+<td>S2</td>
+<td>Bob</td>
+<td>O3</td>
+<td>2024-01-15</td>
+<td>I4</td>
+<td>d.png</td>
+</tr>
+</tbody>
+</table>
+<p>One row per Image. Subject columns repeat across all images for a
+subject. Observation columns repeat across all images for an
+observation.</p>
+<h3 id="dataset-membership-scopes-by-fk-reachability-not-by-direct-membership">Dataset membership scopes by FK-reachability, not by direct membership</h3>
+<p>When you denormalize a <code>Dataset</code>, its members define the <strong>scope</strong> —
+but "in scope" means <strong>FK-reachable from a member</strong>, not
+<strong>a member of</strong>. A row of the <code>row_per</code> table appears whenever it can
+be reached from <em>some</em> dataset member by following foreign keys, even
+if that row was never added to the dataset directly.</p>
+<p>This matters most for <strong>upstream-partitioned</strong> datasets. Suppose a
+dataset has <strong>8 <code>Subject</code> members and 4 <code>Image</code> members</strong>, and <code>Image</code>
+has an FK to <code>Subject</code> (<code>Image.Subject</code>). Denormalizing <code>["Image"]</code>
+returns <strong>every Image reachable from a member</strong> — the 4 direct Image
+members <em>plus</em> every Image belonging to one of the 8 member Subjects.
+On the demo catalog that's <strong>8 rows, not 4</strong>: the member Subjects pull
+their Images into scope through the FK. (This is the behavior that lets
+<code>feature_values</code> and <code>get_denormalized_*</code> work on datasets whose members
+are <code>Subject</code>s but whose features live on <code>Image</code> — see the reference's
+<a href="../../reference/denormalization/#fk-reachable-scoping">FK-reachable scoping</a>.)</p>
+<p>If a dataset's members already <em>are</em> the <code>row_per</code> table, the two
+notions coincide and you get one row per member. The general rule is the
+FK-reachable one; direct-membership is just its simplest case.</p>
+<p>Nested datasets (datasets whose members include other datasets) are
+followed transparently: members of nested datasets contribute their
+own rows, just as if they were direct members of the root dataset.</p>
+<hr />
+<h2 id="the-api">The API</h2>
+<h3 id="on-a-dataset-or-datasetbag">On a Dataset or DatasetBag</h3>
+<pre><code class="language-python">df = ds.get_denormalized_as_dataframe(
+    include_tables=[&quot;Subject&quot;, &quot;Observation&quot;, &quot;Image&quot;]
+)
+</code></pre>
+<p>Returns a pandas DataFrame. Use <code>ds.get_denormalized_as_dict(...)</code>
+to iterate the rows as dicts.</p>
+<p>The method names follow the same conventions as the existing
+<code>get_table_as_dataframe</code> / <code>get_table_as_dict</code> methods on <code>Dataset</code>
+and <code>DatasetBag</code> — the stem <code>denormalized</code> describes the (virtual)
+table being retrieved.</p>
+<h3 id="preview-without-fetching">Preview without fetching</h3>
+<pre><code class="language-python">ds.list_denormalized_columns([&quot;Subject&quot;, &quot;Image&quot;])
+# → [(&quot;Subject.RID&quot;, &quot;text&quot;), (&quot;Subject.Name&quot;, &quot;text&quot;),
+#    (&quot;Image.RID&quot;, &quot;text&quot;), ...]
+
+ds.describe_denormalized([&quot;Subject&quot;, &quot;Image&quot;])
+# → {
+#     &quot;row_per&quot;: &quot;Image&quot;,
+#     &quot;row_per_source&quot;: &quot;auto-inferred&quot;,
+#     &quot;row_per_candidates&quot;: [&quot;Image&quot;],
+#     &quot;columns&quot;: [...],
+#     &quot;include_tables&quot;: [&quot;Subject&quot;, &quot;Image&quot;],
+#     &quot;via&quot;: [],
+#     &quot;join_path&quot;: [...],
+#     &quot;transparent_intermediates&quot;: [],
+#     &quot;ambiguities&quot;: [],
+#     &quot;estimated_row_count&quot;: {...},
+#     &quot;anchors&quot;: {...},
+#     &quot;source&quot;: &quot;catalog&quot;,
+#     &quot;warnings&quot;: [],
+#   }
+
+ds.list_schema_paths()
+# → {&quot;member_types&quot;: [...], &quot;reachable_tables&quot;: {...},
+#    &quot;schema_paths&quot;: {...}, ...}
+</code></pre>
+<p><code>describe_denormalized</code> is the <strong>dry-run</strong> entry point: it never
+raises, even if the request would fail at run time. Inspect the
+returned dict's <code>ambiguities</code> and <code>warnings</code> lists to find out
+what's wrong before committing to a real call. (See the
+<a href="../../design/denormalization-contract/">implementation contract §8.3</a>
+for the full envelope and the dry-run invariant.)</p>
+<h3 id="arbitrary-rid-anchors-no-dataset-required">Arbitrary RID anchors (no dataset required)</h3>
+<p>When you don't have a Dataset but you do have a set of RIDs you
+want to denormalize from, use the <code>Denormalizer.from_rids</code>
+constructor:</p>
+<pre><code class="language-python">from deriva_ml.local_db.denormalize import Denormalizer
+
+d = Denormalizer.from_rids(
+    [&quot;1-ABCD&quot;, &quot;1-EFGH&quot;],     # bare RIDs — tables looked up via catalog
+    ml=ml_instance,
+    dataset_rid=&quot;42-DATASET&quot;,  # required against a live catalog
+)
+df = d.as_dataframe([&quot;Subject&quot;, &quot;Image&quot;])
+</code></pre>
+<p>Or skip the lookup if you already know the tables:</p>
+<pre><code class="language-python">d = Denormalizer.from_rids(
+    [(&quot;Image&quot;, &quot;1-ABCD&quot;), (&quot;Image&quot;, &quot;1-EFGH&quot;)],
+    ml=ml_instance,
+    dataset_rid=&quot;42-DATASET&quot;,
+)
+</code></pre>
+<p>Mixed forms (bare RIDs and <code>(table, RID)</code> tuples in the same
+list) are supported.</p>
+<p>The <code>dataset_rid</code> argument is <strong>required against a live catalog</strong>.
+The underlying SQL scopes everything by <code>Dataset.RID IN
+(dataset_rid, ...)</code>, so without a real dataset RID <code>from_rids</code>
+would silently return zero rows. Local-only / fixture mode (no
+catalog) falls back to using the first anchor as a placeholder
+scope, with a warning logged.</p>
+<p>For most use cases, prefer the <code>Denormalizer(dataset)</code> constructor
+on an existing Dataset — <code>from_rids</code> is a power-user escape hatch
+for flows that don't start from a Dataset object.</p>
+<h3 id="version-pinned-denormalization">Version-pinned denormalization</h3>
+<p>Pass <code>version=</code> to the <code>Denormalizer</code> constructor (or to the sugar
+methods on <code>Dataset</code>) to fetch from a specific catalog snapshot:</p>
+<pre><code class="language-python">df = ds.get_denormalized_as_dataframe(
+    [&quot;Image&quot;, &quot;Subject&quot;],
+    version=ds.version,  # or any DatasetVersion
+)
+</code></pre>
+<p>Snapshot resolution follows the same pattern as
+<code>Dataset.list_dataset_members(version=...)</code>. Bags ignore <code>version</code>
+because they are already pinned to whatever version they were
+built from.</p>
+<hr />
+<h2 id="parameters">Parameters</h2>
+<h3 id="include_tables-liststr-required"><code>include_tables: list[str]</code> — required</h3>
+<p>The tables whose columns appear in the output. Also determines
+which table is <code>row_per</code> (see below).</p>
+<p>You can pass either table names (e.g. <code>"Image"</code>) or feature names
+(e.g. <code>"Image_Classification"</code>) — feature names are translated to
+the underlying feature-association table (e.g.
+<code>"Execution_Image_Image_Classification"</code>) automatically. This
+matches the rest of the DerivaML API (<code>find_features</code>,
+<code>feature_values</code>, <code>lookup_feature</code>).</p>
+<h3 id="row_per-str-none-optional"><code>row_per: str | None</code> — optional</h3>
+<p>Names the table whose rows become output rows (one row per
+instance of this table). If omitted, auto-inferred as the unique
+"deepest" table in <code>include_tables</code> — the one no other requested
+table points to via FK.</p>
+<p>You only need <code>row_per</code> when:</p>
+<ul>
+<li>Auto-inference finds more than one candidate (multi-leaf
+  ambiguity).</li>
+<li>You want a non-default anchor for a specific ML task.</li>
+</ul>
+<h3 id="via-liststr-none-optional"><code>via: list[str] | None</code> — optional</h3>
+<p>Names tables to force into the join chain without contributing
+columns to the output. Useful when two paths exist between your
+requested tables and you want to specify routing without
+cluttering your output columns.</p>
+<p>Example: <code>ds.get_denormalized_as_dataframe(["Image", "Subject"],
+via=["Observation"])</code> routes through Observation but doesn't
+include Observation columns in the output.</p>
+<h3 id="ignore_unrelated_anchors-bool-false"><code>ignore_unrelated_anchors: bool = False</code></h3>
+<p>By default, if an anchor has no FK path to any table in
+<code>include_tables</code>, DerivaML raises an error. Set <code>True</code> to silently
+drop such anchors. Useful when you know some dataset member types
+are out of scope for this particular denormalization.</p>
+<hr />
+<h2 id="examples-by-use-case">Examples by use case</h2>
+<h3 id="i-want-subject-columns-on-each-image-row-hoist-upward">"I want Subject columns on each Image row" (hoist upward)</h3>
+<pre><code class="language-python">ds.get_denormalized_as_dataframe([&quot;Subject&quot;, &quot;Image&quot;])
+# row_per = Image (auto). Each row = one image, Subject columns repeated.
+</code></pre>
+<h3 id="i-want-all-diagnoses-for-each-subject">"I want all diagnoses for each subject"</h3>
+<pre><code class="language-python">ds.get_denormalized_as_dataframe([&quot;Subject&quot;, &quot;Diagnosis&quot;])
+# row_per = Diagnosis (auto — Diagnosis points to Subject).
+# One row per diagnosis; Subject columns repeated across all
+# diagnoses for a subject. Group by Subject.RID in pandas to
+# aggregate.
+</code></pre>
+<h3 id="diamond-path-explicit-routing">Diamond path — explicit routing</h3>
+<pre><code class="language-python"># Schema has Image→Subject direct AND Image→Observation→Subject.
+
+ds.get_denormalized_as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+# ERROR: multiple FK paths.
+
+# Force the multi-hop with columns included:
+ds.get_denormalized_as_dataframe([&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;])
+
+# Force the multi-hop without Observation columns:
+ds.get_denormalized_as_dataframe([&quot;Image&quot;, &quot;Subject&quot;], via=[&quot;Observation&quot;])
+</code></pre>
+<h3 id="feature-values-on-images">Feature values on images</h3>
+<pre><code class="language-python">ds.get_denormalized_as_dataframe([&quot;Image&quot;, &quot;Image_Classification&quot;])
+# row_per = Execution_Image_Image_Classification (auto — feature
+# association table; points to Image).
+# One row per feature observation; Image columns repeated for
+# multi-execution images.
+</code></pre>
+<p>The feature-name shorthand (<code>"Image_Classification"</code>) is resolved
+to the underlying feature-association table
+(<code>"Execution_Image_Image_Classification"</code>) by the same helper that
+backs <code>find_features</code> / <code>feature_values</code>. The full table name
+works too.</p>
+<p><strong>Setting <code>row_per=&lt;target_table&gt;</code> with a feature shorthand in
+<code>include_tables</code> is rejected (<a href="../../reference/denormalization/#downstream-leaf-rejection">Downstream-leaf rejection</a>).</strong>
+The feature-association table is downstream of the target table, and the
+denormalizer does not aggregate. The two intents the caller might have in mind are
+spelled differently:</p>
+<pre><code class="language-python"># Intent A: &quot;one row per Image with the feature value projected
+# as a column.&quot; Pass the value table (vocabulary) directly, not
+# the feature-name shorthand. The feature-association table
+# becomes a transparent bridge in the join.
+ds.get_denormalized_as_dataframe(
+    [&quot;Image&quot;, &quot;Image_Class&quot;],
+    row_per=&quot;Image&quot;,
+)
+# Image_Class.Name is projected onto Image rows — BUT this is &quot;one row
+# per Image&quot; ONLY when each Image has exactly ONE feature value. The
+# join still passes through the (hidden) feature-association table, which
+# has one row per (Image, Execution) annotation. If an Image was
+# annotated by N executions/annotators, that Image appears N times, each
+# with its own Image_Class.Name. Denormalize does NOT aggregate. To force
+# one row per Image, reduce the feature group with a `selector=` (see the
+# &quot;Feature values on images&quot; example) — that collapses the N annotations
+# to one BEFORE projection.
+
+# Intent B: &quot;one row per feature observation.&quot; Let auto-inference
+# pick the feature-association table as row_per (the default
+# behavior shown at the top of this section), or name it
+# explicitly. Image RIDs repeat across multi-execution annotations.
+ds.get_denormalized_as_dataframe(
+    [&quot;Image&quot;, &quot;Image_Classification&quot;],
+    row_per=&quot;Execution_Image_Image_Classification&quot;,
+)
+# OK: one row per feature observation.
+
+# Forbidden combination: feature shorthand with row_per=&lt;target&gt;.
+ds.get_denormalized_as_dataframe(
+    [&quot;Image&quot;, &quot;Image_Classification&quot;],
+    row_per=&quot;Image&quot;,
+)
+# RAISES DerivaMLDenormalizeDownstreamLeaf: the shorthand resolves
+# to Execution_Image_Image_Classification, which is downstream of
+# Image. To project the feature value, use Intent A's shape.
+</code></pre>
+<h3 id="heterogeneous-dataset-with-orphan-members">Heterogeneous dataset with orphan members</h3>
+<pre><code class="language-python"># Dataset has Image members AND Subject members
+# (some subjects with no images in the dataset)
+
+ds.get_denormalized_as_dataframe([&quot;Subject&quot;, &quot;Image&quot;])
+# row_per = Image.
+# Output = |FK-reachable Images| rows (Subjects hoisted)
+#       + |orphan Subjects with no reachable Image| rows (Image columns NULL).
+</code></pre>
+<h3 id="arbitrary-anchors-no-dataset">Arbitrary anchors (no dataset)</h3>
+<pre><code class="language-python">from deriva_ml.local_db.denormalize import Denormalizer
+
+d = Denormalizer.from_rids(
+    [&quot;1-ABCD&quot;, &quot;2-WXYZ&quot;],
+    ml=ml,
+    dataset_rid=&quot;42-DATASET&quot;,
+)
+df = d.as_dataframe([&quot;Subject&quot;, &quot;Image&quot;])
+</code></pre>
+<hr />
+<h2 id="exploring-before-denormalizing">Exploring before denormalizing</h2>
+<p>When you don't know the schema well, use the exploration methods
+in order. Each step is more expensive but more definitive:</p>
+<pre><code class="language-python"># 1. What can I put in include_tables?
+info = ds.list_schema_paths()
+print(info[&quot;member_types&quot;])        # dataset element types
+print(info[&quot;reachable_tables&quot;])    # FK-reachable tables from each type
+print(info[&quot;schema_paths&quot;])        # available FK paths between tables
+
+# 2. What columns will I get for this request?
+ds.list_denormalized_columns([&quot;Image&quot;, &quot;Subject&quot;])
+
+# 3. Will this request succeed? How big will the output be?
+plan = ds.describe_denormalized([&quot;Image&quot;, &quot;Subject&quot;])
+if plan[&quot;ambiguities&quot;]:
+    # Inspect `ambiguities` to see what to add/change
+    ...
+if plan[&quot;warnings&quot;]:
+    # describe never raises — warnings reports anything that was
+    # silently swallowed
+    for w in plan[&quot;warnings&quot;]:
+        print(w)
+print(plan[&quot;estimated_row_count&quot;])
+
+# 4. Run it for real.
+df = ds.get_denormalized_as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+</code></pre>
+<p>The workflow: <code>list_schema_paths</code> → <code>list_denormalized_columns</code> →
+<code>describe_denormalized</code> → <code>get_denormalized_as_dataframe</code>.</p>
+<hr />
+<h2 id="the-six-rules-for-when-you-need-to-reason-about-edge-cases">The six rules (for when you need to reason about edge cases)</h2>
+<p>DerivaML's denormalizer is governed by <strong>six named semantic rules</strong>.
+The <a href="../../reference/denormalization/#formal-rules">reference</a> gives the
+formal definitions and the
+<a href="../../design/denormalization-contract/">implementation contract</a> §6.2
+the planner-level language; this is the user-facing summary, grouped by
+how often you'll meet each rule.</p>
+<h3 id="basic-behavior-every-call">Basic behavior (every call)</h3>
+<p><strong>Row grain.</strong> One output row per <strong><code>row_per</code>-table instance in scope</strong>.
+By default <code>row_per</code> is auto-inferred as the "deepest" requested table —
+the one no other requested table points to via FK. (Ties or FK cycles
+raise; pass <code>row_per=</code> to resolve.) "In scope" means <strong>FK-reachable from
+a dataset member</strong>, not member-of — see
+<a href="#dataset-membership-scopes-by-fk-reachability-not-by-direct-membership">Dataset membership scopes by FK-reachability</a>.</p>
+<p><strong>Column projection.</strong> Columns come from <code>include_tables</code>. Tables in
+<code>via</code>, and the association tables that only bridge two requested tables
+(<em>transparent intermediates</em>), are joined <em>through</em> but contribute no
+columns.</p>
+<p><strong>Column hoisting.</strong> For each <code>row_per</code> row, upstream columns are hoisted
+from the FK graph and <strong>repeated verbatim</strong> across rows sharing the same
+upstream row (the classic star-schema shape). A table reached through an
+N-to-N link produces one row per <code>(row_per, linked-row)</code> combination, so
+the <code>row_per</code> count grows. (This is also where a feature <code>selector</code>
+reduces a multi-row feature group to one row — see
+<a href="#feature-values-on-images">Feature values on images</a>.)</p>
+<h3 id="constraints-cause-an-error-you-must-resolve">Constraints (cause an error you must resolve)</h3>
+<p><strong>Downstream-leaf rejection.</strong> If you set <code>row_per</code> explicitly and
+another requested table is <em>downstream</em> of it (i.e. <code>row_per</code> points to
+it via FK), you get <code>DerivaMLDenormalizeDownstreamLeaf</code> — one row per
+<code>row_per</code> would require aggregating the downstream rows, which
+denormalize doesn't do. Drop <code>row_per</code> (let auto-inference pick the
+downstream table) or remove that table from <code>include_tables</code>.</p>
+<p><strong>Path ambiguity.</strong> If two or more distinct FK paths connect <code>row_per</code>
+to another requested table, you get <code>DerivaMLDenormalizeAmbiguousPath</code>
+listing the paths — the result would differ between them, so DerivaML
+won't guess. Add the disambiguating intermediate to <code>include_tables</code>
+(its columns appear) or to <code>via</code> (path-only), or narrow the request so
+only one path is valid.</p>
+<h3 id="anchor-disposition-what-happens-to-each-member">Anchor disposition (what happens to each member)</h3>
+<p>Every dataset member (anchor) contributes in exactly one way, by its
+table and reachability:</p>
+<ul>
+<li><strong>Member's table is <code>row_per</code></strong> → it's one output row.</li>
+<li><strong>Member is upstream of <code>row_per</code> and reaches a <code>row_per</code> row</strong> →
+  filter-only: it appears via the <code>row_per</code> row that hoists it (no row
+  of its own).</li>
+<li><strong>Member is upstream of <code>row_per</code> but reaches no <code>row_per</code> row</strong> → an
+  <strong>orphan row</strong>: its columns populated, <code>row_per</code>-side columns NULL
+  (LEFT-JOIN shape). Example: a <code>Subject</code> with no Images in scope.</li>
+<li><strong>Member's table has no FK path at all</strong> to any <code>include_tables ∪ via</code>
+  table → raises <code>DerivaMLDenormalizeUnrelatedAnchor</code>. Pass
+  <code>ignore_unrelated_anchors=True</code> to silently drop these instead.</li>
+</ul>
+<p>(<code>ignore_unrelated_anchors</code> affects only the last case, never orphan
+emission. The reference's
+<a href="../../reference/denormalization/#anchor-disposition">Anchor disposition</a>
+table spells out all six sub-cases.)</p>
+<h3 id="anchor-set-definition-not-a-rule">Anchor-set definition (not a rule)</h3>
+<p>The denormalizer's anchor set is the dataset's members <strong>recursively</strong> —
+members of nested datasets are followed transparently, and descendant
+dataset RIDs are threaded into the SQL scope so their members show up
+under the root. (<code>from_rids</code> takes anchors directly and does no
+recursion.) This is <em>how anchors enter the system</em>, not a denormalize
+behavior — so it's a definition, not one of the six rules.</p>
+<blockquote>
+<p><strong>On <code>version</code>.</strong> A <code>version=</code> kwarg pins denormalization to a catalog
+snapshot (see "Version-pinned denormalization" above): implemented for
+live <code>Dataset</code> inputs, ignored for bags. It's a constructor concern,
+not a semantic rule.</p>
+</blockquote>
+<hr />
+<h2 id="when-to-reach-for-feature_values-vs-denormalizer">When to reach for <code>feature_values</code> vs <code>Denormalizer</code></h2>
+<p>Both tools produce tabular output from catalog data, but they
+answer different questions.</p>
+<p><strong>Use <code>feature_values(table, feature_name, selector=...)</code></strong> when:</p>
+<ul>
+<li>You want the values for one specific feature.</li>
+<li>You want typed <code>FeatureRecord</code> objects with provenance
+  attributes.</li>
+<li>You want selector reduction (one value per target RID after
+  filtering by workflow, annotator, or recency).</li>
+<li>You want to iterate over records and process them in Python
+  before converting to a DataFrame.</li>
+</ul>
+<pre><code class="language-python"># feature_values: typed records for one feature, selector-reduced
+selector = FeatureRecord.select_by_workflow(&quot;Manual_Annotation&quot;, container=ml)
+labels = {
+    rec.Image: rec.Diagnosis_Type
+    for rec in ml.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;, selector=selector)
+}
+</code></pre>
+<p><strong>Use <code>Denormalizer</code></strong> when:</p>
+<ul>
+<li>You want a wide DataFrame combining columns from multiple
+  tables in a single call.</li>
+<li>You want structural joins (e.g., <code>Subject → Observation →
+  Image</code>) that are not feature-based.</li>
+<li>You want feature tables to participate as leaves in a
+  multi-table join alongside domain tables.</li>
+<li>You want pandas output directly.</li>
+</ul>
+<pre><code class="language-python"># Denormalizer: wide DataFrame joining Subject, Image, and a feature table
+df = dataset.get_denormalized_as_dataframe(
+    [&quot;Subject&quot;, &quot;Image&quot;, &quot;Execution_Image_Diagnosis&quot;]
+)
+# df has Subject columns, Image columns, and Diagnosis columns —
+# one row per feature value
+</code></pre>
+<p>The same question — "give me the diagnosis for each image, with
+subject context" — answered both ways:</p>
+<pre><code class="language-python"># feature_values approach: start from the feature, join subject in Python
+records = {r.Image: r.Diagnosis_Type for r in ml.feature_values(
+    &quot;Image&quot;, &quot;Diagnosis&quot;, selector=FeatureRecord.select_newest
+)}
+# Then join with a subject lookup if needed
+
+# Denormalizer approach: one call, pandas output with all context columns
+df = dataset.get_denormalized_as_dataframe(
+    [&quot;Subject&quot;, &quot;Observation&quot;, &quot;Image&quot;, &quot;Execution_Image_Diagnosis&quot;]
+)
+</code></pre>
+<p>Use <code>feature_values</code> when you care about provenance, selectors,
+or typed access. Use <code>Denormalizer</code> when you care about wide
+joins and pandas integration.</p>
+<hr />
+<h2 id="known-limitations-and-pitfalls">Known limitations and pitfalls</h2>
+<p>A handful of failure modes are worth knowing about as a user. Each
+is covered in more depth in the
+<a href="../../design/denormalization-contract/">implementation contract</a>.</p>
+<h3 id="as_dict-is-not-streaming"><code>as_dict</code> is not streaming</h3>
+<p>Despite the "memory-efficient" wording in some older docstrings,
+<code>get_denormalized_as_dict(...)</code> and <code>Denormalizer.as_dict(...)</code>
+<strong>materialise the full result before yielding any row</strong>. They
+expose an iteration interface, not a streaming cursor — peak
+memory equals the full result set.</p>
+<p>Use <code>as_dict</code> when downstream code naturally processes one row at
+a time. Don't rely on it to bound memory for very large results.</p>
+<p>True streaming is a known gap (audit finding SC-07); see §8.2 of the
+<a href="../../design/denormalization-contract/">implementation contract</a> for
+the design discussion.</p>
+<h3 id="stale-local-cache-cross-process">Stale local cache (cross-process)</h3>
+<p>The local SQLite cache is a write-through history of past
+catalog fetches. It survives the process and is shared across
+sessions. This is by design — it's what makes re-running
+denormalize fast — but it has one consequence:</p>
+<ul>
+<li><strong>Server-side inserts between calls are observed correctly</strong>
+  (Step 3 picks up new rows).</li>
+<li><strong>Server-side deletes between calls are NOT observed</strong> — the
+  old rows remain in the cache and participate in subsequent
+  joins.</li>
+<li><strong>Server-side updates between calls are NOT observed</strong> for the
+  same reason.</li>
+</ul>
+<p>In practice Deriva data is largely append-only, so this is rarely
+visible. If you need a stable snapshot, use
+<code>download_dataset_bag(version=...)</code> or pass <code>version=</code> to the
+denormalizer (see "Version-pinned denormalization" above).</p>
+<p>There is no caller-visible signal today that a result was
+affected by a stale-cache window. Tracked as audit finding SC-03.</p>
+<h3 id="from_rids-and-the-placeholder-dataset_rid-sc-02-tc-05"><code>from_rids</code> and the placeholder <code>dataset_rid</code> (SC-02 / TC-05)</h3>
+<p>If you construct a <code>Denormalizer</code> via <code>from_rids</code> against a live
+catalog <strong>without</strong> passing <code>dataset_rid=</code>, the call now raises
+<code>ValueError</code> with a clear message — the underlying SQL scopes by
+<code>Dataset.RID IN (dataset_rid, ...)</code> and a missing scope produces
+silent zero rows.</p>
+<p>Local-only / fixture flows (no live catalog) fall back to using
+the first anchor's RID as a placeholder scope, with a warning
+logged. Pre-populated engines treat the RID as an opaque scoping
+key.</p>
+<h3 id="silent-fallback-to-sourcelocal-rb-05">Silent fallback to <code>source="local"</code> (RB-05)</h3>
+<p>When <code>Denormalizer.__init__</code> cannot build an <code>ErmrestPagedClient</code>
+(offline tests, mock catalog, transient auth race), it falls
+back to <code>source="local"</code> and the live-catalog fetch path is
+disabled. A warning is logged and stashed on the Denormalizer;
+in this revision, the warning surfaces via
+<code>describe()["warnings"]</code> as a future improvement (see §8.3.1 in
+the <a href="../../design/denormalization-contract/">implementation contract</a>).</p>
+<p>User-visible effect: a <code>Denormalizer</code> constructed in an
+auth-race window may return whatever rows are already in the
+local engine — possibly zero — rather than fresh data.</p>
+<hr />
+<h2 id="relationship-to-earlier-apis">Relationship to earlier APIs</h2>
+<p>This is the only denormalization API. The earlier method names
+have been removed. The replacements use the same <code>get_*_as_*</code> /
+<code>list_*</code> / <code>describe_*</code> conventions as the existing
+<code>get_table_as_dataframe</code> and <code>list_dataset_members</code> methods on
+Dataset and DatasetBag:</p>
+<table>
+<thead>
+<tr>
+<th>Earlier name</th>
+<th>Current name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>denormalize_as_dataframe(include_tables)</code></td>
+<td><code>get_denormalized_as_dataframe(include_tables, ...)</code></td>
+</tr>
+<tr>
+<td><code>denormalize_as_dict(include_tables)</code></td>
+<td><code>get_denormalized_as_dict(include_tables, ...)</code></td>
+</tr>
+<tr>
+<td><code>denormalize_columns(include_tables)</code></td>
+<td><code>list_denormalized_columns(include_tables, ...)</code></td>
+</tr>
+<tr>
+<td><code>denormalize_info(include_tables)</code></td>
+<td><code>describe_denormalized(include_tables, ...)</code></td>
+</tr>
+</tbody>
+</table>
+<p>Two behavioral changes from the earlier implementations:</p>
+<ul>
+<li><strong>Ambiguous FK paths now error</strong> instead of silently picking
+  the shortest one. Use <code>via</code> or add an intermediate to
+  <code>include_tables</code> to resolve.</li>
+<li><strong>Feature tables are fully supported</strong> as leaves (<code>row_per</code>).
+  Previously they were not handled specially and some requests
+  failed.</li>
+</ul>
+<hr />
+<h2 id="related-concepts">Related concepts</h2>
+<ul>
+<li><a href="../datasets/">Datasets</a> — how dataset membership defines the
+  anchor set.</li>
+<li><a href="../features/">Defining and using features</a> — <code>feature_values</code>
+  is the other half of the picture.</li>
+</ul>
+<hr />
+<h2 id="for-maintainers">For maintainers</h2>
+<p>The full <strong>implementation contract</strong> — pipeline architecture, state
+ownership, the <code>PagedFetcher</code> / <code>_insert_rows</code> contracts, the
+row-completeness invariant, the fragility map, and the test matrix —
+lives in the
+<a href="../../design/denormalization-contract/">Denormalization implementation contract</a>.
+That document is the authoritative design reference for engineers
+working on the denormalize subsystem; this page is the user-facing guide.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../features/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Defining and using features">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Defining and using features
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../executions/" class="md-footer__link md-footer__link--next" aria-label="Next: Running an experiment">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Running an experiment
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

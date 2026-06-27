@@ -1,0 +1,2540 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/audits/2026-06-02-association-index-test-report/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Association-Index Generator — Test Report - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#association-index-generator-test-report" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Association-Index Generator — Test Report
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-catalog-under-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Catalog under test
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-associations-discovered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Associations discovered
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-baseline-plans-no-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Baseline plans (no index)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-generated-sql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Generated SQL
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-apply-result-idempotence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Apply result + idempotence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-index-existence-contract-gate-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Index existence (contract gate) — ✅ PASS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-index-usability-planner-uses-the-index-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Index usability (planner uses the index) — ✅ PASS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-findings-bugs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Findings / bugs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-catalog-disposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Catalog disposition
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="association-index-generator-test-report">Association-Index Generator — Test Report</h1>
+<p><strong>Date:</strong> 2026-06-02
+<strong>Script under test:</strong> <code>scripts/generate_association_indexes.py</code>
+<strong>Plan:</strong> <code>docs/superpowers/plans/2026-06-02-association-index-script-test.md</code>
+<strong>Environment:</strong> local Docker Deriva stack (<code>deriva-postgres</code> postgres:16.13, <code>deriva-webserver</code> at https://localhost).</p>
+<h2 id="1-catalog-under-test">1. Catalog under test</h2>
+<ul>
+<li><strong>Catalog id:</strong> <code>3</code> (<code>https://localhost/ermrest/catalog/3</code>)</li>
+<li><strong>Postgres DB:</strong> <code>_ermrest_catalog_3</code></li>
+<li><strong>Built with:</strong> <code>create_demo_catalog(hostname="localhost", create_features=True, create_datasets=True, on_exit_delete=False)</code></li>
+<li><strong>Schemas:</strong> <code>deriva-ml</code> (core ML) + <code>demo-schema</code> (domain).</li>
+<li><strong>Populated</strong> — representative association tables and approximate row counts (post-<code>ANALYZE</code>):</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Kind</th>
+<th>Rows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>demo-schema.Execution_Subject_Health</code></td>
+<td>feature association</td>
+<td>12</td>
+</tr>
+<tr>
+<td><code>demo-schema.Execution_Image_Quality</code></td>
+<td>feature association</td>
+<td>12</td>
+</tr>
+<tr>
+<td><code>demo-schema.Execution_Image_BoundingBox</code></td>
+<td>feature association</td>
+<td>12</td>
+</tr>
+<tr>
+<td><code>demo-schema.Dataset_Subject</code></td>
+<td>dataset-member association</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>demo-schema.Dataset_Image</code></td>
+<td>dataset-member association</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>deriva-ml.Dataset_Dataset</code></td>
+<td>nested-dataset association</td>
+<td>6</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Note (env):</strong> an empty stray catalog <code>4</code>/<code>_ermrest_catalog_2</code> was
+  created and partially cleaned during an auth probe before the real
+  build; it contains no association tables and does not affect this
+  test (the generator is run against catalog 3 explicitly). Flagged in
+  §8.</li>
+</ul>
+<blockquote>
+<p>Auth note: catalog creation initially failed with HTTP 401; the
+<code>localhost</code> bearer token in <code>~/.deriva/credential.json</code> was refreshed
+by the user, after which <code>POST /ermrest/catalog</code> returned 201 and the
+build succeeded.</p>
+</blockquote>
+<h2 id="2-associations-discovered">2. Associations discovered</h2>
+<p>The generator found <strong>12 pure binary association tables</strong> across the
+<code>demo-schema</code> and <code>deriva-ml</code> schemas. All 12 resolved table + column
+RIDs cleanly, so each got the full 4-index set (2 live + 2 history):</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Association</th>
+<th>FK pair</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>demo-schema.BoundingBox_Asset_Type</code></td>
+<td>(Asset_Type, BoundingBox)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>demo-schema.Dataset_Image</code></td>
+<td>(Dataset, Image)</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>demo-schema.Dataset_Subject</code></td>
+<td>(Dataset, Subject)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>demo-schema.Image_Asset_Type</code></td>
+<td>(Asset_Type, Image)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>deriva-ml.Dataset_Dataset</code></td>
+<td>(Dataset, Nested_Dataset)</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>deriva-ml.Dataset_Dataset_Type</code></td>
+<td>(Dataset, Dataset_Type)</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>deriva-ml.Dataset_Execution</code></td>
+<td>(Dataset, Execution)</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>deriva-ml.Dataset_File</code></td>
+<td>(Dataset, File)</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>deriva-ml.Execution_Asset_Asset_Type</code></td>
+<td>(Asset_Type, Execution_Asset)</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>deriva-ml.Execution_Metadata_Asset_Type</code></td>
+<td>(Asset_Type, Execution_Metadata)</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>deriva-ml.File_Asset_Type</code></td>
+<td>(Asset_Type, File)</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>deriva-ml.Workflow_Workflow_Type</code></td>
+<td>(Workflow, Workflow_Type)</td>
+</tr>
+</tbody>
+</table>
+<p>(Feature-value tables like <code>Execution_Subject_Health</code> are absent —
+correctly, as noted in §3, they are not pure binary associations.)</p>
+<h2 id="3-baseline-plans-no-index">3. Baseline plans (no index)</h2>
+<p><strong>Representative pure-binary association chosen:</strong>
+<code>demo-schema.Dataset_Subject</code> — FK pair <code>(Dataset, Subject)</code>, table
+RID <code>57G</code>, column RIDs <code>Dataset=57W</code>, <code>Subject=57Y</code>. History table
+<code>_ermrest_history."t57G"</code> (8 rows). Real predicate values pulled from a
+live row: <code>Dataset='5CT'</code>, <code>Subject='4C6'</code>.</p>
+<blockquote>
+<p><strong>Scope finding (carried to §8):</strong> feature-value association tables
+like <code>demo-schema.Execution_Subject_Health</code> are <strong>not</strong> pure binary
+associations — they carry 4 user FKs (<code>Execution</code>, <code>Feature_Name</code>,
+<code>Subject</code>, <code>SubjectHealth</code>), so <code>Table.is_association()</code> (pure,
+binary) correctly rejects them and the script does <strong>not</strong> index
+them. The pure-binary associations the script targets are the
+dataset-member (<code>Dataset_Subject</code>, <code>Dataset_Image</code>), nested-dataset
+(<code>Dataset_Dataset</code>), and <code>{X}_Execution</code> / <code>{X}_Asset_Type</code> link
+tables. The second representative table for the usability check is
+taken from the script's own discovered set in §2/Task 4.</p>
+</blockquote>
+<p>All four targeted queries are <strong>Seq Scan</strong> before indexing (the clean
+"before" state):</p>
+<pre><code>-- LIVE Dataset_Subject forward (Dataset, Subject)
+Seq Scan on &quot;Dataset_Subject&quot;  (cost=0.00..1.12 rows=1 width=4)
+  Filter: ((&quot;Dataset&quot; = '5CT') AND (&quot;Subject&quot; = '4C6'))
+
+-- LIVE Dataset_Subject reverse (Subject, Dataset)
+Seq Scan on &quot;Dataset_Subject&quot;  (cost=0.00..1.12 rows=1 width=4)
+  Filter: ((&quot;Subject&quot; = '4C6') AND (&quot;Dataset&quot; = '5CT'))
+
+-- HIST t57G forward (rowdata-&gt;&gt;'57W', rowdata-&gt;&gt;'57Y')
+Seq Scan on &quot;t57G&quot;  (cost=0.00..1.16 rows=1 width=4)
+  Filter: (((rowdata -&gt;&gt; '57W') = '5CT') AND ((rowdata -&gt;&gt; '57Y') = '4C6'))
+
+-- HIST t57G reverse (rowdata-&gt;&gt;'57Y', rowdata-&gt;&gt;'57W')
+Seq Scan on &quot;t57G&quot;  (cost=0.00..1.16 rows=1 width=4)
+  Filter: (((rowdata -&gt;&gt; '57Y') = '4C6') AND ((rowdata -&gt;&gt; '57W') = '5CT'))
+</code></pre>
+<h2 id="4-generated-sql">4. Generated SQL</h2>
+<ul>
+<li><strong>Command:</strong> <code>uv run python scripts/generate_association_indexes.py --hostname localhost --catalog-id 3 --output /tmp/assoc-idx-test/indexes.sql --verbose</code></li>
+<li><strong>Exit code:</strong> 0. <strong>Warnings:</strong> none (only a harmless urllib3
+  <code>InsecureRequestWarning</code> for the self-signed localhost cert — not a
+  generator warning; no RID-lookup misses).</li>
+<li><strong>Shape:</strong> 48 <code>CREATE INDEX CONCURRENTLY IF NOT EXISTS</code> statements =
+  12 associations × 4 (live fwd, live rev, hist fwd, hist rev). Counts
+  per direction: live fwd 12, live rev 12, hist fwd 12, hist rev 12.</li>
+</ul>
+<p><strong>Cross-check — the <code>Dataset_Subject</code> block matches the RIDs this test
+discovered independently from Postgres <code>_ermrest</code> metadata (table
+<code>57G</code>, <code>Dataset=57W</code>, <code>Subject=57Y</code>):</strong></p>
+<pre><code class="language-sql">CREATE INDEX CONCURRENTLY IF NOT EXISTS &quot;Dataset_Subject_assoc_fwd_idx&quot;
+  ON &quot;demo-schema&quot;.&quot;Dataset_Subject&quot; (&quot;Dataset&quot;, &quot;Subject&quot;);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS &quot;Dataset_Subject_assoc_rev_idx&quot;
+  ON &quot;demo-schema&quot;.&quot;Dataset_Subject&quot; (&quot;Subject&quot;, &quot;Dataset&quot;);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS &quot;Dataset_Subject_hist_assoc_fwd_idx&quot;
+  ON _ermrest_history.&quot;t57G&quot;
+     (((rowdata-&gt;&gt;'57W')), ((rowdata-&gt;&gt;'57Y')));
+CREATE INDEX CONCURRENTLY IF NOT EXISTS &quot;Dataset_Subject_hist_assoc_rev_idx&quot;
+  ON _ermrest_history.&quot;t57G&quot;
+     (((rowdata-&gt;&gt;'57Y')), ((rowdata-&gt;&gt;'57W')));
+</code></pre>
+<p>Full file: <code>/tmp/assoc-idx-test/indexes.sql</code> (not committed — scratch).</p>
+<h2 id="5-apply-result-idempotence">5. Apply result + idempotence</h2>
+<p>Applied with
+<code>docker exec deriva-postgres psql -U ermrest -d _ermrest_catalog_3 -v ON_ERROR_STOP=1 -f /tmp/indexes.sql</code>
+(default psql autocommit — <code>CREATE INDEX CONCURRENTLY</code> is <strong>not</strong> wrapped
+in a transaction, which it cannot be).</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Exit</th>
+<th>New indexes created</th>
+<th><code>already exists, skipping</code></th>
+<th>Errors</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>First apply</td>
+<td>0</td>
+<td>48</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Re-apply (idempotence)</td>
+<td>0</td>
+<td>0 (all skipped)</td>
+<td>48</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>The re-run is a clean no-op: every <code>CREATE INDEX CONCURRENTLY IF NOT
+EXISTS</code> reports <code>NOTICE: relation "…" already exists, skipping</code>. Safe
+to re-run against a live catalog.</p>
+<h2 id="6-index-existence-contract-gate-pass">6. Index existence (contract gate) — ✅ PASS</h2>
+<p><code>pg_indexes</code> confirms <strong>48 indexes</strong> = 12 associations × 4. Per-direction
+totals: live fwd 12, live rev 12, hist fwd 12, hist rev 12. Schema
+split: 24 in <code>_ermrest_history</code>, 24 live (16 <code>deriva-ml</code>, 8
+<code>demo-schema</code>).</p>
+<p><strong>Per-association cross-check — all 12 fully covered, both directions on
+both live + history:</strong></p>
+<pre><code>BoundingBox_Asset_Type          live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Image                   live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Subject                 live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Image_Asset_Type                live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Dataset                 live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Dataset_Type            live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Execution               live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_File                    live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Execution_Asset_Asset_Type      live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Execution_Metadata_Asset_Type   live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+File_Asset_Type                 live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Workflow_Workflow_Type          live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+---
+associations fully covered: 12 / 12   (incomplete: 0)
+</code></pre>
+<p><strong>This is the literal success criterion from the request:</strong> every
+association table has composite-key indexes in both directions on both
+the live table and the history table. <strong>Met.</strong></p>
+<h2 id="7-index-usability-planner-uses-the-index-pass">7. Index usability (planner uses the index) — ✅ PASS</h2>
+<p>Representative table: <code>demo-schema.Dataset_Subject</code> (live + history,
+both directions). Method per the spec: natural plan, then forced plan
+with <code>enable_seqscan=off</code> / <code>enable_bitmapscan=off</code>, then an
+<code>idx_scan</code> counter check.</p>
+<p><strong>Natural plan (no override):</strong> still <code>Seq Scan</code> on both live and
+history — <strong>expected and not a failure</strong>: at 8 rows a seq scan is
+genuinely cheaper than an index lookup, so the cost model correctly
+declines the index.</p>
+<p><strong>Forced plan (<code>enable_seqscan=off</code>) — the usability proof:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Table kind</th>
+<th>Plan</th>
+<th>Index used</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Dataset='5CT' AND Subject='4C6'</code></td>
+<td>live</td>
+<td>Index Only Scan</td>
+<td><code>Dataset_Subject_assoc_rev_idx</code> ✓</td>
+</tr>
+<tr>
+<td><code>Subject='4C6' AND Dataset='5CT'</code></td>
+<td>live</td>
+<td>Index Only Scan</td>
+<td><code>Dataset_Subject_assoc_rev_idx</code> ✓</td>
+</tr>
+<tr>
+<td><code>rowdata-&gt;&gt;'57W' AND rowdata-&gt;&gt;'57Y'</code></td>
+<td>history</td>
+<td>Index Scan</td>
+<td><code>Dataset_Subject_hist_assoc_rev_idx</code> ✓</td>
+</tr>
+<tr>
+<td><code>rowdata-&gt;&gt;'57Y' AND rowdata-&gt;&gt;'57W'</code></td>
+<td>history</td>
+<td>Index Scan</td>
+<td><code>Dataset_Subject_hist_assoc_rev_idx</code> ✓</td>
+</tr>
+</tbody>
+</table>
+<p>Every query switches from Seq Scan to an <strong>Index (Only) Scan on one of
+our named composite indexes</strong>, with the <code>Index Cond</code> matching both
+predicate columns — including the JSONB <code>rowdata-&gt;&gt;'&lt;col_rid&gt;'</code>
+expressions on the history side, which is the non-trivial case (the
+expression index must match the query's expression exactly to be
+eligible). The history-side proof is the key result: the script's
+RID-keyed expression indexes are real, correctly-formed, and
+planner-usable.</p>
+<blockquote>
+<p><strong>Why <code>rev</code> for both orderings (not a defect):</strong> a B-tree composite
+index supports equality predicates on its columns regardless of the
+order they appear in the <code>WHERE</code> clause, so both the <code>fwd</code> and <code>rev</code>
+indexes are eligible for either query; the planner picked <code>rev</code> for
+all four. Both directions' indexes exist (§6) and are usable; having
+both simply lets a <em>range/sort</em> on either leading column be served.</p>
+</blockquote>
+<p><strong><code>idx_scan</code> corroboration (independent of EXPLAIN):</strong> counter
+<code>0 → 1</code> after executing the live and history queries (via
+<code>EXPLAIN ANALYZE</code>, which actually runs them):</p>
+<pre><code>Dataset_Subject_assoc_rev_idx        0 → 1
+Dataset_Subject_hist_assoc_rev_idx   0 → 1
+</code></pre>
+<p><code>EXPLAIN ANALYZE</code> reported <code>Index (Only) Scan ... actual time=… rows=1</code>
+for both — the indexes were genuinely consulted, not merely eligible.</p>
+<h2 id="8-findings-bugs">8. Findings / bugs</h2>
+<p><strong>Overall: the script works end-to-end.</strong> Both gates pass — every pure
+binary association ends up with composite indexes in both directions on
+both the live and history tables (§6), and the planner uses them (§7).
+No bugs found in <code>generate_association_indexes.py</code>.</p>
+<p><strong>Findings (none block the script; recorded for completeness):</strong></p>
+<ol>
+<li>
+<p><strong>Feature-value association tables are intentionally not indexed.</strong>
+   <code>Execution_Subject_Health</code> (and the other <code>Execution_&lt;X&gt;_&lt;Feature&gt;</code>
+   tables) carry 4 user FKs, so <code>Table.is_association()</code> (pure binary)
+   rejects them. This is correct behavior, but worth knowing: if the
+   motivation for the indexes is <em>feature-query</em> performance, those
+   tables are out of scope for this tool and would need a separate
+   indexing approach. The tool covers dataset-member, nested-dataset,
+   and <code>{X}_Asset_Type</code> / <code>{X}_Execution</code> link tables.</p>
+</li>
+<li>
+<p><strong>Planner picks the <code>rev</code> index for both orderings at this scale.</strong>
+   Not a defect — B-tree equality is order-insensitive across indexed
+   columns, so both <code>fwd</code> and <code>rev</code> are eligible and the planner chose
+   one. Both are present and usable (§6, §7). The two directions earn
+   their keep on range/sort-on-leading-column queries, not equality.</p>
+</li>
+<li>
+<p><strong><code>pg_indexes</code>/<code>pg_class</code> substring counting needs care.</strong>
+   <code>_assoc_fwd_idx</code> is a substring of <code>_hist_assoc_fwd_idx</code>; naive
+   <code>grep -c '_assoc_fwd_idx'</code> double-counts. This is a <em>test-script</em>
+   gotcha (handled here by anchoring on whole index names), not a
+   script issue.</p>
+</li>
+<li>
+<p><strong>Environment / auth.</strong> Catalog creation first failed HTTP 401
+   (stale <code>localhost</code> bearer token); resolved by a user re-login, after
+   which everything ran. An empty stray catalog (<code>_ermrest_catalog_2</code>)
+   was created during the auth probe and could not be auto-deleted
+   (permission guard on shared infra) — <strong>left in place; harmless</strong>
+   (no association tables). Clean it up manually if desired:
+   <code>curl -k -X DELETE -H "Authorization: Bearer &lt;tok&gt;" https://localhost/ermrest/catalog/2</code>.</p>
+</li>
+<li>
+<p><strong>zsh vs the plan's <code>eval "$PG"</code> pattern.</strong> The plan's
+   <code>eval "$PG" -c "&lt;sql&gt;"</code> idiom breaks under zsh (glob/word-split on
+   the parenthesised SQL). Switched to a <code>pg()</code> helper piping SQL via
+   <code>docker exec -i ... psql</code> stdin heredocs. A future run of this
+   runbook should use the heredoc form.</p>
+</li>
+</ol>
+<h2 id="9-catalog-disposition">9. Catalog disposition</h2>
+<p>Both test catalogs deleted via the ermrest API (user-authorized):</p>
+<ul>
+<li><strong>Catalog 3</strong> (the test catalog) — <code>DELETE /ermrest/catalog/3</code> → 204;
+  subsequent <code>GET</code> → 404.</li>
+<li><strong>Catalog 2</strong> (the auth-probe stray) — <code>DELETE /ermrest/catalog/2</code> →
+  204; <code>GET</code> → 404.</li>
+<li><strong>Catalog 1</strong> (pre-existing, untouched) — still <code>GET</code> → 200.</li>
+</ul>
+<p>(The backing <code>_ermrest_catalog_2/3</code> Postgres databases linger until
+ermrest's async reaper drops them; the catalogs are deregistered and
+no longer API-accessible, which is the meaningful deletion.)</p>
+<hr />
+<p><strong>Conclusion:</strong> <code>scripts/generate_association_indexes.py</code> is validated
+end-to-end. It discovers every pure binary association, emits correct
+composite-pair indexes for the live table and matching JSONB expression
+indexes for the history table in both directions, applies cleanly and
+idempotently via psql, and the resulting indexes are planner-usable
+(including the non-trivial history-side expression indexes). No bugs
+found.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

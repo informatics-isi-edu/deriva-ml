@@ -1,0 +1,3840 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml audit 2026-05 — cross-cutting (Phase 1) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-audit-2026-05-cross-cutting-phase-1" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml audit 2026-05 — cross-cutting (Phase 1)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-1-dead-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 1 — Dead code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 1 — Dead code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-icecream-debug-fallback-pattern-is-dead-code-in-9-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 icecream-debug fallback pattern is dead-code in 9 modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-loggermixin-is-exported-but-never-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 LoggerMixin is exported but never used
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-derivamlnoexecutioncontext-is-defined-but-never-raised" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 DerivaMLNoExecutionContext is defined but never raised
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-assetrid-is-deprecated-exported-and-replaced-everywhere" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 AssetRID is deprecated, exported, and replaced everywhere
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-derivamlworking_data-deprecated-property" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 DerivaML.working_data deprecated property
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-six-shim-modules-under-model-have-only-test-consumers-and-not-always" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6 Six shim modules under model/ have only test consumers (and not always)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-legacy-aliases-on-databasemodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.7 Legacy aliases on DatabaseModel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-assetcopymode-enum-style-class-is-a-25-line-wrapper-for-three-string-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.8 AssetCopyMode enum-style class is a 25-line wrapper for three string constants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-_legacy_only_params-set-defined-but-never-iterated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.9 _LEGACY_ONLY_PARAMS set defined but never iterated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#110-outdated-comment-docstring-drift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.10 Outdated comment / docstring drift
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-2-deriva-py-interface-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 2 — deriva-py interface usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 2 — deriva-py interface usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-clone_via_bag_collect_nested_dataset_rids-rolls-its-own-ermrest-url" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 clone_via_bag._collect_nested_dataset_rids rolls its own ERMrest URL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-cataloglocalizepy_fetch_asset_records-builds-an-or-chain-instead-of-using-in_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 catalog/localize.py:_fetch_asset_records builds an OR chain instead of using .in_()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-executionrid_leasepy_validate_pending_asset_leases-builds-an-ermrest-filter-clause-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 execution/rid_lease.py:_validate_pending_asset_leases builds an ERMrest filter clause by hand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-executionstate_machinepyreconcile_one_execution-uses-raw-ermrest-get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 execution/state_machine.py:reconcile_one_execution uses raw ERMrest GET
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-datasetcatalog_graphpysource_path-parses-a-datapath-uri-back-into-a-path-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 dataset/catalog_graph.py:source_path parses a datapath URI back into a path string
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-asset-upload-spec-uses-raw-url-templates-instead-of-pathbuilder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Asset upload spec uses raw URL templates instead of pathBuilder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-derivamodel-carries-two-association-table-predicates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 DerivaModel carries two association-table predicates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-derivamodelis_dataset_rid-uses-catalogresolve_rid-correctly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 DerivaModel.is_dataset_rid uses catalog.resolve_rid correctly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#29-cataloglocalizepy_extract_hatrac_path-rolls-a-string-parser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.9 catalog/localize.py:_extract_hatrac_path rolls a string parser
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-4-inconsistencies-duplication-added-by-incremental-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 4 — Inconsistencies / duplication added by incremental change
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 4 — Inconsistencies / duplication added by incremental change">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-three-chaise-navbar-builders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Three Chaise-navbar builders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-cataloggraph-and-datasetbagbuilder-are-parallel-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 CatalogGraph and DatasetBagBuilder are parallel implementations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-two-duplicate-cache-status-name-maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Two duplicate cache-status name maps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-two-validate_call-configuration-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Two validate_call configuration patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-three-logginggetlogger-initialization-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Three logging.getLogger initialization patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-two-find_associations-filter-idioms-for-elements-of-a-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Two find_associations() filter idioms for "elements of a dataset"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-_default_skip_tables-and-walker-terminal-table-sets-diverge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 _DEFAULT_SKIP_TABLES and walker terminal-table sets diverge
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-5-simplification-opportunities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 5 — Simplification opportunities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 5 — Simplification opportunities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-collapse-the-model-shim-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Collapse the model/ shim layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-datasetbagbuilder-should-either-become-cataloggraphs-replacement-or-be-deleted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 DatasetBagBuilder should either become CatalogGraph's replacement or be deleted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-unify-the-three-chaise-navbar-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Unify the three Chaise-navbar implementations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-_warn_about_legacy_params-could-use-a-pydantic-deprecation-hook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 _warn_about_legacy_params could use a Pydantic deprecation hook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-_get_table_contents-alias-proliferation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 _get_table_contents alias proliferation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-databasemodeldelete_database-is-a-one-line-alias-with-no-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 DatabaseModel.delete_database is a one-line alias with no callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-asset-localization-or-pattern-is-uniform-but-fragile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 Asset-localization or "..." pattern is uniform but fragile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#58-schema-cache-_apply_logger_overrides-is-the-only-consumer-of-default_logger_overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.8 Schema cache + _apply_logger_overrides is the only consumer of DEFAULT_LOGGER_OVERRIDES
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-6-maintainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 6 — Maintainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 6 — Maintainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-modelcatalogpy-is-a-2085-line-god-class-with-two-distinct-responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 model/catalog.py is a 2085-line god class with two distinct responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-datasetdatasetpy-is-3590-loc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 dataset/dataset.py is 3590 LoC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-docstring-quality-is-uneven" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Docstring quality is uneven
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-the-workflow-modules-ipython-jupyter-import-wrappers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 The Workflow module's IPython / Jupyter import wrappers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-naming-inconsistency-bag_path-bag_dir-output_dir-cache_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Naming inconsistency: bag_path, bag_dir, output_dir, cache_path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-__all__-consistency-in-shim-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 __all__ consistency in shim modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#67-re-exports-through-coredefinitionspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.7 Re-exports through core/definitions.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#68-doctest-coverage-on-selectors-factories-is-good-on-catalog-methods-is-correctly-skipped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.8 Doctest coverage on selectors / factories is good; on catalog methods is correctly skipped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#69-workflowworkflow_type-accepts-str-liststr-returns-liststr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.9 Workflow.workflow_type accepts str | list[str], returns list[str]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-actions-1n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions (1–N)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worst-offending-subsystems-for-phase-2-deep-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worst-offending subsystems for Phase 2 deep audit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Worst-offending subsystems for Phase 2 deep audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#worst-offender-1-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worst-offender #1: dataset/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worst-offender-2-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worst-offender #2: model/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worst-offender-3-optional-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worst-offender #3 (optional): execution/
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-audit-2026-05-cross-cutting-phase-1">deriva-ml audit 2026-05 — cross-cutting (Phase 1)</h1>
+<p>Reviewed <code>/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/</code>
+(~53.6 KLoC across 122 Python files in 8 subsystems) at the tip of
+<code>fix/catalog-manager-state-guards</code> (HEAD <code>4442f82</code>). External-consumer
+checks were run against <code>/Users/carl/GitHub/deriva-py/deriva/</code> —
+ADR-0006's bag pipeline has landed upstream and several deriva-ml
+subsystems have been (partially) ported to it. Findings below are
+concrete: file:line citation, what's wrong, what to do, estimated
+risk, estimated LoC delta. Items not raised here either survived
+scrutiny or are minor enough to not warrant a maintainer's attention
+right now.</p>
+<h2 id="executive-summary">Executive summary</h2>
+<p>Overall posture: <strong>healthy core, dragging tail</strong>. The recent bag
+migration (ADR-0006) is a load-bearing improvement — <code>catalog/clone.py</code>
+shrank from ~1900 to 412 lines, the new <code>clone_via_bag</code> is clean, and
+the <code>model/</code> subsystem is now mostly thin shims over <code>deriva.bag.*</code>.
+But that migration left a layer of half-eviscerated compatibility
+surface (six near-empty shim modules, two parallel <code>DerivaMLDatabase</code>
+names, two <code>AssetCopyMode</code> enums, three deprecated parameter buckets
+on <code>create_ml_workspace</code>) and three places where the new
+<code>CatalogBagBuilder</code> is reachable but the legacy <code>CatalogGraph</code>
+implementation is still doing the actual work (<code>DatasetBagBuilder</code>,
+<code>Dataset.download_dataset_bag</code>, <code>estimate_bag_size</code>).</p>
+<p>Top themes ranked by impact:</p>
+<ol>
+<li>
+<p><strong><code>DatasetBagBuilder</code> is named after ADR-0006 but is a façade
+   around <code>CatalogGraph</code>.</strong> <code>src/deriva_ml/dataset/bag_builder.py:109</code>
+   instantiates <code>CatalogGraph</code> and every public method delegates to it.
+   The bag-pipeline <code>anchors_for</code> / <code>build_policy</code> helpers exist
+   alongside but <strong>no production caller uses them</strong> — every call site
+   (<code>dataset.py:1302, 2495, 2976, 3353</code>, <code>mixins/dataset.py:290</code>)
+   reaches for <code>generate_dataset_download_spec</code> which still routes
+   through the legacy <code>CatalogGraph._collect_paths</code>. ADR-0006's
+   "dataset bag cutover" is <em>unfinished</em>, not just deferred.</p>
+</li>
+<li>
+<p><strong>Legacy shim layer is wider than necessary</strong> (6 modules under
+   <code>model/</code>, 1 under <code>local_db/</code>, plus duplicate names in <code>__init__.py</code>
+   lazy loaders). Each shim is ~20–40 lines of "re-export from
+   <code>deriva.bag.x</code>" plus a docstring promising removal. Only two of
+   them have external (test) callers; the other five are entirely
+   internal and can collapse to direct imports.</p>
+</li>
+<li>
+<p><strong>9 modules carry an unused <code>icecream</code> import + fallback pattern
+   (~6 lines each, ~50 LoC of dead infrastructure).</strong> No <code>ic(...)</code> call
+   sites exist anywhere in <code>src/</code>. The 4 callers that <em>do</em> configure
+   <code>ic.configureOutput</code> write to a stub that ignores its argument.</p>
+</li>
+<li>
+<p><strong>Logger initialization is split between three idioms</strong> (44 callsites
+   of <code>logging.getLogger</code>, half <code>__name__</code> and half <code>"deriva_ml"</code>, plus
+   a <code>LoggerMixin</code> that's exported but never used). <code>core/logging_config.py</code>
+   defines a <code>get_logger()</code> helper for exactly this consolidation —
+   nothing imports it except the configurator itself.</p>
+</li>
+<li>
+<p><strong>Three Chaise-navbar builders</strong> that solve the same problem
+   (<code>core/base.py:apply_catalog_annotations</code> 1218–1335,
+   <code>schema/annotations.py:catalog_annotation</code> 33–212, plus a partial
+   third copy in <code>schema/create_schema.py</code>'s init path). The vocabulary</p>
+</li>
+<li>asset + domain-schema enumeration loops are byte-for-byte
+   duplicated.</li>
+</ol>
+<p>Worst-offending subsystems for Phase 2 deep audit:</p>
+<ol>
+<li>
+<p><strong><code>dataset/</code></strong> (10.9 KLoC across 14 files). Two 2000+-line god
+   modules (<code>dataset.py</code> 3590, <code>dataset_bag.py</code> 2392), the
+   stubbed-out <code>DatasetBagBuilder</code>, plus parallel data-shaping paths
+   between <code>CatalogGraph</code> and <code>_prepare_wide_table</code> that both walk the
+   same FK graph differently.</p>
+</li>
+<li>
+<p><strong><code>model/</code></strong> (4.3 KLoC). Mostly transitional: <code>catalog.py</code> is
+   2085 lines and carries two distinct association-table predicates
+   (<code>is_association</code> vs <code>_is_association_table</code>) plus the
+   denormalization planner that probably belongs adjacent to
+   <code>local_db/denormalizer.py</code>. The six shim files in this directory
+   are the right candidate for "delete and re-import" cleanup.</p>
+</li>
+<li>
+<p><strong><code>execution/</code></strong> (11.3 KLoC, 24 files). Largest subsystem. Three
+   distinct module families that should probably be three packages
+   (lifecycle: <code>execution.py</code>, <code>runner.py</code>, <code>state_machine.py</code>;
+   I/O: <code>bag_commit.py</code>, <code>upload_engine.py</code>, <code>rid_lease.py</code>;
+   config: <code>execution_configuration.py</code>, <code>multirun_config.py</code>,
+   <code>base_config.py</code>). Deferred for Phase 2 because the surface is
+   large and most call sites are in <code>execution.py</code> itself —
+   intra-subsystem audit, not the cross-cutting kind.</p>
+</li>
+</ol>
+<hr />
+<h2 id="subsystem-inventory">Subsystem inventory</h2>
+<table>
+<thead>
+<tr>
+<th>Subsystem</th>
+<th style="text-align: right;">Files</th>
+<th style="text-align: right;">LoC</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>asset/</code></td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">1 000</td>
+<td><strong>Healthy.</strong> Manifest-first design well-implemented (<code>asset/manifest.py</code>). <code>AssetSpec</code> / <code>AssetSpecConfig</code> clean split. One minor gripe: <code>asset_record.py</code> is 102 lines but only used by <code>AssetFilePath.metadata</code> setter.</td>
+</tr>
+<tr>
+<td><code>catalog/</code></td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">1 755</td>
+<td><strong>Recently rewritten.</strong> <code>clone.py</code> is now a 412-line back-compat wrapper over <code>clone_via_bag.py</code> (473 LoC) — the legacy 1900-line implementation is gone. <code>localize.py</code> (477 LoC) is independent and predates ADR-0006.</td>
+</tr>
+<tr>
+<td><code>core/</code></td>
+<td style="text-align: right;">29</td>
+<td style="text-align: right;">11 143</td>
+<td><strong>The hub.</strong> <code>base.py</code> is 1934 LoC (<code>DerivaML</code> class + 11 mixins). <code>mixins/execution.py</code> 1211, <code>mixins/annotation.py</code> 1000, <code>mixins/dataset.py</code> 959 — three of these together are the bulk of the <code>DerivaML</code> public API.</td>
+</tr>
+<tr>
+<td><code>dataset/</code></td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">10 856</td>
+<td><strong>Worst-offender candidate.</strong> <code>dataset.py</code> (3590) and <code>dataset_bag.py</code> (2392) carry parallel implementations of every read operation. <code>DatasetBagBuilder</code> (364 LoC) is a façade over <code>CatalogGraph</code> (799 LoC).</td>
+</tr>
+<tr>
+<td><code>execution/</code></td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">11 260</td>
+<td><strong>Largest, mostly load-bearing.</strong> Bag-commit path (<code>bag_commit.py</code> 744) is new and clean. Lifecycle path (<code>execution.py</code> 2519, <code>runner.py</code> 705, <code>state_machine.py</code> 617) is dense but coherent.</td>
+</tr>
+<tr>
+<td><code>experiment/</code></td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">425</td>
+<td><strong>Small isolated module.</strong> Only consumer in src is <code>mixins/execution.py:43</code>.</td>
+</tr>
+<tr>
+<td><code>local_db/</code></td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">4 841</td>
+<td><strong>Healthy.</strong> <code>denormalizer.py</code> (1282 LoC) is the largest concern; the SQLite-helper shim is the only legacy carryover.</td>
+</tr>
+<tr>
+<td><code>model/</code></td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">4 260</td>
+<td><strong>In transition.</strong> <code>catalog.py</code> 2085 + <code>annotations.py</code> 1277 + <code>database.py</code> 290; six other files are 14–40 line shims over <code>deriva.bag.*</code>.</td>
+</tr>
+<tr>
+<td><code>schema/</code></td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">2 024</td>
+<td><strong>Two utilities + one large generator.</strong> <code>validation.py</code> (617) and <code>create_schema.py</code> (607) are independent. <code>annotations.py</code> (606) duplicates <code>core/base.py:apply_catalog_annotations</code>.</td>
+</tr>
+<tr>
+<td><code>tools/</code></td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">887</td>
+<td><code>validate_schema_doc.py</code> — CLI-only doc-validation tool. Not load-bearing.</td>
+</tr>
+<tr>
+<td><code>cli/</code></td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">129</td>
+<td>Two thin CLI entry points. No issues.</td>
+</tr>
+</tbody>
+</table>
+<p>Cross-subsystem dependencies worth naming:</p>
+<ul>
+<li><code>dataset/dataset.py</code> imports from <code>catalog/</code> (<code>localize_assets</code>),
+  <code>core/</code> (mixins, definitions), <code>execution/</code> (typing only),
+  <code>local_db/</code> (denormalizer), and <code>model/</code>. It is the single
+  highest-fanout module.</li>
+<li><code>model/catalog.py:DerivaModel</code> is the schema-handle used by every
+  mixin via <code>self.model</code>. Its <code>_schema_to_paths</code> is the FK-graph
+  primitive consumed by <code>dataset/catalog_graph.py:_collect_paths</code>,
+  the denormalization planner in <code>model/catalog.py</code> itself, and the
+  Chaise-navbar builders in <code>core/base.py</code> and <code>schema/annotations.py</code>.</li>
+<li><code>dataset/bag_cache.py</code> and <code>dataset/bag_builder.py</code> both import
+  from <code>deriva.bag.*</code> directly; everything else in <code>dataset/</code> still
+  goes through <code>dataset/catalog_graph.py</code>.</li>
+</ul>
+<hr />
+<h2 id="lens-1-dead-code">Lens 1 — Dead code</h2>
+<h3 id="11-icecream-debug-fallback-pattern-is-dead-code-in-9-modules">1.1 <code>icecream</code>-debug fallback pattern is dead-code in 9 modules</h3>
+<p>Nine modules import <code>icecream</code> with a no-op fallback (<code>ic = lambda *a:
+...</code>) and four of them also call <code>ic.configureOutput(...)</code> inside the
+import-success branch. <strong>No <code>ic(...)</code> call sites exist anywhere in
+<code>src/deriva_ml/**</code></strong> — verified by <code>grep -rn ' ic(' src/</code>. The fallback
+silently swallows whatever an <code>ic(...)</code> call would have produced.</p>
+<p>Affected sites:</p>
+<ul>
+<li><code>core/catalog.py:48-51</code> (the import + fallback)</li>
+<li><code>dataset/dataset.py:75-80</code></li>
+<li><code>dataset/dataset_bag.py:67-72</code></li>
+<li><code>dataset/catalog_graph.py:31-39</code></li>
+<li><code>dataset/upload.py:74-79</code></li>
+<li><code>dataset/aux_classes.py:29-35</code></li>
+<li><code>execution/execution.py:94-97</code></li>
+<li><code>model/catalog.py:48-51</code></li>
+<li><code>schema/create_schema.py:41-44</code></li>
+<li><code>demo_catalog.py:39-44</code></li>
+</ul>
+<p><strong>Fix:</strong> delete the import + fallback + <code>configureOutput</code> calls.
+Bring back a single project-wide <code># breakpoint: import icecream as ic</code>
+in <code>conftest.py</code> if developers want it. <strong>Risk: trivial. LoC: −55.</strong>
+<strong>Severity: low</strong> (cosmetic; runtime is unaffected).</p>
+<h3 id="12-loggermixin-is-exported-but-never-used">1.2 <code>LoggerMixin</code> is exported but never used</h3>
+<p><code>core/logging_config.py:195-213</code> defines <code>LoggerMixin</code> and exports it
+from <code>core/__init__.py:36, 67</code>. Grep across <code>src/</code> shows zero
+consumers. The intended consumers (<code>DatabaseModel</code>, <code>Asset</code>,
+<code>Dataset</code>, <code>Execution</code>, etc.) all do <code>self._logger =
+logging.getLogger("deriva_ml")</code> inline instead.</p>
+<p><strong>Fix:</strong> delete <code>LoggerMixin</code> and its <code>core/__init__.py</code> export.
+<strong>Risk: low</strong> (no callers in deriva-ml; spot-check the MCP plugins
+turned up no external consumers either). <strong>LoC: −20.</strong> <strong>Severity: low.</strong></p>
+<h3 id="13-derivamlnoexecutioncontext-is-defined-but-never-raised">1.3 <code>DerivaMLNoExecutionContext</code> is defined but never raised</h3>
+<p><code>core/exceptions.py:174-193</code> declares this exception with a
+nine-line docstring + example. Grep across <code>src/</code> shows it imported
+nowhere and raised nowhere. The docstring refers to "<code>ml.table()</code>
+handles" — that surface doesn't exist (no <code>DerivaML.table()</code> method).</p>
+<p><strong>Fix:</strong> delete <code>DerivaMLNoExecutionContext</code>. <strong>Risk: low</strong> (zero
+callers). <strong>LoC: −20.</strong> <strong>Severity: low.</strong></p>
+<h3 id="14-assetrid-is-deprecated-exported-and-replaced-everywhere">1.4 <code>AssetRID</code> is deprecated, exported, and replaced everywhere</h3>
+<p><code>execution/execution_configuration.py:147-171</code> defines <code>AssetRID</code>
+with a "deprecated; use <code>AssetSpec</code>" notice. It is exported from
+<code>execution/__init__.py:28, 67</code>. The only <code>isinstance(v, AssetRID)</code>
+check is inside <code>ExecutionConfiguration.validate_assets</code> itself
+(<code>execution_configuration.py:111</code>), which converts it to <code>AssetSpec</code>.
+No production caller constructs an <code>AssetRID</code>.</p>
+<p><strong>Fix:</strong> delete <code>AssetRID</code> and the <code>isinstance(v, AssetRID)</code> branch
+of <code>validate_assets</code>. <strong>Risk: low-medium</strong> (external callers passing
+a serialized <code>AssetRID</code> would still be handled by the <code>dict</code> or
+<code>str</code> branches). <strong>LoC: −30.</strong> <strong>Severity: low.</strong></p>
+<h3 id="15-derivamlworking_data-deprecated-property">1.5 <code>DerivaML.working_data</code> deprecated property</h3>
+<p><code>core/base.py:865-893</code> — emits a <code>DeprecationWarning</code> and returns
+<code>self.workspace</code>. No internal callers. The companion property
+<code>workspace</code> has been the canonical name for several releases now.</p>
+<p><strong>Fix:</strong> delete the property. <strong>Risk: low</strong> (<code>DeprecationWarning</code>
+shouldn't be load-bearing for any caller). <strong>LoC: −30.</strong> <strong>Severity: low.</strong></p>
+<h3 id="16-six-shim-modules-under-model-have-only-test-consumers-and-not-always">1.6 Six shim modules under <code>model/</code> have only test consumers (and not always)</h3>
+<p>Each is a 14–40 line module that re-exports from <code>deriva.bag.*</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Shim file</th>
+<th>LoC</th>
+<th>External (non-shim) consumers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model/schema_builder.py</code></td>
+<td>39</td>
+<td><code>local_db/schema.py:26</code> (in <code>src/</code>)</td>
+</tr>
+<tr>
+<td><code>model/data_loader.py</code></td>
+<td>24</td>
+<td>tests only (no <code>src/</code> callers)</td>
+</tr>
+<tr>
+<td><code>model/data_sources.py</code></td>
+<td>33</td>
+<td>tests only</td>
+</tr>
+<tr>
+<td><code>model/fk_orderer.py</code></td>
+<td>21</td>
+<td>tests only</td>
+</tr>
+<tr>
+<td><code>model/handles.py</code></td>
+<td>14</td>
+<td>none — its symbols are re-exported</td>
+</tr>
+<tr>
+<td><code>model/deriva_ml_database.py</code></td>
+<td>30</td>
+<td>tests only</td>
+</tr>
+<tr>
+<td><code>local_db/sqlite_helpers.py</code></td>
+<td>45</td>
+<td>tests only</td>
+</tr>
+</tbody>
+</table>
+<p><code>model/__init__.py:54-57, 60</code> then imports from these shims and
+re-exports the same symbols a second time. The <code>DatabaseModel</code> lazy-load
+in <code>model/__init__.py:118-126</code> exposes <code>DerivaMLDatabase</code> as an alias
+for <code>DerivaMLBagView</code>, <em>and</em> <code>model/deriva_ml_database.py:28</code> re-binds
+the same alias. Two parallel "back-compat" surfaces for the same name.</p>
+<p><strong>Fix (staged):</strong></p>
+<ol>
+<li><strong>Now</strong> — update <code>local_db/schema.py:26</code> to <code>from deriva.bag.schema
+   import SchemaBuilder, SchemaORM</code> directly, then delete
+   <code>model/schema_builder.py</code> and remove the <code>model/__init__.py</code>
+   import.</li>
+<li><strong>Now</strong> — update the four test files that still import via
+   <code>model/data_loader.py</code>, <code>model/data_sources.py</code>,
+   <code>model/fk_orderer.py</code>, <code>model/handles.py</code> to import from
+   <code>deriva.bag.*</code> directly; delete those four shims and the
+   corresponding <code>model/__init__.py</code> entries.</li>
+<li><strong>One release cycle</strong> — collapse <code>model/deriva_ml_database.py</code>'s
+   alias into <code>model/__init__.py</code> (single lazy-import path); drop
+   <code>local_db/sqlite_helpers.py</code> once the two test imports flip.</li>
+</ol>
+<p><strong>Risk: low-medium</strong> (per-shim; the deletion is mechanical once test
+imports are updated). <strong>LoC: −200 across all seven shims plus their
+<code>__init__</code> plumbing.</strong> <strong>Severity: medium</strong> — the shim layer obscures
+the actual deriva-py boundary and adds two re-export paths for every
+symbol it touches.</p>
+<h3 id="17-legacy-aliases-on-databasemodel">1.7 Legacy aliases on <code>DatabaseModel</code></h3>
+<p><code>model/database.py:265-287</code> defines three back-compat methods:</p>
+<ul>
+<li><code>_get_table_contents(self, table)</code> — generator that delegates to
+  the inherited <code>get_table_contents</code>. Called from 5 sites in
+  <code>dataset_bag.py</code> and <code>deriva_ml_bag_view.py</code>.</li>
+<li><code>get_orm_association_class(...)</code> — alias for inherited
+  <code>get_association_class</code>. Called from <code>dataset_bag.py:509</code> only.</li>
+<li><code>delete_database()</code> — alias for <code>dispose()</code> with a docstring noting
+  the "delete" name was misleading. Zero callers.</li>
+</ul>
+<p><strong>Findings:</strong></p>
+<ul>
+<li><code>delete_database()</code> (<code>database.py:279-287</code>) has no callers in
+  <code>src/</code>. Delete. <strong>LoC: −10.</strong></li>
+<li><code>_get_table_contents</code> is consumed by 5 sites outside the
+  defining class — defeats the underscore convention. Either rename
+  the callsites to <code>get_table_contents</code> (already public on
+  <code>BagDatabase</code>) or rename the alias to drop the underscore.
+  <strong>LoC: −5 (delete alias, update 5 callsites).</strong></li>
+<li><code>get_orm_association_class</code> is a one-call alias. Update the call
+  in <code>dataset_bag.py:509</code> and delete the alias. <strong>LoC: −5.</strong></li>
+</ul>
+<p><strong>Risk: low</strong> (mechanical). <strong>Severity: low</strong> — but together with §1.6
+this is a noticeable accumulation of "back-compat I can never delete."</p>
+<h3 id="18-assetcopymode-enum-style-class-is-a-25-line-wrapper-for-three-string-constants">1.8 <code>AssetCopyMode</code> enum-style class is a 25-line wrapper for three string constants</h3>
+<p><code>catalog/clone.py:92-117</code> defines a class that "exists for back-compat"
+and isn't allowed to be instantiated. Its members are aliases for
+<code>AssetMode.ROWS_ONLY</code> / <code>AssetMode.UPLOAD_IF_MISSING</code>, used as the
+default for <code>create_ml_workspace</code>'s <code>asset_mode</code> parameter
+(<code>clone.py:153</code>). <code>_coerce_asset_mode</code> (<code>clone.py:324-346</code>) accepts
+both the legacy and the new spellings.</p>
+<p><code>AssetCopyMode</code> is exported (<code>catalog/__init__.py:28, 61</code>,
+<code>clone.py:404</code>) but no internal caller references it after the
+parameter coercion. The simplification is: <strong>make <code>create_ml_workspace</code>'s
+<code>asset_mode</code> default <code>AssetMode.ROWS_ONLY</code> directly, delete
+<code>AssetCopyMode</code>, delete <code>_coerce_asset_mode</code></strong>, keep only string
+coercion at the boundary. <strong>Risk: low-medium</strong> (one
+DeprecationWarning per stray external caller using <code>.REFERENCES</code> or
+<code>.FULL</code> — they get caught by the string branch). <strong>LoC: −60.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="19-_legacy_only_params-set-defined-but-never-iterated">1.9 <code>_LEGACY_ONLY_PARAMS</code> set defined but never iterated</h3>
+<p><code>catalog/clone.py:125-137</code> defines <code>_LEGACY_ONLY_PARAMS</code> (11 names),
+but the runtime check that warns about non-default values lives in
+<code>_warn_about_legacy_params</code> (<code>clone.py:366-400</code>) and has its own
+<code>defaults = {...}</code> dict of 11 names. Two parallel declarations of
+the same eleven-element set.</p>
+<p><strong>Fix:</strong> delete <code>_LEGACY_ONLY_PARAMS</code> (<code>clone.py:125-137</code>) or use it
+inside <code>_warn_about_legacy_params</code>. <strong>LoC: −15.</strong> <strong>Severity: low.</strong></p>
+<h3 id="110-outdated-comment-docstring-drift">1.10 Outdated comment / docstring drift</h3>
+<ul>
+<li><code>catalog/localize.py:413</code> — "datapath doesn't have an 'in' operator"
+  — incorrect since deriva-py PR #242 added <code>_ColumnWrapper.in_</code>
+  (<code>deriva-py/deriva/core/datapath.py:1269</code>). The <code>_fetch_asset_records</code>
+  fallback builds an OR chain (<code>localize.py:417-423</code>) when one
+  <code>.in_(...)</code> call would do.</li>
+<li><code>catalog/clone_via_bag.py:178</code> — raw URL <code>/entity/deriva-ml:Dataset_Dataset/Dataset=any(...)</code>
+  built by string concatenation in <code>_collect_nested_dataset_rids</code>.
+  Same anti-pattern as bag-audit §2.1. See Lens 2.</li>
+<li><code>model/database.py:281-286</code> — <code>delete_database</code> docstring claims
+  back-compat with pre-migration callers, but those callers no longer
+  exist (see §1.7).</li>
+</ul>
+<p><strong>Severity: low. LoC: ±0 (doc-only) for the comment; see Lens 2 for
+the URL.</strong></p>
+<hr />
+<h2 id="lens-2-deriva-py-interface-usage">Lens 2 — deriva-py interface usage</h2>
+<h3 id="21-clone_via_bag_collect_nested_dataset_rids-rolls-its-own-ermrest-url">2.1 <code>clone_via_bag._collect_nested_dataset_rids</code> rolls its own ERMrest URL</h3>
+<p><code>catalog/clone_via_bag.py:161-201</code> issues a BFS over <code>Dataset_Dataset</code>
+by constructing the URL with <code>urlquote</code> + f-string and calling
+<code>source_catalog.get(path)</code>. The body:</p>
+<pre><code class="language-python">rid_list = &quot;,&quot;.join(urlquote(r) for r in sorted(frontier))
+path = f&quot;/entity/deriva-ml:Dataset_Dataset/Dataset=any({rid_list})&quot;
+response = source_catalog.get(path)
+</code></pre>
+<p>The datapath equivalent (verified in
+<code>deriva-py/deriva/core/datapath.py:1269-1299</code> — <code>_ColumnWrapper.in_</code>):</p>
+<pre><code class="language-python">pb = source_catalog.getPathBuilder()
+dd = pb.schemas[&quot;deriva-ml&quot;].tables[&quot;Dataset_Dataset&quot;]
+rows = dd.filter(dd.Dataset.in_(sorted(frontier))).entities().fetch()
+</code></pre>
+<p>This is the same fix the bag-package audit recommended for
+<code>_validate_anchors</code> (<code>bag-package-audit-2026-05.md</code> §2.1). <strong>Risk: low-medium</strong>
+(needs a live-catalog smoke test; the unit path is straightforward).
+<strong>LoC: −10.</strong> <strong>Severity: medium</strong> — every reimplemented raw URL is
+a place where a hyphen-in-RID or a new ERMrest filter syntax will
+silently break.</p>
+<h3 id="22-cataloglocalizepy_fetch_asset_records-builds-an-or-chain-instead-of-using-in_">2.2 <code>catalog/localize.py:_fetch_asset_records</code> builds an OR chain instead of using <code>.in_()</code></h3>
+<p><code>catalog/localize.py:413-428</code> constructs <code>filter_expr = (col == r1) |
+(col == r2) | ...</code> because the comment at line 413 claims "datapath
+doesn't have an 'in' operator." The fallback handles
+<code>DataPathException</code> by issuing one fetch per RID — fine for the
+single-RID fallback, but the primary path should use <code>.in_()</code>. Same
+fix as §2.1.</p>
+<p><strong>Risk: low. LoC: −8.</strong> <strong>Severity: low.</strong></p>
+<h3 id="23-executionrid_leasepy_validate_pending_asset_leases-builds-an-ermrest-filter-clause-by-hand">2.3 <code>execution/rid_lease.py:_validate_pending_asset_leases</code> builds an ERMrest filter clause by hand</h3>
+<p><code>execution/rid_lease.py:124-130</code> does:</p>
+<pre><code class="language-python">filter_clause = &quot;;&quot;.join(f&quot;RID={rid}&quot; for rid in chunk)
+path = f&quot;/entity/public:ERMrest_RID_Lease/{filter_clause}&quot;
+response = catalog.get(path)
+</code></pre>
+<p>The <code>;</code> separator means OR in ERMrest filter syntax — exactly what
+<code>column.in_(values)</code> produces. The function chunks by
+<code>PENDING_ROWS_LEASE_CHUNK</code> (defined in
+<code>execution/lease_orchestrator.py:211</code> which also builds the same
+filter clause). Two callers of the same idiom.</p>
+<p><strong>Fix:</strong> consolidate into a single helper <code>lease_rids_present(catalog,
+rids) -&gt; set[str]</code> using <code>pb.schemas["public"].tables["ERMrest_RID_Lease"]</code>
+and <code>.in_(rids)</code>. <strong>Risk: low-medium</strong> (live-catalog test needed). <strong>LoC: −15.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="24-executionstate_machinepyreconcile_one_execution-uses-raw-ermrest-get">2.4 <code>execution/state_machine.py:reconcile_one_execution</code> uses raw ERMrest GET</h3>
+<p><code>execution/state_machine.py:488-491</code>:</p>
+<pre><code class="language-python">response = catalog.get(
+    f&quot;/entity/deriva-ml:Execution/RID={execution_rid}&quot;
+)
+rows = response.json()
+</code></pre>
+<p>Standard "fetch a single row by RID" pattern. The deriva-py path is
+<code>pb.schemas["deriva-ml"].tables["Execution"].filter(t.RID ==
+execution_rid).entities().fetch()</code> — same wire request, but the URL
+construction lives in deriva-py where escaping and snapshot handling
+already exist. The neighboring <code>create_catalog_execution</code>
+(<code>state_machine.py:611</code>) does a raw <code>catalog.post("/entity/deriva-ml:Execution",
+json=body)</code> — also fine, but inconsistent with the rest of the
+codebase's preference for the datapath API per the
+deriva-ml <code>CLAUDE.md</code> "API priority" note.</p>
+<p><strong>Recommendation:</strong> track as a follow-up cleanup. Both callsites work;
+the bigger issue is that <code>reconcile_one_execution</code> is the only place
+in the state machine that needs to query an arbitrary RID, and the
+datapath path-builder is already constructed for <code>update_catalog</code>
+calls in the same file. <strong>LoC: −5.</strong> <strong>Severity: low.</strong></p>
+<h3 id="25-datasetcatalog_graphpysource_path-parses-a-datapath-uri-back-into-a-path-string">2.5 <code>dataset/catalog_graph.py:source_path</code> parses a datapath URI back into a path string</h3>
+<p><code>dataset/catalog_graph.py:651-663</code> builds a datapath, then peels the
+ERMrest URI back apart by hand:</p>
+<pre><code class="language-python">def source_path(path: tuple[Table, ...]) -&gt; str:
+    dp, _ = self._build_linked_datapath(path, pb)
+    uri = dp.uri
+    entity_prefix = &quot;/entity/&quot;
+    idx = uri.index(entity_prefix)
+    entity_path = uri[idx + len(entity_prefix):]
+    parts = entity_path.split(&quot;/&quot;, 1)
+    if len(parts) == 1:
+        return f&quot;{parts[0]}/RID={{RID}}&quot;
+    return f&quot;{parts[0]}/RID={{RID}}/{parts[1]}&quot;
+</code></pre>
+<p>This is the conversion layer between datapath and the export engine's
+expected query path. The "parse a URI back into the path" step is
+fragile (it would break if datapath ever emitted <code>?snaptime=...</code> or
+a different query-string format). deriva-py exposes a private
+<code>_path</code> attribute on the datapath that's the string form before URI
+assembly; using it would be slightly cleaner.</p>
+<p><strong>Risk: low</strong> (current code works). <strong>LoC: ±0.</strong> <strong>Severity: low</strong> —
+flag for Phase 2 review of <code>CatalogGraph</code> (which is itself slated
+for replacement by <code>CatalogBagBuilder</code>).</p>
+<h3 id="26-asset-upload-spec-uses-raw-url-templates-instead-of-pathbuilder">2.6 Asset upload spec uses raw URL templates instead of pathBuilder</h3>
+<p><code>dataset/upload.py:277</code> defines <code>record_query_template:
+"/entity/{target_table}/MD5={md5}&amp;Filename={file_name}"</code> and
+<code>hatrac_options</code> / <code>hatrac_templates</code> carry literal path-template
+strings. This is fine — the upload spec is consumed by deriva-py's
+<code>GenericUploader</code>, which expects raw URL templates. No fix needed,
+but worth a comment explaining that these strings are spec-DSL not
+URL construction, since <code>localize.py</code> and <code>clone_via_bag.py</code> (the
+files that <em>should</em> use pathBuilder) have similar-looking idioms
+that are wrong.</p>
+<p><strong>Recommendation:</strong> add a one-line comment at <code>dataset/upload.py:277</code>
+distinguishing the upload-spec template from runtime URL construction.
+<strong>LoC: +2.</strong> <strong>Severity: low.</strong></p>
+<h3 id="27-derivamodel-carries-two-association-table-predicates">2.7 <code>DerivaModel</code> carries two association-table predicates</h3>
+<p><code>model/catalog.py:492-513</code> exposes <code>is_association(table, ...)</code> —
+delegates to deriva-py <code>Table.is_association(...)</code> (verified in
+<code>deriva-py/deriva/core/ermrest_model.py:2206</code>). Default arity is
+2..2, default pure-ness is <code>True</code>.</p>
+<p><code>model/catalog.py:718-772</code> defines <code>_is_association_table</code> — a custom
+predicate that ignores <code>pure</code>, filters out <code>ERMrest_Client</code> /
+<code>ERMrest_Group</code> FKs, and returns True if <strong>exactly</strong> two domain FKs
+remain. The docstring at 738-742 explains it's "stricter in one
+direction, looser in another" than the deriva-py method.</p>
+<p>There's also <code>deriva.bag.schema.SchemaBuilder.is_association_table</code>
+upstream (<code>deriva-py/deriva/bag/_orm_helpers.py:33</code>,
+<code>deriva-py/deriva/bag/schema.py:291</code>) — a <em>third</em> predicate, with
+yet a different arity-rule semantic, intended for ORM building.</p>
+<p>Three predicates with overlapping but non-identical semantics:</p>
+<table>
+<thead>
+<tr>
+<th>Predicate</th>
+<th>Counts system FKs?</th>
+<th>Requires pure?</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Table.is_association</code> (deriva-py)</td>
+<td>yes</td>
+<td>configurable (default yes)</td>
+<td><code>model/catalog.py:is_association</code> (8 callsites)</td>
+</tr>
+<tr>
+<td><code>DerivaModel._is_association_table</code></td>
+<td>no</td>
+<td>no (topology only)</td>
+<td><code>model/catalog.py</code> denormalization planner (5 callsites)</td>
+</tr>
+<tr>
+<td><code>SchemaBuilder.is_association_table</code> (deriva-py bag)</td>
+<td>n/a (SQL-level)</td>
+<td>n/a</td>
+<td><code>BagDatabase</code> ORM auto-build (deriva-ml inherits it)</td>
+</tr>
+</tbody>
+</table>
+<p>The denormalization planner needs the "topology not purity" variant
+because real Deriva linkage tables routinely carry annotation
+columns (<code>Role</code>, <code>Ordinal</code>, <code>Comment</code>) without losing their M:N
+identity. That's a legitimate need.</p>
+<p><strong>Recommendation:</strong> rename <code>_is_association_table</code> to
+<code>is_topological_association</code> and document it as a public method that
+exists alongside <code>is_association</code> (the deriva-py default). Phase 2
+deep-audit should decide whether the denormalization planner's
+predicate can be folded into deriva-py's <code>is_association(pure=False,
+return_fkeys=True)</code> — likely yes, with a custom filter on the
+returned fkey set.</p>
+<p><strong>Risk: low</strong> (rename + doc only). <strong>LoC: +10.</strong> <strong>Severity: low.</strong></p>
+<h3 id="28-derivamodelis_dataset_rid-uses-catalogresolve_rid-correctly">2.8 <code>DerivaModel.is_dataset_rid</code> uses <code>catalog.resolve_rid</code> correctly</h3>
+<p><code>model/catalog.py:678-690</code> calls <code>self.model.catalog.resolve_rid(rid,
+self.model)</code> — the canonical deriva-py API
+(<code>deriva-py/deriva/core/ermrest_catalog.py</code>). This is exactly the
+right pattern. Mentioning it because the rest of this lens has been
+"watch out for raw URL builders" — this is the counterexample of how
+the integration <em>should</em> look.</p>
+<h3 id="29-cataloglocalizepy_extract_hatrac_path-rolls-a-string-parser">2.9 <code>catalog/localize.py:_extract_hatrac_path</code> rolls a string parser</h3>
+<p><code>catalog/localize.py:442-462</code> uses <code>urlparse</code> + <code>path.find("/hatrac/")</code>
+to extract the hatrac path from a URL. Self-contained, no dep on
+deriva-py beyond <code>urlparse</code>. Could use
+<code>deriva.core.hatrac_store.HatracStore</code> helpers but those are
+geared toward GET/PUT, not URL parsing. <strong>No action.</strong></p>
+<hr />
+<h2 id="lens-4-inconsistencies-duplication-added-by-incremental-change">Lens 4 — Inconsistencies / duplication added by incremental change</h2>
+<h3 id="41-three-chaise-navbar-builders">4.1 Three Chaise-navbar builders</h3>
+<p>The exact same navbar tree (User Info / Deriva-ML / WWW / domain
+schemas / Vocabulary / Assets / Features / Catalog Registry /
+Documentation) is built in:</p>
+<ul>
+<li><strong><code>core/base.py:1218-1334</code></strong> — <code>DerivaML.apply_catalog_annotations()</code>,
+  117 lines, instance method.</li>
+<li><strong><code>schema/annotations.py:33-212</code></strong> — <code>catalog_annotation(model:
+  DerivaModel)</code>, ~180 lines, module function.</li>
+<li><strong><code>schema/create_schema.py</code></strong> (partial copy in the schema-init path)
+  — referenced from <code>schema/__init__.py</code>.</li>
+</ul>
+<p>Each implementation:</p>
+<ol>
+<li>Iterates <code>domain_schemas</code> in sorted order to build per-schema menus.</li>
+<li>Iterates both ML and domain schemas to enumerate vocabularies.</li>
+<li>Iterates both ML and domain schemas to enumerate asset tables.</li>
+<li>Skips associations and vocabularies in the domain menu.</li>
+</ol>
+<p>The filter predicates at <code>core/base.py:1162</code>,
+<code>schema/annotations.py:135</code>, and <code>core/base.py:1177, 1191</code> use
+<code>is_association(tname, pure=False, max_arity=3)</code> — identical kwargs.</p>
+<p><strong>Recommendation:</strong> lift the navbar builder to a single module
+function (<code>schema/annotations.py:build_catalog_navbar(model) -&gt; dict</code>)
+and have <code>DerivaML.apply_catalog_annotations</code> and <code>create_ml_schema</code>
+both call it. The wrapping <code>apply()</code> step stays where it is.
+<strong>Risk: medium</strong> (touches three callsites with subtly different
+state). <strong>LoC: −150 to −180.</strong> <strong>Severity: high</strong> — three copies of
+the same logic means three places to update when the navbar layout
+changes; it has already drifted (the WWW menu in
+<code>schema/annotations.py:111</code> lists the same two entries as
+<code>base.py:1281</code>, but the icon rendering rules differ).</p>
+<h3 id="42-cataloggraph-and-datasetbagbuilder-are-parallel-implementations">4.2 <code>CatalogGraph</code> and <code>DatasetBagBuilder</code> are parallel implementations</h3>
+<p><code>dataset/catalog_graph.py:CatalogGraph</code> (799 LoC, production) and
+<code>dataset/bag_builder.py:DatasetBagBuilder</code> (364 LoC, also production
+but slated to replace <code>CatalogGraph</code> per ADR-0006).</p>
+<p>The current state, as of HEAD:</p>
+<ul>
+<li><code>DatasetBagBuilder.__init__</code> (<code>bag_builder.py:83-114</code>) <strong>instantiates a
+  <code>CatalogGraph</code></strong> and stores it as <code>self._catalog_graph</code>.</li>
+<li><code>generate_dataset_download_spec</code>, <code>generate_dataset_download_annotations</code>,
+  <code>aggregate_queries</code> all delegate to <code>self._catalog_graph.&lt;same
+  name&gt;</code>.</li>
+<li>The bag-pipeline-shaped helpers (<code>anchors_for</code>, <code>build_policy</code>,
+  <code>_exclude_empty_associations</code>, <code>_iter_descendant_rids</code>) — 165
+  lines — exist on <code>DatasetBagBuilder</code> but <strong>no production caller
+  invokes them</strong>. The comment at <code>bag_builder.py:99-108</code> explicitly
+  flags this as a deferred cutover.</li>
+</ul>
+<p>The five production callers (<code>dataset.py:1302</code>, <code>2495</code>, <code>2976</code>,
+<code>3353</code>, <code>mixins/dataset.py:290</code>) all reach for
+<code>generate_dataset_download_spec</code> / <code>generate_dataset_download_annotations</code>,
+so the bag-pipeline path is unreachable from anywhere except tests.</p>
+<p><strong>Severity: high.</strong> ADR-0006 declared this cutover; it isn't done.
+The intermediate state — bag-pipeline helpers present and untested
+against production loads, legacy <code>CatalogGraph</code> still doing the
+actual work — is the worst of both worlds.</p>
+<p><strong>Recommended action:</strong> schedule the cutover as a discrete piece of
+work. Until it lands, the parallel surface is a maintenance hazard
+because any change to <code>CatalogGraph._collect_paths</code> semantics has to
+be back-ported to <code>_exclude_empty_associations</code> and vice versa.</p>
+<h3 id="43-two-duplicate-cache-status-name-maps">4.3 Two duplicate cache-status name maps</h3>
+<p><code>dataset/bag_cache.py:CacheStatus</code> defines both <code>cached_holey</code> and
+<code>cached_incomplete</code> as enum members that share the same string value
+(<code>"cached_holey"</code>). The class comment at <code>bag_cache.py:72-76</code> explains
+this is back-compat for the old name. But the consuming docstrings in
+the function that returns the dict use the <strong>old name</strong> —
+<code>mixins/dataset.py:387</code> and <code>dataset/dataset.py:2682</code> both say
+<code>"cache_status": one of "not_cached", "cached_metadata_only",
+"cached_materialized", "cached_incomplete"</code>.</p>
+<p>Two consequences:</p>
+<ul>
+<li>The docstring is wrong about the <em>current</em> return value
+  (<code>bag_cache.py:213</code> and <code>231</code> return <code>CacheStatus.cached_holey</code>,
+  whose <code>.value</code> is <code>"cached_holey"</code>, not <code>"cached_incomplete"</code>).</li>
+<li>The aliasing in the enum means <code>CacheStatus("cached_holey") is
+  CacheStatus.cached_incomplete</code> — which works for <code>==</code> comparisons
+  but is surprising for <code>is</code> comparisons.</li>
+</ul>
+<p><strong>Fix:</strong> update the two docstrings to say <code>"cached_holey"</code> instead
+of <code>"cached_incomplete"</code>, and consider removing the alias entry
+after a release cycle. <strong>Risk: zero (doc-only). LoC: +2 / −0</strong> for
+the doc fix; <strong>−5</strong> if the alias is removed. <strong>Severity: low.</strong></p>
+<h3 id="44-two-validate_call-configuration-patterns">4.4 Two <code>validate_call</code> configuration patterns</h3>
+<p><code>core/validation.py:49-58</code> defines <code>VALIDATION_CONFIG</code> and
+<code>STRICT_VALIDATION_CONFIG</code> exactly so callers can write
+<code>@validate_call(config=VALIDATION_CONFIG)</code>. The module's docstring at
+line 14 explicitly demonstrates this pattern.</p>
+<p>In practice, <strong>44 callsites across <code>src/</code></strong> write
+<code>@validate_call(config=ConfigDict(arbitrary_types_allowed=True))</code>
+inline. <strong>Zero callsites</strong> import <code>VALIDATION_CONFIG</code>.</p>
+<p>Sample sites (confirmed by grep):</p>
+<ul>
+<li><code>core/mixins/annotation.py:79</code></li>
+<li><code>core/mixins/dataset.py:230</code></li>
+<li><code>core/mixins/feature.py:154</code> (and 6 others in the same file)</li>
+<li><code>model/catalog.py:569</code></li>
+<li><code>asset/asset.py:116</code> (in <code>__init__</code>)</li>
+<li><code>dataset/dataset.py:186, 580</code> (and many others)</li>
+<li><code>execution/execution.py:165, 322</code> (etc.)</li>
+</ul>
+<p><strong>Fix:</strong> project-wide search-and-replace of the inline <code>ConfigDict(...)</code>
+with the <code>VALIDATION_CONFIG</code> import. <strong>Risk: low</strong> (semantically
+identical). <strong>LoC: roughly neutral but consolidates the configuration
+point.</strong> <strong>Severity: medium</strong> — if the <code>ConfigDict</code> defaults ever need
+to change (e.g., to forbid extra fields globally), the current state
+requires 44 edits.</p>
+<h3 id="45-three-logginggetlogger-initialization-patterns">4.5 Three <code>logging.getLogger</code> initialization patterns</h3>
+<p>Documented in §1.2 (LoggerMixin) and the executive summary. Summary
+of patterns in use:</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Sample callsite</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logger = logging.getLogger(__name__)</code></td>
+<td><code>model/catalog.py:120</code></td>
+<td>~22</td>
+</tr>
+<tr>
+<td><code>logger = logging.getLogger("deriva_ml")</code></td>
+<td><code>validation.py:40</code>, <code>bag_cache.py:44</code></td>
+<td>~12</td>
+</tr>
+<tr>
+<td><code>self._logger = logging.getLogger("deriva_ml")</code> (in <code>__init__</code>)</td>
+<td><code>model/database.py:94</code>, <code>asset/asset.py:116</code></td>
+<td>~5</td>
+</tr>
+<tr>
+<td>Inline <code>logging.getLogger("deriva_ml").warning(...)</code></td>
+<td><code>core/base.py:377, 452, 589, 636, 832, 839</code></td>
+<td>~6</td>
+</tr>
+</tbody>
+</table>
+<p>The mix means messages from the same conceptual subsystem can hit
+the root logger under different names depending on which path was
+taken. The <code>get_logger()</code> helper in <code>core/logging_config.py:81-95</code>
+exists explicitly to consolidate; nothing uses it.</p>
+<p><strong>Recommendation:</strong> project-wide adoption of <code>from
+deriva_ml.core.logging_config import get_logger; logger =
+get_logger(__name__)</code>. Risk: trivial (logger hierarchies are
+forgiving). LoC: roughly neutral. <strong>Severity: medium</strong> — log
+configuration is the kind of cross-cutting concern that benefits
+most from one canonical entry point.</p>
+<h3 id="46-two-find_associations-filter-idioms-for-elements-of-a-dataset">4.6 Two <code>find_associations()</code> filter idioms for "elements of a dataset"</h3>
+<p>The "list of tables that can be a dataset element type" computation
+appears three times with slightly different forms:</p>
+<ul>
+<li><code>model/catalog.py:692-716</code> — <code>list_dataset_element_types()</code> on
+  <code>DerivaModel</code>: filters by <code>is_domain_or_dataset_table(t)</code> (domain
+  schema, or <code>Dataset</code> itself).</li>
+<li><code>core/mixins/dataset.py:203-228</code> — <code>list_dataset_element_types()</code>
+  on <code>DatasetMixin</code>: same filter, almost word-for-word identical.
+  The mixin version delegates the filter logic and then re-applies
+  it. The DRY thing is to call <code>self.model.list_dataset_element_types()</code>
+  — which is <em>almost</em> what the mixin does (it duplicates the loop).</li>
+<li><code>dataset/catalog_graph.py:450</code> — <code>dataset_association_tables = [a.table
+  for a in self._dataset_table.find_associations()]</code> — a <em>different</em>
+  filter (every association, no schema check).</li>
+</ul>
+<p>The third site is doing something genuinely different — it wants
+<code>Dataset_X</code> associations regardless of which schema X lives in. The
+first two are duplicate.</p>
+<p><strong>Fix:</strong> delete the mixin's local implementation
+(<code>core/mixins/dataset.py:203-228</code>) and have it call
+<code>self.model.list_dataset_element_types()</code>. <strong>Risk: low</strong> (the methods
+are byte-equivalent). <strong>LoC: −20.</strong> <strong>Severity: low.</strong></p>
+<h3 id="47-_default_skip_tables-and-walker-terminal-table-sets-diverge">4.7 <code>_DEFAULT_SKIP_TABLES</code> and walker terminal-table sets diverge</h3>
+<p><code>model/catalog.py:1895</code> defines <code>_DEFAULT_SKIP_TABLES =
+frozenset({"Dataset_Dataset", "Execution"})</code> for the
+<code>_schema_to_paths</code> traversal.</p>
+<p><code>catalog/clone_via_bag.py:349-352</code> defines
+<code>default_terminal_tables = {("deriva-ml", "Execution"), ("deriva-ml",
+"Workflow")}</code> for the bag-pipeline traversal.</p>
+<p><code>dataset/catalog_graph.py</code> doesn't carry an explicit list — it
+relies on <code>_schema_to_paths</code>'s default plus a separate filter to
+skip vocab-ending paths (<code>catalog_graph.py:497</code>).</p>
+<p>So three traversers, three different "what tables are special"
+policies:</p>
+<ul>
+<li><code>_schema_to_paths</code> skips <code>Dataset_Dataset</code> + <code>Execution</code>.</li>
+<li><code>clone_via_bag</code> treats <code>Execution</code> + <code>Workflow</code> as terminal.</li>
+<li><code>CatalogGraph</code> runs a separate vocab-export pass and prunes
+  paths ending at vocab tables.</li>
+</ul>
+<p>Each policy is defensible in isolation but the divergence means
+the same FK graph produces three different "this table is special"
+classifications. ADR-0006's <code>FKTraversalPolicy.terminal_tables</code>
+field is the right place to centralize this for the bag pipeline;
+<code>_schema_to_paths</code> predates the policy concept.</p>
+<p><strong>Recommendation:</strong> Phase 2 — survey the three policies, decide
+whether they can be unified through <code>FKTraversalPolicy</code> once
+<code>DatasetBagBuilder</code> finishes its cutover. <strong>Risk: medium</strong> (these
+policies have catalog-shape semantics; merging them changes the
+bag walk). <strong>LoC: ±0 in Phase 1.</strong> <strong>Severity: medium.</strong></p>
+<hr />
+<h2 id="lens-5-simplification-opportunities">Lens 5 — Simplification opportunities</h2>
+<h3 id="51-collapse-the-model-shim-layer">5.1 Collapse the <code>model/</code> shim layer</h3>
+<p>See §1.6. Net: -200 LoC by deleting the seven shims (<code>schema_builder.py</code>,
+<code>data_loader.py</code>, <code>data_sources.py</code>, <code>fk_orderer.py</code>, <code>handles.py</code>,
+<code>deriva_ml_database.py</code>, <code>local_db/sqlite_helpers.py</code>) after
+flipping 5 internal-source imports and 5 test-file imports.
+<strong>Risk: low (mechanical).</strong> <strong>Severity: medium.</strong></p>
+<h3 id="52-datasetbagbuilder-should-either-become-cataloggraphs-replacement-or-be-deleted">5.2 <code>DatasetBagBuilder</code> should either become <code>CatalogGraph</code>'s replacement or be deleted</h3>
+<p>Currently 364 LoC for a class that:</p>
+<ul>
+<li>Constructs a <code>CatalogGraph</code> (<code>bag_builder.py:109</code>).</li>
+<li>Delegates three methods to it (<code>bag_builder.py:120-192</code>).</li>
+<li>Defines <code>anchors_for</code>, <code>build_policy</code>,
+  <code>_exclude_empty_associations</code>, <code>_iter_descendant_rids</code> (lines
+  198-361) that nothing in <code>src/</code> invokes.</li>
+</ul>
+<p>Two paths forward:</p>
+<p>(a) <strong>Finish the cutover.</strong> Rewire the five callers in
+   <code>dataset/dataset.py</code> and <code>core/mixins/dataset.py</code> to use the
+   bag-pipeline helpers — this is the work ADR-0006 commits to.
+   <code>CatalogGraph</code> becomes deletable once equivalence is verified.
+   ~−800 LoC net (lose <code>CatalogGraph</code>'s 799, keep
+   <code>DatasetBagBuilder</code>'s 165 useful lines, lose 200 of delegation
+   façade). <strong>Risk: high</strong> (live-catalog equivalence tests required).</p>
+<p>(b) <strong>Delete the bag-pipeline-shaped helpers</strong> (<code>anchors_for</code>,
+   <code>build_policy</code>, etc.) until the cutover is actually scheduled.
+   Reduces <code>DatasetBagBuilder</code> to a 200-line delegation wrapper
+   that still works for production callers. <strong>Risk: low.</strong> <strong>LoC:
+   −165.</strong></p>
+<p>The current intermediate state — 165 lines of unreachable code
+that purport to implement ADR-0006 — is strictly worse than either
+option. <strong>Recommended:</strong> option (b) as Phase 1, with the cutover
+tracked separately. <strong>Severity: high</strong> (active hazard).</p>
+<h3 id="53-unify-the-three-chaise-navbar-implementations">5.3 Unify the three Chaise-navbar implementations</h3>
+<p>See §4.1. <strong>Risk: medium. LoC: −150 to −180.</strong> <strong>Severity: high.</strong></p>
+<h3 id="54-_warn_about_legacy_params-could-use-a-pydantic-deprecation-hook">5.4 <code>_warn_about_legacy_params</code> could use a Pydantic deprecation hook</h3>
+<p><code>catalog/clone.py:366-400</code> walks 11 named kwargs and emits a
+<code>DeprecationWarning</code> per non-default value. The function is called
+exactly once. The simpler form is a 3-line helper or a single
+<code>for name, default in DEFAULTS.items()</code> loop reusing the function's
+existing <code>defaults</code> dict. Currently both <code>_LEGACY_ONLY_PARAMS</code>
+(line 125) and <code>defaults</code> (line 375) declare the same 11 names.</p>
+<p><strong>Fix:</strong> delete <code>_LEGACY_ONLY_PARAMS</code> and have
+<code>_warn_about_legacy_params</code> iterate <code>defaults</code> directly. <strong>LoC: −15.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="55-_get_table_contents-alias-proliferation">5.5 <code>_get_table_contents</code> alias proliferation</h3>
+<p><code>model/database.py:265-273</code> and 5 callsites in <code>model/deriva_ml_bag_view.py</code>
++ 1 in <code>dataset/dataset_bag.py</code>. The <code>_</code> prefix is misleading —
+this method is part of the public read-side surface. Either rename
+to <code>get_table_contents</code> and inherit cleanly from <code>BagDatabase</code> (which
+already exposes it at <code>bag/database.py:692</code>), or document the
+override. <strong>Risk: low (mechanical rename). LoC: −10.</strong> <strong>Severity: low.</strong></p>
+<h3 id="56-databasemodeldelete_database-is-a-one-line-alias-with-no-callers">5.6 <code>DatabaseModel.delete_database</code> is a one-line alias with no callers</h3>
+<p>See §1.7. <strong>Risk: low. LoC: −10.</strong> <strong>Severity: low.</strong></p>
+<h3 id="57-asset-localization-or-pattern-is-uniform-but-fragile">5.7 Asset-localization <code>or "..."</code> pattern is uniform but fragile</h3>
+<p><code>catalog/localize.py:178, 254-255</code> each pick a column by trying both
+<code>URL</code> and <code>url</code>, <code>Filename</code> and <code>filename</code>, <code>MD5</code> and <code>md5</code>:</p>
+<pre><code class="language-python">current_url = record.get(&quot;URL&quot;) or record.get(&quot;url&quot;)
+filename = record.get(&quot;Filename&quot;) or record.get(&quot;filename&quot;)
+md5 = record.get(&quot;MD5&quot;) or record.get(&quot;md5&quot;)
+</code></pre>
+<p>This works because empty strings are falsy and lowercase columns
+hold non-empty filenames. But it shadows the case where <code>URL</code> is
+intentionally <code>None</code> (a placeholder asset row). A cleaner version
+calls <code>_detect_url_column</code> once (the function already exists at
+line 163) and uses the detected name for all three.</p>
+<p><strong>Risk: low. LoC: −5.</strong> <strong>Severity: low.</strong></p>
+<h3 id="58-schema-cache-_apply_logger_overrides-is-the-only-consumer-of-default_logger_overrides">5.8 Schema cache + <code>_apply_logger_overrides</code> is the only consumer of <code>DEFAULT_LOGGER_OVERRIDES</code></h3>
+<p><code>core/base.py:347</code> calls <code>_apply_logger_overrides(DEFAULT_LOGGER_OVERRIDES)</code>
+once at <code>__init__</code> time. The function lives in <code>core/logging_config.py:181-192</code>,
+marked as internal ("not part of the public API"). Either fold it into
+<code>configure_logging</code> or make it a top-level helper. <strong>Risk: trivial. LoC: ±0.</strong>
+<strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-6-maintainability">Lens 6 — Maintainability</h2>
+<h3 id="61-modelcatalogpy-is-a-2085-line-god-class-with-two-distinct-responsibilities">6.1 <code>model/catalog.py</code> is a 2085-line god class with two distinct responsibilities</h3>
+<p><code>DerivaModel</code> (<code>model/catalog.py:135-2085</code>) carries:</p>
+<ol>
+<li><strong>Schema-introspection surface</strong> (lines 260-823): <code>is_system_schema</code>,
+   <code>is_domain_schema</code>, <code>is_vocabulary</code>, <code>is_asset</code>, <code>is_association</code>,
+   <code>find_features</code>, <code>lookup_feature</code>, <code>asset_metadata</code>,
+   <code>_is_association_table</code>, <code>_fk_neighbors</code>,
+   <code>_downstream_fk_sources</code>, <code>_outbound_reachable</code>, <code>_find_sinks</code>.
+   ~565 lines. Used by every mixin and most subsystems.</li>
+<li><strong>Denormalization planner</strong> (lines 825-1616): <code>_build_join_tree</code>,
+   <code>_determine_row_per</code>, <code>_enumerate_paths</code>, <code>_find_path_ambiguities</code>,
+   <code>_prepare_wide_table</code>. ~790 lines. Used only by
+   <code>local_db/denormalizer.py</code> and <code>mixins/dataset.py:457</code>.</li>
+<li><strong>Schema mutation</strong> (lines 1618-2085): <code>_schema_to_paths</code>,
+   <code>create_table</code>, <code>_define_association</code>. ~470 lines. Used by all
+   subsystems but for different reasons (<code>_schema_to_paths</code> is FK
+   traversal; <code>create_table</code> is mutation).</li>
+</ol>
+<p>This works but the file is the second-largest in the codebase and
+mixes three distinct roles. The denormalization-planner methods all
+share an <code>_</code> prefix while the public-API methods don't — confusingly,
+<code>_prepare_wide_table</code> is <em>the</em> entry point used by external callers
+(<code>mixins/dataset.py:457</code>).</p>
+<p><strong>Recommendation:</strong> Phase 2 — split <code>DerivaModel</code> into a base
+class + denormalization-planner mixin, or extract the planner into
+<code>local_db/denormalize_planner.py</code> (where it would sit next to the
+executor). <strong>Risk: medium-high</strong> (a popular class; lots of <code>self.</code>
+references to chase). <strong>LoC: ±0 net, but ~800 lines move.</strong>
+<strong>Severity: medium.</strong></p>
+<h3 id="62-datasetdatasetpy-is-3590-loc">6.2 <code>dataset/dataset.py</code> is 3590 LoC</h3>
+<p>The largest single file in the codebase. <code>Dataset</code> class is at line
+126; the file continues to line 3590 with method after method on the
+same class. A handful of standalone helpers (<code>_hash_spec</code> at line
+107) live inline.</p>
+<p>By line count, the natural splits:</p>
+<ul>
+<li>Lines 126–1500 or so: read-side operations
+  (<code>list_dataset_members</code>, <code>list_dataset_parents</code>, <code>dataset_history</code>,
+  <code>current_version</code>, etc.).</li>
+<li>Lines 1500–2800: bag-export pipeline (<code>download_dataset_bag</code>,
+  <code>estimate_bag_size</code>, <code>_create_dataset_minid</code>,
+  <code>_create_dataset_bag_client</code>).</li>
+<li>Lines 2800–3590: write-side operations + version management.</li>
+</ul>
+<p><strong>Recommendation:</strong> Phase 2 — survey the cross-method dependencies
+and decide whether to split. Not blocking. <strong>Severity: medium.</strong></p>
+<h3 id="63-docstring-quality-is-uneven">6.3 Docstring quality is <strong>uneven</strong></h3>
+<p>Sampled sites with notable defects:</p>
+<ul>
+<li><strong><code>model/catalog.py:492-513</code></strong> — <code>is_association</code>'s docstring has
+  empty "Args:" and "Returns:" sections (placeholders never filled
+  in) and a malformed parameter list. Compare with the well-formed
+  <code>_is_association_table</code> at line 718-772, which is a model of how
+  this should read.</li>
+<li><strong><code>model/catalog.py:617-635</code></strong> — <code>lookup_feature</code> docstring has
+  the same placeholder shape.</li>
+<li><strong><code>schema/annotations.py:33-44</code></strong> — <code>catalog_annotation</code> has a
+  3-line docstring; the analogous <code>apply_catalog_annotations</code> in
+  <code>core/base.py:1098-1142</code> is 50 lines and detailed. Same operation,
+  vastly different documentation.</li>
+</ul>
+<p><strong>Severity: medium.</strong> The docstring standard in deriva-ml's
+<code>CLAUDE.md</code> is Google-style with <code>Args:</code> / <code>Returns:</code> / <code>Raises:</code> /
+<code>Example:</code>. Several methods drop the <code>Example:</code> block (excused for
+catalog-touching ones) but the <code>Args:</code> placeholders are bugs.</p>
+<h3 id="64-the-workflow-modules-ipython-jupyter-import-wrappers">6.4 The <code>Workflow</code> module's IPython / Jupyter import wrappers</h3>
+<p><code>execution/workflow.py:34-67</code> carries three nested try/except blocks
+that each import an optional dep and provide a fallback stub. The
+fallback for <code>list_running_servers</code> (<code>workflow.py:49-50</code>) defines
+the stub <em>twice</em> — once inside the <code>except</code> branch (line 48-50) and
+once at module level after the branch (line 52-53). The second
+definition is dead.</p>
+<pre><code class="language-python">except ImportError:
+    def list_running_servers():
+        return []
+
+    def get_servers() -&gt; list[Any]:
+        return list_running_servers()
+</code></pre>
+<p><strong>Fix:</strong> delete the duplicate inner definition. <strong>Risk: zero. LoC: −2.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="65-naming-inconsistency-bag_path-bag_dir-output_dir-cache_path">6.5 Naming inconsistency: <code>bag_path</code>, <code>bag_dir</code>, <code>output_dir</code>, <code>cache_path</code></h3>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Names used</th>
+<th>Inconsistency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cached bag directory</td>
+<td><code>bag_path</code> (<code>bag_cache.py:181</code>), <code>cache_path</code> (<code>bag_cache.py:158</code>), <code>bag_dir</code> (<code>bag_cache.py:166</code>)</td>
+<td>Three names in the same module</td>
+</tr>
+<tr>
+<td>Output destination</td>
+<td><code>output_dir</code> (<code>clone_via_bag.py:286-287</code>), <code>bag_path</code> (<code>clone_via_bag.py:96-114</code>)</td>
+<td>Same <code>Path</code> value, two names depending on caller</td>
+</tr>
+<tr>
+<td>Local SQLite</td>
+<td><code>dbase_path</code> (<code>database.py:91</code>), <code>database_dir</code> (<code>database.py:118</code>), <code>cache_dir</code> (<code>bag_cache.py:101</code>)</td>
+<td>Three names for related paths</td>
+</tr>
+</tbody>
+</table>
+<p>This isn't load-bearing but it makes the storage-layout discussion
+ambiguous. <strong>Severity: low.</strong></p>
+<h3 id="66-__all__-consistency-in-shim-modules">6.6 <code>__all__</code> consistency in shim modules</h3>
+<p>The seven shim modules (§1.6) each define an <code>__all__</code>, but
+<code>model/__init__.py:62-109</code> then re-exports a much larger set including
+symbols (e.g. <code>DatabaseModel</code>, <code>DerivaMLBagView</code>) that come from
+different submodules. The <code>model/__init__.py:64-67</code>'s <code>__all__</code>
+contains <code>"DerivaMLDatabase"</code> — a legacy alias resolved by
+<code>__getattr__</code> — but the actual class binding happens in
+<code>model/deriva_ml_database.py:28</code> not in <code>__init__</code>. New maintainers
+reading <code>__all__</code> first won't see where the alias is created.</p>
+<p><strong>Recommendation:</strong> consolidate the lazy-import in <code>model/__init__.py</code>
+and delete the orphan binding in <code>model/deriva_ml_database.py:28</code>.
+<strong>LoC: −5.</strong> <strong>Severity: low.</strong></p>
+<h3 id="67-re-exports-through-coredefinitionspy">6.7 Re-exports through <code>core/definitions.py</code></h3>
+<p><code>core/definitions.py</code> is a 181-line re-export hub for symbols from
+<code>constants.py</code>, <code>enums.py</code>, <code>ermrest.py</code>, <code>exceptions.py</code>,
+<code>filespec.py</code>. The module's docstring claims it's "the recommended
+import location" — but it imports 18 names from <code>ermrest.py</code> (a
+file that itself imports from <code>deriva.core.typed</code>), so the chain is
+<code>deriva.core.typed → core/ermrest.py → core/definitions.py →
+caller</code>. Three hops to reach <code>ColumnDef</code>.</p>
+<p>For internal callers this is fine. For external (MCP / skill) callers
+who land on <code>from deriva_ml.core.definitions import ColumnDef</code> it
+works but obscures the upstream source.</p>
+<p><strong>Recommendation:</strong> add a one-line "actual source" pointer in
+<code>definitions.py</code> per re-exported group. <strong>Severity: low.</strong></p>
+<h3 id="68-doctest-coverage-on-selectors-factories-is-good-on-catalog-methods-is-correctly-skipped">6.8 Doctest coverage on selectors / factories is good; on catalog methods is correctly skipped</h3>
+<p>Spot-check: <code>feature.py:51-71</code> (<code>FeatureRecord</code> class) has a
+runnable doctest. <code>dataset/aux_classes.py:DatasetSpec.from_shorthand</code>
+(lines 379-389) — runnable. <code>core/exceptions.py:323-348</code> —
+runnable. The pattern from deriva-ml's <code>CLAUDE.md</code> is followed:
+runnable for pure-Python, <code># doctest: +SKIP</code> for catalog-touching.</p>
+<p><strong>No issue.</strong></p>
+<h3 id="69-workflowworkflow_type-accepts-str-liststr-returns-liststr">6.9 <code>Workflow.workflow_type</code> accepts <code>str | list[str]</code>, returns <code>list[str]</code></h3>
+<p><code>execution/workflow.py:85-89</code> documents this as a public API choice
+("Accepts a single string or a list of strings. Internally normalized
+to a list"). This is fine and well-documented. Mentioning it as the
+counter-example: when a method legitimately needs an asymmetric
+type signature, the docstring carries the contract — same standard
+the rest of the codebase should aim for in <code>model/catalog.py</code>
+(§6.3).</p>
+<hr />
+<h2 id="ranked-actions-1n">Ranked actions (1–N)</h2>
+<p>Ranked by <code>(impact × confidence) / cost</code>. Items 1–4 are mechanical
+quick wins; 5–7 want a small test plan; 8–9 are larger refactors
+worth scheduling.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Risk</th>
+<th>LoC</th>
+<th>Files</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>§1.1</strong> Delete the icecream import + fallback pattern from all 9 modules</td>
+<td>trivial</td>
+<td>−55</td>
+<td>9 files</td>
+<td>Pure dead-code removal; no <code>ic()</code> callers exist</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>§1.2 + §1.3 + §1.5</strong> Delete <code>LoggerMixin</code>, <code>DerivaMLNoExecutionContext</code>, <code>DerivaML.working_data</code></td>
+<td>low</td>
+<td>−70</td>
+<td>3 files</td>
+<td>Three independent dead symbols; mechanical</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>§1.4 + §1.8 + §5.4</strong> Delete <code>AssetRID</code>, <code>AssetCopyMode</code>, <code>_LEGACY_ONLY_PARAMS</code> (collapse on top of <code>AssetMode</code>, <code>_warn_about_legacy_params</code>'s own dict)</td>
+<td>low-medium</td>
+<td>−100</td>
+<td>3 files</td>
+<td>Three different back-compat sinks that no internal caller uses</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>§4.3</strong> Fix <code>cache_status</code> docstrings to say <code>cached_holey</code> (drop <code>cached_incomplete</code>)</td>
+<td>trivial</td>
+<td>±0</td>
+<td>2 files</td>
+<td>Doc-bug; current code returns <code>cached_holey</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>§1.6 + §5.1</strong> Collapse the 7-module shim layer to direct <code>deriva.bag.*</code> imports</td>
+<td>low-medium</td>
+<td>−200</td>
+<td>10 files (7 shims + 3 callers)</td>
+<td>Removes a re-export layer the bag-pipeline migration is already done with</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>§4.6 + §5.5 + §1.7</strong> Consolidate <code>list_dataset_element_types</code> duplication, rename <code>_get_table_contents</code>, delete <code>delete_database</code> + <code>get_orm_association_class</code> aliases</td>
+<td>low</td>
+<td>−45</td>
+<td>4 files</td>
+<td>Removes "fix it in two places" hazards in the model layer</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>§2.1 + §2.2 + §2.3</strong> Migrate three raw-URL builders to <code>pathBuilder</code> + <code>.in_()</code> (clone_via_bag nested-dataset expansion, localize asset record fetch, rid-lease validate)</td>
+<td>low-medium</td>
+<td>−30</td>
+<td>3 files</td>
+<td>Brings the codebase in line with the API-priority rule from <code>CLAUDE.md</code> and removes three "datapath doesn't have <code>.in_</code>" comments that became wrong upstream</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>§4.1 + §5.3</strong> Unify the three Chaise-navbar builders into a single function in <code>schema/annotations.py</code></td>
+<td>medium</td>
+<td>−150 to −180</td>
+<td>3 files</td>
+<td>Highest-LoC simplification in the audit; eliminates a known-drifted parallel implementation</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>§5.2</strong> Decide <code>DatasetBagBuilder</code> cutover: either finish ADR-0006 wiring or remove the unreachable bag-pipeline helpers</td>
+<td>high (option a) / low (option b)</td>
+<td>option b: −165</td>
+<td><code>bag_builder.py</code> + tests</td>
+<td>Active hazard. Option (b) recovers correctness now; option (a) finishes the ADR. Either is better than the current intermediate state</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>§4.4</strong> Project-wide replace inline <code>@validate_call(config=ConfigDict(arbitrary_types_allowed=True))</code> with <code>@validate_call(config=VALIDATION_CONFIG)</code></td>
+<td>low</td>
+<td>±0 net</td>
+<td>~30 files</td>
+<td>Consolidates configuration point for the Pydantic validator</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>§4.5</strong> Adopt <code>from deriva_ml.core.logging_config import get_logger; logger = get_logger(__name__)</code> across the 44 callsites</td>
+<td>low</td>
+<td>±0</td>
+<td>~25 files</td>
+<td>Final piece of the logging-consolidation begun by <code>logging_config.py</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>§4.7</strong> Phase 2 — survey <code>_DEFAULT_SKIP_TABLES</code> / <code>terminal_tables</code> / vocab-end pruning policies and unify under <code>FKTraversalPolicy</code></td>
+<td>medium</td>
+<td>TBD</td>
+<td>3 files</td>
+<td>Depends on action 9 landing first</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>§6.1</strong> Phase 2 — split <code>DerivaModel</code>'s denormalization planner (lines 825-1616) into a separate module adjacent to <code>local_db/denormalizer.py</code></td>
+<td>medium-high</td>
+<td>±0 net (800 LoC moves)</td>
+<td>2 files</td>
+<td>Largest single file in <code>model/</code>; mixed responsibilities</td>
+</tr>
+</tbody>
+</table>
+<p>Items 1–4 are good to land in one cleanup PR. Items 5–7 want a
+brief test pass each. Items 8–9 are the highest-value
+simplifications and should be scheduled. Items 10–11 are good
+follow-ups for a code-mod tool. Items 12–13 are Phase 2 scope.</p>
+<hr />
+<h2 id="worst-offending-subsystems-for-phase-2-deep-audit">Worst-offending subsystems for Phase 2 deep audit</h2>
+<h3 id="worst-offender-1-dataset">Worst-offender #1: <code>dataset/</code></h3>
+<p>Two 2000+-line modules (<code>dataset.py</code> 3590, <code>dataset_bag.py</code> 2392),
+plus a 799-line <code>CatalogGraph</code> that's slated for replacement but
+hasn't been replaced, plus a 364-line <code>DatasetBagBuilder</code> façade.
+Phase 2 should:</p>
+<ul>
+<li>Establish whether <code>DatasetBag</code> and <code>Dataset</code> can share more
+  implementation (currently they reimplement <code>list_dataset_members</code>,
+  <code>list_dataset_parents</code>, etc. with similar but not identical code).</li>
+<li>Resolve the <code>DatasetBagBuilder</code> cutover one way or the other
+  (Lens 5 action 9).</li>
+<li>Audit the bag-export → MINID flow (<code>_create_dataset_minid</code>,
+  <code>_create_dataset_bag_client</code>) for opportunities to use
+  <code>BagBuilder</code> directly.</li>
+</ul>
+<h3 id="worst-offender-2-model">Worst-offender #2: <code>model/</code></h3>
+<p>The shim layer (Lens 1, action 5) belongs in Phase 1. Phase 2 should
+audit:</p>
+<ul>
+<li><code>model/catalog.py</code> god-class structure (§6.1). 2085 LoC across
+  three roles is too much for one class.</li>
+<li><code>model/annotations.py</code> (1277 LoC) — Chaise annotation builders.
+  Has its own duplicated navbar code (§4.1). Phase 2 should
+  reconcile with <code>schema/annotations.py</code>.</li>
+<li>The two association predicates (<code>is_association</code> vs
+  <code>_is_association_table</code>) — §2.7. Decide whether the
+  topological-only variant can be folded into deriva-py's
+  <code>is_association(return_fkeys=True)</code>.</li>
+</ul>
+<h3 id="worst-offender-3-optional-execution">Worst-offender #3 (optional): <code>execution/</code></h3>
+<p>11.3 KLoC across 24 files is the largest subsystem but most of the
+LoC is load-bearing — execution lifecycle, RID leasing, state
+machine, upload engine, bag commit. Phase 2 would benefit from
+package-level structural review:</p>
+<ul>
+<li>Three module clusters (lifecycle, I/O, config) are intermixed in
+  one flat directory.</li>
+<li><code>execution.py</code> is 2519 LoC — second-largest file in the codebase.</li>
+<li>The <code>bag_commit.py</code> (744 LoC) is the new bag-pipeline integration;
+  its interaction with the older <code>upload_engine.py</code> (865 LoC) is
+  worth a focused audit.</li>
+</ul>
+<p>Recommendation: scope Phase 2 to <code>dataset/</code> + <code>model/</code> if a single
+follow-up audit. <code>execution/</code> is large enough to deserve its own
+session.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

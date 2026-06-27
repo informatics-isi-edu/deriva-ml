@@ -1,0 +1,2747 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-26-lineage-consumed-version-fix/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Lineage Consumed-Version + Self-Parent Fix Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lineage-consumed-version-self-parent-fix-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Lineage Consumed-Version + Self-Parent Fix Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#global-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Constraints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Global Constraints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-list_input_datasets_with_versions-shared-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: list_input_datasets_with_versions shared helper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-version-aware-_producer_of_dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: version-aware _producer_of_dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-_walk_node-consumed-loop-rewrite-harness-behavioral-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: _walk_node consumed-loop rewrite + harness + behavioral tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-live-versioned-mutation-regression-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: live versioned-mutation regression test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#final-verification-after-all-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final verification (after all tasks)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="lineage-consumed-version-self-parent-fix-implementation-plan">Lineage Consumed-Version + Self-Parent Fix Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Make <code>lookup_lineage</code>'s mid-walk consumed-dataset expansion reflect the version actually consumed (not current membership) and stop an execution that both consumed a dataset and produced some of its members from becoming its own parent.</p>
+<p><strong>Architecture:</strong> Add a new shared helper <code>list_input_datasets_with_versions</code> that surfaces the consumed <code>Dataset_Execution.Dataset_Version</code> (leaving <code>list_input_datasets</code>'s <code>list[Dataset]</code> contract untouched). Make <code>_producer_of_dataset</code> accept an optional <code>version</code>. Rewrite the <code>_walk_node</code> consumed-dataset loop to use the new helper, thread the consumed version into both producer lookups, report the consumed version in the summary, and subtract the currently-expanding execution from the member-producers it adds.</p>
+<p><strong>Tech Stack:</strong> Python 3.13, <code>uv</code>, pytest, deriva-ml core (<code>deriva_ml.core.mixins.execution.ExecutionMixin</code>, <code>deriva_ml.execution._helpers</code>), ERMrest PathBuilder.</p>
+<h2 id="global-constraints">Global Constraints</h2>
+<ul>
+<li>Work in <code>../deriva-ml</code> (<code>/Users/carl/GitHub/DerivaML/deriva-ml</code>) on branch <code>feature/lineage-consumed-version-fix</code> (already created; the spec is committed there).</li>
+<li>Use <code>uv</code> for everything: <code>uv run python -m pytest</code> (NOT <code>uv run pytest</code>), <code>uv run ruff check</code>, <code>uv run ruff format</code>.</li>
+<li>Always <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; &lt;cmd&gt;</code> in every Bash call — the shell CWD is not persistent.</li>
+<li>Google-style docstrings (Args/Returns/Raises/Example) on every new function/method.</li>
+<li>NO change to <code>list_input_datasets()</code> (the existing <code>list[Dataset]</code> contract) or its four callers (<code>Execution</code>, <code>ExecutionRecord</code>, <code>provenance_enforcement</code>, <code>split.py</code>).</li>
+<li>NO public-model change: <code>src/deriva_ml/execution/lineage.py</code> is NOT modified. <code>consumed_datasets[].version</code> now reflects the consumed version (a correctness improvement to an existing field), not a shape change.</li>
+<li>The root path in <code>lookup_lineage</code> is UNCHANGED — a root dataset has no consumed-input edge, so no consumed version applies.</li>
+<li><code>version=None</code> must preserve today's behavior exactly: <code>_producer_of_dataset(rid)</code> returns the latest-version producer; existing lineage unit tests stay green.</li>
+<li>Live tests gate on the <code>DERIVA_HOST</code> env var (the convention in <code>tests/execution/test_lookup_lineage_live.py</code>), NOT <code>DERIVA_ML_LIVE_LOCALHOST</code>.</li>
+</ul>
+<hr />
+<h3 id="task-1-list_input_datasets_with_versions-shared-helper">Task 1: <code>list_input_datasets_with_versions</code> shared helper</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/_helpers.py</code> (add a new function beside <code>list_input_datasets</code>, which ends ~line 226)
+- Test: <code>tests/execution/test_input_datasets_with_versions.py</code> (new file)</p>
+<p><strong>Interfaces:</strong>
+- Consumes (existing): <code>ml_instance.pathBuilder()</code>; <code>ml_instance.ml_schema</code>; <code>ml_instance.lookup_dataset(rid)</code>. The <code>Dataset_Execution</code> association table has columns <code>Execution</code>, <code>Dataset</code>, <code>Dataset_Version</code>.
+- Produces (Task 3 relies on this exact signature): <code>list_input_datasets_with_versions(*, ml_instance, execution_rid) -&gt; list[tuple[Dataset, str | None]]</code>.</p>
+<p><strong>Background:</strong> The existing <code>list_input_datasets</code> (same file) fetches <code>Dataset_Execution</code> rows for an execution and returns <code>[lookup_dataset(row["Dataset"]) for row ...]</code>, discarding the <code>Dataset_Version</code> column. The new helper does the same fetch but pairs each <code>Dataset</code> with its <code>Dataset_Version</code> value. <code>list_input_datasets</code> itself is NOT modified.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_input_datasets_with_versions.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit test for list_input_datasets_with_versions.
+
+Mocks the pathBuilder Dataset_Execution fetch and lookup_dataset so the
+(Dataset, consumed_version) pairing is exercised offline.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+from deriva_ml.execution._helpers import list_input_datasets_with_versions
+
+
+def _make_ml(rows):
+    &quot;&quot;&quot;Build a fake ml_instance whose Dataset_Execution fetch returns `rows`.&quot;&quot;&quot;
+    entities = MagicMock()
+    entities.fetch = lambda: rows
+    de_path = MagicMock()
+    de_path.filter.return_value = MagicMock(entities=lambda: entities)
+    schema = MagicMock()
+    schema.Dataset_Execution = de_path
+    pb = MagicMock()
+    pb.schemas = {&quot;deriva-ml&quot;: schema}
+    ml = MagicMock()
+    ml.ml_schema = &quot;deriva-ml&quot;
+    ml.pathBuilder.return_value = pb
+    # lookup_dataset returns a stand-in carrying its rid so the test can assert.
+    ml.lookup_dataset = lambda rid: SimpleNamespace(dataset_rid=rid)
+    return ml
+
+
+def test_pairs_dataset_with_consumed_version():
+    ml = _make_ml([
+        {&quot;Dataset&quot;: &quot;1-DSAA&quot;, &quot;Dataset_Version&quot;: &quot;1.0.0&quot;, &quot;Execution&quot;: &quot;2-EXAA&quot;},
+        {&quot;Dataset&quot;: &quot;1-DSAB&quot;, &quot;Dataset_Version&quot;: &quot;2.3.0&quot;, &quot;Execution&quot;: &quot;2-EXAA&quot;},
+    ])
+    result = list_input_datasets_with_versions(ml_instance=ml, execution_rid=&quot;2-EXAA&quot;)
+    pairs = {(ds.dataset_rid, v) for ds, v in result}
+    assert pairs == {(&quot;1-DSAA&quot;, &quot;1.0.0&quot;), (&quot;1-DSAB&quot;, &quot;2.3.0&quot;)}
+
+
+def test_version_none_when_edge_has_no_pin():
+    ml = _make_ml([{&quot;Dataset&quot;: &quot;1-DSAA&quot;, &quot;Execution&quot;: &quot;2-EXAA&quot;}])  # no Dataset_Version key
+    result = list_input_datasets_with_versions(ml_instance=ml, execution_rid=&quot;2-EXAA&quot;)
+    assert len(result) == 1
+    ds, version = result[0]
+    assert ds.dataset_rid == &quot;1-DSAA&quot;
+    assert version is None
+
+
+def test_skips_rows_without_dataset():
+    ml = _make_ml([{&quot;Dataset&quot;: None, &quot;Dataset_Version&quot;: &quot;1.0.0&quot;, &quot;Execution&quot;: &quot;2-EXAA&quot;}])
+    result = list_input_datasets_with_versions(ml_instance=ml, execution_rid=&quot;2-EXAA&quot;)
+    assert result == []
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run the test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_input_datasets_with_versions.py -v</code>
+Expected: FAIL — <code>ImportError: cannot import name 'list_input_datasets_with_versions'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the helper</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/_helpers.py</code>, immediately after <code>list_input_datasets</code> (after ~line 226):</p>
+<pre><code class="language-python">def list_input_datasets_with_versions(
+    *,
+    ml_instance: Any,
+    execution_rid: str,
+) -&gt; list[tuple[Any, str | None]]:
+    &quot;&quot;&quot;Input datasets of an execution paired with the consumed version.
+
+    Like :func:`list_input_datasets`, but also returns the
+    ``Dataset_Execution.Dataset_Version`` recorded on each input edge — the
+    version of the dataset that was actually consumed. Lineage uses this to walk
+    the consumed version rather than the dataset's current state. The existing
+    :func:`list_input_datasets` ``list[Dataset]`` contract is intentionally left
+    unchanged; lineage is the only caller that needs the consumed version.
+
+    Args:
+        ml_instance: The bound :class:`DerivaML` instance.
+        execution_rid: The anchor execution RID.
+
+    Returns:
+        List of ``(Dataset, consumed_version)`` tuples. ``consumed_version`` is
+        the version string from the input edge, or ``None`` when the edge has no
+        version pin. Empty when the execution has no input datasets.
+
+    Example:
+        &gt;&gt;&gt; pairs = list_input_datasets_with_versions(  # doctest: +SKIP
+        ...     ml_instance=ml, execution_rid=&quot;2-EXAA&quot;
+        ... )
+        &gt;&gt;&gt; [(ds.dataset_rid, v) for ds, v in pairs]  # doctest: +SKIP
+        [('1-DSAA', '1.0.0')]
+    &quot;&quot;&quot;
+    pb = ml_instance.pathBuilder()
+    dataset_exec = pb.schemas[ml_instance.ml_schema].Dataset_Execution
+    records = dataset_exec.filter(dataset_exec.Execution == execution_rid).entities().fetch()
+    return [
+        (ml_instance.lookup_dataset(record[&quot;Dataset&quot;]), record.get(&quot;Dataset_Version&quot;))
+        for record in records
+        if record.get(&quot;Dataset&quot;)
+    ]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run the test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_input_datasets_with_versions.py -v</code>
+Expected: PASS (3 passed).</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check src/deriva_ml/execution/_helpers.py tests/execution/test_input_datasets_with_versions.py
+uv run ruff format --check src/deriva_ml/execution/_helpers.py tests/execution/test_input_datasets_with_versions.py
+git add src/deriva_ml/execution/_helpers.py tests/execution/test_input_datasets_with_versions.py
+git commit -m &quot;feat(lineage): list_input_datasets_with_versions — surface consumed Dataset_Version&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-version-aware-_producer_of_dataset">Task 2: version-aware <code>_producer_of_dataset</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (<code>_producer_of_dataset</code>, currently ~lines 1325-1348)
+- Test: <code>tests/execution/test_lookup_lineage_unit.py</code> (add a focused unit test using the <code>_FakeML</code> harness — but <code>_producer_of_dataset</code> is overridden there; see note → use a dedicated tiny test that drives the REAL method against a mock pathBuilder, in the new file from Task 1 or a new file)</p>
+<p><strong>Interfaces:</strong>
+- Produces (Task 3 relies on): <code>_producer_of_dataset(self, dataset_rid, version=None) -&gt; RID | None</code>.</p>
+<p><strong>Background:</strong> The current <code>_producer_of_dataset</code> fetches all <code>Dataset_Version</code> rows for the dataset and returns the <code>Execution</code> of the highest semver row. The version-aware path matches the row whose <code>Version</code> text equals <code>str(version)</code> and returns that row's <code>Execution</code>. The existing <code>_FakeML</code> harness OVERRIDES <code>_producer_of_dataset</code>, so the behavioral assertions live in Task 3; THIS task's test drives the real method against a mock pathBuilder.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Add to <code>tests/execution/test_input_datasets_with_versions.py</code> (same file — it already mocks pathBuilder-style fetches; keep the producer test beside the helper test):</p>
+<pre><code class="language-python">from deriva_ml.core.mixins.execution import ExecutionMixin
+
+
+def _ml_with_versions(version_rows):
+    &quot;&quot;&quot;Fake ExecutionMixin host whose Dataset_Version fetch returns version_rows.&quot;&quot;&quot;
+    entities = MagicMock()
+    entities.fetch = lambda: version_rows
+    vp = MagicMock()
+    vp.filter.return_value = MagicMock(entities=lambda: entities)
+    tables = {&quot;Dataset_Version&quot;: vp}
+    schema = MagicMock()
+    schema.tables = tables
+    pb = MagicMock()
+    pb.schemas = {&quot;deriva-ml&quot;: schema}
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.pathBuilder = lambda: pb
+    ml.ml_schema = &quot;deriva-ml&quot;
+    return ml
+
+
+def test_producer_of_dataset_latest_when_version_none():
+    ml = _ml_with_versions([
+        {&quot;Version&quot;: &quot;1.0.0&quot;, &quot;Execution&quot;: &quot;2-EXV1&quot;, &quot;Dataset&quot;: &quot;1-DSAA&quot;},
+        {&quot;Version&quot;: &quot;1.2.0&quot;, &quot;Execution&quot;: &quot;2-EXV2&quot;, &quot;Dataset&quot;: &quot;1-DSAA&quot;},
+    ])
+    assert ml._producer_of_dataset(&quot;1-DSAA&quot;) == &quot;2-EXV2&quot;  # latest
+
+
+def test_producer_of_dataset_specific_version():
+    ml = _ml_with_versions([
+        {&quot;Version&quot;: &quot;1.0.0&quot;, &quot;Execution&quot;: &quot;2-EXV1&quot;, &quot;Dataset&quot;: &quot;1-DSAA&quot;},
+        {&quot;Version&quot;: &quot;1.2.0&quot;, &quot;Execution&quot;: &quot;2-EXV2&quot;, &quot;Dataset&quot;: &quot;1-DSAA&quot;},
+    ])
+    assert ml._producer_of_dataset(&quot;1-DSAA&quot;, version=&quot;1.0.0&quot;) == &quot;2-EXV1&quot;  # consumed
+
+
+def test_producer_of_dataset_missing_version_returns_none():
+    ml = _ml_with_versions([
+        {&quot;Version&quot;: &quot;1.0.0&quot;, &quot;Execution&quot;: &quot;2-EXV1&quot;, &quot;Dataset&quot;: &quot;1-DSAA&quot;},
+    ])
+    assert ml._producer_of_dataset(&quot;1-DSAA&quot;, version=&quot;9.9.9&quot;) is None
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run the test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_input_datasets_with_versions.py -k producer_of_dataset -v</code>
+Expected: FAIL — <code>test_producer_of_dataset_specific_version</code> and <code>_missing_version</code> fail (the method ignores <code>version</code>); <code>_latest</code> passes already.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the version param</strong></li>
+</ul>
+<p>Replace <code>_producer_of_dataset</code> in <code>src/deriva_ml/core/mixins/execution.py</code> with:</p>
+<pre><code class="language-python">    def _producer_of_dataset(self, dataset_rid: RID, version: Any | None = None) -&gt; RID | None:
+        &quot;&quot;&quot;Return the Execution RID that produced a version of ``dataset_rid``.
+
+        Args:
+            dataset_rid: Dataset whose producing execution to find.
+            version: When given, return the ``Execution`` recorded on that
+                specific version's ``Dataset_Version`` row (the execution that
+                produced the consumed version). When ``None`` (default), return
+                the producer of the **latest** version — the historical
+                behavior, unchanged for existing callers and the root path.
+
+        Returns:
+            The producing-execution RID, or ``None`` if the dataset has no
+            ``Dataset_Version`` rows, the requested ``version`` has no row, or
+            the matched row carries no ``Execution`` link.
+
+        Example:
+            &gt;&gt;&gt; ml._producer_of_dataset(&quot;1-DSAA&quot;)  # doctest: +SKIP
+            '2-EXV2'
+            &gt;&gt;&gt; ml._producer_of_dataset(&quot;1-DSAA&quot;, version=&quot;1.0.0&quot;)  # doctest: +SKIP
+            '2-EXV1'
+        &quot;&quot;&quot;
+        pb = self.pathBuilder()
+        version_path = pb.schemas[self.ml_schema].tables[&quot;Dataset_Version&quot;]
+        rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
+        if not rows:
+            return None
+
+        if version is not None:
+            want = str(version)
+            for row in rows:
+                if (row.get(&quot;Version&quot;) or &quot;&quot;) == want:
+                    return row.get(&quot;Execution&quot;)
+            return None
+
+        # Pick the row with the highest semver-style Version. The catalog
+        # stores Version as text (e.g. &quot;0.1.0&quot;); sort lexically as a
+        # tuple of ints so &quot;1.10.0&quot; beats &quot;1.2.0&quot;.
+        def _key(row: dict[str, Any]) -&gt; tuple[int, ...]:
+            v = row.get(&quot;Version&quot;) or &quot;0.0.0&quot;
+            try:
+                return tuple(int(p) for p in v.split(&quot;.&quot;))
+            except ValueError:
+                return (0,)
+
+        latest = max(rows, key=_key)
+        return latest.get(&quot;Execution&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run the test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_input_datasets_with_versions.py -k producer_of_dataset -v</code>
+Expected: PASS (3 passed).</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check src/deriva_ml/core/mixins/execution.py tests/execution/test_input_datasets_with_versions.py
+uv run ruff format --check src/deriva_ml/core/mixins/execution.py tests/execution/test_input_datasets_with_versions.py
+git add src/deriva_ml/core/mixins/execution.py tests/execution/test_input_datasets_with_versions.py
+git commit -m &quot;feat(lineage): _producer_of_dataset accepts version= (consumed-version producer)&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-_walk_node-consumed-loop-rewrite-harness-behavioral-tests">Task 3: <code>_walk_node</code> consumed-loop rewrite + harness + behavioral tests</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (<code>_walk_node</code> consumed-dataset loop, ~lines 1564-1586)
+- Modify: <code>tests/execution/test_lookup_lineage_unit.py</code> (extend the <code>_FakeML</code> harness + add behavioral tests)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>list_input_datasets_with_versions</code> (Task 1); <code>_producer_of_dataset(dataset_rid, version=)</code> (Task 2); <code>_producers_of_dataset_members(dataset_rid, version=)</code> (already version-aware).</p>
+<p><strong>Background:</strong> <code>_walk_node</code> currently iterates <code>record.list_input_datasets()</code> (a method on the <code>ExecutionRecord</code> stub) and uses <code>ds.current_version</code> + version-less producer lookups. After this task it iterates <code>list_input_datasets_with_versions(ml_instance=self, execution_rid=execution_rid)</code> (the module helper), uses the consumed version for the summary and both producer lookups, and subtracts <code>execution_rid</code> from the member-producers it adds.</p>
+<p>Because the walk now calls the MODULE-LEVEL helper (keyed by <code>execution_rid</code>) instead of <code>record.list_input_datasets()</code>, the <code>_FakeML</code> harness must intercept the new helper. The harness already stores <code>input_datasets</code> per execution on the <code>_StubExecutionRecord</code>; add a <code>_FakeML._input_dataset_versions</code> map (execution_rid -&gt; list of (dataset_rid, consumed_version)) and override the module helper via monkeypatching OR via a method the helper resolves through. Simplest: monkeypatch <code>deriva_ml.core.mixins.execution.list_input_datasets_with_versions</code> is NOT possible if it's imported at call time inside <code>_walk_node</code> — so import it at call time inside <code>_walk_node</code> (the plan's implementation does <code>from ... import list_input_datasets_with_versions</code> inside the loop scope) and have <code>_FakeML</code> provide the inputs through a scripted map that a test-only override reads. See Step 1 for the exact harness shape.</p>
+<ul>
+<li>[ ] <strong>Step 1: Extend the <code>_FakeML</code> harness</strong></li>
+</ul>
+<p>In <code>tests/execution/test_lookup_lineage_unit.py</code>:</p>
+<p>(a) The current <code>_StubExecutionRecord.list_input_datasets()</code> returns <code>_StubDataset</code> objects. We keep scripting inputs the same way (via <code>add_execution(input_datasets=[...])</code>), but ALSO let each <code>_StubDataset</code> optionally carry a consumed version. Extend <code>_StubDataset</code>:</p>
+<pre><code class="language-python">class _StubDataset:
+    &quot;&quot;&quot;Minimal Dataset stand-in for list_input_datasets().&quot;&quot;&quot;
+
+    def __init__(
+        self,
+        dataset_rid: str,
+        description: str = &quot;&quot;,
+        version: str = &quot;0.1.0&quot;,
+        consumed_version: str | None = None,
+    ) -&gt; None:
+        self.dataset_rid = dataset_rid
+        self.description = description
+        self._version = version
+        # The version recorded on the Dataset_Execution edge (what was consumed).
+        # None means &quot;no pin&quot; -&gt; the walk falls back to current_version.
+        self.consumed_version = consumed_version
+
+    @property
+    def current_version(self) -&gt; str:
+        return self._version
+</code></pre>
+<p>(b) Add an override on <code>_FakeML</code> so the module helper resolves to the scripted inputs. <code>_walk_node</code> will call <code>list_input_datasets_with_versions(ml_instance=self, execution_rid=...)</code>; make <code>_FakeML</code> provide a method the implementation uses. To keep the implementation clean, the implementation calls the module function; the test overrides it by defining a method <code>list_input_datasets_with_versions</code> on <code>_FakeML</code> is NOT how a module function resolves. Instead, monkeypatch at test-collection time. Add this fixture-free helper at the top of <code>_FakeML</code>:</p>
+<pre><code class="language-python">    def _scripted_input_pairs(self, execution_rid: str):
+        &quot;&quot;&quot;(Dataset, consumed_version) pairs for an execution, from the stub record.&quot;&quot;&quot;
+        rec = self._executions.get(execution_rid)
+        if rec is None:
+            return []
+        return [(ds, ds.consumed_version) for ds in rec.list_input_datasets()]
+</code></pre>
+<p>(c) Because <code>_walk_node</code> calls the module-level <code>list_input_datasets_with_versions</code>, the implementation in Task 3 Step 3 must call it through an overridable seam. Define a thin private method on <code>ExecutionMixin</code> that <code>_walk_node</code> calls, so <code>_FakeML</code> can override it:</p>
+<p>In the IMPLEMENTATION (execution.py), <code>_walk_node</code> calls <code>self._input_dataset_pairs(execution_rid)</code>, and <code>ExecutionMixin</code> defines:</p>
+<pre><code class="language-python">    def _input_dataset_pairs(self, execution_rid: RID) -&gt; list[tuple[Any, str | None]]:
+        &quot;&quot;&quot;(Dataset, consumed_version) pairs for an execution's input edges.
+
+        Thin wrapper over
+        :func:`deriva_ml.execution._helpers.list_input_datasets_with_versions`
+        so the lineage walk has a single overridable seam for tests.
+        &quot;&quot;&quot;
+        from deriva_ml.execution._helpers import list_input_datasets_with_versions
+
+        return list_input_datasets_with_versions(ml_instance=self, execution_rid=execution_rid)
+</code></pre>
+<p>Then <code>_FakeML</code> overrides <code>_input_dataset_pairs</code> to return <code>self._scripted_input_pairs(execution_rid)</code>:</p>
+<pre><code class="language-python">    def _input_dataset_pairs(self, execution_rid: str):  # type: ignore[override]
+        return self._scripted_input_pairs(execution_rid)
+</code></pre>
+<p>This seam keeps the real wiring (helper call) in <code>_input_dataset_pairs</code> and lets the offline harness script inputs without a catalog.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the failing behavioral tests</strong></li>
+</ul>
+<p>Add to <code>tests/execution/test_lookup_lineage_unit.py</code>. (<code>_FakeML</code> already has <code>set_member_producers</code>, <code>_producer_of_dataset</code> override, and now <code>consumed_version</code> on <code>_StubDataset</code>. The <code>_producer_of_dataset</code> override in <code>_FakeML</code> keys off <code>dataset_rid</code> only — extend it to honor a per-(dataset,version) map; add a <code>set_versioned_producer</code> helper.)</p>
+<p>First extend <code>_FakeML</code> producer scripting:</p>
+<pre><code class="language-python">    # in __init__:  self._versioned_dataset_producers: dict[tuple[str, str], str] = {}
+    def set_versioned_producer(self, dataset_rid: str, version: str, producer: str) -&gt; None:
+        &quot;&quot;&quot;Script the producer of a SPECIFIC dataset version.&quot;&quot;&quot;
+        self._versioned_dataset_producers[(dataset_rid, version)] = producer
+
+    def _producer_of_dataset(self, dataset_rid: str, version: Any = None) -&gt; str | None:  # type: ignore[override]
+        if version is not None:
+            return self._versioned_dataset_producers.get((dataset_rid, str(version)))
+        return self._dataset_producers.get(dataset_rid)
+</code></pre>
+<p>And extend the member-producer override to honor version (so version-aware member tests work):</p>
+<pre><code class="language-python">    # in __init__:  self._versioned_member_producers: dict[tuple[str, str], set[str]] = {}
+    def set_versioned_member_producers(self, dataset_rid: str, version: str, producers: set[str]) -&gt; None:
+        self._versioned_member_producers[(dataset_rid, str(version))] = set(producers)
+
+    def _producers_of_dataset_members(self, dataset_rid: str, version: Any = None) -&gt; set[str]:  # type: ignore[override]
+        if version is not None and (dataset_rid, str(version)) in self._versioned_member_producers:
+            return set(self._versioned_member_producers[(dataset_rid, str(version))])
+        return set(self._dataset_member_producers.get(dataset_rid, set()))
+</code></pre>
+<p>Now the tests:</p>
+<pre><code class="language-python">def test_mid_walk_self_parent_guard_no_false_cycle():
+    &quot;&quot;&quot;An execution that consumed D and also produced one of D's members must
+    not become its own parent (no false cycle).&quot;&quot;&quot;
+    ml = _FakeML()
+    ml.add_dataset(&quot;1-DSAA&quot;, producer=None)
+    # EXSC consumes D-CON and also produced a member of D-CON.
+    ml.add_dataset(&quot;1-DCON&quot;, producer=&quot;2-EXOT&quot;)
+    ml.add_execution(&quot;2-EXSC&quot;, input_datasets=[_StubDataset(&quot;1-DCON&quot;)])
+    ml.add_dataset(&quot;1-DOUT&quot;, producer=&quot;2-EXSC&quot;)
+    ml.set_member_producers(&quot;1-DCON&quot;, {&quot;2-EXSC&quot;})  # self-produced member
+    ml.add_execution(&quot;2-EXOT&quot;, input_datasets=[])
+
+    result = ml.lookup_lineage(&quot;1-DOUT&quot;)
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == &quot;2-EXSC&quot;
+    # 2-EXSC must NOT appear among its own parents, and no false cycle.
+    assert all(p.execution.rid != &quot;2-EXSC&quot; for p in result.lineage.parents)
+    assert result.cycle_detected is False
+
+
+def test_mid_walk_uses_consumed_version_producer():
+    &quot;&quot;&quot;When E consumed D@1.0.0 (produced by X) but D@2.0.0 (latest) is by Y,
+    walking through E surfaces X, not Y.&quot;&quot;&quot;
+    ml = _FakeML()
+    ml.add_dataset(&quot;1-DSRC&quot;, producer=None)
+    ml.add_execution(&quot;2-EXVX&quot;, input_datasets=[_StubDataset(&quot;1-DSRC&quot;)])  # produced D@1.0.0
+    ml.add_execution(&quot;2-EXVY&quot;, input_datasets=[])                         # produced D@2.0.0
+    # D consumed at 1.0.0 by EXMID:
+    ml.add_dataset(&quot;1-DVER&quot;, producer=&quot;2-EXVY&quot;)  # latest producer = Y
+    ml.set_versioned_producer(&quot;1-DVER&quot;, &quot;1.0.0&quot;, &quot;2-EXVX&quot;)  # consumed-version producer = X
+    ml.add_execution(&quot;2-EXMID&quot;, input_datasets=[_StubDataset(&quot;1-DVER&quot;, consumed_version=&quot;1.0.0&quot;)])
+    ml.add_dataset(&quot;1-DEND&quot;, producer=&quot;2-EXMID&quot;)
+
+    result = ml.lookup_lineage(&quot;1-DEND&quot;)
+
+    parent_rids = {p.execution.rid for p in result.lineage.parents}
+    assert &quot;2-EXVX&quot; in parent_rids   # consumed-version producer
+    assert &quot;2-EXVY&quot; not in parent_rids  # latest-version producer must NOT appear
+
+
+def test_mid_walk_uses_consumed_version_member_producers():
+    &quot;&quot;&quot;D@1.0.0 members by P1; D@2.0.0 adds members by P2. Walking E (consumed
+    1.0.0) surfaces P1, not P2.&quot;&quot;&quot;
+    ml = _FakeML()
+    ml.add_dataset(&quot;1-DSRC&quot;, producer=None)
+    ml.add_execution(&quot;2-EXP1&quot;, input_datasets=[_StubDataset(&quot;1-DSRC&quot;)])
+    ml.add_execution(&quot;2-EXP2&quot;, input_datasets=[])
+    ml.add_dataset(&quot;1-DVER&quot;, producer=None)
+    ml.set_versioned_member_producers(&quot;1-DVER&quot;, &quot;1.0.0&quot;, {&quot;2-EXP1&quot;})
+    ml.set_versioned_member_producers(&quot;1-DVER&quot;, &quot;2.0.0&quot;, {&quot;2-EXP1&quot;, &quot;2-EXP2&quot;})
+    ml.add_execution(&quot;2-EXMID&quot;, input_datasets=[_StubDataset(&quot;1-DVER&quot;, consumed_version=&quot;1.0.0&quot;)])
+    ml.add_dataset(&quot;1-DEND&quot;, producer=&quot;2-EXMID&quot;)
+
+    result = ml.lookup_lineage(&quot;1-DEND&quot;)
+
+    parent_rids = {p.execution.rid for p in result.lineage.parents}
+    assert &quot;2-EXP1&quot; in parent_rids
+    assert &quot;2-EXP2&quot; not in parent_rids
+
+
+def test_mid_walk_consumed_dataset_summary_reports_consumed_version():
+    &quot;&quot;&quot;consumed_datasets[].version reflects the consumed version, not current.&quot;&quot;&quot;
+    ml = _FakeML()
+    ml.add_dataset(&quot;1-DSRC&quot;, producer=None)
+    ml.add_dataset(&quot;1-DVER&quot;, producer=None)
+    ml.add_execution(
+        &quot;2-EXMID&quot;,
+        input_datasets=[_StubDataset(&quot;1-DVER&quot;, version=&quot;9.9.9&quot;, consumed_version=&quot;1.0.0&quot;)],
+    )
+    ml.add_dataset(&quot;1-DEND&quot;, producer=&quot;2-EXMID&quot;)
+
+    result = ml.lookup_lineage(&quot;1-DEND&quot;)
+
+    consumed = result.lineage.consumed_datasets
+    assert len(consumed) == 1
+    assert consumed[0].version == &quot;1.0.0&quot;  # consumed, not current 9.9.9
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run the new tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_lookup_lineage_unit.py -k "mid_walk_self_parent or consumed_version" -v</code>
+Expected: FAIL — these exercise behavior not yet implemented (the loop still uses <code>record.list_input_datasets()</code> + version-less lookups + no self-parent guard). The harness seam <code>_input_dataset_pairs</code> may also need the implementation method to exist; if the import of <code>list_input_datasets_with_versions</code> is missing it errors — that's an expected red.</p>
+<ul>
+<li>[ ] <strong>Step 4: Implement the <code>_walk_node</code> rewrite</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/execution.py</code>:</p>
+<p>(a) Add the <code>_input_dataset_pairs</code> seam method (place it beside <code>_producer_of_dataset</code>, before <code>_walk_node</code>):</p>
+<pre><code class="language-python">    def _input_dataset_pairs(self, execution_rid: RID) -&gt; list[tuple[Any, str | None]]:
+        &quot;&quot;&quot;(Dataset, consumed_version) pairs for an execution's input edges.
+
+        Thin wrapper over
+        :func:`deriva_ml.execution._helpers.list_input_datasets_with_versions`
+        so the lineage walk has one overridable seam (tests stub this).
+
+        Args:
+            execution_rid: Execution whose input edges to read.
+
+        Returns:
+            List of ``(Dataset, consumed_version)`` tuples; ``consumed_version``
+            is ``None`` for edges with no version pin.
+        &quot;&quot;&quot;
+        from deriva_ml.execution._helpers import list_input_datasets_with_versions
+
+        return list_input_datasets_with_versions(ml_instance=self, execution_rid=execution_rid)
+</code></pre>
+<p>(b) Replace the consumed-dataset loop in <code>_walk_node</code> (currently):</p>
+<pre><code class="language-python">            # Consumed inputs.
+            consumed_datasets: list[DatasetSummary] = []
+            parent_rids: set[RID] = set()
+            for ds in record.list_input_datasets():
+                ds_version = None
+                try:
+                    ds_version = str(ds.current_version)
+                except Exception:
+                    pass
+                consumed_datasets.append(
+                    DatasetSummary(
+                        rid=ds.dataset_rid,
+                        description=ds.description or None,
+                        version=ds_version,
+                    )
+                )
+                producer = self._producer_of_dataset(ds.dataset_rid)
+                if producer:
+                    parent_rids.add(producer)
+                # Members of this consumed dataset may have been produced by a
+                # different execution than the one that assembled the dataset;
+                # those member-producers are data-flow parents too.
+                parent_rids |= self._producers_of_dataset_members(ds.dataset_rid)
+</code></pre>
+<p>with:</p>
+<pre><code class="language-python">            # Consumed inputs. Walk the version that was ACTUALLY consumed
+            # (Dataset_Execution.Dataset_Version), not the dataset's current
+            # state, so lineage reflects the inputs as they were at consumption.
+            consumed_datasets: list[DatasetSummary] = []
+            parent_rids: set[RID] = set()
+            for ds, consumed_version in self._input_dataset_pairs(execution_rid):
+                version_str = consumed_version
+                if version_str is None:
+                    try:
+                        version_str = str(ds.current_version)
+                    except Exception:
+                        version_str = None
+                consumed_datasets.append(
+                    DatasetSummary(
+                        rid=ds.dataset_rid,
+                        description=ds.description or None,
+                        version=version_str,
+                    )
+                )
+                producer = self._producer_of_dataset(ds.dataset_rid, version=consumed_version)
+                if producer:
+                    parent_rids.add(producer)
+                # Member-producers of the CONSUMED version. Never the execution
+                # we are currently expanding: an execution that both consumed
+                # this dataset and produced some of its members must not become
+                # its own parent (the mid-walk analogue of the root path's
+                # version-producer subtraction).
+                member_producers = self._producers_of_dataset_members(
+                    ds.dataset_rid, version=consumed_version
+                )
+                parent_rids |= member_producers - {execution_rid}
+</code></pre>
+<p>Leave the consumed-ASSET loop, the <code>extra_parent_rids</code> merge, and the recursion UNCHANGED.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run the new tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_lookup_lineage_unit.py -k "mid_walk_self_parent or consumed_version" -v</code>
+Expected: PASS (4 passed).</p>
+<ul>
+<li>[ ] <strong>Step 6: Run the FULL unit file for no-regression</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_lookup_lineage_unit.py -v</code>
+Expected: ALL pass. The existing tests script inputs via <code>_StubDataset</code> with <code>consumed_version=None</code>, so the loop falls back to <code>current_version</code> and version-less producer lookups — identical to today's behavior. The member-producer override returns the unversioned set when no versioned entry is scripted, so existing member-producer tests are unchanged. The self-parent subtraction <code>- {execution_rid}</code> is a no-op for them (the expanding execution isn't in their member-producer sets).</p>
+<ul>
+<li>[ ] <strong>Step 7: Run the producers + helper files too (full lineage surface)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_lookup_lineage_unit.py tests/execution/test_producers_of_dataset_members.py tests/execution/test_input_datasets_with_versions.py -q</code>
+Expected: all green.</p>
+<ul>
+<li>[ ] <strong>Step 8: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check src/deriva_ml/core/mixins/execution.py tests/execution/test_lookup_lineage_unit.py
+uv run ruff format --check src/deriva_ml/core/mixins/execution.py tests/execution/test_lookup_lineage_unit.py
+git add src/deriva_ml/core/mixins/execution.py tests/execution/test_lookup_lineage_unit.py
+git commit -m &quot;fix(lineage): mid-walk uses consumed version + self-parent guard&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-live-versioned-mutation-regression-test">Task 4: live versioned-mutation regression test</h3>
+<p><strong>Files:</strong>
+- Modify: <code>tests/execution/test_lookup_lineage_live.py</code> (add one DERIVA_HOST-gated test)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: the full <code>lookup_lineage</code> behavior (Tasks 1-3), the <code>test_ml</code> fixture, <code>tests/factories.py</code>, the <code>DERIVA_HOST</code> gate.</p>
+<p><strong>Background:</strong> This is the one scenario no offline mock fully proves: a real catalog where a consumed dataset is mutated to a new version after consumption, with the new version's members produced by a different execution. The test must assert <code>lookup_lineage</code> reflects the CONSUMED version's producers, not the latest. Read the existing live tests + <code>tests/factories.py</code> first; build the shape with the real catalog APIs.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the live test</strong></li>
+</ul>
+<p>Add to <code>tests/execution/test_lookup_lineage_live.py</code> (after the existing tests). Replace the <code>...</code> with real construction using the catalog APIs — study the existing live tests + factories first; the ASSERTION block is the contract:</p>
+<pre><code class="language-python">@pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;lookup_lineage live smoke test requires DERIVA_HOST&quot;,
+)
+def test_lookup_lineage_reflects_consumed_version_not_latest(test_ml):
+    &quot;&quot;&quot;A dataset consumed at v1 must contribute v1's producers to lineage even
+    after it is mutated to v2 by a different execution (tk-020 Gap 1).
+
+    Shape:
+        exec_v1 produces D@v1
+        exec_mid consumes D@v1, produces DS_OUT
+        exec_v2 later mutates D to v2 (new members / new version producer)
+    Assert: lookup_lineage(DS_OUT) surfaces exec_v1 (the consumed-version
+    producer of D), NOT exec_v2 (the later/latest producer).
+    &quot;&quot;&quot;
+    # Build exec_v1 -&gt; D@v1; exec_mid consumes D@v1 -&gt; DS_OUT; then exec_v2
+    # mutates D to v2. Use the catalog APIs / factories (see existing live
+    # tests + tests/factories.py).
+    #
+    #   d_rid        = RID of D
+    #   ds_out_rid   = RID of DS_OUT
+    #   exec_v1_rid  = producer of D@v1 (consumed)
+    #   exec_v2_rid  = producer/mutator of D@v2 (latest)
+    ...
+
+    result = test_ml.lookup_lineage(ds_out_rid)
+
+    # Collect every execution RID anywhere in the lineage tree.
+    seen: set[str] = set()
+
+    def _collect(node):
+        if node is None:
+            return
+        seen.add(node.execution.rid)
+        for p in node.parents:
+            _collect(p)
+
+    _collect(result.lineage)
+
+    assert exec_v1_rid in seen, (
+        f&quot;consumed-version producer {exec_v1_rid} missing; saw {seen}&quot;
+    )
+    assert exec_v2_rid not in seen, (
+        f&quot;latest-version producer {exec_v2_rid} leaked into lineage; saw {seen}&quot;
+    )
+    assert result.cycle_detected is False
+</code></pre>
+<p>The implementer MUST replace the <code>...</code> with real construction (no leftover ellipsis). If a faithful versioned-mutation shape cannot be built through the available public APIs, report exactly what blocked it and what partial shape was achievable — do NOT weaken the assertions or fake a pass.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the live test (gated)</strong></li>
+</ul>
+<p>Run (localhost container is up; the <code>test_ml</code> fixture defaults <code>DERIVA_HOST=localhost</code> and manages its own throwaway catalog; set <code>DERIVA_ML_ALLOW_DIRTY=true</code> if workflow creation complains about a dirty tree):
+<code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_HOST=localhost DERIVA_ML_ALLOW_DIRTY=true uv run python -m pytest tests/execution/test_lookup_lineage_live.py::test_lookup_lineage_reflects_consumed_version_not_latest -v</code>
+Expected: PASS. If a live host is unavailable, report that, confirm it SKIPS without <code>DERIVA_HOST</code>, and confirm collection is clean — do NOT fake a pass.</p>
+<ul>
+<li>[ ] <strong>Step 3: Confirm skip path + collection</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_lookup_lineage_live.py -v</code>
+Expected: all live tests SKIP (no <code>DERIVA_HOST</code>), no collection errors.</p>
+<ul>
+<li>[ ] <strong>Step 4: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check tests/execution/test_lookup_lineage_live.py
+uv run ruff format --check tests/execution/test_lookup_lineage_live.py
+git add tests/execution/test_lookup_lineage_live.py
+git commit -m &quot;test(lineage): live consumed-version regression (tk-020 Gap 1)&quot;
+</code></pre>
+<hr />
+<h2 id="final-verification-after-all-tasks">Final verification (after all tasks)</h2>
+<ul>
+<li>[ ] Full execution test directory: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/ -v</code> — all pass (live tests skip without <code>DERIVA_HOST</code>; the 2 pre-existing <code>test_workflow_creation_*</code> subprocess failures are unrelated).</li>
+<li>[ ] Lint the touched surface: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src tests</code>.</li>
+<li>[ ] Confirm <code>list_input_datasets</code> (the original helper) and its four callers are untouched: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git diff main -- src/deriva_ml/execution/_helpers.py</code> shows ONLY the new function added, <code>list_input_datasets</code> unchanged.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

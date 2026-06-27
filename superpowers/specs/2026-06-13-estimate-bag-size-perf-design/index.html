@@ -1,0 +1,2665 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-06-13-estimate-bag-size-perf-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Fast estimate_bag_size / bag_info — redundant /schema introspection — Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#fast-estimate_bag_size-bag_info-redundant-schema-introspection-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Fast estimate_bag_size / bag_info — redundant /schema introspection — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem statement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Problem statement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#root-cause-deriva-ml-not-deriva-py" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Root cause (deriva-ml, not deriva-py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-two-redundancies-and-the-fix-for-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The two redundancies, and the fix for each
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The two redundancies, and the fix for each">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-redundant-schema-from-snapshot-catalog-construction-the-98" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Redundant /schema from snapshot-catalog construction (the 98 %)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#31a-correction-2026-06-13-found-during-implementation-the-audits-harmless-claim-is-false-on-non-304-servers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1a CORRECTION (2026-06-13, found during implementation): the audit's "HARMLESS" claim is false on non-304 servers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#31b-lever-c-build-the-pathbuilder-from-the-held-model-revised-2026-06-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1b Lever C — build the pathBuilder from the held model (REVISED 2026-06-14)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-redundant-tree-walks-the-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Redundant tree walks (the 2.5×)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-out-of-scope-explicitly-not-changing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Out of scope (explicitly not changing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-deliverables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Deliverables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-testing-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Testing / verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Testing / verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-unit-catalog_snapshot-performs-no-schema-fetch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Unit — catalog_snapshot() performs no /schema fetch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#51b-equivalence-reused-schema-model-freshly-fetched-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1b Equivalence — reused-schema model == freshly-fetched model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#51c-unit-live-pathbuilder-is-cached-invalidated-on-refresh-lever-c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1c Unit — live pathBuilder() is cached + invalidated on refresh (Lever C)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-integration-get-count-regression-guard-live-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Integration — GET-count regression guard (live catalog)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-correctness-numbers-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Correctness — numbers unchanged
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-live-smoke-manual-recorded-in-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Live smoke (manual, recorded in PR)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="fast-estimate_bag_size-bag_info-redundant-schema-introspection-design">Fast <code>estimate_bag_size</code> / <code>bag_info</code> — redundant <code>/schema</code> introspection — Design</h1>
+<p><strong>Date:</strong> 2026-06-13
+<strong>Status:</strong> Approved in brainstorming; spec for implementation.
+<strong>Subproject:</strong> <code>deriva-ml</code></p>
+<h2 id="1-problem-statement">1. Problem statement</h2>
+<p><code>estimate_bag_size</code> (and <code>bag_info</code>, which calls it) takes <strong>~8.5 minutes</strong>
+on the <code>www.eye-ai.org</code> <code>2-277G</code> dataset (84 nested descendants, 80 tables,
+360 k rows, 18 GB). That is unusable as a "how big before I download?"
+preview.</p>
+<p>Profiling (live, 2026-06-13) shows the cost is <strong>not</strong> the size queries —
+it is <strong>redundant catalog-schema introspection</strong>:</p>
+<ul>
+<li>The walk issues <strong>2,375 serial HTTP GETs</strong>; <strong>391 s of 412 s (95 %) is
+  <code>_ssl._SSLSocket.read</code></strong> — pure network wait, ~0 CPU.</li>
+<li><strong>849 of those GETs are <code>/schema</code></strong> (full catalog-model introspection),
+  re-fetched over and over.</li>
+<li>The actual estimate queries (per-table counts + asset <code>Length</code>) are
+  <strong>~2 %</strong> of the traffic — a few dozen GETs at the bottom of the profile.</li>
+</ul>
+<h3 id="root-cause-deriva-ml-not-deriva-py">Root cause (deriva-ml, not deriva-py)</h3>
+<p><code>Dataset.list_dataset_members()</code> and <code>Dataset.list_dataset_children()</code> each
+call:</p>
+<pre><code class="language-python">version_snapshot_catalog = self._version_snapshot_catalog(version)
+pb = version_snapshot_catalog.pathBuilder()
+</code></pre>
+<p><code>_version_snapshot_catalog(version)</code> (<code>dataset.py:2844</code>) calls
+<code>self._ml_instance.catalog_snapshot(...)</code> which <strong>builds a fresh,
+uncached snapshot-catalog object on every call</strong>. <code>pathBuilder()</code> on that
+fresh object has an empty cache, so it <strong>re-introspects <code>/schema</code></strong> each
+time. (When <code>version</code> is <code>None</code> it returns the shared <code>_ml_instance</code>,
+whose pathbuilder <em>is</em> cached — so only the versioned path, which the
+estimate uses, pays this.)</p>
+<p>This fires <strong>once per descendant dataset</strong> during the nesting walk, and the
+nesting walk runs <strong>~2.5×</strong> per estimate:</p>
+<ol>
+<li><code>aggregate_queries</code> → <code>anchors_for(ds)</code> → <code>_iter_descendant_rids</code> (walk 1:
+   <code>list_dataset_children</code> per node).</li>
+<li><code>aggregate_queries</code> → <code>build_policy(ds)</code> → <code>_exclude_empty_associations</code>
+   → <code>_iter_descendant_rids</code> <strong>again</strong> (walk 2) <strong>plus</strong> a
+   <code>lookup_dataset(rid)</code> + <code>list_dataset_members()</code> for <strong>every</strong> RID in the
+   tree (walk 3, the member scan).</li>
+</ol>
+<p>Measured attribution (2-277G):</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>wall</th>
+<th>GETs</th>
+<th><code>/schema</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>anchors_for</code> alone</td>
+<td>35 s</td>
+<td>676</td>
+<td>338</td>
+</tr>
+<tr>
+<td><code>aggregate_queries</code> total</td>
+<td>415 s</td>
+<td>2 375</td>
+<td>849</td>
+</tr>
+</tbody>
+</table>
+<p>So ~98 % of the time is redundant <code>/schema</code> fetches + repeated tree walks;
+the genuine estimate work is the remaining ~2 %.</p>
+<p><strong>Note (revises an earlier call):</strong> during investigation we tentatively
+concluded the fix belonged upstream in deriva-py's <code>CatalogBagBuilder</code>.
+The profile disproves that — <code>CatalogBagBuilder._get_model()</code> and
+<code>getPathBuilder()</code> are correctly cached per instance, and the FK walk
+(<code>SchemaPathWalker.walk_bfs</code>) is pure in-memory. The redundant <code>/schema</code>
+fetches originate in <strong>deriva-ml</strong>'s snapshot-catalog re-creation and
+double tree-walk. The fix is deriva-ml-side.</p>
+<h2 id="2-goals">2. Goals</h2>
+<ul>
+<li><code>estimate_bag_size(2-277G)</code> and <code>bag_info(2-277G)</code> drop from ~8.5 min to
+  <strong>seconds</strong> (target: &lt; 30 s; the irreducible work is ~the bottom-of-profile
+  estimate queries plus one <code>/schema</code> and one tree walk). <strong>Requires both</strong>
+  Lever A (snapshot construction, §3.1) <strong>and</strong> Lever C (live-instance
+  pathBuilder caching, §3.1b) — A1/A2 alone leaves an O(N) live-instance
+  <code>/schema</code> refetch (discovered during implementation; servers don't honor
+  304).</li>
+<li><strong>No change to what the estimate computes</strong> — exact row counts and exact
+  asset bytes, identical numbers, byte-for-byte. (User decision: "keep exact,
+  just make it fast.")</li>
+<li>No public-API change to <code>estimate_bag_size</code> / <code>bag_info</code> signatures.</li>
+</ul>
+<h2 id="3-the-two-redundancies-and-the-fix-for-each">3. The two redundancies, and the fix for each</h2>
+<h3 id="31-redundant-schema-from-snapshot-catalog-construction-the-98">3.1 Redundant <code>/schema</code> from snapshot-catalog construction (the 98 %)</h3>
+<p>The deeper finding: <code>_version_snapshot_catalog(version)</code> calls
+<code>self._ml_instance.catalog_snapshot(...)</code>, and <code>catalog_snapshot()</code>
+(<code>core/base.py:766</code>) <strong>constructs a brand-new <code>DerivaML(...)</code> instance</strong>.
+<code>DerivaML.__init__</code> → <code>_init_online</code> unconditionally calls
+<code>self.catalog.getCatalogSchema()</code> (<code>base.py:465</code>) — a full <code>/schema</code> fetch —
+<em>even though <code>_init_online</code> already writes that schema to a disk
+<code>SchemaCache</code> it never reads back</em> (<code>base.py:435</code>). So every snapshot
+construction re-fetches the whole catalog model from the server.</p>
+<p><strong>The schema does not need to be fetched at all.</strong> A snapshot pins the
+<em>data</em> view at a snaptime; the <strong>model structure is identical to the live
+catalog</strong> the <code>_ml_instance</code> already holds in memory (<code>self.model</code>, parsed
+once at construction via <code>DerivaModel.from_cached</code>). So the snapshot
+instance can be seeded from the live instance's already-parsed schema and
+skip the network entirely.</p>
+<p><strong>Scope of the redundancy (full audit, 2026-06-13).</strong> A repo-wide audit of
+every <code>/schema</code>-triggering call site (<code>getCatalogSchema</code>, <code>getCatalogModel</code>/
+<code>Model.fromcatalog</code>, <code>getPathBuilder</code>/<code>pathBuilder</code>, and every new
+catalog-object construction) found that <strong><code>catalog_snapshot()</code> is the <em>only</em>
+source of redundant schema fetching</strong> in deriva-ml. Every other site is
+either:</p>
+<ul>
+<li><strong>HARMLESS</strong> — repeated <code>getCatalogSchema()</code> / <code>pathBuilder()</code> /
+  <code>getCatalogModel()</code> on the <em>same</em> long-lived <code>_ml_instance.catalog</code>
+  (deriva-py caches the parsed <code>/schema</code> per catalog object, so the 77
+  <code>pathBuilder()</code> call sites share <strong>one</strong> fetch); or</li>
+<li><strong>NECESSARY</strong> — a genuine first-ever fetch on a freshly-created catalog
+  (initial <code>DerivaML</code> construction; <code>clone_via_bag</code> / <code>localize</code> connecting
+  to <em>different</em> source/dest catalogs), or a <strong>deliberate</strong> refresh that
+  purges the cache on purpose (<code>refresh_schema</code>, <code>pin_schema</code>, <code>diff_schema</code>
+  each call <code>purge_cache_by_prefix("/schema")</code> before re-fetching — that is
+  their job).</li>
+</ul>
+<p>So fixing <code>catalog_snapshot()</code> cures the snapshot-construction class. The one
+offender is amplified two ways: <strong>(i)</strong> the nesting walk calls it once per
+descendant dataset (85× for 2-277G), and <strong>(ii)</strong> even within a <em>single</em>
+operation, <strong>8 distinct <code>Dataset</code> call sites</strong> (<code>list_dataset_members</code>,
+<code>list_dataset_children</code>, denormalization, etc.) each build their own snapshot
+catalog and none reuse it.</p>
+<h3 id="31a-correction-2026-06-13-found-during-implementation-the-audits-harmless-claim-is-false-on-non-304-servers">3.1a CORRECTION (2026-06-13, found during implementation): the audit's "HARMLESS" claim is false on non-304 servers</h3>
+<p>The audit's "HARMLESS" bucket above assumed deriva-py caches the parsed
+<code>/schema</code> per catalog object, so repeated <code>pathBuilder()</code> /
+<code>getCatalogSchema()</code> on the same live <code>_ml_instance.catalog</code> cost <strong>one</strong>
+fetch. <strong>That assumption is wrong for the servers deriva-ml actually talks
+to.</strong> deriva-py's cache is <em>conditional-revalidation</em>-based:
+<code>getCatalogSchema()</code> calls <code>self.get('/schema')</code> every time and only returns
+the memoized parsed dict when the binding reports a <strong>304 Not Modified</strong>
+(<code>cached[0] is r</code> — same <code>Response</code> object). <code>getPathBuilder()</code> likewise
+re-derives from <code>getCatalogSchema()</code> and only hits its wrapper cache when the
+returned schema dict is the <em>same object</em> — which again only happens on a
+304.</p>
+<p><strong>Measured 2026-06-13:</strong> both the localhost Deriva Docker stack <strong>and
+production <code>www.eye-ai.org</code></strong> return <strong>HTTP 200 (not 304)</strong> on a conditional
+<code>/schema</code> GET (<code>If-None-Match</code> is sent but ignored). Therefore deriva-py's
+schema/pathbuilder cache <strong>never engages</strong> on these servers — every
+<code>pathBuilder()</code> call re-fetches and re-parses the full <code>/schema</code>.</p>
+<p>Consequence: there is a <strong>second, independent O(N) source</strong> the original
+audit missed. During an estimate, <code>bag_builder._iter_descendant_rids</code> calls
+<code>self._ml_instance.lookup_dataset(rid)</code> for <strong>every</strong> descendant, and
+<code>lookup_dataset</code> → <code>pathBuilder()</code> → <code>getCatalogSchema()</code> → a <code>/schema</code> GET.
+On the demo catalog this measured <strong>~12 <code>/schema</code> GETs per descendant</strong>
+(76 for 6 descendants; 16 for a leaf). A1/A2 alone (snapshot construction)
+does <strong>not</strong> fix this — it is live-instance refetching, not snapshot
+construction.</p>
+<h3 id="31b-lever-c-build-the-pathbuilder-from-the-held-model-revised-2026-06-14">3.1b Lever C — build the pathBuilder from the held model (REVISED 2026-06-14)</h3>
+<blockquote>
+<p><strong>Revision note.</strong> Lever C was first implemented as "cache deriva-py's
+<code>getPathBuilder()</code> result on the DerivaML instance, keyed on inner-model
+identity." That was <strong>buggy</strong>: <code>create_table</code>/<code>create_vocabulary</code> mutate the
+deriva-py <code>Model</code> <strong>in place</strong> (object identity unchanged), so the
+identity-keyed cache returned a <strong>stale wrapper missing the new table</strong> →
+<code>KeyError: 'SubjectHealth'</code> in the <code>ensure_features</code> fixture (3 core tests).
+Root cause confirmed empirically. The corrected design below replaces it.</p>
+</blockquote>
+<p><strong>Root finding (source-verified).</strong> The path-builder wrapper
+(<code>_CatalogWrapper</code>) is built <strong>entirely from <code>catalog.getCatalogModel().schemas</code></strong>;
+the <code>/schema</code> dict that <code>getPathBuilder()</code> fetches is used <strong>only as an
+<code>is</code>-identity freshness cache key and is never read for content</strong>. The reason
+<code>pathBuilder()</code> re-fetches <code>/schema</code> at all is that deriva-py's
+<code>getCatalogModel()</code> is <strong>uncached</strong> — it rebuilds the <code>Model</code> from <code>/schema</code>
+every call. deriva-ml already holds an <strong>up-to-date</strong> <code>Model</code>
+(<code>self.model.model</code>): <code>create_table</code> mutates it in place; <code>refresh_model()</code> /
+<code>refresh_schema()</code> rebind it. So the wrapper can be built from the held model
+with <strong>zero <code>/schema</code> GETs</strong>, and it correctly reflects in-place table creation
+(it reads the current <code>self.model.model.schemas</code> at build time).</p>
+<p><strong>Fix: <code>DerivaML.pathBuilder()</code> builds the wrapper from the held model</strong> via a
+new public deriva-py helper <code>datapath.from_model(catalog, model)</code> (which adds an
+optional <code>model=</code> param to <code>_CatalogWrapper</code>, defaulting to the historical
+<code>getCatalogModel()</code> fetch). The wrapper is cached on the DerivaML instance
+keyed on inner-model identity (so <code>refresh_model</code>'s rebind invalidates it); on a
+cache miss it rebuilds from the <em>current</em> <code>self.model.model</code>, so an in-place
+<code>create_table</code> is reflected. <strong>HTTP — reads AND writes — still routes through
+<code>self.catalog</code></strong> (the wrapper's <code>_wrapped_catalog</code>), so writes, datapath joins,
+snapshot-pinning, and offline behavior are unchanged.</p>
+<p>This is the correct layer per the cross-repo rule: the redundant fetch is a
+deriva-py inefficiency (<code>getCatalogModel</code> uncached), so the reusable primitive
+(<code>from_model</code>) lands in deriva-py; deriva-ml consumes it. A <strong>7-axis
+blast-radius audit (2026-06-14)</strong> verified SAFE on: writes, query/FK-join
+execution, identity/caching, snapshot catalogs, offline (CatalogStub),
+cross-instance staleness (no new risk vs. the documented "model is a snapshot
+until refresh" contract), and all 77 <code>pathBuilder()</code> call sites. Residual risk
+is implementation-only (the wrapper-construction seam must keep
+<code>_wrapped_catalog</code> = the real catalog and preserve offline <code>DerivaMLReadOnlyError</code>),
+guarded by write-through + snapshot-pinning + offline tests.</p>
+<ul>
+<li><strong>Invalidation ownership (load-bearing, found in P3 review).</strong> By building
+  the wrapper ourselves (not via <code>self.catalog.getPathBuilder()</code>), we <strong>opt out
+  of deriva-py's own auto-invalidation</strong> — deriva-py purges its path-builder
+  cache on every schema-mutating POST/PUT/DELETE, but our DerivaML-level cache
+  never sees those. So <strong>deriva-ml now owns invalidation at every in-place
+  model-mutation site.</strong> In-place <code>create_table</code> keeps the inner-Model identity
+  unchanged, so an identity-keyed cache that was <em>warmed before</em> the mutation
+  returns a stale wrapper missing the new table → <code>KeyError</code>. Therefore EVERY
+  DerivaML method that does an in-place <code>model.schemas[...].create_table(...)</code>
+  (or column/association add) <strong>must</strong> set <code>self._path_builder_cache = None</code>
+  right after the mutation — unless it already calls <code>refresh_model()</code> (which
+  rebinds the inner model and self-invalidates). The known sites:
+  <code>create_vocabulary</code>, <code>create_table</code>, <code>create_asset_table</code> (base.py),
+  <code>create_feature</code> (feature mixin), <code>create_asset</code> (asset mixin), and
+  <code>add_dataset_element_type</code>'s no-<code>_workspace</code> branch (dataset mixin). A
+  same-instance create-then-read regression test pins this (a create site that
+  forgets to invalidate fails it).</li>
+<li><strong>Freshness contract:</strong> because the wrapper is built from the <em>current</em>
+  <code>self.model.model</code> on each cache miss, it reflects in-place <code>create_table</code>
+  mutations; because the cache is keyed on inner-model identity, a
+  <code>refresh_model()</code> / <code>refresh_schema()</code> rebind invalidates it. deriva-ml's
+  documented contract is that the model is a per-instance snapshot updated
+  only via explicit refresh — the audit confirmed no flow does
+  create-then-read-via-pathBuilder without an intervening refresh. (If a
+  future flow needs that, the create choke point clears the cache — a
+  one-liner, not a redesign.)</li>
+<li><strong>Scope:</strong> <code>_ml_instance.pathBuilder()</code> is used pervasively (77 call sites);
+  building from the held model eliminates the live-instance refetch for
+  <em>every</em> caller, not just the estimate — a broad perf win with no behavior
+  change (HTTP still routes through the real catalog).</li>
+<li><strong>Snapshot instances</strong> also benefit: a snapshot <code>DerivaML</code> holds its
+  (schema-reused) model, so its pathBuilder builds from that model and reads
+  route to the <code>@snaptime</code> endpoint via the snapshot catalog.</li>
+</ul>
+<p>With this, <code>_iter_descendant_rids</code>'s N <code>lookup_dataset</code> calls issue <strong>zero</strong>
+<code>/schema</code> GETs on the live instance — collapsing the O(N) live-instance
+refetch to O(1) (in fact O(0) <code>/schema</code>).</p>
+<p><strong>Lever A (revised — eliminate, don't memoize) — reuse the live model when
+building a snapshot catalog.</strong> <code>catalog_snapshot()</code> threads the live
+instance's parsed <code>schema_json</code> into the new instance's construction so
+<code>_init_online</code> builds its <code>DerivaModel</code> via the existing
+<code>DerivaModel.from_cached(schema_json, catalog=&lt;snapshot catalog&gt;, ...)</code> path
+<strong>without calling <code>getCatalogSchema()</code></strong>. Net <code>/schema</code> fetches for the whole
+estimate: <strong>0</strong> (the live instance's one construction-time fetch already
+happened; snapshots reuse it).</p>
+<p>Mechanics (cleanest seam, to be finalized in the plan):</p>
+<ul>
+<li>Add an internal opt-in to the online init path that accepts a
+  pre-parsed <code>schema_json</code> (or a <code>DerivaModel</code>) and, when present, skips
+  <code>getCatalogSchema()</code> and constructs the model from the supplied dict via
+  <code>from_cached</code>. The snaptime still flows into the
+  <code>server.connect_ermrest(catalog_id@snaptime)</code> catalog object, so <strong>data</strong>
+  reads are correctly snapshot-pinned — only the redundant <strong>schema</strong> fetch
+  is removed.</li>
+<li><code>catalog_snapshot()</code> passes <code>self.model</code>'s source <code>schema_json</code> (the same
+  dict <code>__init__</code> already wrote to <code>SchemaCache</code>) through that opt-in.</li>
+<li>This is strictly better than memoizing the snapshot object: it removes
+  the fetch at the source, and it composes with the memoization below.</li>
+</ul>
+<p><strong>Lever A2 — memoize the snapshot instance per snapshot id.</strong> Even with the
+fetch eliminated, each of the 8 <code>Dataset</code> call sites still <em>constructs</em> a new
+snapshot <code>DerivaML</code> and rebuilds the model object from the dict. Memoize
+<code>_version_snapshot_catalog</code> (or <code>catalog_snapshot</code>) on the <code>_ml_instance</code>,
+keyed by the resolved snapshot id (<code>catalog_id@snaptime</code>), so all call sites
+within a process share one snapshot instance. Cache key is the resolved id —
+not the raw <code>version</code> arg — so <code>None</code>, <code>"4.11.0"</code>, and an equivalent parsed
+<code>DatasetVersion</code> collapse to one entry. Snapshots are immutable, so entries
+never go stale; the dict is bounded by the number of distinct snapshots a
+session touches (normally 1). A1 (no fetch) + A2 (no rebuild) together make
+the second-and-later snapshot accesses effectively free.</p>
+<p><strong>Correctness guard (load-bearing):</strong> reusing the live schema for a snapshot
+is valid <strong>only because the snapshot's schema equals live's</strong>. This is true
+for the snapshots deriva-ml pins (recent dataset-version snaptimes on a
+catalog whose schema hasn't been migrated between the snaptime and now). The
+plan must (a) state this assumption explicitly, and (b) add a test that the
+reused-schema snapshot model is structurally identical to a freshly-fetched
+snapshot model on the demo catalog. If a catalog could have a <em>schema</em>
+migration between the snaptime and live, the live schema would be wrong for
+the snapshot — but deriva-ml's snapshot use is for data-version pinning, not
+schema-archaeology, so this is acceptable and must be documented as a
+precondition.</p>
+<h3 id="32-redundant-tree-walks-the-25">3.2 Redundant tree walks (the 2.5×)</h3>
+<p><strong>Lever B — walk the descendant tree once per estimate.</strong>
+<code>_iter_descendant_rids(dataset)</code> is invoked by both <code>anchors_for</code> and
+<code>_exclude_empty_associations</code>, and <code>_exclude_empty_associations</code> <em>also</em>
+re-fetches members per RID. With Lever A in place each of those calls is far
+cheaper (no <code>/schema</code> refetch), but the <strong>redundant tree traversal</strong> remains
+(N <code>list_dataset_children</code> round-trips, done ~twice).</p>
+<p>Memoize the descendant-RID list for the duration of one
+<code>aggregate_queries</code> call so the tree is walked once. Options considered:</p>
+<ul>
+<li><strong>B1 (recommended):</strong> have <code>aggregate_queries</code> compute the descendant set
+  <strong>once</strong> and pass it to both <code>anchors_for</code> and <code>build_policy</code>
+  (thread it through, or stash it on the builder for the call). Explicit, no
+  hidden state.</li>
+<li><strong>B2:</strong> memoize <code>_iter_descendant_rids</code> on the <code>DatasetBagBuilder</code> keyed by
+  <code>dataset.dataset_rid</code>. Simpler call sites, but adds instance state that
+  must not outlive a logical operation.</li>
+</ul>
+<p>Lever B is <strong>secondary</strong> — after Lever A removes the <code>/schema</code> cost, the
+remaining tree-walk is ~85 cheap <code>Dataset_Dataset</code>/<code>Dataset</code> GETs done twice
+(~170, sub-second-each but serial). We will implement A first, <strong>re-measure</strong>,
+and only add B if the post-A time still exceeds the &lt; 30 s target. (YAGNI:
+don't build B speculatively if A alone hits the goal.)</p>
+<h3 id="33-out-of-scope-explicitly-not-changing">3.3 Out of scope (explicitly not changing)</h3>
+<ul>
+<li>The RID-union exactness of counts (kept — user decision).</li>
+<li>Swapping <code>attributes(RID)</code> → <code>aggregates(Cnt(RID))</code> (the count queries are
+  ~2 % of cost; not worth the dedup-semantics risk now).</li>
+<li>Any async/concurrency change to the estimate query layer (already bounded
+  by ADR-0008 / #289; not the bottleneck).</li>
+<li>deriva-py <code>CatalogBagBuilder</code> (correctly cached; not the cause).</li>
+</ul>
+<h2 id="4-deliverables">4. Deliverables</h2>
+<ul>
+<li><code>src/deriva_ml/core/base.py</code>:</li>
+<li>an internal opt-in on the online init path to skip <code>getCatalogSchema()</code>
+    and build the model from a supplied parsed schema via
+    <code>DerivaModel.from_cached</code> (Lever A1); <strong>[DONE]</strong></li>
+<li><code>catalog_snapshot()</code> threads the live instance's parsed <code>schema_json</code>
+    through that opt-in so snapshot construction performs <strong>0</strong> <code>/schema</code>
+    fetches (A1), and memoizes the constructed snapshot instance by resolved
+    snapshot id so the 8 <code>Dataset</code> call sites share one instance (A2).
+    <strong>[DONE]</strong></li>
+<li><code>src/deriva_ml/core/mixins/path_builder.py</code> (Lever C — the live-instance
+  refetch fix, §3.1b):</li>
+<li><code>DerivaML.pathBuilder()</code> caches the deriva-py wrapper on the DerivaML
+    instance (e.g. <code>self._path_builder</code> set on first call) and returns it on
+    subsequent calls, instead of calling <code>self.catalog.getPathBuilder()</code> (a
+    <code>/schema</code> refetch) every time.</li>
+<li><code>src/deriva_ml/core/base.py</code> + <code>src/deriva_ml/model/catalog.py</code> (Lever C
+  invalidation):</li>
+<li><code>refresh_model()</code> / <code>refresh_schema()</code> / <code>pin_schema()</code> /
+    <code>unpin_schema()</code> clear the cached <code>pathBuilder</code> so a deliberate schema
+    refresh is observed by the next <code>pathBuilder()</code> call. (Match the existing
+    refresh contract — these are the only paths that legitimately change the
+    instance's schema.)</li>
+<li>(Conditional, only if post-A+C re-measure misses target)
+  <code>src/deriva_ml/dataset/bag_builder.py</code>:</li>
+<li>single-tree-walk wiring for <code>aggregate_queries</code> (Lever B1).</li>
+<li>Tests (below).</li>
+<li>Patch/minor version bump after merge.</li>
+</ul>
+<h2 id="5-testing-verification">5. Testing / verification</h2>
+<h3 id="51-unit-catalog_snapshot-performs-no-schema-fetch">5.1 Unit — <code>catalog_snapshot()</code> performs no <code>/schema</code> fetch</h3>
+<p>A unit test that spies on <code>getCatalogSchema()</code> (or the underlying <code>/schema</code>
+GET) and asserts that <code>catalog_snapshot(version_snapshot)</code> constructs the
+snapshot instance <strong>without</strong> calling it — the snapshot model is built from
+the live instance's already-parsed schema via <code>from_cached</code>. Drive with a
+stub catalog whose <code>getCatalogSchema</code> increments a counter; assert the
+counter does not increment across a <code>catalog_snapshot()</code> call.</p>
+<h3 id="51b-equivalence-reused-schema-model-freshly-fetched-model">5.1b Equivalence — reused-schema model == freshly-fetched model</h3>
+<p>On the demo catalog, build a snapshot instance two ways: (a) via the new
+schema-reusing <code>catalog_snapshot()</code>, (b) by forcing a real
+<code>getCatalogSchema()</code> fetch for the same snaptime. Assert the two
+<code>DerivaModel</code>s are structurally identical (same schemas, tables, columns,
+FKs). This pins the load-bearing assumption from §3.1.</p>
+<h3 id="51c-unit-live-pathbuilder-is-cached-invalidated-on-refresh-lever-c">5.1c Unit — live <code>pathBuilder()</code> is cached + invalidated on refresh (Lever C)</h3>
+<p>Spy on <code>ErmrestCatalog.getPathBuilder</code> (or <code>/schema</code> GET). Assert:
+- repeated <code>ml.pathBuilder()</code> calls on a live instance trigger
+  <code>getPathBuilder()</code> / a <code>/schema</code> GET <strong>once</strong>, not per call (the wrapper is
+  cached on the DerivaML instance);
+- after <code>ml.refresh_model()</code> (or <code>refresh_schema()</code>), the <strong>next</strong>
+  <code>pathBuilder()</code> call rebuilds (cache cleared) — so a deliberate schema
+  refresh is still observed. This pins the invalidation contract so the cache
+  can't mask a real schema change.</p>
+<h3 id="52-integration-get-count-regression-guard-live-catalog">5.2 Integration — GET-count regression guard (live catalog)</h3>
+<p>Against the demo catalog (the same <code>catalog_manager.ensure_datasets</code> fixture):
+build a small <strong>nested</strong> dataset, then run <code>estimate_bag_size</code> while counting
+catalog GETs (monkeypatch <code>DerivaBinding.get</code> to increment a counter, as the
+investigation harness did). Assert the <strong><code>/schema</code> GET count does not scale
+with the number of descendants</strong> — it should be a small fixed constant
+independent of nesting depth (post-fix the snapshot path adds <strong>0</strong> schema
+fetches; the only <code>/schema</code> GETs are the live instance's own
+construction-time fetch plus any deliberate refresh). Concretely: assert the
+<code>/schema</code> count for an N-descendant dataset equals the count for a
+single-node dataset (± a small fixed allowance), <strong>not</strong> O(N). This pins the
+regression: if a future change reintroduces per-descendant snapshot-catalog
+fetching, the count grows with N and the test fails.</p>
+<ul>
+<li>The demo catalog must exhibit nesting for this to be meaningful; the
+  <code>catalog_with_datasets</code> fixture already builds nested splits. Assert the
+  descendant count is ≥ 2 first (skip with a clear message if not), so the
+  guard is exercised.</li>
+</ul>
+<h3 id="53-correctness-numbers-unchanged">5.3 Correctness — numbers unchanged</h3>
+<p>Assert <code>estimate_bag_size</code> on the demo nested dataset returns the <strong>same</strong>
+<code>total_rows</code> / <code>total_asset_bytes</code> / per-table counts before and after the
+change (capture once on <code>main</code>, compare). Since the change is pure caching,
+the estimate dict must be identical.</p>
+<h3 id="54-live-smoke-manual-recorded-in-pr">5.4 Live smoke (manual, recorded in PR)</h3>
+<p>Re-run <code>estimate_bag_size(2-277G)</code> against www.eye-ai.org and record the new
+wall-clock + <code>/schema</code> GET count in the PR description (target &lt; 30 s, was
+~510 s). Not a CI test (needs the production catalog); the demo-catalog GET
+guard is the CI pin.</p>
+<h2 id="6-risks">6. Risks</h2>
+<ul>
+<li><strong>Schema drift between snaptime and live (the load-bearing assumption):</strong>
+  reusing the live schema for a snapshot is correct only when the snapshot's
+  schema equals live's. deriva-ml pins snapshots for <em>data</em>-version
+  reproducibility on catalogs whose schema is not migrated mid-session, so
+  this holds. The §5.1b equivalence test pins it; the precondition is
+  documented on the new init opt-in. A future caller that needs a snapshot
+  from <em>before</em> a schema migration must not use the schema-reuse path — call
+  this out in the docstring.</li>
+<li><strong><code>version=None</code> branch unaffected:</strong> <code>_version_snapshot_catalog(None)</code>
+  already returns the shared <code>_ml_instance</code> (no new catalog, no fetch). The
+  change only touches the versioned branch. Confirm the <code>None</code> branch is
+  untouched.</li>
+<li><strong>Write paths:</strong> the schema-reuse opt-in is for read-oriented snapshot
+  construction. Snapshots are read-only by nature; verify no caller writes
+  through a snapshot instance built this way.</li>
+<li><strong>Offline mode:</strong> <code>_init_offline</code> already builds from cache and never
+  fetches <code>/schema</code>; the new opt-in must not change that path.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

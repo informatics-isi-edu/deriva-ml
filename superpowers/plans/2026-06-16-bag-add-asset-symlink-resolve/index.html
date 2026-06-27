@@ -1,0 +1,2389 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-16-bag-add-asset-symlink-resolve/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>BagBuilder.add_asset Symlink-Resolve Fix — Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bagbuilderadd_asset-symlink-resolve-fix-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              BagBuilder.add_asset Symlink-Resolve Fix — Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-failing-contract-test-in-deriva-py-red-on-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Failing contract test in deriva-py (RED on Linux)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-the-fix-in-deriva-py-add_asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: The fix in deriva-py add_asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-open-the-deriva-py-pr-upstream-do-not-self-merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Open the deriva-py PR (upstream — do NOT self-merge)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-advance-the-deriva-py-pin-in-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Advance the deriva-py pin in deriva-ml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-verify-against-the-pinned-fix-broad-sweep-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Verify against the pinned fix + broad sweep + PR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="bagbuilderadd_asset-symlink-resolve-fix-implementation-plan">BagBuilder.add_asset Symlink-Resolve Fix — Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Make <code>deriva.bag.builder.BagBuilder.add_asset(src, link=True)</code> embed the real file's bytes as a regular file in the bag even when <code>src</code> is a symlink, fixing Linux bag corruption (and bagit "unsafe path") — then advance deriva-ml's deriva-py pin to the fixed commit.</p>
+<p><strong>Architecture:</strong> One-line fix in deriva-py (<code>source_path = Path(source_path).resolve()</code> before linking) plus a contract test pinning the symlink-source case, in the <strong>same</strong> deriva-py PR. The bug is Linux-only (<code>os.link</code> follows symlinks on macOS/BSD but hardlinks the symlink inode on Linux), so the failing-test (RED) and the fixed-test (GREEN) are both verified on <strong>Linux via Docker</strong> (<code>python:3.12-slim</code>) since the deriva-py checkout has no Linux CI. deriva-ml gets no code change — only a two-location pin advance after the upstream PR merges.</p>
+<p><strong>Tech Stack:</strong> Python 3.12, <code>os.link</code>/<code>pathlib</code>, pytest, <code>uv</code>, Docker (<code>python:3.12-slim</code>) for the Linux proof. deriva-py checkout at <code>/Users/carl/GitHub/deriva-py</code> (on branch <code>deriva-ml</code>, at the SHA deriva-ml currently pins). deriva-ml at <code>/Users/carl/GitHub/DerivaML/deriva-ml</code>.</p>
+<hr />
+<h2 id="file-structure">File structure</h2>
+<ul>
+<li><strong>deriva-py — Modify</strong> <code>/Users/carl/GitHub/deriva-py/deriva/bag/builder.py</code> (the <code>add_asset</code> method, ~L424): one-line resolve.</li>
+<li><strong>deriva-py — Modify</strong> <code>/Users/carl/GitHub/deriva-py/tests/deriva/bag/test_builder.py</code>: add one contract test for the symlink-source case (mirrors the existing <code>test_builder_add_asset_link_mode_hardlinks_source</code> at L224).</li>
+<li><strong>deriva-ml — Modify</strong> <code>/Users/carl/GitHub/DerivaML/deriva-ml/pyproject.toml</code>: advance the deriva-py pin in BOTH locations (<code>project.dependencies</code> URL + <code>[tool.uv.sources]</code> rev). <code>uv.lock</code> updates via <code>uv lock</code>.</li>
+</ul>
+<blockquote>
+<p><strong>CWD discipline:</strong> chain <code>cd</code> into every Bash call. deriva-py commands run in <code>/Users/carl/GitHub/deriva-py</code>; deriva-ml commands in <code>/Users/carl/GitHub/DerivaML/deriva-ml</code>. Both are <code>uv</code>-managed (<code>uv run pytest</code>, <code>uv lock</code>, <code>uv sync</code>).</p>
+<p><strong>Upstream-merge pause:</strong> the deriva-py PR (Tasks 1–3) is on an <strong>upstream</strong> repo. Open it but do NOT self-merge — the human reviews/merges. Tasks 4–5 (pin advance) only run <strong>after</strong> the upstream PR has merged to the <code>deriva-ml</code> branch.</p>
+</blockquote>
+<hr />
+<h3 id="task-1-failing-contract-test-in-deriva-py-red-on-linux">Task 1: Failing contract test in deriva-py (RED on Linux)</h3>
+<p>Add a test that links a <strong>symlink</strong> source with <code>link=True</code> and asserts the bag contains a regular file with the real bytes — NOT a symlink. This fails on Linux today (the bug) and passes after Task 2.</p>
+<p><strong>Files:</strong>
+- Modify: <code>/Users/carl/GitHub/deriva-py/tests/deriva/bag/test_builder.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the existing twin test to mirror its style</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; sed -n '224,250p' tests/deriva/bag/test_builder.py</code>
+This is <code>test_builder_add_asset_link_mode_hardlinks_source</code> — it links a REGULAR file and asserts <code>not dest.is_symlink()</code>. The new test is its symlink-source twin.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the failing test</strong></li>
+</ul>
+<p>Add this function immediately after <code>test_builder_add_asset_link_mode_hardlinks_source</code> (after its last line, ~L248) in <code>tests/deriva/bag/test_builder.py</code>:</p>
+<pre><code class="language-python">def test_builder_add_asset_link_mode_resolves_symlink_source(
+    tmp_path: Path,
+) -&gt; None:
+    &quot;&quot;&quot;link=True must embed the REAL file as a regular file in the bag even when
+    the source is a SYMLINK.
+
+    asset_file_path() in deriva-ml stages assets as absolute symlinks. os.link()
+    follows the symlink on macOS/BSD (hardlinks the real file) but hardlinks the
+    SYMLINK INODE on Linux — putting a symlink-to-an-external-path in the bag
+    payload, which corrupts the bag and trips bagit's _path_is_dangerous(). The
+    bag payload must contain the real file's bytes as a regular file on every
+    platform.
+    &quot;&quot;&quot;
+    real = tmp_path / &quot;real.bin&quot;
+    real.write_bytes(b&quot;real bytes&quot;)
+    link = tmp_path / &quot;link.bin&quot;
+    link.symlink_to(real.resolve())  # absolute symlink, as asset_file_path makes
+    assert link.is_symlink()
+
+    out = tmp_path / &quot;bag&quot;
+    bb = BagBuilder(metadata=_two_table_metadata(), output_dir=out)
+    bb.add_asset(&quot;Image&quot;, &quot;I1&quot;, link, link=True)
+    bb.finalize(make_bdbag=False)
+
+    dest = out / &quot;data&quot; / &quot;asset&quot; / &quot;Image&quot; / &quot;I1&quot; / &quot;link.bin&quot;
+    assert dest.is_file()
+    # The load-bearing assertion: the bag payload must not be a symlink.
+    # Fails on Linux pre-fix (hardlink to the symlink inode), passes after.
+    assert not dest.is_symlink(), f&quot;bag payload must not contain a symlink: {dest}&quot;
+    assert dest.read_bytes() == b&quot;real bytes&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run on the host (macOS) — note it likely PASSES (bug is invisible on macOS)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; uv run pytest tests/deriva/bag/test_builder.py::test_builder_add_asset_link_mode_resolves_symlink_source -v 2&gt;&amp;1 | tail -8</code>
+Expected on macOS: <strong>PASS</strong> (BSD <code>os.link</code> follows the symlink). This is EXPECTED and is exactly why the bug was invisible — do NOT treat a macOS pass as "test is wrong." The RED must be demonstrated on Linux (next step).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run on Linux via Docker — must FAIL (the RED that proves the bug)</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; docker run --rm -v &quot;$PWD&quot;:/work -w /work python:3.12-slim bash -c &quot;pip -q install uv 2&gt;/dev/null; uv run --frozen pytest tests/deriva/bag/test_builder.py::test_builder_add_asset_link_mode_resolves_symlink_source -v 2&gt;&amp;1 | tail -15&quot;
+</code></pre>
+<p>Expected on Linux: <strong>FAIL</strong> at <code>assert not dest.is_symlink()</code> — the bag payload IS a symlink (the bug). If the test instead ERRORs on setup (uv/install/import problem) rather than failing on the assertion, fix the Docker invocation until it runs and fails on the assertion. If <code>uv run --frozen</code> has trouble in the container, fall back to: <code>pip -q install -e . pytest &amp;&amp; python -m pytest tests/deriva/bag/test_builder.py::test_builder_add_asset_link_mode_resolves_symlink_source -v</code>. The goal: a clean assertion failure on Linux proving the bug.</p>
+<blockquote>
+<p>If Docker is unavailable in the environment, STOP and report — the Linux RED/GREEN proof is mandatory per the spec (no Linux CI exists upstream). Do not proceed on the macOS pass alone.</p>
+</blockquote>
+<ul>
+<li>[ ] <strong>Step 5: Commit the failing test</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py
+git add tests/deriva/bag/test_builder.py
+git commit -m &quot;test(bag): add_asset(link=True) must resolve symlink sources (RED on Linux)&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-the-fix-in-deriva-py-add_asset">Task 2: The fix in deriva-py <code>add_asset</code></h3>
+<p>Resolve the source before linking so <code>os.link</code> always targets the real inode.</p>
+<p><strong>Files:</strong>
+- Modify: <code>/Users/carl/GitHub/deriva-py/deriva/bag/builder.py</code> (<code>add_asset</code>, ~L424)</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the exact lines around the source-path handling</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; sed -n '422,432p' deriva/bag/builder.py</code>
+You should see <code>self._check_not_finalized()</code>, then <code>source_path = Path(source_path)</code>, then <code>if not source_path.is_file():</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Apply the one-line resolve</strong></li>
+</ul>
+<p>In <code>deriva/bag/builder.py</code>, change:</p>
+<pre><code class="language-python">        self._check_not_finalized()
+        source_path = Path(source_path)
+        if not source_path.is_file():
+</code></pre>
+<p>to:</p>
+<pre><code class="language-python">        self._check_not_finalized()
+        # Resolve symlinks so link=True hardlinks the REAL file, not the symlink
+        # inode. os.link() follows symlinks on macOS/BSD but not on Linux, where
+        # it would otherwise put a symlink-to-an-external-path in the bag payload
+        # (corrupting the bag and tripping bagit's _path_is_dangerous safety
+        # check). Resolving here keeps the documented invariant — &quot;hardlinks live
+        # inside the bag as regular files&quot; — true on every platform.
+        source_path = Path(source_path).resolve()
+        if not source_path.is_file():
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run the new test on the host (macOS) — PASS</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; uv run pytest tests/deriva/bag/test_builder.py::test_builder_add_asset_link_mode_resolves_symlink_source -v 2&gt;&amp;1 | tail -6</code>
+Expected: PASS (was already passing on macOS; still passes).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run the new test on Linux via Docker — now PASS (the GREEN proving the fix)</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; docker run --rm -v &quot;$PWD&quot;:/work -w /work python:3.12-slim bash -c &quot;pip -q install uv 2&gt;/dev/null; uv run --frozen pytest tests/deriva/bag/test_builder.py::test_builder_add_asset_link_mode_resolves_symlink_source -v 2&gt;&amp;1 | tail -10&quot;
+</code></pre>
+<p>Expected on Linux: <strong>PASS</strong> — <code>dest</code> is now a regular file with the real bytes (was FAIL in Task 1 Step 4). This is the proof the fix works on the platform where it broke.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run the FULL deriva-py bag-builder suite (host) — no regressions</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; uv run pytest tests/deriva/bag/test_builder.py -q 2&gt;&amp;1 | tail -8</code>
+Expected: ALL pass (was 33 tests + your new one = 34). Pay special attention that these still pass — they exercise the idempotency/duplicate-source key that now records a resolved path:
+- <code>test_builder_add_asset_idempotent_same_source</code> (real file, resolves stably → still idempotent)
+- <code>test_builder_add_asset_duplicate_destination_different_source</code> (two distinct real files → still raises "already populated")
+- <code>test_builder_add_asset_link_mode_passes_bagit_validation</code> (regular-file source → unaffected)
+If any of these fail, STOP — resolving changed real-file behavior unexpectedly; report it.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run the broader deriva-py bag tests (host) to catch any other consumer</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; uv run pytest tests/deriva/bag/ -q 2&gt;&amp;1 | tail -8</code>
+Expected: all pass (or pre-existing skips unrelated to this change). <code>add_asset</code> is also used by <code>add_assets</code> (bulk) and the database/loader tests — confirm none regress.</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit the fix</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py
+git add deriva/bag/builder.py
+git commit -m &quot;fix(bag): add_asset resolves symlink sources so link=True hardlinks the real file
+
+os.link() follows symlinks on macOS/BSD but hardlinks the symlink inode on
+Linux, putting a symlink-to-an-external-path in the bag payload (corrupting
+the bag and tripping bagit's unsafe-path check). Resolve source_path before
+linking so the documented 'hardlinks are regular files' invariant holds on
+every platform. Pinned by test_builder_add_asset_link_mode_resolves_symlink_source.&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-open-the-deriva-py-pr-upstream-do-not-self-merge">Task 3: Open the deriva-py PR (upstream — do NOT self-merge)</h3>
+<p><strong>Files:</strong> none (git/PR only)</p>
+<ul>
+<li>[ ] <strong>Step 1: Confirm branch + push</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; git rev-parse --abbrev-ref HEAD &amp;&amp; git log --oneline -3</code>
+The fix + test commits must be on a branch off the <code>deriva-ml</code> branch (the branch deriva-ml pins). If you are on <code>deriva-ml</code> directly, create a feature branch first: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; git checkout -b fix/add-asset-resolve-symlink &amp;&amp; git log --oneline -2</code> (the two commits come with you). Then push:
+<code>cd /Users/carl/GitHub/deriva-py &amp;&amp; git push -u origin HEAD 2&gt;&amp;1 | tail -3</code></p>
+<ul>
+<li>[ ] <strong>Step 2: Open the PR against the <code>deriva-ml</code> branch</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; gh pr create --base deriva-ml \
+  --title &quot;fix(bag): add_asset resolves symlink sources (Linux bag corruption)&quot; \
+  --body &quot;## Summary
+\`BagBuilder.add_asset(src, link=True)\` did \`os.link(src, dest)\`. When \`src\` is a symlink (deriva-ml stages assets as absolute symlinks via \`asset_file_path\`), \`os.link\` follows it on macOS/BSD (bag gets the real bytes) but hardlinks the **symlink inode** on Linux — putting a symlink-to-an-external-path in the bag payload. This corrupts the bag on Linux and trips bagit's \`_path_is_dangerous()\` 'unsafe path' check.
+
+## Fix
+Resolve \`source_path\` before linking so the hardlink targets the real file on every platform, restoring the method's documented invariant ('hardlinks live inside the bag as regular files').
+
+## Test
+\`test_builder_add_asset_link_mode_resolves_symlink_source\` links a symlink source and asserts the bag payload is a regular file with the real bytes (\`not dest.is_symlink()\`). Verified on Linux via Docker (\`python:3.12-slim\`): FAILS before the fix, PASSES after. (macOS passes both ways — which is why the bug was invisible.)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)&quot; 2&gt;&amp;1 | tail -3
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2b: STOP — hand off for human merge</strong></li>
+</ul>
+<p>Report the PR URL to the controller. The upstream PR must be reviewed/merged by a human. Do NOT proceed to Task 4 until the controller confirms the PR has merged to <code>origin/deriva-ml</code>.</p>
+<hr />
+<h3 id="task-4-advance-the-deriva-py-pin-in-deriva-ml">Task 4: Advance the deriva-py pin in deriva-ml</h3>
+<p><strong>Only after the deriva-py PR has merged to <code>origin/deriva-ml</code>.</strong></p>
+<p><strong>Files:</strong>
+- Modify: <code>/Users/carl/GitHub/DerivaML/deriva-ml/pyproject.toml</code> (two pin locations)
+- Modify: <code>/Users/carl/GitHub/DerivaML/deriva-ml/uv.lock</code> (via <code>uv lock</code>)</p>
+<ul>
+<li>[ ] <strong>Step 1: Get the merged SHA</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; git fetch -q origin &amp;&amp; git rev-parse origin/deriva-ml</code>
+Capture this SHA (call it <code>&lt;NEWSHA&gt;</code>). Confirm it is the merge of the fix: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; git log --oneline origin/deriva-ml -3</code> should show the add_asset-resolve commit(s).</p>
+<ul>
+<li>[ ] <strong>Step 2: Read the current pin (both locations must match each other)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -nE "deriva-py@|rev = " pyproject.toml | grep -i deriva</code>
+Note the current SHA (<code>93add80...</code>) in both <code>project.dependencies</code> (the <code>deriva @ git+...@&lt;sha&gt;</code> URL, ~L19) and <code>[tool.uv.sources]</code> (<code>rev = "&lt;sha&gt;"</code>, ~L65).</p>
+<ul>
+<li>[ ] <strong>Step 3: Replace the SHA in BOTH locations</strong></li>
+</ul>
+<p>Edit <code>/Users/carl/GitHub/DerivaML/deriva-ml/pyproject.toml</code>:
+- <code>project.dependencies</code>: <code>"deriva @ git+https://github.com/informatics-isi-edu/deriva-py@&lt;NEWSHA&gt;"</code>
+- <code>[tool.uv.sources]</code>: <code>deriva = { git = "https://github.com/informatics-isi-edu/deriva-py", rev = "&lt;NEWSHA&gt;" }</code>
+Both must be exactly <code>&lt;NEWSHA&gt;</code>. Verify they match: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -nE "deriva-py@|rev = " pyproject.toml | grep -i deriva</code> — both lines show <code>&lt;NEWSHA&gt;</code>.</p>
+<ul>
+<li>[ ] <strong>Step 4: Re-lock and sync</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv lock 2&gt;&amp;1 | tail -4 &amp;&amp; uv sync 2&gt;&amp;1 | tail -6</code>
+Expected: <code>uv.lock</code> updates to the new deriva-py commit; <code>uv sync</code> installs it. Confirm the installed deriva-py is the new SHA: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -c "import deriva, subprocess" 2&gt;&amp;1; grep -A1 "name = \"deriva\"" uv.lock | grep -i "rev\|commit" | head</code> (or check the lock entry references <code>&lt;NEWSHA&gt;</code>).</p>
+<ul>
+<li>[ ] <strong>Step 5: Confirm the fix is present in the installed deriva-py</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -n "resolve()" .venv/lib/python3.13/site-packages/deriva/bag/builder.py | head</code>
+Expected: the <code>source_path = Path(source_path).resolve()</code> line is present in the installed <code>add_asset</code>. If absent, the sync didn't pick up the fix — re-check the SHA and re-run <code>uv sync</code>.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit the pin advance</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add pyproject.toml uv.lock
+git commit -m &quot;chore(deps): advance deriva-py pin to add_asset symlink-resolve fix
+
+Picks up the deriva-py fix where BagBuilder.add_asset resolves symlink sources
+before link=True, fixing Linux bag corruption (os.link hardlinking the symlink
+inode) and bagit 'unsafe path' rejection on symlinked staging assets.&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-verify-against-the-pinned-fix-broad-sweep-pr">Task 5: Verify against the pinned fix + broad sweep + PR</h3>
+<p><strong>Files:</strong> none (verification + PR)</p>
+<ul>
+<li>[ ] <strong>Step 1: Re-confirm the full deriva-py bag suite on Linux against the FIXED code</strong></li>
+</ul>
+<p>The Task 2 Step 4 Docker run already proved the new test green on Linux. Re-confirm the WHOLE bag-builder suite is green on Linux (catches any sibling regression the resolve introduced):
+Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; docker run --rm -v "$PWD":/work -w /work python:3.12-slim bash -c "pip -q install uv 2&gt;/dev/null; uv run --frozen pytest tests/deriva/bag/test_builder.py -q 2&gt;&amp;1 | tail -5"</code>
+Expected: full bag-builder suite green on Linux. No throwaway script needed — the committed test IS the acceptance.</p>
+<ul>
+<li>[ ] <strong>Step 2: Confirm the deriva-ml asset/commit flow against the new pin (localhost)</strong></li>
+</ul>
+<p>Run the existing asset + execution suites — they exercise <code>asset_file_path</code> (default <code>copy_file=False</code> → symlink staging) → <code>commit_output_assets</code> → bag end to end against the newly-pinned deriva-py:
+Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/asset/ -q 2&gt;&amp;1 | tail -8</code>
+Then (if not too long): <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/ -q 2&gt;&amp;1 | tail -8</code>
+Expected: green. These run on macOS (where the bug was already invisible), so their purpose here is confirming the <strong>pin advance didn't break the asset/commit flow</strong> — not re-proving the Linux fix (Step 1 does that). Report the pass/skip/fail counts.</p>
+<ul>
+<li>[ ] <strong>Step 3: Broad deriva-ml regression sweep</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/model/ tests/asset/ -q 2&gt;&amp;1 | tail -8</code>
+Expected: green. Confirms the pin advance is clean across the unit surface.</p>
+<ul>
+<li>[ ] <strong>Step 4: Push the pin-advance branch and open the deriva-ml PR</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git push -u origin fix/bag-add-asset-symlink-resolve 2&gt;&amp;1 | tail -3
+gh pr create --title &quot;fix(deps): advance deriva-py pin — add_asset resolves symlink sources (Linux bag fix)&quot; \
+  --body &quot;&lt;summary: the Linux os.link-on-symlink root cause, the deriva-py fix (PR link), the pin advance, and the verification (Docker-Linux test green + deriva-ml asset/execution suites green). Link the spec docs/superpowers/specs/2026-06-16-bag-add-asset-symlink-resolve-design.md.&gt;&quot; 2&gt;&amp;1 | tail -3
+</code></pre>
+<p>The spec + this plan are already committed on the branch (from brainstorming/planning); the PR bundles them with the pin advance.</p>
+<ul>
+<li>[ ] <strong>Step 5: Release (after the deriva-ml PR merges to main)</strong></li>
+</ul>
+<p>This step is the controller's, run on <code>main</code> after merge: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git checkout main &amp;&amp; git pull --ff-only &amp;&amp; uv run bump-version patch</code>. The pin advance IS the release content. (Level: patch — a consumer-visible bug fix with no API change. Controller confirms the level.)</p>
+<hr />
+<h2 id="self-review-notes">Self-Review notes</h2>
+<ul>
+<li><strong>Spec coverage:</strong> the deriva-py fix → Task 2; the upstream contract test → Task 1 (RED) + Task 2 (GREEN), in the same PR (Task 3); the Linux Docker proof (mandatory, no upstream CI) → Task 1 Step 4 + Task 2 Step 4; idempotency/duplicate-source safety → Task 2 Step 5 (named tests must stay green); pin advance in both locations → Task 4; verification → Task 5; sequencing with the upstream-merge pause → Task 3 Step 2b gate before Task 4; release → Task 5 Step 5. Out-of-scope items (no asset_file_path default change, no restructure/cache change, no deriva-ml code, no bridge) are respected — no task touches them.</li>
+<li><strong>TDD subtlety handled:</strong> the RED is macOS-invisible, so the plan demonstrates RED and GREEN on Linux via Docker explicitly, and treats a macOS pass as expected (not a wrong test).</li>
+<li><strong>No placeholders:</strong> verification uses concrete commands (the committed test on Linux via Docker + the existing asset/execution suites) rather than bespoke throwaway scripts. The PR bodies are described, not templated with fake content, because the real PR/spec links aren't known until those steps run.</li>
+<li><strong>Cross-repo:</strong> deriva-py commands are pinned to <code>/Users/carl/GitHub/deriva-py</code>; deriva-ml to <code>/Users/carl/GitHub/DerivaML/deriva-ml</code>. The upstream PR is opened but human-merged (Task 3 Step 2b gate).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

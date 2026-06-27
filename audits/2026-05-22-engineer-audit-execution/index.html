@@ -1,0 +1,3745 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/audits/2026-05-22-engineer-audit-execution/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Engineer audit — execution/ subsystem (2026-05-22) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#engineer-audit-execution-subsystem-2026-05-22" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Engineer audit — execution/ subsystem (2026-05-22)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-by-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings by module
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Findings by module">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionworkflowpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/workflow.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/workflow.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p0-dirty-tree-detection-is-wrong-silently-accepts-dirty-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] Dirty-tree detection is wrong — silently accepts dirty workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-triple-quoted-docstring-mid-function-is-a-stray-comment-not-a-docstring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Triple-quoted "docstring" mid-function is a stray comment, not a docstring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-_github_url-has-no-error-handling-for-git-remote-get-url-exit-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] _github_url has no error handling for git remote get-url exit code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-get_url_and_checksum-raises-on-non-git-directories-even-when-allow_dirtytrue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] get_url_and_checksum raises on non-git directories even when allow_dirty=True
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_check_nbstrip_status-is-defined-but-never-called" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _check_nbstrip_status is defined but never called
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-get_dynamic_version-raises-runtimeerror-not-a-derivaml-exception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] get_dynamic_version raises RuntimeError, not a DerivaML* exception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-__setattr__-validator-does-heavy-work-on-every-assignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] __setattr__ validator does heavy work on every assignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionexecutionpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/execution.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/execution.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-god-class-execution-carries-30-methods-and-2676-loc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] God class — Execution carries 30+ methods and 2,676 LOC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-_update_asset_execution_table-output-branch-is-dead-in-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] _update_asset_execution_table Output branch is dead in production
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-asset_file_path-falsy-asset_types-bug-empty-list-collapses-to-asset_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] asset_file_path falsy-asset_types bug — empty list collapses to asset_name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-_initialize_execution-mixes-init-side-effects-with-download-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] _initialize_execution mixes init-side-effects with download work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-execution__init__-performs-catalog-inserts-before-sqlite-registry-write-partial-failure-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Execution.__init__ performs catalog inserts before SQLite registry write — partial-failure window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-from_registry-skips-workflow-lookup-leaving-workflow_ridnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] from_registry skips workflow lookup, leaving workflow_rid=None
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_clean_folder_contents-has-duplicate-retry-logic-with-magic-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _clean_folder_contents has duplicate retry logic with magic constants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-download_asset-cache-code-has-two-expected_md5-asset_recordgetmd5-lookups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] download_asset cache code has two expected_md5 = asset_record.get("MD5") lookups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-inconsistent-logger-usage-logger-self_logger-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Inconsistent logger usage (logger, self._logger, logging)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-executionexecute-is-a-sugar-method-that-doesnt-add-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Execution.execute() is a sugar method that doesn't add value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-list_input_datasets-dry-run-fallback-is-unreachable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] list_input_datasets dry-run fallback is unreachable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-list_assets-swallows-lookup-failures-with-bare-except-exception-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] list_assets swallows lookup failures with bare except Exception: pass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-asset_file_path-accepts-arbitrary-kwargs-as-metadata-silent-typos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] asset_file_path accepts arbitrary **kwargs as metadata — silent typos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-__str__-and-__repr__-both-define-output-but-__str__-doesnt-include-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] __str__ and __repr__ both define output but __str__ doesn't include status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionexecution_recordpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/execution_record.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/execution_record.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-list_assets-is-a-quadratic-schema-walk-with-bare-except-exception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] list_assets is a quadratic schema walk with bare except Exception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-duplicate-list_input_datasets-list_assets-between-execution-and-executionrecord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Duplicate list_input_datasets / list_assets between Execution and ExecutionRecord
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-pydantic-_workflow-privateattr-violates-the-projects-user-facing-basemodel-field-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Pydantic _workflow PrivateAttr violates the project's "user-facing → BaseModel field" rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-executionrecord__init__-overrides-pydantics-auto-init-for-no-clear-reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] ExecutionRecord.__init__ overrides Pydantic's auto-init for no clear reason
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-is_nested-is_parent-materialize-the-full-iterator-just-to-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] is_nested() / is_parent() materialize the full iterator just to count
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionrunnerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/runner.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/runner.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-docstrings-use-numpy-style-project-mandates-google-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Docstrings use NumPy style, project mandates Google style
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-_complete_parent_execution-catches-and-warns-on-every-exception-no-test-coverage-for-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] _complete_parent_execution catches and warns on every exception, no test coverage for failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-multirunstate-uses-a-class-with-class-level-mutable-defaults-instead-of-an-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] MultirunState uses a class with class-level mutable defaults instead of an instance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-global-singleton-state-across-all-multirun-calls-concurrency-hazard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Global singleton state across all multirun calls — concurrency hazard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_resolve_model_source-swallows-typeerror-oserror-silently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _resolve_model_source swallows (TypeError, OSError) silently
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-run_model-is-270-lines-with-13-sectional-comments-split-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] run_model is 270 lines with 13 sectional comments — split it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-returns-nnone-docstring-sections-will-not-render" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Returns -------\nNone docstring sections will not render
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionbag_commitpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/bag_commit.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/bag_commit.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-_add_asset_rows_to_bag-and-_add_staged_feature_rows_to_bag-each-lease-rids-in-a-separate-batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] _add_asset_rows_to_bag and _add_staged_feature_rows_to_bag each lease RIDs in a separate batch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-_add_staged_feature_rows_to_bag-silently-skips-rows-on-lookup-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] _add_staged_feature_rows_to_bag silently skips rows on lookup failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-match_by_columns-construction-walks-every-table-in-every-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] match_by_columns construction walks every table in every schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_read_asset_type_map-ignores-duplicate-filename-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _read_asset_type_map ignores duplicate filename writes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-total_assets-denominator-silently-zeroes-when-manifest-is-empty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] total_assets denominator silently zeroes when manifest is empty
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionstate_machinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/state_machine.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/state_machine.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-transition-writes-sqlite-preemptively-with-sync_pendingtrue-even-on-success" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] transition writes SQLite preemptively with sync_pending=True even on success
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-reconcile_with_catalog-doesnt-cover-stopped-uploaded-pending_upload-disagreements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] reconcile_with_catalog doesn't cover Stopped ↔ {Uploaded, Pending_Upload} disagreements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-validate_transition-example-renders-as-assert-value-is-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] validate_transition example renders as assert &lt;value&gt; is None
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionstate_storepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/state_store.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/state_store.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-pending_summary_rows-count_pending_by_kind-count_pending_rows-are-no-op-stubs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] pending_summary_rows, count_pending_by_kind, count_pending_rows are no-op stubs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-update_execution-accepts-arbitrary-fields-then-validates-against-column-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] update_execution accepts arbitrary **fields then validates against column set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-delete_execution-doesnt-return-whether-a-row-was-deleted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] delete_execution doesn't return whether a row was deleted
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionexecution_configurationpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/execution_configuration.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/execution_configuration.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-validate_assets-else-branch-fabricates-an-assetspec-from-strv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] validate_assets else branch fabricates an AssetSpec from str(v)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-argv-default-uses-fielddefault_factorylambda-sysargv-captures-import-time-argv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] argv default uses Field(default_factory=lambda: sys.argv) — captures import-time argv
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionfind_callerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/find_caller.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/find_caller.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-_top_user_frame-walks-the-entire-stack-twice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _top_user_frame walks the entire stack twice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_get_notebook_path-queries-jupyter-server-api-with-timeout3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _get_notebook_path queries Jupyter Server API with timeout=3
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionbase_configpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/base_config.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/base_config.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-_captured_hydra_output_dir-is-a-module-global-mutable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _captured_hydra_output_dir is a module-global mutable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-load_configs-experiments-must-load-last-rule-is-undocumented-invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] load_configs "experiments must load last" rule is undocumented invariant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mlexecutionenvironmentpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/execution/environment.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/execution/environment.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-get_os_infoenviron-captures-every-environment-variable-verbatim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] get_os_info["environ"] captures every environment variable verbatim
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-coverage-gaps-cross-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test coverage gaps (cross-module)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test coverage gaps (cross-module)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-zero-tests-for-multirun_configpy-public-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Zero tests for multirun_config.py public surface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-zero-tests-for-environmentpy-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Zero tests for environment.py helpers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-executionmetrics_file-database_catalog-and-catalog-property-paths-untested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Execution.metrics_file, database_catalog, and catalog property paths untested
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-from_registry-classmethod-not-directly-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] from_registry classmethod not directly tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-lineagepy-pydantic-models-tested-at-the-lookup-layer-not-as-standalone-shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] lineage.py Pydantic models tested at the lookup layer, not as standalone shapes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_clean_folder_contents-retry-path-not-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _clean_folder_contents retry path not tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-describedlist-runtime-behavior-covered-via-test_ast_walker-but-with_description-not-directly-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DescribedList runtime behavior covered via test_ast_walker, but with_description not directly tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duplication-candidates-cross-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplication candidates (cross-module)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Duplication candidates (cross-module)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-_update_description_in_catalog-_update_status_in_catalog-duplicated-across-workflow-executionrecord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] _update_description_in_catalog / _update_status_in_catalog duplicated across Workflow, ExecutionRecord
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-pathbuilderschemasml_schemaexecution_execution-query-for-parentchild-appears-4-across-the-codebase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] pathBuilder().schemas[ml_schema].Execution_Execution query for parent/child appears 4× across the codebase
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_check_writable_catalog-duplicated-between-workflow-and-executionrecord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _check_writable_catalog duplicated between Workflow and ExecutionRecord
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-update_status-implementation-pattern-duplicated-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] update_status implementation pattern duplicated 3×
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_format_duration-is-a-module-private-but-its-logic-is-duplicated-by-transition-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _format_duration is a module-private but its logic is duplicated by transition callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-lookup_termmlvocabasset_role-called-repeatedly-across-asset-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] lookup_term(MLVocab.asset_role, ...) called repeatedly across asset paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-two-identical-from-datetime-import-timezone-local-imports-inside-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Two identical from datetime import timezone local imports inside Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#top-action-items-for-v1371-hold-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top action items for v1.37.1 hold-gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="engineer-audit-execution-subsystem-2026-05-22">Engineer audit — execution/ subsystem (2026-05-22)</h1>
+<p>Release target: <strong>v1.37.1</strong>
+Scope: <code>src/deriva_ml/execution/*.py</code> (21 modules, ~9,451 LOC) and
+<code>tests/execution/*.py</code> (34 files, ~10,668 LOC).</p>
+<h2 id="summary">Summary</h2>
+<ul>
+<li><strong>21 modules audited</strong> (8 large: execution.py 2,676 LOC; runner.py
+  720; bag_commit.py 761; base_config.py 698; workflow.py 706;
+  execution_record.py 688; state_machine.py 626; state_store.py 420).</li>
+<li><strong>65 findings: 1 P0, 24 P1, 31 P2, 9 P3.</strong></li>
+<li>Top themes:</li>
+<li><strong><code>execution.py</code> is a god module (2,676 LOC, ~30 public/protected
+     methods on one class).</strong> Asset-tagging, lifecycle transitions, asset
+     download, dataset attach, feature staging, hierarchy, and cleanup
+     all live in one place. Heaviest method (<code>_update_asset_execution_table</code>)
+     mixes Input/Output branches over 130 lines with documented
+     dead Output-path. Split candidates exist in <code>bag_commit.py</code> and
+     <code>execution_record.py</code> patterns.</li>
+<li><strong>Real bug in dirty-tree detection (<code>Workflow._github_url</code>).</strong> The
+     check <code>"M " in result.stdout.strip()</code> misses every case where the
+     change is unstaged (<code>M</code>), both-modified (<code>MM</code>), renamed (<code>R</code>),
+     deleted (<code>D</code>), or untracked (<code>??</code>), and falsely flags clean
+     files whenever any unrelated file in the repo has a staged
+     modification. Combined with <code>cwd=executable_path.parent</code> rather
+     than the repo root, dirty-detection is unreliable. This silently
+     allows provenance-violating runs through. Tests only exercise the
+     happy path (<code># modified</code> → modified-not-staged → <code>M</code>); they
+     pass today only because the test fixture stages-then-modifies in
+     a way that doesn't reproduce the substring.</li>
+<li><strong>Duplicate <code>list_input_datasets</code> / <code>list_assets</code> between
+     <code>Execution</code> and <code>ExecutionRecord</code>.</strong> Both walk the same catalog
+     tables with the same Producer filter and the same try/except.
+     <code>Execution</code>'s "fallback for dry_run" branch can never fire (a
+     dry-run execution is created with <code>_execution_record=None</code>, so the
+     delegate path uses the fallback unconditionally) — but the
+     <code>_execution_record</code> guard implies otherwise.</li>
+<li><strong>Docstring-style inconsistency in <code>runner.py</code></strong> (NumPy section
+     headers <code>Parameters / ----------</code> inside an otherwise Google-style
+     codebase — CLAUDE.md mandates Google). Affects readability and
+     tooling that parses doctrings.</li>
+<li><strong><code>_update_asset_execution_table</code> Output branch is dead in
+     production.</strong> All Output assets now flow through
+     <code>bag_commit._add_asset_rows_to_bag</code>. The Output branch only runs
+     from tests (<code>test_asset_role_auto_tag.py</code>). Tests preserve a code
+     path the production pipeline no longer exercises — risks divergence
+     between bag-commit reality and the tested behaviour.</li>
+</ul>
+<h2 id="findings-by-module">Findings by module</h2>
+<h3 id="srcderiva_mlexecutionworkflowpy">src/deriva_ml/execution/workflow.py</h3>
+<h4 id="p0-dirty-tree-detection-is-wrong-silently-accepts-dirty-workflows">[P0] Dirty-tree detection is wrong — silently accepts dirty workflows</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/workflow.py:627-637</code>
+<strong>Issue:</strong> Two compounding bugs in <code>_github_url</code>:
+1. <code>is_dirty = bool("M " in result.stdout.strip())</code> matches only the
+   first-column-<code>M</code> staged-modified status. <code>git status --porcelain</code>
+   emits <code>M</code> (unstaged modify), <code>MM</code> (both), <code>??</code> (untracked), <code>D</code> /
+   <code>D</code>, <code>R</code> (rename), <code>A</code> (added), etc. None of these set
+   <code>is_dirty=True</code>, so a user editing a workflow file and saving (but
+   not staging) will have provenance recorded with the LAST-COMMITTED
+   checksum — defeating the entire dirty-workflow guard.
+2. <code>cwd=executable_path.parent</code> plus <code>--porcelain</code> (no path argument)
+   walks the whole repo. A clean workflow file in a repo with any
+   staged modification elsewhere will be flagged dirty (false positive).
+<strong>Evidence:</strong></p>
+<pre><code class="language-python">result = subprocess.run(
+    [&quot;git&quot;, &quot;status&quot;, &quot;--porcelain&quot;],
+    cwd=executable_path.parent,
+    capture_output=True, text=True, check=False,
+)
+is_dirty = bool(&quot;M &quot; in result.stdout.strip())
+</code></pre>
+<p><strong>Suggested fix:</strong> Scope to the file and check the porcelain line's
+first two columns properly. The robust form is <code>git status --porcelain
+-- &lt;relative-path&gt;</code> and treat any non-empty output as dirty:</p>
+<pre><code class="language-python">result = subprocess.run(
+    [&quot;git&quot;, &quot;status&quot;, &quot;--porcelain&quot;, &quot;--&quot;, str(executable_path)],
+    cwd=repo_root, capture_output=True, text=True, check=False,
+)
+is_dirty = bool(result.stdout.strip())
+</code></pre>
+<p>Add tests for <code>M</code>, <code>MM</code>, <code>??</code>, <code>D</code>, and the "clean file in dirty
+repo" case. This is the only P0 in the audit and warrants a hold-and-fix
+before tagging v1.37.1.</p>
+<h4 id="p1-triple-quoted-docstring-mid-function-is-a-stray-comment-not-a-docstring">[P1] Triple-quoted "docstring" mid-function is a stray comment, not a docstring</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/workflow.py:639</code>
+<strong>Issue:</strong> The line <code>"""Get SHA-1 hash of latest commit of the file in
+the repository"""</code> sits inside <code>_github_url</code>, not at function head, and
+behaves as a no-op string expression that the bytecode evaluator
+discards. Looks like a misplaced docstring; should be <code># Get SHA-1 ...</code>.
+<strong>Suggested fix:</strong> Convert to a regular <code>#</code> comment. Trivial.</p>
+<h4 id="p1-_github_url-has-no-error-handling-for-git-remote-get-url-exit-code">[P1] <code>_github_url</code> has no error handling for <code>git remote get-url</code> exit code</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/workflow.py:612-621</code>
+<strong>Issue:</strong> <code>subprocess.run([... "git", "remote", "get-url", "origin"])</code> is
+called without <code>check=True</code>. If <code>origin</code> doesn't exist, <code>result.stdout</code>
+is empty and <code>github_url</code> becomes <code>""</code>. The <code>except CalledProcessError</code>
+clause is unreachable without <code>check=True</code>. Returned URL silently looks
+like <code>/blob/&lt;sha&gt;/relative/path.py</code> (no host) and gets recorded as
+provenance.
+<strong>Suggested fix:</strong> Either add <code>check=True</code> (so the except clause fires)
+or test <code>result.returncode</code> explicitly. Same pattern fix applies to the
+<code>git log</code> block at line 641.</p>
+<h4 id="p1-get_url_and_checksum-raises-on-non-git-directories-even-when-allow_dirtytrue">[P1] <code>get_url_and_checksum</code> raises on non-git directories even when <code>allow_dirty=True</code></h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/workflow.py:472-480</code>
+<strong>Issue:</strong> The "Not executing in a Git repository" guard fires before
+<code>allow_dirty</code> is consulted. A dry-run / one-off script run from
+outside a checkout cannot benefit from <code>DERIVA_ML_ALLOW_DIRTY=true</code>.
+Combined with the <code>DERIVA_ML_DRY_RUN=true</code> env flag flowing into
+<code>allow_dirty=True</code> in the model validator, the intent ("allow dirty
+provenance") is broken at the precondition stage.
+<strong>Suggested fix:</strong> Bypass the git-presence check when <code>allow_dirty</code> is
+True; emit a warning instead and leave URL/checksum empty.</p>
+<h4 id="p2-_check_nbstrip_status-is-defined-but-never-called">[P2] <code>_check_nbstrip_status</code> is defined but never called</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/workflow.py:540-556</code>
+<strong>Issue:</strong> Static method appears unreferenced inside this module and is
+not exported. Dead code per CLAUDE "no backwards-compat shims" rule.
+<strong>Suggested fix:</strong> Delete or wire into <code>_github_url</code> for <code>.ipynb</code>
+files.</p>
+<h4 id="p2-get_dynamic_version-raises-runtimeerror-not-a-derivaml-exception">[P2] <code>get_dynamic_version</code> raises <code>RuntimeError</code>, not a <code>DerivaML*</code> exception</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/workflow.py:697-700</code>
+<strong>Issue:</strong> Departs from the documented hierarchy
+(<code>DerivaMLConfigurationError</code>/<code>DerivaMLException</code>). Callers can't catch
+this with the project's exception umbrella.
+<strong>Suggested fix:</strong> Wrap as <code>DerivaMLConfigurationError("setuptools_scm
+is not available")</code>.</p>
+<h4 id="p3-__setattr__-validator-does-heavy-work-on-every-assignment">[P3] <code>__setattr__</code> validator does heavy work on every assignment</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/workflow.py:136-175</code>
+<strong>Issue:</strong> For each <code>workflow.description = ...</code> assignment, the
+override checks <code>__pydantic_private__</code>, dispatches to
+<code>_update_description_in_catalog</code>, then re-enters Pydantic. Fine for
+intentional updates, but the same path triggers for internal
+re-assignment paths (e.g. <code>setup_url_checksum</code> mutating <code>self.url</code>
+inside a model validator — guarded only by the <code>_ml_instance is not
+None</code> test). Document the invariant in the class docstring.</p>
+<h3 id="srcderiva_mlexecutionexecutionpy">src/deriva_ml/execution/execution.py</h3>
+<h4 id="p1-god-class-execution-carries-30-methods-and-2676-loc">[P1] God class — Execution carries 30+ methods and 2,676 LOC</h4>
+<p><strong>Location:</strong> entire file
+<strong>Issue:</strong> One class manages lifecycle transitions (<code>__enter__</code>,
+<code>__exit__</code>, <code>execution_start</code>, <code>execution_stop</code>, <code>abort</code>,
+<code>update_status</code>), asset download (<code>download_asset</code>,
+<code>_initialize_execution</code>), asset upload (<code>upload_execution_outputs</code>,
+<code>_bag_commit_upload</code>, <code>_update_asset_execution_table</code>,
+<code>_set_asset_descriptions</code>), asset staging (<code>asset_file_path</code>,
+<code>metrics_file</code>), feature staging (<code>add_features</code>), dataset attach
+(<code>download_dataset_bag</code>, <code>create_dataset</code>, <code>add_files</code>,
+<code>list_input_datasets</code>), hierarchy (<code>add_nested_execution</code>, <code>is_nested</code>,
+<code>is_parent</code>), and cleanup (<code>_clean_folder_contents</code>). Cognitive load is
+high and changes ripple. Suggest extracting <code>AssetUploadPipeline</code> /
+<code>AssetStaging</code> mixins, leaving lifecycle on <code>Execution</code>.
+<strong>Suggested fix:</strong> Phase out by extracting the asset-staging and
+upload methods into <code>execution/asset_upload.py</code> (mirroring the
+<code>bag_commit.py</code> extraction pattern). Not a blocker for v1.37.1; ledger
+for the next minor.</p>
+<h4 id="p1-_update_asset_execution_table-output-branch-is-dead-in-production">[P1] <code>_update_asset_execution_table</code> Output branch is dead in production</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1864-1899</code> (Output
+branch); only call site at line 1462 always passes <code>asset_role="Input"</code>.
+<strong>Issue:</strong> The Output flow now lives in
+<code>bag_commit._add_asset_rows_to_bag</code> (which writes
+<code>{Asset}_Execution</code> + <code>{Asset}_Asset_Type</code> rows during bag build —
+explicitly noted in <code>bag_commit.py:322-326</code>). Only tests still call
+<code>_update_asset_execution_table</code> with <code>asset_role="Output"</code>
+(<code>test_asset_role_auto_tag.py</code>). The tests are pinning a code path
+that production no longer exercises — silent risk of bag-commit
+diverging from the tested behavior.
+<strong>Evidence:</strong></p>
+<pre><code class="language-python"># execution.py:1462 (only production caller)
+self._update_asset_execution_table(
+    {f&quot;{asset_table.schema.name}/{asset_table.name}&quot;: [asset_path]},
+    asset_role=&quot;Input&quot;,  # always Input here
+)
+</code></pre>
+<p><strong>Suggested fix:</strong> Either (a) drop the Output branch from
+<code>_update_asset_execution_table</code> and rewrite the auto-tag tests to
+exercise <code>bag_commit._add_asset_rows_to_bag</code> directly, or (b) keep the
+branch but route the bag-commit Output path through it as the single
+source of truth. Option (a) is the smaller change and aligns with the
+documented "bag is now authoritative" stance.</p>
+<h4 id="p1-asset_file_path-falsy-asset_types-bug-empty-list-collapses-to-asset_name">[P1] <code>asset_file_path</code> falsy-<code>asset_types</code> bug — empty list collapses to asset_name</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1950</code>
+<strong>Issue:</strong> <code>asset_types = asset_types or kwargs.pop("Asset_Type", None)
+or asset_name</code>. If the user explicitly passes <code>asset_types=[]</code> to
+register an asset with no content tags, the empty list is falsy and the
+code substitutes <code>asset_name</code> (the table name as a tag) which then
+triggers a <code>lookup_term</code> on a name that may not exist in
+<code>Asset_Type</code> vocabulary. The user's intent ("no tags") becomes "guess
+a tag from the table name."
+<strong>Suggested fix:</strong> Use <code>if asset_types is None:</code> instead of <code>or</code> so an
+explicit empty list is honored. Add a test:
+<code>asset_file_path(..., asset_types=[])</code> should not call <code>lookup_term</code>.</p>
+<h4 id="p1-_initialize_execution-mixes-init-side-effects-with-download-work">[P1] <code>_initialize_execution</code> mixes init-side-effects with download work</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:654-772</code>
+<strong>Issue:</strong> 118-line method does (1) dataset materialization,
+(2) <code>Dataset_Execution</code> association inserts, (3) batched asset
+download, (4) per-asset destination-dir construction, (5) configuration
+JSON serialization, (6) uv.lock attachment, (7) Hydra config asset
+registration, (8) runtime-env snapshot, (9) the first
+<code>_bag_commit_upload</code>. Each step has its own failure mode but they
+share one log message ("Initialize status finished.") and one
+exception umbrella (<code>DerivaMLException</code>). Hard to reason about
+recovery — which steps already succeeded if upload at step 9 raises?
+<strong>Suggested fix:</strong> Split into <code>_materialize_datasets()</code>,
+<code>_download_inputs()</code>, <code>_register_init_metadata()</code>, and
+<code>_upload_init_assets()</code> private helpers. Each one log-bracketed and
+individually catchable.</p>
+<h4 id="p1-execution__init__-performs-catalog-inserts-before-sqlite-registry-write-partial-failure-window">[P1] <code>Execution.__init__</code> performs catalog inserts before SQLite registry write — partial-failure window</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:378-482</code>
+<strong>Issue:</strong> The catalog <code>Execution.insert</code> (line 378) happens BEFORE
+the SQLite registry insert (line 449). If the SQLite write raises
+(disk full, schema mismatch), the catalog row exists but the workspace
+has no record. The <code>except Exception</code> at line 468 logs and re-raises,
+but the orphaned catalog row stays. The error message says "Execution
+can be recovered via ml.lookup_execution(rid) + manual adoption" — but
+that path requires implementing manual adoption, which is not a documented
+public API.
+<strong>Suggested fix:</strong> Either (a) insert SQLite first (so a catalog
+failure can be retried without orphan), or (b) document and ship the
+adopt-orphan path that the error message references.</p>
+<h4 id="p1-from_registry-skips-workflow-lookup-leaving-workflow_ridnone">[P1] <code>from_registry</code> skips workflow lookup, leaving <code>workflow_rid=None</code></h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:484-524</code>
+<strong>Issue:</strong> <code>from_registry</code> minimally hydrates an Execution for
+<code>resume_execution</code>, but sets <code>instance.workflow_rid = None</code> (line 523)
+without loading it from SQLite (the registry row carries it). Any
+downstream code that relies on <code>execution.workflow_rid</code> (e.g.,
+<code>add_workflow_executions</code> linkage during nested-execution attach) will
+see None on a resumed execution.
+<strong>Evidence:</strong></p>
+<pre><code class="language-python">instance.workflow_rid = None  # never repopulated from store.get_execution
+</code></pre>
+<p><strong>Suggested fix:</strong> Populate from the SQLite row in <code>from_registry</code>:
+<code>instance.workflow_rid = store.get_execution(rid)["workflow_rid"]</code>.</p>
+<h4 id="p2-_clean_folder_contents-has-duplicate-retry-logic-with-magic-constants">[P2] <code>_clean_folder_contents</code> has duplicate retry logic with magic constants</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1721-1764</code>
+<strong>Issue:</strong> Inline <code>MAX_RETRIES = 3</code>, <code>RETRY_DELAY = 1</code>, and a nested
+<code>remove_with_retry</code> closure. Same retry pattern appears in
+<code>asset/manifest.py</code> and <code>catalog/clone.py</code>. Magic constants live in
+each call site rather than <code>core/constants.py</code>.
+<strong>Suggested fix:</strong> Move to a <code>core/file_utils.py</code> retry helper. Not a
+blocker.</p>
+<h4 id="p2-download_asset-cache-code-has-two-expected_md5-asset_recordgetmd5-lookups">[P2] <code>download_asset</code> cache code has two <code>expected_md5 = asset_record.get("MD5")</code> lookups</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1399, 1404, 1430</code>
+<strong>Issue:</strong> <code>expected_md5</code> is fetched once at line 1399, then re-fetched
+as <code>asset_record.get("MD5")</code> at line 1404 (<code>if use_cache: md5 =
+expected_md5</code>) and again at line 1430. Three lookups, two locals
+(<code>md5</code> and <code>expected_md5</code>) holding the same value. Reads cleaner with
+one local.
+<strong>Suggested fix:</strong> Use <code>expected_md5</code> throughout; drop the <code>md5</code> local.</p>
+<h4 id="p2-inconsistent-logger-usage-logger-self_logger-logging">[P2] Inconsistent logger usage (<code>logger</code>, <code>self._logger</code>, <code>logging</code>)</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:208, 474, 549, 673,
+685, 772, 1229, 1272, 1417, 1441, 1646, 1659, 1668, 1683, 1714, 1745,
+1764, 2505, 2567, 2575</code>
+<strong>Issue:</strong> Three different logger handles in one file:
+- <code>logger</code> (module-level, line 90)
+- <code>self._logger</code> (instance handle from <code>ml_object._logger</code>)
+- <code>logging.warning(...)</code> / <code>logging.error(...)</code> (root logger calls)
+The module-level <code>logger</code> is <code>get_logger(__name__)</code> (deriva_ml.<em>),
+while <code>logging.error</code> bypasses that and lands on the root logger.
+Inconsistent observability and filter behavior.
+</em><em>Suggested fix:</em>* Use module-level <code>logger</code> everywhere; remove the
+<code>self._logger</code> indirection.</p>
+<h4 id="p2-executionexecute-is-a-sugar-method-that-doesnt-add-value">[P2] <code>Execution.execute()</code> is a sugar method that doesn't add value</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:2141-2158</code>
+<strong>Issue:</strong> Returns <code>self</code>. Docstring says "use as <code>with exe.execute()
+as e:</code>". Same semantics as <code>with exe as e:</code>. Adds a method the user
+must know about without buying anything.
+<strong>Suggested fix:</strong> Either delete (and update docs to use bare
+<code>with exe:</code>) or document the legacy-compat rationale.</p>
+<h4 id="p2-list_input_datasets-dry-run-fallback-is-unreachable">[P2] <code>list_input_datasets</code> dry-run fallback is unreachable</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:2174-2191</code>
+<strong>Issue:</strong> The check <code>if self._execution_record is not None: return
+self._execution_record.list_input_datasets()</code> delegates the persistent
+path. The "Fallback for dry_run mode" branch below requires
+<code>_execution_record is None</code>, but dry-run executions also have
+<code>_dry_run=True</code> and never insert into <code>Dataset_Execution</code> (per
+<code>_initialize_execution</code> line 679-682). The fallback queries
+<code>Dataset_Execution</code> for an execution_rid that's never been written —
+returning an empty list. The fallback is dead code in practice.
+<strong>Suggested fix:</strong> Either remove the fallback (raising
+<code>DerivaMLException("not available in dry-run")</code> like <code>is_nested()</code> /
+<code>is_parent()</code>) or fix the gap by populating
+<code>Dataset_Execution</code> in dry-run.</p>
+<h4 id="p2-list_assets-swallows-lookup-failures-with-bare-except-exception-pass">[P2] <code>list_assets</code> swallows lookup failures with bare <code>except Exception: pass</code></h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:2218-2226</code>
+<strong>Issue:</strong> The dry-run fallback iterates <code>Execution_Asset_Execution</code>,
+calls <code>lookup_asset(r["Execution_Asset"])</code>, and swallows every
+exception with <code>pass</code>. Hides real bugs (e.g., a typo in the column
+name); user sees an empty list and assumes "no assets" when the lookup
+is just broken.
+<strong>Suggested fix:</strong> Log at <code>WARNING</code> with the swallowed exception. The
+<code>ExecutionRecord.list_assets</code> (line 660-661) does it correctly with
+<code>logger.debug</code>; mirror that.</p>
+<h4 id="p3-asset_file_path-accepts-arbitrary-kwargs-as-metadata-silent-typos">[P3] <code>asset_file_path</code> accepts arbitrary <code>**kwargs</code> as metadata — silent typos</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1911, 1963</code>
+<strong>Issue:</strong> <code>**kwargs</code> are merged into <code>metadata_dict</code> without
+column-name validation. A typo like <code>Lenght=12345</code> silently lands in
+the asset's metadata column dict and gets dropped by the asset_table
+filter later (or rejected at insert time with a confusing message).
+<strong>Suggested fix:</strong> Validate kwargs against
+<code>self._model.asset_metadata(asset_name)</code> before merging; raise
+<code>DerivaMLValidationError</code> on unknown columns.</p>
+<h4 id="p3-__str__-and-__repr__-both-define-output-but-__str__-doesnt-include-status">[P3] <code>__str__</code> and <code>__repr__</code> both define output but <code>__str__</code> doesn't include status</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:2410-2419</code>
+<strong>Issue:</strong> <code>__str__</code> lists working_dir, execution_rid, workflow_rid,
+asset_paths, configuration — no status. <code>__repr__</code> includes status.
+Calling <code>print(exe)</code> is less informative than <code>repr(exe)</code>.
+<strong>Suggested fix:</strong> Either include <code>status</code> in <code>__str__</code> or have
+<code>__str__</code> delegate to <code>__repr__</code>.</p>
+<h3 id="srcderiva_mlexecutionexecution_recordpy">src/deriva_ml/execution/execution_record.py</h3>
+<h4 id="p1-list_assets-is-a-quadratic-schema-walk-with-bare-except-exception">[P1] <code>list_assets</code> is a quadratic schema walk with bare <code>except Exception</code></h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution_record.py:609-664</code>
+<strong>Issue:</strong> For each schema (domain + ml), iterates every table and
+filters by <code>endswith("_Execution")</code>. For a 200-table catalog that's
+400 catalog touches per call. Plus the inner try/except swallows every
+filter-and-fetch error at <code>logger.debug</code>. A real catalog connectivity
+problem becomes "execution has no assets." Same anti-pattern as
+<code>Execution.list_assets</code> (see above).
+<strong>Suggested fix:</strong> Index association tables once (per ml_instance
+lifetime) into <code>self._ml_instance._asset_execution_tables</code> and iterate
+that. Drop the bare-except to surface real errors.</p>
+<h4 id="p1-duplicate-list_input_datasets-list_assets-between-execution-and-executionrecord">[P1] Duplicate <code>list_input_datasets</code> / <code>list_assets</code> between Execution and ExecutionRecord</h4>
+<p><strong>Location:</strong> <code>execution.py:2160-2227</code> vs <code>execution_record.py:568-664</code>
+<strong>Issue:</strong> Both classes implement the same Producer-filter walk
+(<code>Dataset_Execution</code> filter then <code>_producer_of_dataset</code> exclusion).
+Even the error message style differs ("ExecutionRecord is not bound to
+a catalog" vs "Execution has no bound ExecutionRecord"). Two places to
+keep in sync.
+<strong>Suggested fix:</strong> Move the implementation into a free function
+<code>lineage._list_input_datasets(ml, execution_rid)</code> and have both classes
+call it. Removes ~60 lines.</p>
+<h4 id="p2-pydantic-_workflow-privateattr-violates-the-projects-user-facing-basemodel-field-rule">[P2] Pydantic <code>_workflow</code> PrivateAttr violates the project's "user-facing → BaseModel field" rule</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution_record.py:131-141</code>
+<strong>Issue:</strong> CLAUDE.md ("Class idiom choice — Pydantic vs <code>@dataclass</code>")
+says user-facing fields should be Pydantic fields with validation, not
+PrivateAttr-backed properties. <code>_workflow</code>, <code>_status</code>, <code>_description</code>
+are user-visible (read via <code>record.workflow</code>, set via
+<code>record.description = ...</code>) but bypass Pydantic validation entirely.
+The catalog setter is in <code>__setattr__</code>-like wrappers instead.
+<strong>Suggested fix:</strong> Restructure so <code>workflow</code>, <code>status</code>, <code>description</code>
+are real Pydantic fields with <code>@field_validator</code> for catalog write-back.
+Matches the audit's "single serialization story" rationale.</p>
+<h4 id="p2-executionrecord__init__-overrides-pydantics-auto-init-for-no-clear-reason">[P2] <code>ExecutionRecord.__init__</code> overrides Pydantic's auto-init for no clear reason</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution_record.py:143-185</code>
+<strong>Issue:</strong> Hand-rolled <code>__init__</code> that calls <code>super().__init__(...)</code>
+with a partial kwargs set then manually sets <code>_workflow</code>, <code>_status</code>,
+etc. Pydantic v2 supports <code>PrivateAttr(default=...)</code> initialization
+through the constructor; the manual override is redundant.
+<strong>Suggested fix:</strong> Use Pydantic v2's <code>model_post_init</code> hook, or fold
+the private-attr initialization into a <code>@model_validator(mode="after")</code>.</p>
+<h4 id="p2-is_nested-is_parent-materialize-the-full-iterator-just-to-count">[P2] <code>is_nested()</code> / <code>is_parent()</code> materialize the full iterator just to count</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution_record.py:337-359</code>
+<strong>Issue:</strong> <code>return len(list(self.list_execution_parents())) &gt; 0</code> walks
+every parent (recursively if there's a cycle) just to ask "does at
+least one parent exist?" Use the iterator and short-circuit.
+<strong>Suggested fix:</strong> <code>return next(iter(self.list_execution_parents()),
+None) is not None</code>.</p>
+<h3 id="srcderiva_mlexecutionrunnerpy">src/deriva_ml/execution/runner.py</h3>
+<h4 id="p1-docstrings-use-numpy-style-project-mandates-google-style">[P1] Docstrings use NumPy style, project mandates Google style</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/runner.py:380-450, 633-707</code>
+<strong>Issue:</strong> Sections like <code>Parameters\n----------\n</code> and <code>Examples\n--------\n</code>
+are NumPy-style. CLAUDE.md ("Docstrings: Google style") requires
+<code>Args:</code> / <code>Returns:</code> / <code>Raises:</code> / <code>Example:</code>. The mismatch breaks
+mkdocstrings parsing if the project enforces Google in its mkdocs
+config (the module docstring uses RST <code>:class:</code> directives too — also
+non-Google).
+<strong>Suggested fix:</strong> Convert <code>run_model</code> and <code>create_model_config</code>
+docstrings to Google sections. Roughly 80 lines of docstring rewrite.</p>
+<h4 id="p1-_complete_parent_execution-catches-and-warns-on-every-exception-no-test-coverage-for-failure">[P1] <code>_complete_parent_execution</code> catches and warns on every exception, no test coverage for failure</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/runner.py:259-263</code>
+<strong>Issue:</strong> <code>except Exception as e: logging.warning(...)</code>. Atexit runs
+in a teardown context; a swallowed upload failure means the user
+loses their multirun parent. Only the dry-run-skip path
+(<code>test_dry_run_placeholder_does_not_warn</code>) is tested. No coverage for
+"parent upload raises mid-atexit" — and no observability beyond a
+single WARN line.
+<strong>Suggested fix:</strong> At minimum, log the exception with stack
+(<code>logger.exception("...")</code>) instead of formatting <code>{e}</code>. Better: write
+the failure to the workspace so <code>ml.find_incomplete_executions()</code>
+surfaces it on next run.</p>
+<h4 id="p1-multirunstate-uses-a-class-with-class-level-mutable-defaults-instead-of-an-instance">[P1] <code>MultirunState</code> uses a class with class-level mutable defaults instead of an instance</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/runner.py:175-198</code>
+<strong>Issue:</strong> <code>parent_execution_rid: str | None = None</code> etc. are
+class-level attributes, but <code>_multirun_state = MultirunState()</code> is a
+module-level singleton. Subclassing or instantiating elsewhere would
+silently share state through the class. Should be an instance or a
+plain <code>@dataclass</code>.
+<strong>Suggested fix:</strong> <code>@dataclass</code> with default factory, or move the
+state to module-level globals. The current shape misleads.</p>
+<h4 id="p2-global-singleton-state-across-all-multirun-calls-concurrency-hazard">[P2] Global singleton state across all multirun calls — concurrency hazard</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/runner.py:198, 451</code>
+<strong>Issue:</strong> <code>_multirun_state</code> is module-global; a single Python process
+running two multirun sweeps concurrently (via subprocess or asyncio)
+shares parent-execution state. The atexit hook compounds: register
+once, runs once, even if multiple multiruns happen in sequence in a
+notebook.
+<strong>Suggested fix:</strong> Document the single-process-single-sweep invariant
+explicitly. Long-term, scope state by Hydra job name.</p>
+<h4 id="p2-_resolve_model_source-swallows-typeerror-oserror-silently">[P2] <code>_resolve_model_source</code> swallows <code>(TypeError, OSError)</code> silently</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/runner.py:362-364</code>
+<strong>Issue:</strong> When source-resolution fails, the workflow URL stays at the
+CLI entry point and the user has no signal. Especially relevant for
+<code>deriva-ml-run</code> users — they expect the workflow URL to reflect the
+model file, and <code>_resolve_model_source</code> is the only path that fixes
+it.
+<strong>Suggested fix:</strong> Log at <code>WARNING</code> when resolution fails, naming the
+config.</p>
+<h4 id="p2-run_model-is-270-lines-with-13-sectional-comments-split-it">[P2] <code>run_model</code> is 270 lines with 13 sectional comments — split it</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/runner.py:369-630</code>
+<strong>Issue:</strong> One function does Hydra-logging-reset, ML-instance
+construction, RID validation, workflow URL correction, multirun parent
+creation, choices capture, execution config build, parent linking, the
+actual <code>callable_config(...)</code> call, and the upload. Sections are
+visually separated by <code># ----</code> banners, but the same 13 sections could
+be 5 helper functions.
+<strong>Suggested fix:</strong> Extract <code>_connect_ml</code>, <code>_correct_workflow_url</code>,
+<code>_capture_choices</code>, <code>_run_callable_in_execution</code>, <code>_upload_outputs</code>
+helpers.</p>
+<h4 id="p3-returns-nnone-docstring-sections-will-not-render">[P3] <code>Returns -------\nNone</code> docstring sections will not render</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/runner.py:432-435</code>
+<strong>Issue:</strong> Even in NumPy style, "Returns" should describe the return
+value semantics. Saying <code>None</code> literally is fine, but pair with the
+side-effects line.</p>
+<h3 id="srcderiva_mlexecutionbag_commitpy">src/deriva_ml/execution/bag_commit.py</h3>
+<h4 id="p1-_add_asset_rows_to_bag-and-_add_staged_feature_rows_to_bag-each-lease-rids-in-a-separate-batch">[P1] <code>_add_asset_rows_to_bag</code> and <code>_add_staged_feature_rows_to_bag</code> each lease RIDs in a separate batch</h4>
+<p><strong>Location:</strong> <code>bag_commit.py:337-339, 363-372, 490-491</code>
+<strong>Issue:</strong> Three separate <code>post_lease_batch</code> calls per commit (one for
+asset_execution_assoc, one for asset_type rows, one for feature rows).
+Each is a serialized round trip. For a 1,000-asset commit with 3 types
+each + features, that's 3 sequential POSTs that could be one batch
+(or one POST per logical group, properly amortized).
+<strong>Suggested fix:</strong> Either batch into one <code>post_lease_batch</code> with
+typed-token-prefix-routing, or accept the multi-batch cost and
+document it.</p>
+<h4 id="p1-_add_staged_feature_rows_to_bag-silently-skips-rows-on-lookup-failure">[P1] <code>_add_staged_feature_rows_to_bag</code> silently skips rows on lookup failure</h4>
+<p><strong>Location:</strong> <code>bag_commit.py:444-452</code>
+<strong>Issue:</strong> When <code>ml.lookup_feature(target_table, feature_name)</code> raises,
+the entire feature group is skipped with <code>continue</code> and a <code>logger.error</code>.
+The user's staged feature records vanish from this commit. They stay
+"pending" in SQLite (no <code>mark_feature_records_failed</code>), so the next
+commit re-tries — which will fail the same way. Silent loss of work
+that needs operator intervention to discover.
+<strong>Suggested fix:</strong> Call <code>mark_feature_records_failed</code> for the group so
+the user sees the failure via <code>pending_summary()</code>.</p>
+<h4 id="p2-match_by_columns-construction-walks-every-table-in-every-schema">[P2] <code>match_by_columns</code> construction walks every table in every schema</h4>
+<p><strong>Location:</strong> <code>bag_commit.py:561-576</code>
+<strong>Issue:</strong> Nested <code>for schema in model.schemas: for table in
+model.schemas[schema].tables.values():</code> iterates the full model on
+every load. Cheap for small catalogs, but a deriva-py model can carry
+hundreds of tables.
+<strong>Suggested fix:</strong> Cache on the model object (or compute once per
+DerivaML instance lifetime).</p>
+<h4 id="p2-_read_asset_type_map-ignores-duplicate-filename-writes">[P2] <code>_read_asset_type_map</code> ignores duplicate filename writes</h4>
+<p><strong>Location:</strong> <code>bag_commit.py:725-760</code>
+<strong>Issue:</strong> Iterates JSONL lines and calls <code>out.update(json.loads(line))</code>.
+If two lines carry the same filename with different type lists, the
+later one wins silently. Should at least log when a filename is
+overwritten.
+<strong>Suggested fix:</strong> Detect collision and union or warn.</p>
+<h4 id="p3-total_assets-denominator-silently-zeroes-when-manifest-is-empty">[P3] <code>total_assets</code> denominator silently zeroes when manifest is empty</h4>
+<p><strong>Location:</strong> <code>bag_commit.py:195-196</code>
+<strong>Issue:</strong> <code>total_assets = sum(len(es) for es in by_table.values())</code>.
+When empty, progress callback's <code>100.0 * staged_so_far / total_assets</code>
+would be <code>0/0</code>. Code guards with <code>if total_assets &gt; 0</code>, but the user
+sees no <code>Staging</code> events for a feature-only commit. Document that
+behavior, or emit a single "no assets" event.</p>
+<h3 id="srcderiva_mlexecutionstate_machinepy">src/deriva_ml/execution/state_machine.py</h3>
+<h4 id="p1-transition-writes-sqlite-preemptively-with-sync_pendingtrue-even-on-success">[P1] <code>transition</code> writes SQLite preemptively with <code>sync_pending=True</code> even on success</h4>
+<p><strong>Location:</strong> <code>state_machine.py:264-295</code>
+<strong>Issue:</strong> The flow is: (1) write SQLite with <code>sync_pending=True</code>, (2) PUT
+catalog, (3) write SQLite again to clear <code>sync_pending</code>. Two SQLite
+writes per online transition. The doc-comment explains the rationale
+(crash safety), but the cost is a 2× write amplification for every
+status change. For a fast happy path (Created → Running → Stopped →
+Pending_Upload → Uploaded), that's 8 SQLite writes per execution. WAL
+mode amortizes, but 8× fsync is still real.
+<strong>Suggested fix:</strong> Use a savepoint or single-transaction-with-deferred-flush
+pattern: write the row optimistically with <code>sync_pending=False</code>, do
+the catalog PUT, on failure set <code>sync_pending=True</code>. Trade-off
+documented in spec §2.2 but worth re-checking against actual fsync
+cost.</p>
+<h4 id="p2-reconcile_with_catalog-doesnt-cover-stopped-uploaded-pending_upload-disagreements">[P2] <code>reconcile_with_catalog</code> doesn't cover <code>Stopped ↔ {Uploaded, Pending_Upload}</code> disagreements</h4>
+<p><strong>Location:</strong> <code>state_machine.py:424-439</code> (<code>_DISAGREEMENT_RULES</code>)
+<strong>Issue:</strong> The rule table covers 8 pairs but misses several plausible
+ones: <code>(Stopped, Uploaded)</code>, <code>(Stopped, Pending_Upload)</code>, <code>(Pending_Upload,
+Aborted)</code>. These fall into the "unexpected" else branch (line 570) and
+raise <code>DerivaMLStateInconsistency</code> — but the user's recourse is to
+manually edit SQLite. Common case for resuming a workspace from a
+catalog where another process has advanced the execution.
+<strong>Suggested fix:</strong> Extend <code>_DISAGREEMENT_RULES</code> to "adopt" the catalog
+state in these cases.</p>
+<h4 id="p3-validate_transition-example-renders-as-assert-value-is-none">[P3] <code>validate_transition</code> example renders as <code>assert &lt;value&gt; is None</code></h4>
+<p><strong>Location:</strong> <code>state_machine.py:156-161</code>
+<strong>Issue:</strong> Docstring shows <code>&gt;&gt;&gt; validate_transition(...)</code> with the
+comment "returns None, no raise". This is pure-Python and runs as
+doctest — but the call requires <code>ExecutionStatus</code> to be in the local
+namespace. Without conftest.py wiring it, the doctest collects and
+fails on <code>ExecutionStatus</code> not being defined.
+<strong>Verification needed:</strong> Run <code>uv run pytest --collect-only --doctest-modules
+src/deriva_ml/execution/state_machine.py</code> and confirm.
+<strong>Suggested fix:</strong> Mark the example <code># doctest: +SKIP</code> or expose
+<code>ExecutionStatus</code> in <code>src/deriva_ml/conftest.py</code>.</p>
+<h3 id="srcderiva_mlexecutionstate_storepy">src/deriva_ml/execution/state_store.py</h3>
+<h4 id="p1-pending_summary_rows-count_pending_by_kind-count_pending_rows-are-no-op-stubs">[P1] <code>pending_summary_rows</code>, <code>count_pending_by_kind</code>, <code>count_pending_rows</code> are no-op stubs</h4>
+<p><strong>Location:</strong> <code>state_store.py:336-399</code>
+<strong>Issue:</strong> Three reader methods always return zero/empty
+("retired in Phase 3 cleanup"). Production code paths still call them
+(<code>Execution.pending_summary</code>, <code>find_executions</code>,
+<code>__repr__</code> pending suffix). Documented, but live as silent
+zero-truthers. Any caller expecting "what's pending in this execution"
+gets a misleading "nothing pending" when there genuinely is staged
+work in the asset manifest (<code>pending_assets</code>).
+<strong>Evidence:</strong> <code>ml.pending_summary()</code> and <code>exe.pending_summary()</code> both
+return empty PendingSummary objects in production today, regardless of
+manifest state.
+<strong>Suggested fix:</strong> Either (a) implement against the asset manifest
+(<code>AssetManifest.pending_assets()</code> is the real source of pending data),
+or (b) delete the stubs and update the callers to query the manifest
+directly. Option (a) restores the documented surface.</p>
+<h4 id="p2-update_execution-accepts-arbitrary-fields-then-validates-against-column-set">[P2] <code>update_execution</code> accepts arbitrary <code>**fields</code> then validates against column set</h4>
+<p><strong>Location:</strong> <code>state_store.py:258-286</code>
+<strong>Issue:</strong> Runtime KeyError check is fine, but a typed signature
+(<code>**fields: object</code>) gives no IDE hint about valid kwargs. A typed
+TypedDict overload would catch typos statically.
+<strong>Suggested fix:</strong> Define <code>class ExecutionFields(TypedDict, total=False):
+status: ExecutionStatus; error: str | None; ...</code> and overload.</p>
+<h4 id="p3-delete_execution-doesnt-return-whether-a-row-was-deleted">[P3] <code>delete_execution</code> doesn't return whether a row was deleted</h4>
+<p><strong>Location:</strong> <code>state_store.py:403-420</code>
+<strong>Issue:</strong> Silent no-op when rid doesn't exist. Caller has to call
+<code>get_execution</code> before to know whether the delete actually fired.
+<strong>Suggested fix:</strong> Return <code>bool</code> (whether a row was deleted).</p>
+<h3 id="srcderiva_mlexecutionexecution_configurationpy">src/deriva_ml/execution/execution_configuration.py</h3>
+<h4 id="p2-validate_assets-else-branch-fabricates-an-assetspec-from-strv">[P2] <code>validate_assets</code> <code>else</code> branch fabricates an AssetSpec from <code>str(v)</code></h4>
+<p><strong>Location:</strong> <code>execution_configuration.py:113-114</code>
+<strong>Issue:</strong> "Unknown type — try string coercion" is too lenient. A
+mistaken <code>None</code> becomes <code>AssetSpec(rid="None")</code> which is later
+"resolved" against the catalog and raises a confusing not-found error.
+<strong>Suggested fix:</strong> Raise <code>DerivaMLValidationError</code> listing the
+unsupported type instead.</p>
+<h4 id="p3-argv-default-uses-fielddefault_factorylambda-sysargv-captures-import-time-argv">[P3] <code>argv</code> default uses <code>Field(default_factory=lambda: sys.argv)</code> — captures import-time argv</h4>
+<p><strong>Location:</strong> <code>execution_configuration.py:82</code>
+<strong>Issue:</strong> <code>default_factory</code> is called at instance construction (correct),
+but <code>sys.argv</code> at construction time may not match the argv of the
+process that originally launched the execution (e.g., a notebook
+kernel restart). The semantic is "the argv that created this
+ExecutionConfiguration object" rather than "the argv that started the
+job."
+<strong>Suggested fix:</strong> Document the semantics explicitly.</p>
+<h3 id="srcderiva_mlexecutionfind_callerpy">src/deriva_ml/execution/find_caller.py</h3>
+<h4 id="p2-_top_user_frame-walks-the-entire-stack-twice">[P2] <code>_top_user_frame</code> walks the entire stack twice</h4>
+<p><strong>Location:</strong> <code>find_caller.py:111-189</code>
+<strong>Issue:</strong> The function records <code>last_user_frame</code> and "keeps going back
+to find an even higher one." Then <code>_get_calling_module</code> calls it
+twice (line 292 and line 306), each walking the full stack. For deep
+notebooks this is measurable.
+<strong>Suggested fix:</strong> Cache the result for the lifetime of one
+<code>_get_calling_module</code> invocation.</p>
+<h4 id="p2-_get_notebook_path-queries-jupyter-server-api-with-timeout3">[P2] <code>_get_notebook_path</code> queries Jupyter Server API with <code>timeout=3</code></h4>
+<p><strong>Location:</strong> <code>find_caller.py:239</code>
+<strong>Issue:</strong> A non-responsive Jupyter server blocks workflow construction
+for 3 seconds × N servers. In a notebook session this is hit on every
+<code>create_workflow</code>/<code>create_execution</code> call.
+<strong>Suggested fix:</strong> Cache the resolved notebook path per process. The
+mapping <code>(kernel_id) → notebook_path</code> is stable for the lifetime of the
+kernel.</p>
+<h3 id="srcderiva_mlexecutionbase_configpy">src/deriva_ml/execution/base_config.py</h3>
+<h4 id="p2-_captured_hydra_output_dir-is-a-module-global-mutable">[P2] <code>_captured_hydra_output_dir</code> is a module-global mutable</h4>
+<p><strong>Location:</strong> <code>base_config.py:61, 264-266, 527</code>
+<strong>Issue:</strong> Captures Hydra's output dir at <code>get_notebook_configuration</code>
+call time, then <code>run_notebook</code> reads it. Two notebooks running
+concurrently in the same process (Jupyter Lab kernels in the same
+host?) would share-state-and-clobber. Stack-trace recoverable but a
+multi-tenant footgun.
+<strong>Suggested fix:</strong> Return the path from <code>get_notebook_configuration</code>
+explicitly as a second tuple element; remove the module global.</p>
+<h4 id="p2-load_configs-experiments-must-load-last-rule-is-undocumented-invariant">[P2] <code>load_configs</code> "experiments must load last" rule is undocumented invariant</h4>
+<p><strong>Location:</strong> <code>base_config.py:425-428</code>
+<strong>Issue:</strong> Magic name "experiments" is special-cased without
+explanation. Future devs adding a config module won't know why.
+<strong>Suggested fix:</strong> Document the dependency direction explicitly in the
+function's <code>Note:</code> block (it's noted at the end, but the <em>why</em> isn't).</p>
+<h3 id="srcderiva_mlexecutionenvironmentpy">src/deriva_ml/execution/environment.py</h3>
+<h4 id="p2-get_os_infoenviron-captures-every-environment-variable-verbatim">[P2] <code>get_os_info["environ"]</code> captures every environment variable verbatim</h4>
+<p><strong>Location:</strong> <code>environment.py:171</code>
+<strong>Issue:</strong> Includes secrets-bearing variables like
+<code>AWS_SECRET_ACCESS_KEY</code>, <code>DERIVA_CLIENT_AUTH_TOKEN</code>, etc. The captured
+snapshot gets uploaded as an Execution_Metadata asset. Anyone with
+catalog read access to the asset table can extract these.
+<strong>Evidence:</strong> No allow/deny-list applied.
+<strong>Suggested fix:</strong> Filter against an explicit allow-list or redact
+keys matching common secret-name patterns (<code>*_TOKEN</code>, <code>*_KEY</code>,
+<code>*_SECRET</code>, <code>*_PASSWORD</code>). This is a confidentiality issue but not
+P0 because access to the asset already implies catalog read which
+is itself privileged.</p>
+<h3 id="test-coverage-gaps-cross-module">Test coverage gaps (cross-module)</h3>
+<h4 id="p1-zero-tests-for-multirun_configpy-public-surface">[P1] Zero tests for <code>multirun_config.py</code> public surface</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/multirun_config.py</code> (153 LOC)
+<strong>Issue:</strong> None of <code>multirun_config()</code>, <code>get_multirun_config()</code>,
+<code>list_multirun_configs()</code>, <code>get_all_multirun_configs()</code>, or
+<code>MultirunSpec</code> are exercised by any test. They're public symbols
+re-exported in <code>__init__.py</code>. A typo or re-architecting would land
+silently.
+<strong>Suggested fix:</strong> Add <code>tests/execution/test_multirun_config.py</code>
+covering register/lookup/list/get-all and registry isolation.</p>
+<h4 id="p1-zero-tests-for-environmentpy-helpers">[P1] Zero tests for <code>environment.py</code> helpers</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/environment.py</code> (237 LOC)
+<strong>Issue:</strong> <code>get_execution_environment</code>, <code>get_loaded_modules</code>,
+<code>get_platform_info</code>, <code>get_os_info</code>, <code>get_umask</code>, <code>get_sys_info</code> are all
+untested. They run on every execution (saved as a metadata asset). A
+platform-specific edge case (e.g., <code>os.getlogin()</code> raising on a
+container with no login session) would crash every execution.
+<strong>Suggested fix:</strong> At least smoke tests that the dict has the
+documented keys and serializes to JSON.</p>
+<h4 id="p1-executionmetrics_file-database_catalog-and-catalog-property-paths-untested">[P1] <code>Execution.metrics_file</code>, <code>database_catalog</code>, and <code>catalog</code> property paths untested</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1025-1070, 2016-2091</code>
+<strong>Issue:</strong> No tests for <code>metrics_file()</code> (the convenience metric
+write path), <code>database_catalog</code> property (returns DerivaMLBagView for
+downloaded bags), or <code>catalog</code> property.
+<strong>Suggested fix:</strong> Unit tests with the existing <code>basic_execution</code>
+fixture pattern.</p>
+<h4 id="p1-from_registry-classmethod-not-directly-tested">[P1] <code>from_registry</code> classmethod not directly tested</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:484-524</code>
+<strong>Issue:</strong> Only exercised indirectly through <code>resume_execution</code> calls
+in <code>test_execution_registry.py</code>. The classmethod itself — minimum-init
+construction, the explicit <code>workflow_rid=None</code> assignment, the
+absent <code>_execution_record</code> — isn't asserted.
+<strong>Suggested fix:</strong> Test that the constructed instance answers
+<code>status</code> (via read-through) and raises on <code>is_nested()</code> /
+<code>is_parent()</code> (the documented dry-run failure modes).</p>
+<h4 id="p2-lineagepy-pydantic-models-tested-at-the-lookup-layer-not-as-standalone-shapes">[P2] <code>lineage.py</code> Pydantic models tested at the lookup layer, not as standalone shapes</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/lineage.py</code>
+<strong>Issue:</strong> <code>LineageResult</code>, <code>LineageNode</code>, <code>RootDescriptor</code>,
+<code>WorkflowSummary</code>, etc. are exposed publicly (re-exported from
+<code>__init__.py</code>) for downstream MCP consumers. No direct
+schema/serialization tests for the model boundary —
+<code>test_lookup_lineage_unit.py</code> exercises them via the lookup path but
+doesn't pin the JSON shape.
+<strong>Suggested fix:</strong> Add <code>test_lineage_models.py</code> with <code>.model_dump()</code> /
+<code>.model_validate_json()</code> round-trip tests.</p>
+<h4 id="p2-_clean_folder_contents-retry-path-not-tested">[P2] <code>_clean_folder_contents</code> retry path not tested</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1721-1764</code>
+<strong>Issue:</strong> The retry-on-PermissionError logic (for Windows compat) is
+never triggered in tests. A regression that turns retries off would
+go unnoticed.
+<strong>Suggested fix:</strong> Mock <code>Path.unlink</code> to raise PermissionError once,
+then succeed; assert retry count.</p>
+<h4 id="p2-describedlist-runtime-behavior-covered-via-test_ast_walker-but-with_description-not-directly-tested">[P2] <code>DescribedList</code> runtime behavior covered via <code>test_ast_walker</code>, but <code>with_description</code> not directly tested</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/base_config.py:580-698</code>
+<strong>Issue:</strong> Only consumer is <code>tests/config/test_ast_walker.py</code> (which
+runs at the AST level). No test verifies that <code>instantiate(
+with_description([...]))</code> actually produces a <code>DescribedList</code> with the
+expected <code>.description</code> attribute.
+<strong>Suggested fix:</strong> Add <code>test_with_description_instantiates.py</code> with a
+hydra-zen instantiate round-trip.</p>
+<h3 id="duplication-candidates-cross-module">Duplication candidates (cross-module)</h3>
+<h4 id="p1-_update_description_in_catalog-_update_status_in_catalog-duplicated-across-workflow-executionrecord">[P1] <code>_update_description_in_catalog</code> / <code>_update_status_in_catalog</code> duplicated across Workflow, ExecutionRecord</h4>
+<p><strong>Location:</strong> <code>workflow.py:201-219</code>, <code>execution_record.py:282-314</code>
+<strong>Issue:</strong> Both classes implement near-identical <code>pathBuilder().schemas
+[ml_schema].&lt;Table&gt;.update([{"RID": ..., "&lt;Col&gt;": ...}])</code> helpers.
+Pattern is "look up the path, update one column on one RID." Could be
+a shared <code>_catalog_set_column(ml, schema, table, rid, column, value)</code>
+helper.</p>
+<h4 id="p1-pathbuilderschemasml_schemaexecution_execution-query-for-parentchild-appears-4-across-the-codebase">[P1] <code>pathBuilder().schemas[ml_schema].Execution_Execution</code> query for parent/child appears 4× across the codebase</h4>
+<p><strong>Location:</strong> <code>execution.py:2358-2368</code>, <code>execution_record.py:412-447,
+500-535</code>
+<strong>Issue:</strong> Same "filter <code>Execution_Execution</code> on parent/child, fetch
+related Execution rows, instantiate ExecutionRecord" walked 4 times.
+Each has minor variations (recurse flag, visited set, RID kwarg).
+<strong>Suggested fix:</strong> Extract <code>lineage._walk_execution_hierarchy(ml,
+rid, direction)</code> (direction = "children" or "parents") with the
+recursion / visited tracking centralized.</p>
+<h4 id="p2-_check_writable_catalog-duplicated-between-workflow-and-executionrecord">[P2] <code>_check_writable_catalog</code> duplicated between Workflow and ExecutionRecord</h4>
+<p><strong>Location:</strong> <code>workflow.py:177-199</code>, <code>execution_record.py:256-280</code>
+<strong>Issue:</strong> Same <code>ErmrestSnapshot</code> isinstance check + same RID-presence
+check + same exception message format. The only difference is the
+"operation" string interpolation.
+<strong>Suggested fix:</strong> Move to a free function
+<code>_assert_writable_catalog(catalog, rid, operation)</code> in
+<code>execution_record.py</code> or <code>core/checks.py</code>. Both classes import it.</p>
+<h4 id="p2-update_status-implementation-pattern-duplicated-3">[P2] <code>update_status</code> implementation pattern duplicated 3×</h4>
+<p><strong>Location:</strong> <code>execution.py:1189-1243</code>, <code>execution_snapshot.py:199-251</code>,
+<code>execution_record.py:316-335</code>
+<strong>Issue:</strong> Three classes implement <code>update_status</code> differently:
+- <code>Execution.update_status</code> goes through the state machine.
+- <code>ExecutionRecord.update_status</code> goes through
+  <code>_update_status_in_catalog</code> (catalog-only, no state machine).
+- <code>ExecutionSnapshot.update_status</code> goes through the state machine.
+The mismatch: <code>ExecutionRecord</code> skips state-machine validation, so
+<code>record.update_status(ExecutionStatus.Failed)</code> from any starting
+status will succeed without <code>ALLOWED_TRANSITIONS</code> enforcement.
+<strong>Suggested fix:</strong> Either (a) route ExecutionRecord through the state
+machine (preferred — consistent validation), or (b) document the
+"no state-machine guard" intent and add a warning to the docstring.</p>
+<h4 id="p2-_format_duration-is-a-module-private-but-its-logic-is-duplicated-by-transition-callers">[P2] <code>_format_duration</code> is a module-private but its logic is duplicated by <code>transition</code> callers</h4>
+<p><strong>Location:</strong> <code>execution.py:110-138</code>
+<strong>Issue:</strong> <code>execution_start</code> / <code>execution_stop</code> / <code>__exit__</code> /
+<code>upload_execution_outputs</code> all call <code>_format_duration</code> — five sites.
+The state machine sees only the formatted string. Could move the
+formatting INTO the state machine's <code>extra_fields</code> post-processing so
+callers pass <code>{stop_time: dt}</code> and the state machine derives
+<code>duration</code>.
+<strong>Suggested fix:</strong> Centralize in <code>state_machine.transition</code> once the
+read-through pattern stabilizes.</p>
+<h4 id="p2-lookup_termmlvocabasset_role-called-repeatedly-across-asset-paths">[P2] <code>lookup_term(MLVocab.asset_role, ...)</code> called repeatedly across asset paths</h4>
+<p><strong>Location:</strong> <code>execution.py:1812, 1953</code>, <code>bag_commit.py:168</code>
+<strong>Issue:</strong> <code>Output</code> / <code>Input</code> / individual asset-type lookups happen
+on every asset operation. Each is a small catalog GET. Could be cached
+once on the ml_instance.
+<strong>Suggested fix:</strong> Memoize <code>lookup_term</code> results per
+<code>(vocab, term)</code> pair on the ml_instance for the session lifetime.</p>
+<h4 id="p3-two-identical-from-datetime-import-timezone-local-imports-inside-execution">[P3] Two identical <code>from datetime import timezone</code> local imports inside <code>Execution</code></h4>
+<p><strong>Location:</strong> <code>execution.py:127, 426, 1270, 1317, 1560, 2499</code>
+<strong>Issue:</strong> Six in-function local imports of the same name. Pulled
+locally to avoid potential import-time circulars, but the module
+already imports <code>from datetime import datetime</code> at top level — the
+<code>timezone</code> import could join it without breaking anything.
+<strong>Suggested fix:</strong> Lift to top-level import.</p>
+<h2 id="top-action-items-for-v1371-hold-gate">Top action items for v1.37.1 hold-gate</h2>
+<ol>
+<li><strong>P0 fix:</strong> <code>Workflow._github_url</code> dirty-detection — replace the
+   substring check with proper file-scoped porcelain parsing. Add
+   tests for <code>M</code>, <code>MM</code>, <code>??</code>, <code>D</code>, untracked, and the
+   "clean file in dirty repo" false positive case.</li>
+<li><strong>P1 backports worth doing pre-release</strong> (cheap, contained):</li>
+<li><code>asset_file_path</code> <code>or asset_name</code> falsy-asset_types bug (one
+     line + one test).</li>
+<li><code>_initialize_execution</code> setting <code>instance.workflow_rid = None</code>
+     in <code>from_registry</code> (one line + one test).</li>
+<li>Mid-function triple-quoted string at workflow.py:639 (one line).</li>
+<li><strong>Defer to v1.38.x:</strong></li>
+<li>God-class refactor of <code>Execution</code>.</li>
+<li><code>runner.py</code> Google-style docstring conversion.</li>
+<li><code>_update_asset_execution_table</code> dead-Output-branch removal.</li>
+<li>State-store pending-summary stubs replaced with manifest-backed
+     readers.</li>
+<li><code>multirun_config</code> and <code>environment</code> test gaps.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

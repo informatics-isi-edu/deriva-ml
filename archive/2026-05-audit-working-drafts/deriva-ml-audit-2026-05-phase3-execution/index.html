@@ -1,0 +1,5618 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase3-execution/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml audit 2026-05 — Phase 3: execution/ - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-audit-2026-05-phase-3-execution" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml audit 2026-05 — Phase 3: execution/
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-1-dead-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 1 — Dead code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 1 — Dead code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-_engine_harnesspy-is-a-doc-only-file-with-no-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 _engine_harness.py is a doc-only file with no contents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-execution_flush_staged_features-has-no-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Execution._flush_staged_features has no callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-execution_from_registry-is-a-vestigial-classmethod-with-no-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Execution._from_registry is a vestigial classmethod with no callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-executionupload_assets-is-a-dataset-style-upload-with-no-production-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 Execution.upload_assets is a dataset-style upload with no production callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-state_storependingrowstatus-directoryrulestatus-and-all-pending-row-crud-have-no-production-writers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 state_store.PendingRowStatus, DirectoryRuleStatus, and all pending-row CRUD have no production writers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-lease_orchestratoracquire_leases_for_execution-is-production-dead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6 lease_orchestrator.acquire_leases_for_execution is production-dead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-environmentlocaleconv-and-environmentlocale_module-are-dead-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.7 environment.localeconv and environment.locale_module are dead helpers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-execution__str__-references-selfasset_paths-and-selfconfiguration-after-_from_registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.8 Execution.__str__ references self.asset_paths and self.configuration after _from_registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-executionpy99-107-defines-an-ipython-display-fallback-thats-no-longer-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.9 execution.py:99-107 defines an IPython display fallback that's no longer used
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#110-stale-group-d-group-e-task-f2-task-c3-wi2-references-in-docstrings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.10 Stale Group D / Group E / Task F2 / Task C3 / WI2 references in docstrings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-2-deriva-py-interface-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 2 — deriva-py interface usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 2 — deriva-py interface usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-state_machineflush_pending_sync-and-transition-use-the-same-pbschemastablesupdatebody-shape-clean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 state_machine.flush_pending_sync and transition use the same pb.schemas[...].tables[...].update(body) shape — clean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-state_machinereconcile_with_catalog-uses-raw-ermrest-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 state_machine.reconcile_with_catalog uses raw ERMrest path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-rid_leasepost_lease_batch-uses-raw-catalogpost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 rid_lease.post_lease_batch uses raw catalog.post
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-executionpydownload_asset-uses-hatracstore-directly-instead-of-mldownload_asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 execution.py::download_asset uses HatracStore directly instead of ml.download_asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-lease_orchestratorreconcile_pending_leases-uses-raw-ermrest-url-with-urllibquote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 lease_orchestrator.reconcile_pending_leases uses raw ERMrest URL with urllib.quote
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-executionpy_update_asset_execution_table-does-the-right-thing-with-on_conflict_skip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 execution.py::_update_asset_execution_table does the right thing with on_conflict_skip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-workflowpy-re-implements-optional-ipythonjupyter-imports-that-find_callerpy-already-has" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 workflow.py re-implements optional IPython/Jupyter imports that find_caller.py already has
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-4-inconsistencies-duplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 4 — Inconsistencies / duplication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 4 — Inconsistencies / duplication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-two-parallel-lease-implementations-the-headline-duplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Two parallel lease implementations (the headline duplication)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-executionexecution_start-and-execution__enter__-do-nearly-identical-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Execution.execution_start and Execution.__enter__ do nearly identical work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-execution_initialize_execution-builds-the-manifest-before-__enter__-would" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Execution._initialize_execution builds the manifest before __enter__ would
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-three-places-construct-executionconfiguration-from-scratch-with-different-argument-styles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Three places construct ExecutionConfiguration from scratch with different argument styles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-executionexecution_stop-does-the-catalog-write-directly-the-state-machine-does-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Execution.execution_stop does the catalog write directly; the state machine does not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-find_callerpy-and-workflowpy-redundantly-detect-the-jupyter-notebook-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 find_caller.py and workflow.py redundantly detect the Jupyter notebook path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-datasetcollection__iter__-violates-the-mapping-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 DatasetCollection.__iter__ violates the Mapping contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#48-executionstatus-error-start_time-stop_time-are-four-near-identical-read-through-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.8 Execution.status / error / start_time / stop_time are four near-identical read-through properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-5-simplification-opportunities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 5 — Simplification opportunities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 5 — Simplification opportunities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-delete-the-sqlite-pending-rows-machinery-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Delete the SQLite pending-rows machinery (§1.5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-delete-_flush_staged_features-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Delete _flush_staged_features (§1.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-delete-_engine_harnesspy-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Delete _engine_harness.py (§1.1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-delete-_from_registry-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Delete _from_registry (§1.3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-delete-executionupload_assets-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Delete Execution.upload_assets (§1.4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-delete-lease_orchestratoracquire_leases_for_execution-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 Delete lease_orchestrator.acquire_leases_for_execution (§1.6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-consolidate-the-ipythonjupyter-notebook-path-detection-27-46" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 Consolidate the IPython/Jupyter notebook-path detection (§2.7 + §4.6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#58-delete-dead-environmentlocale-helpers-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.8 Delete dead environment.locale* helpers (§1.7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#59-factor-executionstatuserrorstart_timestop_time-to-share-one-fetcher-48" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.9 Factor Execution.status/error/start_time/stop_time to share one fetcher (§4.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#510-delegate-execution__enter__-to-execution_start-42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.10 Delegate Execution.__enter__ to execution_start() (§4.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#511-scrub-stale-task-group-wi-references-from-docstrings-110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.11 Scrub stale Task / Group / WI references from docstrings (§1.10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-6-maintainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 6 — Maintainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 6 — Maintainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-executionpy-carries-three-responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 execution.py carries three responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-state_storepy-carries-an-unshipped-second-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 state_store.py carries an unshipped second architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-docstring-quality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Docstring quality
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-__all__-discipline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 __all__ discipline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-datasetcollection-violates-mapping__iter__-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 DatasetCollection violates Mapping.__iter__ contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-logger-usage-is-consistent-good" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 Logger usage is consistent — good
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#67-global-mutable-state-in-runner_multirun_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.7 Global mutable state in runner._multirun_state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#68-naming-workspace-working_dir-_working_dir-cache_dir-_cache_dir-execution_root-_execution_root-_asset_root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.8 Naming: workspace, working_dir, _working_dir, cache_dir, _cache_dir, execution_root, _execution_root, _asset_root
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#69-executionadd_features-docstring-promises-derivamlvalidationerror-but-the-production-path-is-staging-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.9 Execution.add_features docstring promises "DerivaMLValidationError" but the production path is staging-only
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-a-legacy-user-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens A — Legacy-user removal
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens A — Legacy-user removal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a1-_engine_harnesspy-full-file-legacy-reservation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.1 _engine_harness.py — full-file legacy reservation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a2-execution_flush_staged_features-retained-for-tests-but-tests-dont-call-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.2 Execution._flush_staged_features — "retained for tests" but tests don't call it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a3-execution_from_registry-temporary-implementation-for-group-d" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.3 Execution._from_registry — "Temporary implementation for Group D"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a4-executionupload_assets-predates-asset_file_path-upload_execution_outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.4 Execution.upload_assets — predates asset_file_path + upload_execution_outputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a5-state_storepending_rows-directory_rules-and-their-crud-pre-bag-commit-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.5 state_store.pending_rows, directory_rules and their CRUD — pre-bag-commit architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a6-lease_orchestratoracquire_leases_for_execution-pre-bag-commit-lease-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.6 lease_orchestrator.acquire_leases_for_execution — pre-bag-commit lease path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a7-stale-grouptask-references-in-docstrings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.7 Stale Group/Task references in docstrings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a8-the-uploaded_assets-attribute-on-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A.8 The "uploaded_assets" attribute on Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-b-privatization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens B — Privatization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens B — Privatization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#b1-executionstatestore-class-internal-currently-public-via-lazy-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.1 ExecutionStateStore class — internal, currently public via lazy module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b2-pendingrowstatus-directoryrulestatus-executions_table-pending_rows_table-directory_rules_table-table-name-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.2 PendingRowStatus, DirectoryRuleStatus, EXECUTIONS_TABLE, PENDING_ROWS_TABLE, DIRECTORY_RULES_TABLE — table-name constants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b3-lease_orchestratoracquire_leases_for_execution-public-but-tests-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.3 lease_orchestrator.acquire_leases_for_execution — public but tests-only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b4-lease_orchestratorreconcile_pending_leases-public-used-by-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.4 lease_orchestrator.reconcile_pending_leases — public, used by core
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b5-rid_leasegenerate_lease_token-post_lease_batch-public-used-cross-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.5 rid_lease.generate_lease_token, post_lease_batch — public, used cross-module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b6-rid_lease_validate_pending_asset_leases-already-underscore-private" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.6 rid_lease._validate_pending_asset_leases — already underscore-private
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b7-rid_leasepending_rows_lease_chunk-public-constant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.7 rid_lease.PENDING_ROWS_LEASE_CHUNK — public constant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b8-manifest_leaselease_manifest_pending_assets-public-used-by-bag_commit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.8 manifest_lease.lease_manifest_pending_assets — public, used by bag_commit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b9-state_machinetransition-validate_transition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.9 state_machine.transition, validate_transition,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b10-state_machine_catalog_body_for_execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.10 state_machine._catalog_body_for_execution,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b11-state_machineinvalidtransitionerror-public-exception-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.11 state_machine.InvalidTransitionError — public exception class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b12-executionexecution_initialize_execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.12 execution.Execution._initialize_execution,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b13-executionexecute-public-returns-self" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.13 Execution.execute() — public, returns self
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b14-find_caller_get_calling_module-_get_notebook_path-_top_user_frame-etc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.14 find_caller._get_calling_module, _get_notebook_path, _top_user_frame, etc.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b15-workflowworkflow_check_writable_catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.15 workflow.Workflow._check_writable_catalog,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b16-runner_multirun_state-_atexit_registered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.16 runner._multirun_state, _atexit_registered,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b17-multirun_config_multirun_registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.17 multirun_config._multirun_registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b18-base_config_captured_hydra_output_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.18 base_config._captured_hydra_output_dir,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b19-pending_summary_humanize_bytes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.19 pending_summary._humanize_bytes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b20-datasetcollection-public-but-only-constructed-by-executiondatasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.20 DatasetCollection — public, but only constructed by Execution.datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b21-execution_recordexecutionrecord_update_status_in_catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B.21 execution_record.ExecutionRecord._update_status_in_catalog,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lens-b-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens B summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-c-test-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens C — Test coverage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens C — Test coverage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-file-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-file posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coverage-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage gaps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-leakage-warning-load-bearing-finding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State-leakage warning (load-bearing finding)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-trade-off-per-test-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost trade-off per test file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamlining-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streamlining recommendations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-d-docsspecadrdocstring-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens D — Docs/spec/ADR/docstring sync
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens D — Docs/spec/ADR/docstring sync">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#d1-orphan-spec-2026-04-21-upload-engine-deriva-py-integration-designmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.1 Orphan spec: 2026-04-21-upload-engine-deriva-py-integration-design.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d2-orphan-spec-2026-04-18-sqlite-execution-state-designmd-partially-superseded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.2 Orphan spec: 2026-04-18-sqlite-execution-state-design.md partially superseded
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d3-docsuser-guideexecutionsmd-matches-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.3 docs/user-guide/executions.md matches code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d4-docsconfigurationoverviewmd-includes-derivamlmodel-snippet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.4 docs/configuration/overview.md includes DerivaMLModel snippet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d5-workflowpysetup_url_checksum-docstring-lies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.5 workflow.py::setup_url_checksum docstring lies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d6-state_machinepytransition-claims-notimplementederror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.6 state_machine.py::transition claims NotImplementedError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d7-_engine_harnesspy-is-the-canonical-reference-for-the-dead-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.7 _engine_harness.py is the canonical reference for the dead surface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d8-adr-0006-bag-pipeline-accurately-describes-the" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.8 ADR-0006 (bag pipeline) accurately describes the
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d9-adr-0007-annotation-builders-public-api-not-relevant-to-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.9 ADR-0007 (annotation builders public API) — not relevant to execution/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d10-adr-0008-estimate_bag_size-opt-out-not-relevant-to-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.10 ADR-0008 (estimate_bag_size opt-out) — not relevant to execution/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d11-executionupload_execution_outputs-docstring-promises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.11 Execution.upload_execution_outputs docstring promises
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d12-executionadd_features-raises-clause-inaccurate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.12 Execution.add_features Raises clause inaccurate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d13-pending_summarypy-references-workspacependingsummary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.13 pending_summary.py references "WorkspacePendingSummary"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d14-deriva-mcp-legacy-readme-references-assetridconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D.14 deriva-mcp legacy README references AssetRIDConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persona-summaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persona summaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Persona summaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#senior-software-engineer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Senior software engineer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing-engineer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing engineer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical writer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-developer-user-the-workflow-author" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ML-developer user (the workflow author)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DBA
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-actions-1n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions (1–N)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#follow-up-scope-phase-4-candidates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Follow-up scope (Phase 4 candidates)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Follow-up scope (Phase 4 candidates)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#4a-executionpy-structural-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.A execution.py structural split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4b-state_storepy-split-executions-only-vs-engine-machinery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.B state_store.py split: executions only vs. engine machinery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4c-bag-commit-byte-streaming-progress-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.C Bag-commit byte-streaming progress callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4d-concurrent-execution-safety-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.D Concurrent-execution safety review
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4e-unify-the-lease-primitives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.E Unify the lease primitives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-3-audit-closing-inventory-2026-05-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 audit — closing inventory (2026-05-15)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 3 audit — closing inventory (2026-05-15)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ranked-actions-115" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions (1–15)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#items-intentionally-not-done-explicit-deferrals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Items intentionally NOT done (explicit deferrals)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loc-reduction-achieved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoC reduction achieved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#closing-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closing posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-audit-2026-05-phase-3-execution">deriva-ml audit 2026-05 — Phase 3: execution/</h1>
+<p>Reviewed <code>/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/execution/</code>
+(10 230 LoC across 23 Python files) and the corresponding test suite
+<code>/Users/carl/GitHub/DerivaML/deriva-ml/tests/execution/</code> (8 883 LoC,
+29 test files, ~363 tests) at the tip of
+<code>fix/catalog-manager-state-guards</code> (HEAD <code>4442f82</code>). Cross-workspace
+references were grepped against
+<code>/Users/carl/GitHub/DerivaML/{deriva-mcp,deriva-mcp-core,deriva-ml-mcp,deriva-ml-model-template,deriva-skills,deriva-ml-skills}/</code>.</p>
+<p>The Phase 1 audit flagged <code>execution/</code> as the worst-offender candidate
+("11 260 LoC, 24 files" — "Largest, mostly load-bearing") and deferred
+it. The deferral was correct: nothing in <code>execution/</code> is a façade over
+a deleted upstream class the way <code>dataset/</code> had <code>CatalogGraph</code> as a
+load-bearing relic. The dragging tail here is different — <strong>the
+subsystem carries two parallel halves of an unfinished cutover</strong>.
+The bag-commit pipeline (<code>bag_commit.py</code>, <code>manifest_lease.py</code>,
+<code>AssetManifest</code>) is the live production path. Alongside it, the
+SQLite-pending-rows / RID-lease / state-store machinery built for
+the upload-engine cutover (per spec <code>2026-04-18-sqlite-execution-state-design.md</code>)
+lives at full size with substantial test coverage <strong>but no production
+writer</strong> for the <code>pending_rows</code> table. The <code>_engine_harness.py</code> module
+is a doc-only file documenting that the engine path is "Phase 2."
+Phase 2 is the bag commit; the engine never shipped. The lease
+machinery has two parallel implementations — <code>lease_orchestrator</code>
+(SQLite-pending-row based, used only by tests) and <code>manifest_lease</code>
+(manifest-based, used by production).</p>
+<h2 id="executive-summary">Executive summary</h2>
+<p>Overall posture: <strong>two-thirds load-bearing, one-third unfinished cutover
+with a parallel test-only API surface.</strong> The execution lifecycle
+(<code>Execution</code>, <code>state_machine</code>, <code>state_store.executions</code>,
+<code>execution_record</code>, <code>execution_snapshot</code>) is healthy and correct. The
+bag-commit upload path is clean. But the SQLite pending-rows /
+directory-rules / RID-lease machinery — ~1 800 LoC of <code>state_store.py</code>,
+all of <code>lease_orchestrator.py</code>, plus 1 000+ LoC of tests — is
+<em>production-dead</em>: no code in <code>src/</code> inserts a row into
+<code>execution_state__pending_rows</code>. Production writes the asset manifest
+instead. The lifecycle properties (<code>status</code>, <code>start_time</code>, <code>stop_time</code>,
+<code>error</code>) read through SQLite's <code>executions</code> table; nothing else does.</p>
+<p>Top themes ranked by impact:</p>
+<ol>
+<li>
+<p><strong>The SQLite pending-rows / directory-rules / engine machinery is
+   production-dead.</strong> <code>state_store.py</code> defines three tables
+   (<code>executions</code>, <code>pending_rows</code>, <code>directory_rules</code>); only the first
+   is written by production code. Grep across <code>src/</code> for
+   <code>insert_pending_row</code>, <code>insert_directory_rule</code>,
+   <code>mark_pending_leasing</code>, <code>revert_pending_leasing</code>,
+   <code>finalize_pending_lease</code>, <code>list_pending_rows</code>,
+   <code>list_leasing_rows</code>, <code>pending_summary_rows</code> — every hit is inside
+   <code>state_store.py</code> itself, <code>lease_orchestrator.py</code>, the <code>executions</code>
+   bookkeeping in <code>Execution.__init__</code>, or tests. The
+   <code>pending_summary</code> machinery is the one exception that <em>reads</em>
+   pending_rows (from the test-only inserters). This is the largest
+   single LoC liability in <code>execution/</code>. <code>_engine_harness.py</code> is a
+   12-line module that exists solely to document this state.</p>
+</li>
+<li>
+<p><strong>Two parallel lease implementations.</strong> <code>manifest_lease.py</code>
+   (production) leases RIDs against the asset manifest;
+   <code>lease_orchestrator.py</code> (test-only in prod, ~248 LoC of orchestrator</p>
+</li>
+<li>
+<p>~366 LoC of tests) leases against <code>pending_rows</code>. The two phases
+   are conceptually identical (<code>generate_lease_token</code> → <code>post_lease_batch</code>
+   → finalize/revert) but implemented twice with diverged failure
+   semantics. <code>reconcile_pending_leases</code> is the only function in
+   <code>lease_orchestrator.py</code> with production callers (2: <code>core/base.py:367</code>,
+   <code>core/mixins/execution.py:481</code>); both fire during <code>_open_for_use</code>
+   and find zero rows to reconcile because no production caller
+   transitions a row to <code>leasing</code>.</p>
+</li>
+<li>
+<p><strong><code>Execution._flush_staged_features</code> is retained-by-docstring but
+   has no callers.</strong> <code>execution/execution.py:1569</code> carries a 110-LoC
+   <code>_flush_staged_features</code> whose docstring says "retained only for
+   the few remaining direct-flush callers (tests)." Grep across <code>src/</code>
+   and <code>tests/</code> shows zero callers other than the docstring itself and
+   comments inside other functions describing what the legacy version
+   did. The bag-commit path
+   (<code>bag_commit.py::_add_staged_feature_rows_to_bag</code>) carries the
+   feature rows inline and is the only production path.</p>
+</li>
+<li>
+<p><strong><code>workflow.py::setup_url_checksum</code> is a <code>@model_validator</code> whose
+   docstring describes a <code>Workflow.create_workflow(...)</code> factory that
+   doesn't exist.</strong> <code>workflow.py:382-469</code> is decorated <code>@model_validator(mode="after")</code>
+   but its docstring example shows <code>&gt;&gt;&gt; workflow = Workflow.create_workflow(...)</code>.
+   <code>Workflow</code> has no <code>create_workflow</code> method anywhere in the
+   workspace (the canonical entry point is <code>DerivaML.create_workflow</code>
+   in <code>core/mixins/workflow.py:361</code>). The Args section is empty.
+   This docstring will mislead anyone reading the public Workflow API.</p>
+</li>
+<li>
+<p><strong><code>base_config.py</code> types <code>datasets</code>/<code>assets</code> as <code>Any</code>.</strong> The
+   <code>BaseConfig</code> dataclass at <code>base_config.py:115-116</code> declares
+   <code>datasets: Any = None</code> and <code>assets: Any = None</code>. The docstring at
+   <code>base_config.py:95-96</code> describes the runtime types
+   (<code>list[DatasetSpec]</code>, <code>list[str]</code>) but the class declares neither.
+   The comment justifies it ("OmegaConf compatibility") but
+   <code>ExecutionConfiguration</code> solves the same problem via a
+   <code>@field_validator("assets", mode="before")</code> coercer
+   (<code>execution_configuration.py:87-115</code>). The two configs diverge on
+   how they handle hydra-zen's structured-config tax.</p>
+</li>
+</ol>
+<p>Worst-offending modules within <code>execution/</code>:</p>
+<ol>
+<li>
+<p><strong><code>state_store.py</code></strong> (1 072 LoC). Defines three tables; only one
+   is written by production. The pending_rows / directory_rules
+   surface is ~700 LoC of unused-by-prod CRUD + 250 LoC of accurate
+   tests. Cleanest deletion target in <code>execution/</code>.</p>
+</li>
+<li>
+<p><strong><code>execution.py</code></strong> (2 525 LoC). Healthy core (lifecycle, asset
+   register, bag upload) wrapped around three dead-or-vestigial
+   methods: <code>_flush_staged_features</code> (110 LoC),
+   <code>_from_registry</code> classmethod (40 LoC, only called by
+   <code>resume_execution</code> which now has the full reconstruction logic
+   inline), and <code>upload_assets</code> (35 LoC, 1 callsite in tests, 0 in
+   <code>src/</code>).</p>
+</li>
+<li>
+<p><strong><code>lease_orchestrator.py</code></strong> (248 LoC). <code>acquire_leases_for_execution</code>
+   has zero production callers; <code>reconcile_pending_leases</code> runs but
+   finds no work because (1) is also production-dead. The whole
+   module is bookkeeping for an unshipped path.</p>
+</li>
+<li>
+<p><strong><code>workflow.py</code></strong> (786 LoC). Healthy intent but burdened by the
+   misleading <code>setup_url_checksum</code> docstring (theme 4), three optional
+   imports for IPython/Jupyter that duplicate the same machinery
+   <code>find_caller.py</code> already implements (<code>workflow.py:39-72</code> vs.
+   <code>find_caller.py:1-35</code>), and a static <code>get_dynamic_version</code> that
+   imports <code>setuptools_scm</code> lazily in the call path — fine, but
+   wrapped in 18 lines of historical commentary justifying the
+   removal of a long-deleted env-var mutation.</p>
+</li>
+</ol>
+<hr />
+<h2 id="subsystem-inventory">Subsystem inventory</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">LoC</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__.py</code></td>
+<td style="text-align: right;">99</td>
+<td>Public surface; explicit <code>__all__</code> with lazy <code>Execution</code> import. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>_engine_harness.py</code></td>
+<td style="text-align: right;">12</td>
+<td>Doc-only module about the unshipped engine. <strong>Dead.</strong></td>
+</tr>
+<tr>
+<td><code>bag_commit.py</code></td>
+<td style="text-align: right;">746</td>
+<td>The production upload path. <code>build_execution_bag</code> → <code>BagCatalogLoader</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>base_config.py</code></td>
+<td style="text-align: right;">698</td>
+<td><code>BaseConfig</code>, <code>notebook_config</code>, <code>run_notebook</code>, <code>load_configs</code>. Two top-level docstrings (lines 1-39, 1-39) overlap. <code>datasets</code>/<code>assets</code> typed <code>Any</code>.</td>
+</tr>
+<tr>
+<td><code>dataset_collection.py</code></td>
+<td style="text-align: right;">93</td>
+<td>RID-keyed mapping + iterable wrapper. <strong>Healthy</strong> but violates <code>Mapping.__iter__</code> contract (theme 6.5).</td>
+</tr>
+<tr>
+<td><code>environment.py</code></td>
+<td style="text-align: right;">290</td>
+<td><code>get_execution_environment()</code> for provenance. Carries two dead helpers <code>localeconv</code> / <code>locale_module</code>.</td>
+</tr>
+<tr>
+<td><code>execution.py</code></td>
+<td style="text-align: right;">2 525</td>
+<td>God module. Lifecycle is clean. <code>_flush_staged_features</code> (1 569-1 679) is dead. <code>_from_registry</code> (361-401) is vestigial.</td>
+</tr>
+<tr>
+<td><code>execution_configuration.py</code></td>
+<td style="text-align: right;">141</td>
+<td>Pydantic config. <code>assets</code> field has a <code>@field_validator</code> coercer. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>execution_record.py</code></td>
+<td style="text-align: right;">646</td>
+<td>Live catalog-bound execution row. <code>list_execution_children</code> / <code>parents</code> with <code>_visited</code> recursion guard (same fig-leaf pattern Phase 2 §1.6 flagged).</td>
+</tr>
+<tr>
+<td><code>execution_snapshot.py</code></td>
+<td style="text-align: right;">248</td>
+<td>Frozen Pydantic value object. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>find_caller.py</code></td>
+<td style="text-align: right;">312</td>
+<td>Module/notebook-path resolution. <strong>Healthy</strong> but duplicates 3 optional-import blocks from <code>workflow.py</code> (theme 4.2).</td>
+</tr>
+<tr>
+<td><code>lease_orchestrator.py</code></td>
+<td style="text-align: right;">248</td>
+<td><code>acquire_leases_for_execution</code> production-dead. <code>reconcile_pending_leases</code> production-live but finds nothing.</td>
+</tr>
+<tr>
+<td><code>lineage.py</code></td>
+<td style="text-align: right;">210</td>
+<td>Pydantic models for <code>lookup_lineage</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>manifest_lease.py</code></td>
+<td style="text-align: right;">64</td>
+<td>Production lease path against the asset manifest. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>model_protocol.py</code></td>
+<td style="text-align: right;">175</td>
+<td><code>DerivaMLModel</code> protocol — consumed by <code>deriva-ml-model-template</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>multirun_config.py</code></td>
+<td style="text-align: right;">153</td>
+<td>Multirun spec registry. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>pending_summary.py</code></td>
+<td style="text-align: right;">200</td>
+<td><code>PendingSummary</code> rendering. Consumes test-inserted pending_rows. <strong>Healthy</strong> (but depends on theme 1's dead writer surface).</td>
+</tr>
+<tr>
+<td><code>rid_lease.py</code></td>
+<td style="text-align: right;">146</td>
+<td><code>post_lease_batch</code> + <code>_validate_pending_asset_leases</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>runner.py</code></td>
+<td style="text-align: right;">698</td>
+<td><code>run_model</code> + multirun. Global <code>_multirun_state</code> is the only mutable global in <code>execution/</code>.</td>
+</tr>
+<tr>
+<td><code>state_machine.py</code></td>
+<td style="text-align: right;">616</td>
+<td>Status transitions. <strong>Healthy</strong> but <code>validate_transition</code> example claims "returns None"; the function returns nothing and raises.</td>
+</tr>
+<tr>
+<td><code>state_store.py</code></td>
+<td style="text-align: right;">1 072</td>
+<td>Executions table is load-bearing. Pending-rows + directory-rules tables (~700 LoC) are test-only writers.</td>
+</tr>
+<tr>
+<td><code>upload_report.py</code></td>
+<td style="text-align: right;">52</td>
+<td>Return type for <code>upload_pending</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>workflow.py</code></td>
+<td style="text-align: right;">786</td>
+<td><code>Workflow</code> Pydantic model + script-URL resolution. <code>setup_url_checksum</code> docstring is misleading.</td>
+</tr>
+</tbody>
+</table>
+<p>Cross-module dependencies worth naming:</p>
+<ul>
+<li><code>Execution.__init__</code> (<code>execution.py:165-359</code>) reads
+  <code>workspace.execution_state_store()</code> and writes the <code>executions</code>
+  row. That's the single production writer to <code>state_store</code>.</li>
+<li><code>bag_commit.py</code> is the only consumer of <code>manifest_lease.py</code>. Every
+  asset RID assignment in production flows through this pair.</li>
+<li><code>lease_orchestrator.py</code> and <code>manifest_lease.py</code> both import
+  <code>rid_lease.generate_lease_token</code> and <code>rid_lease.post_lease_batch</code>
+  — those two helpers are the only shared lease primitives.</li>
+<li><code>runner.py</code>'s <code>_multirun_state</code> global is read by every <code>run_model</code>
+  invocation and written by <code>_create_parent_execution</code>. Tests must
+  call <code>reset_multirun_state()</code> to avoid cross-test pollution.</li>
+<li><code>execution.py</code> imports nothing from <code>lease_orchestrator.py</code> —
+  the production lease path is entirely through <code>bag_commit.py</code> →
+  <code>manifest_lease.py</code>.</li>
+</ul>
+<hr />
+<h2 id="lens-1-dead-code">Lens 1 — Dead code</h2>
+<h3 id="11-_engine_harnesspy-is-a-doc-only-file-with-no-contents">1.1 <code>_engine_harness.py</code> is a doc-only file with no contents</h3>
+<p><code>_engine_harness.py:1-12</code> — twelve lines describing why the upload
+engine is "Phase 2." The Phase 2 it describes never landed; the
+production path is the bag-commit pipeline. No production code
+imports the module; grep confirms zero references in <code>src/</code> or
+<code>tests/</code>.</p>
+<p><strong>Fix:</strong> delete the file. The doc content, if anyone cares,
+belongs in a one-line note inside <code>state_store.py</code> (or, more
+realistically, in the obsolete spec document that already
+describes this design — <code>2026-04-18-sqlite-execution-state-design.md</code>).
+<strong>Risk: trivial. LoC: −12.</strong> <strong>Severity: low</strong> but symbolically
+high — it advertises the dead surface.</p>
+<h3 id="12-execution_flush_staged_features-has-no-callers">1.2 <code>Execution._flush_staged_features</code> has no callers</h3>
+<p><code>execution.py:1569-1679</code> — 110-LoC method retained per docstring
+("retained only for the few remaining direct-flush callers (tests)").
+Reality check:</p>
+<pre><code>$ grep -rn &quot;_flush_staged_features\b&quot; src/ tests/
+src/deriva_ml/execution/execution.py:1472:  # comment about legacy path
+src/deriva_ml/execution/execution.py:1569:  # the definition itself
+src/deriva_ml/execution/execution.py:1950:  # docstring on _manifest_store
+src/deriva_ml/local_db/manifest_store.py:55:  # docstring reference
+src/deriva_ml/local_db/manifest_store.py:658: # docstring reference
+src/deriva_ml/execution/bag_commit.py:405:    # comment &quot;same as _flush...&quot;
+src/deriva_ml/execution/bag_commit.py:430:    # comment &quot;same as _flush...&quot;
+tests/execution/test_staged_features.py:150: # comment in a test docstring
+tests/execution/test_staged_features.py:491: # comment in a test docstring
+</code></pre>
+<p>Every hit is a comment or docstring; nothing actually <em>calls</em>
+<code>_flush_staged_features</code>. The bag-commit path is the canonical
+flusher. The method's <code>try/except</code> swallows asset-rewriting bugs
+that the bag path treats correctly via <code>_rewrite_fks</code>. Risk of
+keeping it: a copy-paste from this method into a maintenance fix
+would reintroduce the legacy per-table-failure semantics the
+bag-commit path replaced.</p>
+<p><strong>Fix:</strong> delete <code>_flush_staged_features</code> and update the four
+docstring/comment references to say "see <code>bag_commit._add_staged_feature_rows_to_bag</code>."
+<strong>Risk: low</strong> (no production callers). <strong>LoC: −110 + a few
+comment touch-ups.</strong> <strong>Severity: medium</strong> — it confuses the
+maintenance picture; the docstring lies about retention purpose.</p>
+<h3 id="13-execution_from_registry-is-a-vestigial-classmethod-with-no-callers">1.3 <code>Execution._from_registry</code> is a vestigial classmethod with no callers</h3>
+<p><code>execution.py:361-401</code> — 40-LoC classmethod whose docstring says
+"Distinct from create_execution: does NOT contact the catalog and
+does NOT POST a new row. Called by ml.resume_execution.
+Temporary implementation for Group D — Group E replaces the body
+to wire up read-through lifecycle properties."</p>
+<p>Group E has shipped — the read-through properties (<code>status</code>,
+<code>start_time</code>, <code>stop_time</code>, <code>error</code>) are at
+<code>execution.py:636-779</code>. <code>resume_execution</code> lives in
+<code>core/mixins/execution.py:444-500</code> and constructs an <code>Execution</code>
+the canonical way (<code>reload=execution_rid</code>); <code>_from_registry</code> is
+not called.</p>
+<p><strong>Fix:</strong> delete the method. <strong>Risk: low</strong> (no callers).
+<strong>LoC: −40.</strong> <strong>Severity: low.</strong></p>
+<h3 id="14-executionupload_assets-is-a-dataset-style-upload-with-no-production-callers">1.4 <code>Execution.upload_assets</code> is a dataset-style upload with no production callers</h3>
+<p><code>execution.py:1264-1299</code> — 35-LoC public method that scans a
+directory and calls <code>upload_directory(self._model, assets_dir)</code>.
+The public flow is <code>asset_file_path()</code> → <code>upload_execution_outputs()</code>;
+<code>upload_assets()</code> is a legacy "upload this directory directly"
+shortcut. Grep across <code>src/</code>: zero callers. Tests:
+<code>test_execution.py::test_upload_assets_invalid_directory</code>
+(line 1362) is the only caller, and it asserts the failure path.</p>
+<p><strong>Fix:</strong> delete the method. The single negative test deletes with
+it. <strong>Risk: low.</strong> <strong>LoC: −40.</strong> <strong>Severity: low.</strong></p>
+<h3 id="15-state_storependingrowstatus-directoryrulestatus-and-all-pending-row-crud-have-no-production-writers">1.5 <code>state_store.PendingRowStatus</code>, <code>DirectoryRuleStatus</code>, and all pending-row CRUD have no production writers</h3>
+<p><code>state_store.py:75-99</code> defines <code>PendingRowStatus</code> (6 members) and
+<code>DirectoryRuleStatus</code> (2 members). The full CRUD surface:</p>
+<ul>
+<li><code>insert_pending_row</code> (line 417) — production callers: zero.</li>
+<li><code>update_pending_row</code> / <code>update_pending_rows_batch</code> (line 475/492)
+  — production callers: zero.</li>
+<li><code>list_pending_rows</code> (line 539) — production callers: zero.</li>
+<li><code>mark_pending_leasing*</code> / <code>finalize_pending_leases*</code> /
+  <code>revert_pending_leasing</code> (lines 795-927) — production callers:
+  zero.</li>
+<li><code>list_leasing_rows</code> (line 929) — called by <code>reconcile_pending_leases</code>
+  (<code>lease_orchestrator.py:187</code>) which is production-live but
+  finds nothing because nobody writes a <code>leasing</code> row.</li>
+<li><code>insert_directory_rule</code> / <code>update_directory_rule</code> /
+  <code>list_directory_rules</code> (lines 959-1049) — production callers:
+  zero.</li>
+<li><code>count_pending_rows</code> (line 644) — production callers: 1
+  (<code>core/base.py:561</code>, the schema-refresh guard); always returns 0
+  in production.</li>
+<li><code>pending_summary_rows</code> (line 670) — called by
+  <code>Execution.pending_summary</code> (<code>execution.py:2467-2496</code>) which
+  itself has only test callers in <code>src/</code>.</li>
+</ul>
+<p>Test callers: extensive
+(<code>test_state_store.py</code>, <code>test_lease_orchestrator.py</code>,
+<code>test_pending_summary.py</code>, <code>test_offline_init.py</code>,
+<code>test_lookup_lineage_unit.py</code>).</p>
+<p>The pending_rows / directory_rules architecture is the
+"upload-engine, sqlite-handle-based" design spelled out in
+<code>2026-04-18-sqlite-execution-state-design.md</code>. That design was
+superseded by the bag-commit path before the
+pending_rows-writing handle API shipped (see
+<code>_engine_harness.py:1-12</code>). The schemas, the enum, and the CRUD
+methods landed; the writer never did.</p>
+<p><strong>Fix:</strong> four options, in order of preference:</p>
+<p>(a) <strong>Delete the dead surface.</strong> Remove <code>PendingRowStatus</code>,
+<code>DirectoryRuleStatus</code>, <code>insert_pending_row</code>, <code>update_pending_row</code>,
+<code>list_pending_rows</code>, <code>mark_pending_leasing*</code>,
+<code>finalize_pending_leases*</code>, <code>revert_pending_leasing</code>,
+<code>insert_directory_rule</code>, <code>update_directory_rule</code>,
+<code>list_directory_rules</code>, the <code>pending_rows</code> and <code>directory_rules</code>
+Table definitions. Keep <code>executions</code>, <code>count_pending_rows</code>
+(returns 0), <code>pending_summary_rows</code> (returns empty).
+<strong>LoC: −600 to −700.</strong> <strong>Risk: medium</strong> — the test suite covering
+this surface goes with it (~700 LoC of tests).</p>
+<p>(b) <strong>Ship the writer.</strong> Wire <code>Execution.add_features</code> and the
+plain-row write path through <code>state_store.insert_pending_row</code>
+to give pending-row durability for free. Requires a bag-commit
+refactor to read from <code>pending_rows</code> instead of from the asset
+manifest. <strong>High risk, high reward.</strong> Out of audit scope.</p>
+<p>(c) <strong>Document the dead surface as an intentional reserve API.</strong>
+Add a <code>state_store.py</code> module docstring section explaining that
+the pending_rows machinery is a future-work hook, kept tested to
+preserve invariants while production uses the asset manifest.
+This is the do-nothing-now answer.</p>
+<p>(d) <strong>Carve the dead surface into a separate <code>state_store_legacy.py</code>
+or <code>state_store_engine.py</code>.</strong> Keeps the surface area visible
+without polluting the production file. Mechanical, low risk.</p>
+<p><strong>Recommended:</strong> (a) for the pending_rows write surface but keep
+<code>pending_summary_rows</code> and <code>count_pending_rows</code> (they degrade
+gracefully and would be needed by option (b) if it ever ships).
+Alternative: (c) plus a redesign in a future spec. The current
+state — full implementation + full test coverage + no production
+writer — is the worst of every option.</p>
+<p><strong>Severity: high</strong> (largest LoC liability in <code>execution/</code>;
+biggest divergence between docs and reality).</p>
+<h3 id="16-lease_orchestratoracquire_leases_for_execution-is-production-dead">1.6 <code>lease_orchestrator.acquire_leases_for_execution</code> is production-dead</h3>
+<p><code>lease_orchestrator.py:29-147</code> — entry point per the docstring:
+"Called by handle.rid property and by the upload-engine drain."
+Neither caller exists: there is no <code>handle.rid</code> property and the
+upload-engine drain was replaced by <code>bag_commit</code>.</p>
+<p><strong>Fix:</strong> delete <code>acquire_leases_for_execution</code>. Keep
+<code>reconcile_pending_leases</code> (it has production callers, even if
+they find no work today). The deletion takes ~120 LoC of source
+and a parallel ~250 LoC of <code>test_lease_orchestrator.py</code> (8 of 9
+tests exercise the acquire path). <strong>Risk: medium</strong> (cross-cuts
+with §1.5; ship together). <strong>LoC: −120 src + −250 tests.</strong>
+<strong>Severity: medium.</strong></p>
+<h3 id="17-environmentlocaleconv-and-environmentlocale_module-are-dead-helpers">1.7 <code>environment.localeconv</code> and <code>environment.locale_module</code> are dead helpers</h3>
+<p><code>environment.py:241-291</code> defines <code>localeconv()</code> and <code>locale_module()</code>.
+Neither is exported from <code>__init__.py</code>. Neither is called by
+<code>get_execution_environment()</code> (line 49-56) — the dict returned to
+the catalog does not include locale info. Grep across the
+workspace shows zero callers.</p>
+<p><strong>Fix:</strong> delete both. <strong>Risk: trivial. LoC: −50.</strong> <strong>Severity: low.</strong></p>
+<h3 id="18-execution__str__-references-selfasset_paths-and-selfconfiguration-after-_from_registry">1.8 <code>Execution.__str__</code> references <code>self.asset_paths</code> and <code>self.configuration</code> after <code>_from_registry</code></h3>
+<p><code>execution.py:2254-2263</code> builds a string from <code>self.asset_paths</code>,
+<code>self.configuration</code>, <code>self.workflow_rid</code>. For an Execution
+constructed via <code>_from_registry</code> (theme 1.3) <code>self.configuration</code>
+is <code>None</code> and <code>self.workflow_rid</code> is <code>None</code>. Since
+<code>_from_registry</code> itself is dead, this isn't a runtime bug today,
+but if anything ever calls <code>_from_registry</code>, <code>str(exe)</code> includes
+<code>configuration: None</code>.</p>
+<p><strong>Fix:</strong> subsumed by §1.3. <strong>Severity: low.</strong></p>
+<h3 id="19-executionpy99-107-defines-an-ipython-display-fallback-thats-no-longer-used">1.9 <code>execution.py:99-107</code> defines an IPython display fallback that's no longer used</h3>
+<p>The <code>from IPython.display import Markdown, display</code> block with the
+fallback <code>def display(s): print(s)</code> and <code>def Markdown(s): return s</code>
+is defined at module load but never invoked: grep across
+<code>execution/execution.py</code> shows zero call sites for <code>display</code> or
+<code>Markdown</code>.</p>
+<p><strong>Fix:</strong> delete the optional-import block. <strong>Risk: trivial.
+LoC: −10.</strong> <strong>Severity: low.</strong></p>
+<h3 id="110-stale-group-d-group-e-task-f2-task-c3-wi2-references-in-docstrings">1.10 Stale <code>Group D / Group E / Task F2 / Task C3 / WI2</code> references in docstrings</h3>
+<p>Multiple module docstrings reference internal task IDs from the
+SQLite-execution-state design and the upload-engine cutover:</p>
+<ul>
+<li><code>state_machine.py:207</code> — "NotImplementedError: Online-mode path
+  is implemented in Task C3." Online mode is implemented.</li>
+<li><code>execution.py:368</code> — "Temporary implementation for Group D —
+  Group E replaces the body…". Group E shipped.</li>
+<li><code>rid_lease.py:5-7</code> — "Pure helpers — no SQLite awareness here.
+  The acquire_leases_for_pending function in state_store
+  composition (Task F2) wires these into the two-phase SQLite
+  protocol." Task F2 shipped (as lease_orchestrator).</li>
+<li><code>upload_report.py:5-7</code> — "lives in its own module (rather than
+  alongside the now-retired <code>upload_engine.py</code>) so the type can
+  survive independent of the engine's life cycle. Post-WI2 the
+  engine is gone."</li>
+</ul>
+<p>These are useful archaeology but misleading to maintainers —
+"implemented in Task C3" reads as "not implemented yet."</p>
+<p><strong>Fix:</strong> rewrite each to describe the current state without
+referencing task IDs. <strong>LoC: ±0 doc-only.</strong> <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-2-deriva-py-interface-usage">Lens 2 — deriva-py interface usage</h2>
+<h3 id="21-state_machineflush_pending_sync-and-transition-use-the-same-pbschemastablesupdatebody-shape-clean">2.1 <code>state_machine.flush_pending_sync</code> and <code>transition</code> use the same <code>pb.schemas[...].tables[...].update(body)</code> shape — clean</h3>
+<p><code>state_machine.py:284-302</code> (in <code>transition</code>) and
+<code>state_machine.py:391-402</code> (in <code>flush_pending_sync</code>) both use the
+datapath API for the catalog PUT, with identical inline comments
+about why raw <code>catalog.put</code> doesn't work. This is correct usage of
+deriva-py; the duplication is small enough (2 lines each) that
+factoring would be over-engineering. <strong>No fix.</strong></p>
+<h3 id="22-state_machinereconcile_with_catalog-uses-raw-ermrest-path">2.2 <code>state_machine.reconcile_with_catalog</code> uses raw ERMrest path</h3>
+<p><code>state_machine.py:484</code> — <code>catalog.get(f"/entity/deriva-ml:Execution/RID={execution_rid}")</code>.
+This works but is the only raw-URL ERMrest call in <code>execution/</code>.
+The datapath equivalent (<code>pb.schemas["deriva-ml"].Execution.filter(...).entities().fetch()</code>)
+matches the pattern used everywhere else. The reconcile call is
+read-only and runs at resume time so the performance cost is
+negligible, but the inconsistency stands out.</p>
+<p><strong>Fix:</strong> swap to the datapath form. <strong>Risk: low. LoC: ±0.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="23-rid_leasepost_lease_batch-uses-raw-catalogpost">2.3 <code>rid_lease.post_lease_batch</code> uses raw <code>catalog.post</code></h3>
+<p><code>rid_lease.py:79</code> — <code>catalog.post("/entity/public:ERMrest_RID_Lease", json=body)</code>.
+This is the correct shape — the lease table is in the <code>public</code>
+schema (not under any deriva-ml schema) and the body is a list of
+<code>{"ID": token}</code> dicts, which the datapath API doesn't make easier.
+<strong>No fix.</strong></p>
+<h3 id="24-executionpydownload_asset-uses-hatracstore-directly-instead-of-mldownload_asset">2.4 <code>execution.py::download_asset</code> uses <code>HatracStore</code> directly instead of <code>ml.download_asset</code></h3>
+<p><code>execution.py:1221-1222</code> constructs a <code>HatracStore</code> and calls
+<code>hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())</code>.
+This is the canonical way to fetch a Hatrac object; the alternative
+would be <code>ml.catalog</code>'s aggregated helpers, but those don't exist
+for raw Hatrac. <strong>No fix.</strong></p>
+<h3 id="25-lease_orchestratorreconcile_pending_leases-uses-raw-ermrest-url-with-urllibquote">2.5 <code>lease_orchestrator.reconcile_pending_leases</code> uses raw ERMrest URL with <code>urllib.quote</code></h3>
+<p><code>lease_orchestrator.py:212-215</code> constructs a filter clause by
+hand:</p>
+<pre><code class="language-python">filter_clause = &quot;;&quot;.join(f&quot;ID={quote(t, safe='')}&quot; for t in chunk)
+path = f&quot;/entity/public:ERMrest_RID_Lease/{filter_clause}&quot;
+response = catalog.get(path)
+</code></pre>
+<p>The datapath equivalent is <code>lease_table.filter(lease_table.ID.in_(chunk)).fetch()</code>
+(matching <code>rid_lease._validate_pending_asset_leases:127</code>). The
+existing pattern in the same subsystem is the datapath form —
+<code>reconcile_pending_leases</code> is the outlier.</p>
+<p><strong>Fix:</strong> swap to the datapath form. <strong>Risk: low. LoC: −5.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="26-executionpy_update_asset_execution_table-does-the-right-thing-with-on_conflict_skip">2.6 <code>execution.py::_update_asset_execution_table</code> does the right thing with <code>on_conflict_skip</code></h3>
+<p><code>execution.py:1705-1715</code> uses <code>path.insert([...], on_conflict_skip=True)</code>
+to handle the case where an asset is registered against the same
+execution twice. This is the correct deriva-py idiom; the bag-commit
+path matches it via the loader's <code>match_by_columns</code>. <strong>No fix;
+flagged as well-shaped for the audit record.</strong></p>
+<h3 id="27-workflowpy-re-implements-optional-ipythonjupyter-imports-that-find_callerpy-already-has">2.7 <code>workflow.py</code> re-implements optional IPython/Jupyter imports that <code>find_caller.py</code> already has</h3>
+<p><code>workflow.py:39-72</code> defines three fallback blocks for IPython,
+jupyter_server, and ipykernel. <code>find_caller.py:9-32</code> defines the
+same three blocks (more concisely, with <code># type: ignore</code> and
+<code># pragma: no cover - optional</code> markers). <code>_get_python_script</code>
+(<code>workflow.py:670-674</code>) delegates to <code>find_caller._get_calling_module</code>,
+but <code>_get_notebook_path</code> (<code>workflow.py:583-597</code>) builds its own
+session lookup via the optional imports defined at module top.</p>
+<p><strong>Fix:</strong> delete the optional-import block in <code>workflow.py:39-72</code>
+and route <code>_get_notebook_path</code> and <code>_get_notebook_session</code>
+through helpers in <code>find_caller.py</code> (lift them up since both
+files have the same need). <strong>Risk: medium</strong> (notebook path is
+non-trivial to test without a live kernel). <strong>LoC: −50 net.</strong>
+<strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-4-inconsistencies-duplication">Lens 4 — Inconsistencies / duplication</h2>
+<h3 id="41-two-parallel-lease-implementations-the-headline-duplication">4.1 Two parallel lease implementations (the headline duplication)</h3>
+<p><code>manifest_lease.py:25-65</code> (production) and
+<code>lease_orchestrator.py:29-147</code> (production-dead per §1.6) implement
+the same two-phase protocol over different state stores.</p>
+<p>Both:</p>
+<ol>
+<li>Collect items needing RIDs.</li>
+<li>Generate a token per item via <code>generate_lease_token</code>.</li>
+<li><code>post_lease_batch(catalog=..., tokens=...)</code>.</li>
+<li>Write the assigned RIDs back to the originating state.</li>
+</ol>
+<p>Differences:</p>
+<ul>
+<li>
+<p><strong>Mark intermediate state.</strong> <code>lease_orchestrator</code> writes
+  <code>status='leasing'</code> to SQLite <em>before</em> the POST so a crash
+  between commit and POST is recoverable.
+  <code>manifest_lease</code> writes nothing intermediate — manifest entries
+  go from "no RID" directly to "leased RID" inside one POST
+  round-trip; a crash mid-POST leaves entries without RIDs and
+  the manifest's idempotent re-leasing handles it on retry.</p>
+</li>
+<li>
+<p><strong>Failure handling.</strong> <code>lease_orchestrator</code> reverts marked rows
+  on POST failure (<code>revert_pending_leasing</code>); <code>manifest_lease</code>
+  simply raises.</p>
+</li>
+<li>
+<p><strong>Concurrency.</strong> The SQLite path is built to be safe against
+  workspace-wide concurrent acquires (the two-phase lease, the
+  <code>revert_pending_leasing</code> rollback, the <code>reconcile_pending_leases</code>
+  startup sweep). The manifest path assumes the asset manifest is
+  single-writer.</p>
+</li>
+</ul>
+<p>If the SQLite engine path ever ships, the asset manifest's
+single-writer assumption breaks down and the lease logic needs to
+be unified. If it doesn't ship (theme 1's status quo), the SQLite
+lease orchestrator is dead code.</p>
+<p><strong>Fix:</strong> subsumed by §1.5 / §1.6 — delete the SQLite lease
+orchestrator until/unless the engine ships, at which point bring
+both lease paths under a shared interface. <strong>Severity: medium</strong>
+(silent divergence; tests pin both shapes).</p>
+<h3 id="42-executionexecution_start-and-execution__enter__-do-nearly-identical-work">4.2 <code>Execution.execution_start</code> and <code>Execution.__enter__</code> do nearly identical work</h3>
+<p><code>execution.py:1069-1119</code> (<code>execution_start</code>) and
+<code>execution.py:2293-2337</code> (<code>__enter__</code>) both:</p>
+<ol>
+<li>Skip if <code>self._dry_run</code>.</li>
+<li>Read <code>current = self.status</code> from SQLite.</li>
+<li>Call <code>transition(... target=Running, extra_fields={"start_time": now})</code>.</li>
+</ol>
+<p><code>execution_start</code> is documented as "non-context-manager
+counterpart for code paths that can't use <code>with</code>" — the multirun
+parent and <code>run_notebook</code> callers. <code>__enter__</code> is the
+context-manager path. The bodies are 12 lines apart and they
+differ only in trivial respects (an unused <code>self.uploaded_assets = None</code>
+assignment in <code>execution_start</code>, an extra <code>self._logger.info("Start execution...")</code>).</p>
+<p><strong>Fix:</strong> delegate <code>__enter__</code> to <code>execution_start()</code> (or vice
+versa). <strong>Risk: low</strong> (mechanical). <strong>LoC: −10.</strong> <strong>Severity: low.</strong></p>
+<h3 id="43-execution_initialize_execution-builds-the-manifest-before-__enter__-would">4.3 <code>Execution._initialize_execution</code> builds the manifest before <code>__enter__</code> would</h3>
+<p><code>execution.py:531-634</code> runs in <code>Execution.__init__</code> and calls
+<code>self._bag_commit_upload()</code> at line 627 <em>before</em> the execution
+ever enters the <code>Running</code> state. This uploads the
+<code>configuration.json</code>, <code>uv.lock</code>, runtime environment, and Hydra
+configs as Execution_Metadata. The comment at line 596-597
+("Save configuration details and upload (skip in dry_run mode)")
+treats this as setup, not output, but the upload pipeline doesn't
+distinguish.</p>
+<p>Consequence: <code>create_execution(config)</code> returns a context manager
+whose status is still <code>Created</code> but which has already done a
+catalog write. If the user never calls <code>__enter__</code> (the
+test-without-<code>with</code> case used in some legacy tests), the metadata
+assets are committed against a never-Running execution.</p>
+<p><strong>Fix:</strong> debatable. The current behavior is what the test suite
+asserts; changing it would ripple through the multirun harness.
+Document the early upload at the API surface
+(<code>create_execution</code>'s docstring should mention that initial
+metadata uploads happen at construction time, not at <code>__enter__</code>).
+<strong>Risk: low (doc-only).</strong> <strong>LoC: ±0.</strong> <strong>Severity: low</strong> — but
+the user-facing surprise is real.</p>
+<h3 id="44-three-places-construct-executionconfiguration-from-scratch-with-different-argument-styles">4.4 Three places construct <code>ExecutionConfiguration</code> from scratch with different argument styles</h3>
+<p><code>execution.py:165-208</code> (<code>Execution.__init__</code> accepts a config
+already), <code>runner.py:539-545</code> (<code>run_model</code> builds one), and
+<code>base_config.py:559-564</code> (<code>run_notebook</code> builds one).</p>
+<p><code>runner.py:539-545</code> passes <code>config_choices</code> as a kwarg;
+<code>base_config.py:559-564</code> does not (the <code>_captured_hydra_output_dir</code>
+goes through a different channel). Tests in <code>tests/catalog_manager.py</code>
+build <code>ExecutionConfiguration()</code> with zero arguments and rely on
+the model's defaults.</p>
+<p><strong>Fix:</strong> factor the construction into a helper, or accept that
+the three callers genuinely differ. <strong>Severity: low</strong> — the
+duplication is shallow and the inputs differ.</p>
+<h3 id="45-executionexecution_stop-does-the-catalog-write-directly-the-state-machine-does-not">4.5 <code>Execution.execution_stop</code> does the catalog write directly; the state machine does not</h3>
+<p><code>execution.py:1121-1164</code> calls <code>self.update_status(ExecutionStatus.Stopped)</code>
+which routes through <code>transition()</code>, <strong>then</strong> at line 1162-1164
+does a <em>second</em> catalog write to update <code>Duration</code>:</p>
+<pre><code class="language-python">self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
+    [{&quot;RID&quot;: self.execution_rid, &quot;Duration&quot;: duration_str}]
+)
+</code></pre>
+<p>The state machine's <code>_catalog_body_for_execution</code> (state_machine.py:305-348)
+explicitly omits <code>Duration</code> per its comment ("Duration is computed
+elsewhere (in execution_stop) and written directly; don't echo it
+here"). So we have two writers to the same catalog row, one
+synced through SQLite and one bypassing it. If the first PUT
+fails (sync_pending stays True) but the second succeeds, the
+catalog has a <code>Duration</code> that doesn't match the catalog's <code>Status</code>
+nor SQLite's <code>status</code>. The probability is low but the design is
+fragile.</p>
+<p><strong>Fix:</strong> Either add <code>duration</code> to SQLite's <code>executions</code> table and
+let the state machine sync it (cleaner), or fold the Duration
+write into the <code>transition()</code> <code>extra_fields</code> and let
+<code>_catalog_body_for_execution</code> include it. <strong>Risk: medium</strong> (a
+column add ripples). <strong>LoC: −10 + schema change.</strong> <strong>Severity: medium.</strong></p>
+<h3 id="46-find_callerpy-and-workflowpy-redundantly-detect-the-jupyter-notebook-path">4.6 <code>find_caller.py</code> and <code>workflow.py</code> redundantly detect the Jupyter notebook path</h3>
+<p>Theme 2.7 covered the optional-import duplication.
+<code>find_caller._get_notebook_path</code> (<code>find_caller.py:192-252</code>) and
+<code>workflow.Workflow._get_notebook_path</code> (<code>workflow.py:583-597</code>) both
+walk the running-Jupyter-servers list and query for sessions.
+<code>workflow._get_python_script</code> (line 670-674) calls
+<code>find_caller._get_calling_module</code> for everything else but
+re-implements the notebook path itself.</p>
+<p><strong>Fix:</strong> consolidate. <strong>Risk: low. LoC: −60.</strong> <strong>Severity: low.</strong></p>
+<h3 id="47-datasetcollection__iter__-violates-the-mapping-contract">4.7 <code>DatasetCollection.__iter__</code> violates the <code>Mapping</code> contract</h3>
+<p><code>dataset_collection.py:72-75</code> overrides <code>__iter__</code> to yield
+<strong>values</strong>, not keys, with the comment "Mapping's default would
+iterate keys; we override to iterate values (bags) because that's
+the overwhelmingly common use." This violates the <code>Mapping</code>
+abstract contract: every code that types <code>def f(m: Mapping[str, X])</code>
+and calls <code>for k in m: m[k]</code> will get <code>for v in m: m[v]</code> instead,
+indexing a <code>DatasetBag</code> into a mapping that expects a <code>str</code> key.</p>
+<p>This is a deliberate ergonomic choice the docstring documents
+clearly, but the class inherits from <code>Mapping</code> precisely to
+advertise the contract. Downstream type-checkers and any
+<code>isinstance(x, Mapping)</code> check that then iterates will hit the
+bug.</p>
+<p><strong>Fix:</strong> either drop the <code>Mapping</code> inheritance and make
+<code>DatasetCollection</code> a custom value-iterable (with separate
+<code>keys()</code> / <code>values()</code> / <code>items()</code>), or restore the Mapping
+contract and rename the iteration ergonomics to a separate method
+(e.g. <code>for bag in exe.datasets.values():</code>). <strong>Risk: medium</strong>
+(test suite asserts <code>for bag in exe.datasets:</code>). <strong>LoC: ±0 to +10.</strong>
+<strong>Severity: medium</strong> — silent contract violation.</p>
+<h3 id="48-executionstatus-error-start_time-stop_time-are-four-near-identical-read-through-properties">4.8 <code>Execution.status</code> / <code>error</code> / <code>start_time</code> / <code>stop_time</code> are four near-identical read-through properties</h3>
+<p><code>execution.py:636-779</code> defines four properties, each with
+identical boilerplate:</p>
+<pre><code class="language-python">store = self._ml_object.workspace.execution_state_store()
+row = store.get_execution(self.execution_rid)
+if row is None:
+    raise DerivaMLStateInconsistency(...)
+return ExecutionStatus(row[&quot;status&quot;])  # or row[&quot;error&quot;], row[&quot;start_time&quot;], row[&quot;stop_time&quot;]
+</code></pre>
+<p><code>start_time</code> and <code>stop_time</code> additionally do the UTC coercion. The
+four implementations each have an 18-line docstring; the bodies are
+6 lines each.</p>
+<p><strong>Fix:</strong> factor the SQLite read into a single private
+<code>_get_registry_row()</code> that the four properties call. <strong>Risk: low.
+LoC: −40.</strong> <strong>Severity: low</strong> — quality-of-life maintainability.</p>
+<hr />
+<h2 id="lens-5-simplification-opportunities">Lens 5 — Simplification opportunities</h2>
+<h3 id="51-delete-the-sqlite-pending-rows-machinery-15">5.1 Delete the SQLite pending-rows machinery (§1.5)</h3>
+<p>Net: <strong>~−600 LoC src + ~−700 LoC tests</strong>. Largest single
+simplification available in <code>execution/</code>. See §1.5 for the option
+matrix; recommended path is (a).</p>
+<h3 id="52-delete-_flush_staged_features-12">5.2 Delete <code>_flush_staged_features</code> (§1.2)</h3>
+<p>Net: <strong>−110 LoC</strong> plus comment cleanup.</p>
+<h3 id="53-delete-_engine_harnesspy-11">5.3 Delete <code>_engine_harness.py</code> (§1.1)</h3>
+<p>Net: <strong>−12 LoC</strong>. Symbolic but worthwhile.</p>
+<h3 id="54-delete-_from_registry-13">5.4 Delete <code>_from_registry</code> (§1.3)</h3>
+<p>Net: <strong>−40 LoC</strong>.</p>
+<h3 id="55-delete-executionupload_assets-14">5.5 Delete <code>Execution.upload_assets</code> (§1.4)</h3>
+<p>Net: <strong>−40 LoC src + −10 LoC tests</strong> (one negative test goes).</p>
+<h3 id="56-delete-lease_orchestratoracquire_leases_for_execution-16">5.6 Delete <code>lease_orchestrator.acquire_leases_for_execution</code> (§1.6)</h3>
+<p>Net: <strong>−120 LoC src + −250 LoC tests</strong>. Bundle with §5.1.</p>
+<h3 id="57-consolidate-the-ipythonjupyter-notebook-path-detection-27-46">5.7 Consolidate the IPython/Jupyter notebook-path detection (§2.7 + §4.6)</h3>
+<p>Net: <strong>−60 LoC</strong>.</p>
+<h3 id="58-delete-dead-environmentlocale-helpers-17">5.8 Delete dead <code>environment.locale*</code> helpers (§1.7)</h3>
+<p>Net: <strong>−50 LoC</strong>.</p>
+<h3 id="59-factor-executionstatuserrorstart_timestop_time-to-share-one-fetcher-48">5.9 Factor <code>Execution.status</code>/<code>error</code>/<code>start_time</code>/<code>stop_time</code> to share one fetcher (§4.8)</h3>
+<p>Net: <strong>−40 LoC</strong>.</p>
+<h3 id="510-delegate-execution__enter__-to-execution_start-42">5.10 Delegate <code>Execution.__enter__</code> to <code>execution_start()</code> (§4.2)</h3>
+<p>Net: <strong>−10 LoC</strong>.</p>
+<h3 id="511-scrub-stale-task-group-wi-references-from-docstrings-110">5.11 Scrub stale <code>Task / Group / WI</code> references from docstrings (§1.10)</h3>
+<p>Net: <strong>±0 doc-only</strong>, but maintainability win.</p>
+<hr />
+<h2 id="lens-6-maintainability">Lens 6 — Maintainability</h2>
+<h3 id="61-executionpy-carries-three-responsibilities">6.1 <code>execution.py</code> carries three responsibilities</h3>
+<p><code>Execution</code> class methods cluster into:</p>
+<ul>
+<li><strong>Lifecycle</strong> (~600 LoC): <code>__init__</code>, <code>__enter__</code>, <code>__exit__</code>,
+  <code>execution_start</code>, <code>execution_stop</code>, <code>update_status</code>, <code>abort</code>,
+  status / error / start_time / stop_time properties,
+  <code>pending_summary</code>, <code>upload_outputs</code>, <code>_from_registry</code>.</li>
+<li><strong>Asset register/upload</strong> (~900 LoC): <code>asset_file_path</code>,
+  <code>metrics_file</code>, <code>download_asset</code>, <code>_bag_commit_upload</code>,
+  <code>_update_asset_execution_table</code>, <code>_set_asset_descriptions</code>,
+  <code>_clean_folder_contents</code>, <code>upload_execution_outputs</code>,
+  <code>upload_assets</code>, <code>_get_manifest</code>, <code>_manifest_store</code>, the
+  <code>_flush_staged_features</code> legacy.</li>
+<li><strong>Provenance / nesting / metadata</strong> (~400 LoC):
+  <code>_save_runtime_environment</code>, <code>_upload_hydra_config_assets</code>,
+  <code>_get_metadata_description</code>, <code>_initialize_execution</code>,
+  <code>create_dataset</code>, <code>add_files</code>, <code>add_features</code>,
+  <code>add_nested_execution</code>, <code>is_nested</code>, <code>is_parent</code>,
+  <code>list_input_datasets</code>, <code>list_assets</code>, <code>database_catalog</code>,
+  <code>catalog</code>, <code>working_dir</code>, <code>_execution_root</code>, <code>_asset_root</code>.</li>
+</ul>
+<p>The lifecycle cluster is the bone-deep correct concern of
+<code>Execution</code>. The asset cluster could conceivably move into
+<code>bag_commit.py</code> or a sibling <code>execution_assets.py</code>. The provenance
+cluster is mostly thin sugar over <code>ExecutionRecord</code> and
+<code>bag_commit</code>.</p>
+<p><strong>Severity: medium</strong> (file size; mixed concerns). Phase 4 scope.</p>
+<h3 id="62-state_storepy-carries-an-unshipped-second-architecture">6.2 <code>state_store.py</code> carries an unshipped second architecture</h3>
+<p>The <code>executions</code> table CRUD (~300 LoC) is the production half;
+the pending_rows / directory_rules CRUD (~700 LoC) is the
+unshipped half. Splitting into <code>state_store.py</code> (executions only,
+~400 LoC including imports + base) and either deleting or
+isolating the pending_rows machinery would make the prod-vs-spec
+distinction maintainable. <strong>Severity: high</strong> — see §1.5.</p>
+<h3 id="63-docstring-quality">6.3 Docstring quality</h3>
+<p>Sampled the public methods on <code>Execution</code>, <code>ExecutionRecord</code>,
+<code>Workflow</code>, <code>state_machine</code>, <code>bag_commit</code>. The Google-format
+skeleton is consistently filled in; <code>Example:</code> blocks are
+correctly marked <code># doctest: +SKIP</code> for catalog-dependent paths.
+<strong>Healthy overall.</strong> Specific issues:</p>
+<ul>
+<li><strong><code>workflow.py:382-414</code></strong> — <code>setup_url_checksum</code> decorated
+  <code>@model_validator(mode="after")</code>. The docstring describes a
+  "factory" and the example shows <code>Workflow.create_workflow(...)</code>
+  which doesn't exist. The Args section is empty. The Returns
+  section says "Workflow: New workflow instance with detected Git
+  information" — the method actually returns <code>self</code> after mutating
+  it. <strong>Misleading.</strong> Fix: rewrite the docstring as a Pydantic
+  model-validator description ("Mutates the freshly-constructed
+  Workflow to fill in URL, checksum, and version from the calling
+  context").</li>
+<li><strong><code>state_machine.py:141-165</code></strong> — <code>validate_transition</code>'s
+  <code>Example</code> says "returns None, no raise" but the function returns
+  <code>None</code> implicitly (no explicit return). Fine in Python; the
+  doctest shape is <code>validate_transition(...)  # returns None, no raise</code>
+  which is correct but oddly phrased. <strong>Minor.</strong></li>
+<li><strong><code>state_machine.py:204-207</code></strong> — <code>transition</code>'s <code>Raises</code> section
+  says "NotImplementedError: Online-mode path is implemented in
+  Task C3." Online mode is fully implemented. <strong>Stale.</strong></li>
+<li><strong><code>execution.py:1166-1192</code></strong> — <code>download_asset</code>'s docstring
+  mentions the <code>_asset_table: Any</code> parameter with the warning
+  "Internal — pre-resolved Table object… callers should not rely
+  on this; pass through the public <code>resolve_rid</code> path
+  otherwise." Good practice; the leading underscore signals
+  internal use but it's still a public method parameter. <strong>Fine.</strong></li>
+<li><strong><code>bag_commit.py:35-44</code></strong> — module docstring describes a
+  "progress reporting" section that the code partially implements.
+  Per-asset events during staging fire; byte-level streaming
+  does not. The docstring explicitly says so ("Byte-level
+  streaming progress would require a new hook on <code>BagCatalogLoader</code>
+  (tracked as deriva-py follow-up)"). <strong>Healthy.</strong></li>
+</ul>
+<p><strong>LoC: ±0 (doc-only).</strong> <strong>Severity: low.</strong></p>
+<h3 id="64-__all__-discipline">6.4 <code>__all__</code> discipline</h3>
+<p><code>execution/__init__.py:63-99</code> declares an explicit <code>__all__</code> —
+the right pattern. Per-module:</p>
+<ul>
+<li><code>state_machine.py:39-47</code> — explicit <code>__all__</code>. Good.</li>
+<li><code>upload_report.py:52</code> — explicit <code>__all__</code>. Good.</li>
+<li>Every other module lacks <code>__all__</code>. Anything imported from those
+  modules' namespaces (e.g., <code>from deriva_ml.execution.workflow
+  import logger, get_logger, RequestException</code>) is reachable.</li>
+</ul>
+<p><strong>Recommendation:</strong> add <code>__all__</code> to <code>bag_commit.py</code>,
+<code>base_config.py</code>, <code>dataset_collection.py</code>, <code>environment.py</code>,
+<code>execution.py</code>, <code>execution_configuration.py</code>,
+<code>execution_record.py</code>, <code>execution_snapshot.py</code>, <code>find_caller.py</code>,
+<code>lease_orchestrator.py</code>, <code>lineage.py</code>, <code>manifest_lease.py</code>,
+<code>model_protocol.py</code>, <code>multirun_config.py</code>, <code>pending_summary.py</code>,
+<code>rid_lease.py</code>, <code>runner.py</code>, <code>state_store.py</code>, <code>workflow.py</code>.
+<strong>LoC: +75.</strong> <strong>Severity: low.</strong></p>
+<h3 id="65-datasetcollection-violates-mapping__iter__-contract">6.5 <code>DatasetCollection</code> violates <code>Mapping.__iter__</code> contract</h3>
+<p>Covered under §4.7. The class advertises itself as a <code>Mapping</code>
+but iterates values. A <code>Mapping</code>-typed parameter elsewhere will
+double-dispatch incorrectly. <strong>Severity: medium</strong> (silent
+correctness gap, not just style).</p>
+<h3 id="66-logger-usage-is-consistent-good">6.6 Logger usage is consistent — good</h3>
+<p>Every module uses <code>get_logger(__name__)</code> from
+<code>deriva_ml.core.logging_config</code>. No <code>logging.getLogger(...)</code>
+direct calls in <code>execution/</code>. Phase 1 §1.4 flagged the logger
+fragmentation across the codebase; the <code>execution/</code> subsystem is
+already clean.</p>
+<h3 id="67-global-mutable-state-in-runner_multirun_state">6.7 Global mutable state in <code>runner._multirun_state</code></h3>
+<p><code>runner.py:196</code> constructs a module-level <code>MultirunState</code>
+singleton. Tests must call <code>reset_multirun_state()</code> to clean it
+up; <code>tests/execution/test_runner.py</code> does this in 9 of 15 tests.
+A single test that forgets to reset leaves cross-test pollution.</p>
+<p>The global is unavoidable in the multirun architecture (Hydra's
+<code>--multirun</code> mode invokes the runner once per job within the same
+process). It is correctly fenced — the global is the only place
+in <code>execution/</code> that needs explicit test isolation.</p>
+<p><strong>Recommendation:</strong> add a <code>pytest</code> autouse fixture in
+<code>tests/execution/conftest.py</code> (currently absent) that resets
+<code>_multirun_state</code> between tests. <strong>LoC: +10 (test only).</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="68-naming-workspace-working_dir-_working_dir-cache_dir-_cache_dir-execution_root-_execution_root-_asset_root">6.8 Naming: <code>workspace</code>, <code>working_dir</code>, <code>_working_dir</code>, <code>cache_dir</code>, <code>_cache_dir</code>, <code>execution_root</code>, <code>_execution_root</code>, <code>_asset_root</code></h3>
+<p>A 100-line block in <code>Execution.__init__</code> (<code>execution.py:226-302</code>)
+juggles eight related path concepts. The naming is consistent
+across the codebase (Phase 1 §6.5 already flagged the
+inter-module variant) but the local density makes the lifecycle
+hard to read.</p>
+<p><strong>Severity: low.</strong></p>
+<h3 id="69-executionadd_features-docstring-promises-derivamlvalidationerror-but-the-production-path-is-staging-only">6.9 <code>Execution.add_features</code> docstring promises "DerivaMLValidationError" but the production path is staging-only</h3>
+<p><code>execution.py:925-927</code> documents:</p>
+<pre><code>Raises:
+    DerivaMLValidationError: Records do not share a single feature
+        definition.
+</code></pre>
+<p>The function does raise correctly (line 951-954). But the
+<code>DerivaMLDataError: SQLite staging write failed</code> clause is harder
+to surface — the SQLite write goes through
+<code>_manifest_store.stage_feature_records</code> which wraps SQLAlchemy
+errors as <code>DerivaMLException</code>, not <code>DerivaMLDataError</code>. The
+docstring is wishful, not accurate.</p>
+<p><strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-a-legacy-user-removal">Lens A — Legacy-user removal</h2>
+<p>There are <strong>no legacy users</strong>. Items that exist to support them
+are liabilities.</p>
+<h3 id="a1-_engine_harnesspy-full-file-legacy-reservation">A.1 <code>_engine_harness.py</code> — full-file legacy reservation</h3>
+<p>12 lines describing the future direction the codebase didn't
+take. See §1.1. <strong>Delete.</strong></p>
+<h3 id="a2-execution_flush_staged_features-retained-for-tests-but-tests-dont-call-it">A.2 <code>Execution._flush_staged_features</code> — "retained for tests" but tests don't call it</h3>
+<p>Docstring <code>execution.py:1576-1577</code> claims test retention. Reality
+shows zero test callers. See §1.2. <strong>Delete.</strong></p>
+<h3 id="a3-execution_from_registry-temporary-implementation-for-group-d">A.3 <code>Execution._from_registry</code> — "Temporary implementation for Group D"</h3>
+<p>Group E shipped. See §1.3. <strong>Delete.</strong></p>
+<h3 id="a4-executionupload_assets-predates-asset_file_path-upload_execution_outputs">A.4 <code>Execution.upload_assets</code> — predates <code>asset_file_path</code> + <code>upload_execution_outputs</code></h3>
+<p>Documented in <code>execution.py:1265-1289</code> as if it's a current
+public API. The canonical flow doesn't go through it; users who
+call it are running the legacy pre-manifest path. See §1.4.
+<strong>Delete.</strong></p>
+<h3 id="a5-state_storepending_rows-directory_rules-and-their-crud-pre-bag-commit-architecture">A.5 <code>state_store.pending_rows</code>, <code>directory_rules</code> and their CRUD — pre-bag-commit architecture</h3>
+<p>See §1.5. The largest single legacy carryover. <strong>Delete the
+production-dead surface.</strong> Keep <code>pending_summary_rows</code>,
+<code>count_pending_rows</code> because the schema-refresh guard still
+calls into them and they degrade to zero in the absence of
+writers.</p>
+<h3 id="a6-lease_orchestratoracquire_leases_for_execution-pre-bag-commit-lease-path">A.6 <code>lease_orchestrator.acquire_leases_for_execution</code> — pre-bag-commit lease path</h3>
+<p>See §1.6. <strong>Delete.</strong> Keep <code>reconcile_pending_leases</code> (it has
+prod callers, even if they no-op today; the call is cheap).</p>
+<h3 id="a7-stale-grouptask-references-in-docstrings">A.7 Stale Group/Task references in docstrings</h3>
+<p>See §1.10. <strong>Rewrite or delete.</strong></p>
+<h3 id="a8-the-uploaded_assets-attribute-on-execution">A.8 The "uploaded_assets" attribute on <code>Execution</code></h3>
+<p><code>execution.py:219</code> initializes <code>self.uploaded_assets: dict[str, list[AssetFilePath]] | None = None</code>,
+<code>upload_execution_outputs</code> writes it (line 1392, 1399), and
+<code>execution_start</code> reassigns it to <code>None</code> (line 1096) before the
+state machine transitions. The third call to
+<code>upload_execution_outputs</code> in §test_additive_upload_after_uploaded
+relies on the cached value to short-circuit. The "no-op return
+on <code>Uploaded</code> with no pending manifest entries" path
+(<code>execution.py:1378-1381</code>) reads <code>self.uploaded_assets or {}</code>.</p>
+<p>This isn't legacy per se — but the comment at
+<code>execution.py:213-218</code> describing the removal of in-memory
+status/start_time/stop_time fields explicitly does not justify
+keeping <code>uploaded_assets</code> as an instance field. After the bag-
+commit refactor, the manifest is authoritative; reading the
+manifest's <code>uploaded</code> rows is the source of truth.</p>
+<p><strong>Recommendation:</strong> make <code>uploaded_assets</code> a computed property
+that reads from <code>self._get_manifest().assets</code>. The "cached return
+value" pattern in additive upload becomes obsolete.
+<strong>Risk: medium</strong> (cross-cuts the test suite). <strong>LoC: −20.</strong>
+<strong>Severity: low</strong> — but the field is the last in-memory
+remnant of the pre-bag-commit lifecycle.</p>
+<hr />
+<h2 id="lens-b-privatization">Lens B — Privatization</h2>
+<p>Cross-workspace grep performed against
+<code>/Users/carl/GitHub/DerivaML/{deriva-mcp,deriva-mcp-core,deriva-ml-mcp,deriva-ml-model-template,deriva-skills,deriva-ml-skills}/</code>.</p>
+<h3 id="b1-executionstatestore-class-internal-currently-public-via-lazy-module">B.1 <code>ExecutionStateStore</code> class — internal, currently public via lazy module</h3>
+<p><code>state_store.py:107</code>. Constructed inside <code>Workspace.execution_state_store()</code>
+(in <code>local_db/workspace.py</code>); not re-exported from
+<code>execution/__init__.py</code>. External grep: zero hits.</p>
+<p><strong>Recommendation:</strong> rename <code>ExecutionStateStore</code> →
+<code>_ExecutionStateStore</code> once the pending-row surface deletions
+(§1.5) land. The "executions" CRUD remains its sole public role;
+that's a <code>Workspace</code> internal helper.
+<strong>Severity: low.</strong></p>
+<h3 id="b2-pendingrowstatus-directoryrulestatus-executions_table-pending_rows_table-directory_rules_table-table-name-constants">B.2 <code>PendingRowStatus</code>, <code>DirectoryRuleStatus</code>, <code>EXECUTIONS_TABLE</code>, <code>PENDING_ROWS_TABLE</code>, <code>DIRECTORY_RULES_TABLE</code> — table-name constants</h3>
+<p><code>state_store.py:75-104</code>. All module-level. External grep:
+zero hits. Module table names should be <code>_PENDING_ROWS_TABLE</code>
+etc. The enums are part of the dead pending-rows surface.</p>
+<p><strong>Recommendation:</strong> delete the enums (§1.5). Privatize the table
+names with leading underscore. <strong>LoC: ±0.</strong> <strong>Severity: low.</strong></p>
+<h3 id="b3-lease_orchestratoracquire_leases_for_execution-public-but-tests-only">B.3 <code>lease_orchestrator.acquire_leases_for_execution</code> — public but tests-only</h3>
+<p><code>lease_orchestrator.py:29</code>. External grep: zero. <strong>Already
+production-dead — delete (§1.6).</strong></p>
+<h3 id="b4-lease_orchestratorreconcile_pending_leases-public-used-by-core">B.4 <code>lease_orchestrator.reconcile_pending_leases</code> — public, used by core</h3>
+<p><code>lease_orchestrator.py:150</code>. Called from
+<code>core/base.py:367</code> and <code>core/mixins/execution.py:481</code>. Should
+remain public.</p>
+<h3 id="b5-rid_leasegenerate_lease_token-post_lease_batch-public-used-cross-module">B.5 <code>rid_lease.generate_lease_token</code>, <code>post_lease_batch</code> — public, used cross-module</h3>
+<p><code>rid_lease.py:29</code> (<code>generate_lease_token</code>) and
+<code>rid_lease.py:44</code> (<code>post_lease_batch</code>). Both used by
+<code>manifest_lease.py</code>, <code>bag_commit.py</code>, <code>lease_orchestrator.py</code>,
+and tests. External grep: zero. <strong>Keep public</strong> within
+<code>execution/</code> (cross-module internal API); not exposed from
+<code>__init__.py</code>.</p>
+<h3 id="b6-rid_lease_validate_pending_asset_leases-already-underscore-private">B.6 <code>rid_lease._validate_pending_asset_leases</code> — already underscore-private</h3>
+<p><code>rid_lease.py:86</code>. Already <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="b7-rid_leasepending_rows_lease_chunk-public-constant">B.7 <code>rid_lease.PENDING_ROWS_LEASE_CHUNK</code> — public constant</h3>
+<p><code>rid_lease.py:26</code>. Imported by <code>lease_orchestrator.py:14</code>. External
+grep: zero. Should be <code>_PENDING_ROWS_LEASE_CHUNK</code> once
+<code>lease_orchestrator</code> either consumes it as a module-private import
+or <code>lease_orchestrator</code> is deleted (§1.6).
+<strong>Severity: low.</strong></p>
+<h3 id="b8-manifest_leaselease_manifest_pending_assets-public-used-by-bag_commit">B.8 <code>manifest_lease.lease_manifest_pending_assets</code> — public, used by bag_commit</h3>
+<p><code>manifest_lease.py:25</code>. Called from <code>bag_commit.py:128</code>. Tests
+hit it directly. External grep: zero. <strong>Keep public</strong> within
+<code>execution/</code> (it's the canonical production lease primitive); not
+in <code>__init__.py</code>. Future plan: surface as <code>_lease_manifest_pending_assets</code>
+and bury bag_commit's import — currently public is harmless.</p>
+<h3 id="b9-state_machinetransition-validate_transition">B.9 <code>state_machine.transition</code>, <code>validate_transition</code>,</h3>
+<p><code>flush_pending_sync</code>, <code>reconcile_with_catalog</code>, <code>create_catalog_execution</code> —
+public, exported via <code>__all__</code></p>
+<p><code>state_machine.py:39-47</code>. Used by <code>Execution.update_status</code>,
+<code>Execution.__enter__</code>/<code>__exit__</code>, <code>core/mixins/execution.py</code> for
+the resume path, and <code>execution_snapshot.py</code>. Tests exercise them
+directly. External grep: zero. <strong>Keep public</strong> as the
+state-machine's contract.</p>
+<h3 id="b10-state_machine_catalog_body_for_execution">B.10 <code>state_machine._catalog_body_for_execution</code>,</h3>
+<p><code>state_machine._DISAGREEMENT_RULES</code> — already private</p>
+<p><code>state_machine.py:305, 417</code>. Already <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="b11-state_machineinvalidtransitionerror-public-exception-class">B.11 <code>state_machine.InvalidTransitionError</code> — public exception class</h3>
+<p><code>state_machine.py:50-59</code>. Exported via <code>__all__</code>. External grep:
+zero hits (the legacy <code>deriva-mcp</code> references it via a comment in
+<code>deriva-ml-mcp/docs/</code>), but it's a <code>DerivaMLException</code> subclass
+in the publicly-documented <code>Raises:</code> clause of
+<code>Execution.update_status</code>. <strong>Keep public.</strong></p>
+<h3 id="b12-executionexecution_initialize_execution">B.12 <code>execution.Execution._initialize_execution</code>,</h3>
+<p><code>Execution._save_runtime_environment</code>,
+<code>Execution._upload_hydra_config_assets</code>,
+<code>Execution._get_metadata_description</code>,
+<code>Execution._set_asset_descriptions</code>,
+<code>Execution._bag_commit_upload</code>,
+<code>Execution._clean_folder_contents</code>,
+<code>Execution._update_asset_execution_table</code>,
+<code>Execution._get_manifest</code>,
+<code>Execution._manifest_store</code>,
+<code>Execution._execution_root</code>,
+<code>Execution._asset_root</code> — already private</p>
+<p>All <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="b13-executionexecute-public-returns-self">B.13 <code>Execution.execute()</code> — public, returns self</h3>
+<p><code>execution.py:1985-2002</code>. Exists per spec §2.8 so usage reads
+<code>with exe.execute() as e:</code>. Tested. External grep: every test
+file under <code>deriva-ml/tests/</code> and <code>deriva-ml-mcp/tests/</code> uses it.
+<strong>Keep public.</strong> Slight design oddity: it's a no-op that returns
+self; consumers could just <code>with exe as e:</code>. Removing it would
+break MCP code and skill snippets.</p>
+<h3 id="b14-find_caller_get_calling_module-_get_notebook_path-_top_user_frame-etc">B.14 <code>find_caller._get_calling_module</code>, <code>_get_notebook_path</code>, <code>_top_user_frame</code>, etc.</h3>
+<p><code>find_caller.py:35-313</code>. All <code>_</code>-prefixed (private). Used by
+<code>workflow.py:30</code> and <code>runner.py</code>. External grep: zero. <strong>Correct.</strong></p>
+<h3 id="b15-workflowworkflow_check_writable_catalog">B.15 <code>workflow.Workflow._check_writable_catalog</code>,</h3>
+<p><code>_update_description_in_catalog</code>, <code>_update_workflow_types_in_catalog</code>,
+<code>_get_workflow_type_association_table</code>,
+<code>_get_python_script</code>, <code>_get_notebook_path</code>,
+<code>_get_notebook_session</code>, <code>_get_git_root</code>, <code>_github_url</code>,
+<code>_check_nbstrip_status</code>, <code>_in_repl</code> — already private</p>
+<p>All <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="b16-runner_multirun_state-_atexit_registered">B.16 <code>runner._multirun_state</code>, <code>_atexit_registered</code>,</h3>
+<p><code>_complete_parent_execution</code>, <code>_create_parent_execution</code>,
+<code>_resolve_model_source</code>, <code>_is_multirun</code>, <code>_get_job_num</code></p>
+<p>All <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="b17-multirun_config_multirun_registry">B.17 <code>multirun_config._multirun_registry</code></h3>
+<p><code>multirun_config.py:63</code>. <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="b18-base_config_captured_hydra_output_dir">B.18 <code>base_config._captured_hydra_output_dir</code>,</h3>
+<p><code>_notebook_configs</code>, <code>_make_described_list</code>,
+<code>_DescribedListConfig</code></p>
+<p><code>base_config.py:61, 275, 630, 640</code>. All <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="b19-pending_summary_humanize_bytes">B.19 <code>pending_summary._humanize_bytes</code></h3>
+<p><code>pending_summary.py:189</code>. <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="b20-datasetcollection-public-but-only-constructed-by-executiondatasets">B.20 <code>DatasetCollection</code> — public, but only constructed by <code>Execution.datasets</code></h3>
+<p><code>dataset_collection.py:18</code>. Only constructor caller in <code>src/</code> is
+<code>execution.py:812-814</code>. External grep: zero. Tests in
+<code>test_dataset_collection.py</code> do <code>from deriva_ml.execution.dataset_collection import DatasetCollection</code>
+(test-only).</p>
+<p><strong>Recommendation:</strong> keep public — it's the return-type of a public
+property and users will reasonably want to type-annotate
+<code>exe.datasets</code> as <code>DatasetCollection</code>. <strong>Severity: low.</strong></p>
+<h3 id="b21-execution_recordexecutionrecord_update_status_in_catalog">B.21 <code>execution_record.ExecutionRecord._update_status_in_catalog</code>,</h3>
+<p><code>_update_description_in_catalog</code>, <code>_check_writable_catalog</code></p>
+<p><code>execution_record.py:262, 281, 236</code>. All <code>_</code>-prefixed. <strong>Correct.</strong></p>
+<h3 id="lens-b-summary">Lens B summary</h3>
+<p>Privatization candidates with concrete impact:</p>
+<ul>
+<li><code>PENDING_ROWS_TABLE</code>, <code>DIRECTORY_RULES_TABLE</code> constants → <code>_</code>-prefix.</li>
+<li><code>PendingRowStatus</code>, <code>DirectoryRuleStatus</code> enums → delete (§1.5).</li>
+<li><code>acquire_leases_for_execution</code> → delete (§1.6).</li>
+<li><code>PENDING_ROWS_LEASE_CHUNK</code> → <code>_</code>-prefix.</li>
+<li><code>ExecutionStateStore</code> → <code>_ExecutionStateStore</code> (once §1.5
+  retirement makes its surface internal-only).</li>
+</ul>
+<p><strong>Severity overall: low.</strong> No external consumer of any privatized
+symbol; the cleanup is mechanical.</p>
+<hr />
+<h2 id="lens-c-test-coverage">Lens C — Test coverage</h2>
+<h3 id="per-file-posture">Per-file posture</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">LoC</th>
+<th style="text-align: right;"># tests</th>
+<th>Posture</th>
+<th>State-leakage risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_execution.py</code></td>
+<td style="text-align: right;">1 893</td>
+<td style="text-align: right;">62</td>
+<td>Live-catalog (uses <code>workflow_terms</code>, <code>basic_execution</code>). 152 fixture refs.</td>
+<td>High — long; uses session catalog.</td>
+</tr>
+<tr>
+<td><code>test_state_store.py</code></td>
+<td style="text-align: right;">797</td>
+<td style="text-align: right;">31</td>
+<td>Pure SQLite, no catalog. Builds engine + <code>ExecutionStateStore</code>.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_staged_features.py</code></td>
+<td style="text-align: right;">703</td>
+<td style="text-align: right;">20</td>
+<td>Live-catalog. 4 fixture refs.</td>
+<td>Medium.</td>
+</tr>
+<tr>
+<td><code>test_state_machine.py</code></td>
+<td style="text-align: right;">624</td>
+<td style="text-align: right;">23</td>
+<td>Pure unit + tiny mocks (3).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_lookup_lineage_unit.py</code></td>
+<td style="text-align: right;">465</td>
+<td style="text-align: right;">15</td>
+<td>Pure unit, mocked services.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_execution_registry.py</code></td>
+<td style="text-align: right;">459</td>
+<td style="text-align: right;">20</td>
+<td>Live-catalog; 86 fixture refs.</td>
+<td>High.</td>
+</tr>
+<tr>
+<td><code>test_find_caller.py</code></td>
+<td style="text-align: right;">375</td>
+<td style="text-align: right;">20</td>
+<td>Pure unit, frame stack mocked.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_lease_orchestrator.py</code></td>
+<td style="text-align: right;">366</td>
+<td style="text-align: right;">9</td>
+<td>Pure SQLite + 2 MagicMocks (no real catalog).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_runner.py</code></td>
+<td style="text-align: right;">310</td>
+<td style="text-align: right;">15</td>
+<td>Heavy mocking (98 mock refs).</td>
+<td>Multirun-state pollution.</td>
+</tr>
+<tr>
+<td><code>test_bug_c_live_smoke.py</code></td>
+<td style="text-align: right;">286</td>
+<td style="text-align: right;">3</td>
+<td>Live smoke. 24 fixture refs.</td>
+<td>High.</td>
+</tr>
+<tr>
+<td><code>test_storage.py</code></td>
+<td style="text-align: right;">269</td>
+<td style="text-align: right;">11</td>
+<td>Live-catalog; 26 fixture refs.</td>
+<td>High.</td>
+</tr>
+<tr>
+<td><code>test_pending_summary.py</code></td>
+<td style="text-align: right;">244</td>
+<td style="text-align: right;">12</td>
+<td>SQLite + Workspace (no catalog).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_base_config.py</code></td>
+<td style="text-align: right;">202</td>
+<td style="text-align: right;">10</td>
+<td>Pure unit + mocks (hydra_zen stores).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_bag_commit_poc.py</code></td>
+<td style="text-align: right;">186</td>
+<td style="text-align: right;">1</td>
+<td>"POC" name — single test only.</td>
+<td>TBD.</td>
+</tr>
+<tr>
+<td><code>test_bug_e2_live_smoke.py</code></td>
+<td style="text-align: right;">172</td>
+<td style="text-align: right;">2</td>
+<td>Live smoke. 15 fixture refs.</td>
+<td>High.</td>
+</tr>
+<tr>
+<td><code>test_execution_readthrough.py</code></td>
+<td style="text-align: right;">168</td>
+<td style="text-align: right;">8</td>
+<td>Live-catalog; 25 fixture refs.</td>
+<td>Medium.</td>
+</tr>
+<tr>
+<td><code>test_upload_public_api.py</code></td>
+<td style="text-align: right;">149</td>
+<td style="text-align: right;">4</td>
+<td>Live-catalog; 22 fixture refs.</td>
+<td>Medium.</td>
+</tr>
+<tr>
+<td><code>test_dirty_workflow.py</code></td>
+<td style="text-align: right;">138</td>
+<td style="text-align: right;">8</td>
+<td>Subprocess + git fixtures.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_update_status.py</code></td>
+<td style="text-align: right;">137</td>
+<td style="text-align: right;">6</td>
+<td>Live-catalog; 25 fixture refs.</td>
+<td>Medium.</td>
+</tr>
+<tr>
+<td><code>test_manifest_lease.py</code></td>
+<td style="text-align: right;">131</td>
+<td style="text-align: right;">4</td>
+<td>Pure mock (6 mock refs).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_pending_asset_lease_validator.py</code></td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">5</td>
+<td>Pure mock (12 mock refs).</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_lookup_lineage_live.py</code></td>
+<td style="text-align: right;">116</td>
+<td style="text-align: right;">2</td>
+<td>Live smoke. 11 fixture refs.</td>
+<td>Medium.</td>
+</tr>
+<tr>
+<td><code>test_execution_snapshot.py</code></td>
+<td style="text-align: right;">111</td>
+<td style="text-align: right;">4</td>
+<td>Pure unit.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_find_executions_sort.py</code></td>
+<td style="text-align: right;">93</td>
+<td style="text-align: right;">4</td>
+<td>Live-catalog.</td>
+<td>Medium.</td>
+</tr>
+<tr>
+<td><code>test_rid_lease.py</code></td>
+<td style="text-align: right;">90</td>
+<td style="text-align: right;">5</td>
+<td>Pure unit.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_find_workflows_sort.py</code></td>
+<td style="text-align: right;">86</td>
+<td style="text-align: right;">4</td>
+<td>Live-catalog.</td>
+<td>Medium.</td>
+</tr>
+<tr>
+<td><code>test_dataset_collection.py</code></td>
+<td style="text-align: right;">85</td>
+<td style="text-align: right;">7</td>
+<td>Pure unit, no catalog.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_status_migration.py</code></td>
+<td style="text-align: right;">61</td>
+<td style="text-align: right;">5</td>
+<td>Pure unit.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>test_execution_hierarchy.py</code></td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">1</td>
+<td>One test.</td>
+<td>TBD.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Mock-vs-live mix per module:</strong></p>
+<ul>
+<li><strong>Lifecycle / state machine</strong> (<code>state_machine.py</code>,
+  <code>state_store.py</code>): excellent — pure unit + SQLite tests, no
+  catalog dependency, 54 tests across two files.</li>
+<li><strong>Bag-commit pipeline</strong> (<code>bag_commit.py</code>): minimal —
+  <code>test_bag_commit_poc.py</code> is a single "POC" test; everything else
+  comes through <code>test_execution.py</code>'s end-to-end paths. No
+  isolated test for <code>_add_asset_rows_to_bag</code>, <code>_add_staged_feature_rows_to_bag</code>,
+  <code>load_execution_bag</code>, <code>report_to_asset_map</code>. <strong>Coverage gap.</strong></li>
+<li><strong>Lease primitives</strong> (<code>rid_lease.py</code>, <code>manifest_lease.py</code>,
+  <code>lease_orchestrator.py</code>): good mocked coverage. Production lease
+  path (<code>manifest_lease</code>) has 4 mocked tests; orchestrator
+  (production-dead, §1.6) has 9 tests. Imbalanced.</li>
+<li><strong>Runner / multirun</strong> (<code>runner.py</code>): heavy mocking (98 mock
+  refs in test_runner.py); zero live execution. Reasonable —
+  Hydra integration tests would require a non-trivial harness.</li>
+<li><strong>Workflow detection</strong> (<code>workflow.py</code>): split between
+  <code>test_dirty_workflow.py</code> (subprocess + git fixtures, real but
+  isolated) and <code>test_execution.py::TestWorkflow*</code> (live catalog).
+  Docker scenarios fully unit-tested via <code>monkeypatch</code>. <strong>Healthy.</strong></li>
+<li><strong>Asset upload / register</strong> (<code>execution.py::asset_file_path</code>,
+  <code>upload_execution_outputs</code>): exercised by every live
+  <code>test_execution.py</code> test that creates assets. No isolated mock
+  tests for the manifest write-through path; that lives in
+  <code>tests/asset/</code>. <strong>Acceptable.</strong></li>
+</ul>
+<h3 id="coverage-gaps">Coverage gaps</h3>
+<p><strong>C.1 No isolated test for <code>bag_commit._add_asset_rows_to_bag</code>,
+<code>_add_staged_feature_rows_to_bag</code>, <code>load_execution_bag</code>.</strong></p>
+<p>The bag-commit pipeline is the production upload path. Tests
+exercise it through <code>Execution.upload_execution_outputs()</code> end-to-end
+(every "test_asset_*" in <code>test_execution.py</code>). When the upload
+fails, the failure surface is the full pipeline, not the
+individual function. Bug locality is poor.</p>
+<p><strong>Recommendation:</strong> add <code>tests/execution/test_bag_commit_unit.py</code>
+with mocked <code>BagBuilder</code> and <code>BagCatalogLoader</code>. Target:
+URL-dedup behavior, type-pair leasing, asset-RID rewriting in
+feature payloads. <strong>LoC: +400 of tests.</strong> <strong>Severity: medium</strong>
+(prevents future regressions, doesn't fix today's coverage hole).</p>
+<p><strong>C.2 No test for <code>Execution.__exit__</code>'s exception-propagation contract.</strong></p>
+<p><code>execution.py:2339-2432</code> — <code>__exit__</code> is documented to return
+False (propagate the exception) per spec §2.12 / R6.3. The
+specifications point at "the legacy <code>__exit__</code> which returned
+True to suppress." Searching <code>test_execution.py</code> for <code>with pytest.raises(.*) as exc.*\n.*with .*execute()</code> (the exception-in-context test) returns
+zero hits. Each "exception" test catches the exception from outside the
+context manager (the implicit shape) but no test verifies that an
+exception inside the <code>with</code> block actually re-raises through <code>__exit__</code>
+to the caller.</p>
+<p><strong>Recommendation:</strong> add three tests — exception during work,
+exception in the upload, double-exception (work raised, then
+<strong>exit</strong>'s state-machine transition raises). <strong>LoC: +50 of tests.</strong>
+<strong>Severity: medium.</strong></p>
+<p><strong>C.3 No test for <code>state_machine.reconcile_with_catalog</code> when
+catalog has unrecognized Status.</strong></p>
+<p><code>state_machine.py:509-515</code> catches <code>ValueError</code> from the
+<code>ExecutionStatus(...)</code> constructor and raises
+<code>DerivaMLStateInconsistency</code>. <code>test_state_machine.py</code> has 23
+tests; none exercises a catalog row with an unknown status string.
+This branch is reachable in field-deployed catalogs that drift
+ahead of the deriva-ml install.</p>
+<p><strong>Recommendation:</strong> add one parametrized test feeding bogus
+status strings. <strong>LoC: +20.</strong> <strong>Severity: low.</strong></p>
+<p><strong>C.4 No test for <code>Execution.upload_execution_outputs</code> retry semantics.</strong></p>
+<p><code>execution.py:1305-1339</code> documents <code>max_retries=3</code>, <code>retry_delay=5.0</code>,
+"Doubles on each successive retry." Grep across <code>execution.py</code>
+for <code>max_retries</code> shows zero use after the parameter is accepted —
+the value is <strong>not propagated</strong> to any retry mechanism. The
+parameter is a no-op.</p>
+<p><strong>Recommendation:</strong> either delete the parameter and the docstring
+(if no retry is intended in the bag-commit pipeline) or
+implement the retry loop wrapping <code>_bag_commit_upload</code>.
+<strong>LoC: −10 (delete) or +30 (implement).</strong> <strong>Severity: medium</strong> —
+the docstring promises retry behavior the code doesn't deliver.</p>
+<p><strong>C.5 <code>DatasetCollection</code> test coverage is healthy.</strong></p>
+<p><code>test_dataset_collection.py</code> covers 7 tests: keyed access,
+iteration order, missing-key error message, length, contains,
+<code>keys</code>/<code>values</code>/<code>items</code>. Does NOT verify the <code>Mapping</code> contract
+violation (§4.7); a test asserting "for k in dc: assert dc[k]" works
+correctly would fail and force the contract decision.</p>
+<p><strong>Recommendation:</strong> add the explicit contract test. <strong>LoC: +15.</strong>
+<strong>Severity: low.</strong></p>
+<p><strong>C.6 <code>find_executions_sort.py</code> / <code>find_workflows_sort.py</code> parallel structure</strong></p>
+<p>Both files have 4 tests of similar shape (insert N records, fetch
+with various sort orders, assert order). Identical helper code
+across files. The two files exist because the find-paths
+themselves are duplicated (<code>find_executions</code> and <code>find_workflows</code>).</p>
+<p><strong>Recommendation:</strong> parametrize. <strong>LoC: −60.</strong> <strong>Severity: low.</strong></p>
+<h3 id="state-leakage-warning-load-bearing-finding">State-leakage warning (load-bearing finding)</h3>
+<p><strong>The execution-test suite's risk profile:</strong></p>
+<p><code>tests/execution/test_execution.py</code> (1 893 LoC, 62 tests) uses
+<code>workflow_terms</code> and <code>basic_execution</code> fixtures that depend on
+<code>test_ml</code>, which calls <code>catalog_manager.reset()</code> before each test
+and sets <code>state = CatalogState.POPULATED</code> after (to force the
+next test to reset again). The state-flag-guards landed in
+<code>catalog_manager.py</code> per PR #99 (commit <code>4442f82</code>'s parent) and
+the existence guards in <code>ensure_features</code> / <code>ensure_datasets</code>
+catch the case where state is stale.</p>
+<p><strong>Risks specific to <code>tests/execution/</code>:</strong></p>
+<p>(a) <strong><code>runner._multirun_state</code> pollution.</strong> Not handled by
+<code>catalog_manager</code> — that resets catalog tables but not
+deriva-ml module-level globals. <code>test_runner.py</code> calls
+<code>reset_multirun_state()</code> in fixtures (line 14 of <code>tests/execution/test_runner.py</code>
+uses an autouse fixture pattern via context). Other tests that
+trigger the multirun path (especially <code>test_execution.py::test_multirun_parent_lifecycle</code>)
+do not. <strong>Risk:</strong> one test creates a parent execution and stores
+it in <code>_multirun_state</code>; the next test that calls <code>run_model</code>
+finds a stale parent, links a new child to a deleted parent
+catalog row.</p>
+<p><strong>Recommendation:</strong> add an autouse fixture in
+<code>tests/execution/conftest.py</code> (currently missing) that calls
+<code>reset_multirun_state()</code> between tests. <strong>LoC: +10.</strong>
+<strong>Severity: medium.</strong></p>
+<p>(b) <strong><code>Workspace</code> SQLite registry pollution.</strong> Each <code>test_ml</code>
+returns a fresh DerivaML instance with <code>working_dir=tmp_path</code>.
+The SQLite registry is per-working-dir, so <code>tmp_path</code>'s
+randomization gives test isolation. Confirmed by reading
+<code>tests/conftest.py:117-130</code>. <strong>No risk.</strong></p>
+<p>(c) <strong>Catalog state — long execution chains.</strong> Tests in
+<code>TestExecutionAssets</code>, <code>TestAssetCaching</code> upload multiple assets
+into the same execution, then assume that the next test sees an
+empty <code>Execution_Asset</code> table. The <code>catalog_manager.reset()</code> at
+test start clears <code>Execution</code>, <code>Workflow</code>, <code>Dataset_Execution</code>,
+but NOT <code>Execution_Asset</code> — that's a dynamic table managed by
+the schema and dropped by <code>_drop_dynamic_tables</code>. Verified
+by reading <code>catalog_manager.py:142-219</code>. <strong>No risk</strong> for
+<code>tests/execution/</code>; <code>Execution_Asset</code> is in the permanent set.</p>
+<p>(d) <strong><code>add_features</code> staging in SQLite outlives the test.</strong>
+<code>Execution.add_features</code> writes to the workspace's
+<code>execution_state__feature_records</code> table. The workspace is
+per-<code>tmp_path</code>, so each test's workspace is fresh.
+<strong>No risk.</strong></p>
+<p>(e) <strong>Hatrac uploads accumulate across tests.</strong> The test catalog
+is destroyed at session end (<code>catalog_manager.destroy()</code>). Hatrac
+content for the test catalog is also destroyed. <strong>No risk</strong> within
+a single session; cross-session leakage is solved by the catalog
+being session-scoped.</p>
+<p>(f) <strong>Test order sensitivity.</strong> <code>test_execution.py</code> is the largest
+file in the suite. If pytest runs in alphabetical order
+(default), <code>test_bag_commit_poc.py</code> runs before
+<code>test_execution.py</code>, but the POC test creates an execution that
+isn't cleaned up. The state-flag-guards in
+<code>catalog_manager.ensure_populated</code> and friends catch the empty-
+table case but not the dirty-table case (an execution-row that
+the next test's <code>basic_execution</code> fixture creates a <em>second</em>
+of). This is the most likely source of test flakiness.</p>
+<p><strong>Recommendation:</strong> make <code>test_bag_commit_poc.py</code> use <code>test_ml</code>
+(which calls <code>catalog_manager.reset()</code>) — currently it doesn't
+read from the file content shown. (Verify by inspection — if it
+doesn't use fixtures, mark it for cleanup. The "POC" in the name
+suggests it's exploratory and may be deletable.)</p>
+<h3 id="cost-trade-off-per-test-file">Cost trade-off per test file</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Choice</th>
+<th>Cost</th>
+<th>Right?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_state_store.py</code> (31 tests, no catalog)</td>
+<td>Fast SQLite-only</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_state_machine.py</code> (23 tests, no catalog)</td>
+<td>Pure unit + mocks</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_lookup_lineage_unit.py</code> (15 tests, mocked)</td>
+<td>Mocked services</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_find_caller.py</code> (20 tests, frame mocks)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_rid_lease.py</code> (5 tests, no catalog)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_manifest_lease.py</code> (4 tests, mocked)</td>
+<td>Pure mock</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_pending_asset_lease_validator.py</code> (5, mocked)</td>
+<td>Pure mock</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_base_config.py</code> (10 tests, hydra mocks)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_lease_orchestrator.py</code> (9 tests, SQLite + mocks)</td>
+<td>SQLite-only</td>
+<td>&lt; 1s</td>
+<td>Yes — but tests dead surface (§1.6)</td>
+</tr>
+<tr>
+<td><code>test_pending_summary.py</code> (12 tests, SQLite)</td>
+<td>SQLite-only</td>
+<td>&lt; 1s</td>
+<td>Yes — but tests dead-writer surface (§1.5)</td>
+</tr>
+<tr>
+<td><code>test_runner.py</code> (15 tests, heavy mock)</td>
+<td>Mock-only</td>
+<td>&lt; 5s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_dataset_collection.py</code> (7 tests)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_status_migration.py</code> (5 tests)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_execution_snapshot.py</code> (4 tests)</td>
+<td>Pure unit</td>
+<td>&lt; 1s</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_dirty_workflow.py</code> (8 tests, subprocess)</td>
+<td>Subprocess + git</td>
+<td>5-10s</td>
+<td>Yes — subprocess isolation is appropriate</td>
+</tr>
+<tr>
+<td><code>test_execution.py</code> (62 tests, live)</td>
+<td>Live-catalog</td>
+<td>5-10min</td>
+<td><strong>Mostly right but oversized — could split.</strong></td>
+</tr>
+<tr>
+<td><code>test_execution_registry.py</code> (20, live)</td>
+<td>Live-catalog</td>
+<td>1-3min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_staged_features.py</code> (20, live)</td>
+<td>Live-catalog</td>
+<td>1-3min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_storage.py</code> (11, live)</td>
+<td>Live-catalog</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_execution_readthrough.py</code> (8, live)</td>
+<td>Live-catalog</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_upload_public_api.py</code> (4, live)</td>
+<td>Live-catalog</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_update_status.py</code> (6, live)</td>
+<td>Live-catalog</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_lookup_lineage_live.py</code> (2, live smoke)</td>
+<td>Live smoke</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_bug_c_live_smoke.py</code> (3, live smoke)</td>
+<td>Live smoke</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_bug_e2_live_smoke.py</code> (2, live smoke)</td>
+<td>Live smoke</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_find_executions_sort.py</code> (4, live)</td>
+<td>Live-catalog</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_find_workflows_sort.py</code> (4, live)</td>
+<td>Live-catalog</td>
+<td>&lt; 1min</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>test_bag_commit_poc.py</code> (1 test)</td>
+<td>Live?</td>
+<td>TBD</td>
+<td>"POC" suggests exploratory; review for retention</td>
+</tr>
+<tr>
+<td><code>test_execution_hierarchy.py</code> (1 test)</td>
+<td>TBD</td>
+<td>TBD</td>
+<td>One test — verify it's not orphaned</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Test-runtime headline:</strong> <code>test_execution.py</code> and the 7 other
+live-catalog files dominate runtime. Splitting <code>test_execution.py</code>
+into per-class files (<code>test_workflow.py</code>,
+<code>test_execution_lifecycle.py</code>, <code>test_execution_assets.py</code>, …) is a
+mechanical refactor that improves debuggability of failures but
+doesn't change runtime.</p>
+<h3 id="streamlining-recommendations">Streamlining recommendations</h3>
+<p><strong>C.S1 Delete the <code>lease_orchestrator</code> tests when <code>lease_orchestrator</code>
+is deleted (§1.6).</strong> 9 tests / 366 LoC.</p>
+<p><strong>C.S2 Delete the pending-rows half of <code>test_state_store.py</code> when
+the pending-rows surface is deleted (§1.5).</strong> Approximately 18 of
+31 tests / ~500 LoC.</p>
+<p><strong>C.S3 Delete <code>test_pending_summary.py</code>'s pending-row tests</strong> —
+keep the executions-only tests. ~150 LoC.</p>
+<p><strong>C.S4 Consolidate <code>test_find_executions_sort.py</code> and
+<code>test_find_workflows_sort.py</code></strong> via parametrization. ~60 LoC.</p>
+<p><strong>C.S5 Investigate <code>test_execution_hierarchy.py</code> (19 LoC, 1 test)
+and <code>test_bag_commit_poc.py</code> (186 LoC, 1 test).</strong> Verify they
+aren't orphans of deleted features.</p>
+<p><strong>C.S6 Add <code>tests/execution/conftest.py</code> with an autouse
+<code>reset_multirun_state()</code> fixture.</strong> Solves a latent leakage hole.
+<strong>LoC: +15.</strong></p>
+<p><strong>Net test LoC delta from §1 + §C cleanups:</strong>
+- Delete: ~1 100 LoC of tests covering dead production surface.
+- Add: ~500 LoC of bag-commit unit coverage + multirun fixture +
+  Mapping contract + retry-semantics test.</p>
+<hr />
+<h2 id="lens-d-docsspecadrdocstring-sync">Lens D — Docs/spec/ADR/docstring sync</h2>
+<h3 id="d1-orphan-spec-2026-04-21-upload-engine-deriva-py-integration-designmd">D.1 Orphan spec: <code>2026-04-21-upload-engine-deriva-py-integration-design.md</code></h3>
+<p>This spec describes the production path for <code>upload_engine.py</code> →
+<code>GenericUploader</code> integration. <code>upload_engine.py</code> has been
+retired; the production path is <code>bag_commit.py</code>. The spec
+references functions (<code>run_upload_engine</code>, <code>_invoke_deriva_py_uploader</code>)
+that no longer exist.</p>
+<p><strong>Reality check</strong> (<code>upload_report.py:4-7</code>): "Post-WI2 the engine
+is gone and <code>upload_pending</code> drives <code>Execution._bag_commit_upload</code>
+per execution."</p>
+<p><strong>Fix:</strong> mark the spec deprecated with a one-line preamble
+("Superseded by ADR-0006 / bag-commit path; retained for
+archaeology"), or move to <code>docs/superpowers/specs/archive/</code>.
+<strong>Severity: low.</strong></p>
+<h3 id="d2-orphan-spec-2026-04-18-sqlite-execution-state-designmd-partially-superseded">D.2 Orphan spec: <code>2026-04-18-sqlite-execution-state-design.md</code> partially superseded</h3>
+<p>This spec describes the <code>executions</code>, <code>pending_rows</code>,
+<code>directory_rules</code> schema. The <code>executions</code> table shipped and is
+load-bearing. The <code>pending_rows</code> + <code>directory_rules</code> schema
+shipped but has no production writer (§1.5). The spec describes
+them as the architecture; production has a different one
+(asset manifest).</p>
+<p><strong>Fix:</strong> the spec is correct historical record; add a top-of-
+document note that the pending_rows / directory_rules halves are
+implemented-but-not-used and the actual production write path
+is via <code>AssetManifest</code>. <strong>Severity: medium</strong> — newcomers reading
+this spec will believe the writer surface is alive.</p>
+<h3 id="d3-docsuser-guideexecutionsmd-matches-code">D.3 <code>docs/user-guide/executions.md</code> matches code</h3>
+<p>The user-facing description of the execution lifecycle (Created
+→ Running → Stopped → Pending_Upload → Uploaded), with the four
+non-happy-path edges (<code>Running → Pending_Upload</code>,
+<code>Failed → Pending_Upload</code>, <code>Uploaded → Pending_Upload</code>,
+<code>Created/Running/Stopped/Failed → Aborted</code>), matches
+<code>state_machine.ALLOWED_TRANSITIONS</code> exactly.</p>
+<p><strong>Drift checked:</strong> the user guide names <code>execution_stop()</code> /
+<code>execution_start()</code> for imperative paths. Both exist
+(<code>execution.py:1069</code>, <code>1121</code>). <strong>No drift.</strong></p>
+<h3 id="d4-docsconfigurationoverviewmd-includes-derivamlmodel-snippet">D.4 <code>docs/configuration/overview.md</code> includes <code>DerivaMLModel</code> snippet</h3>
+<p>The class snippet at <code>docs/configuration/overview.md:384</code>
+matches <code>execution/model_protocol.py:93-176</code>. <strong>No drift.</strong></p>
+<h3 id="d5-workflowpysetup_url_checksum-docstring-lies">D.5 <code>workflow.py::setup_url_checksum</code> docstring lies</h3>
+<p>Covered in §6.3 / theme 4. The docstring describes a
+<code>Workflow.create_workflow</code> factory that doesn't exist. The
+example uses a non-existent method. <strong>High-impact doc drift.</strong></p>
+<h3 id="d6-state_machinepytransition-claims-notimplementederror">D.6 <code>state_machine.py::transition</code> claims <code>NotImplementedError</code></h3>
+<p><code>state_machine.py:207</code> lists "NotImplementedError: Online-mode
+path is implemented in Task C3" in <code>Raises:</code>. Task C3 shipped.
+<strong>Stale.</strong> See §1.10.</p>
+<h3 id="d7-_engine_harnesspy-is-the-canonical-reference-for-the-dead-surface">D.7 <code>_engine_harness.py</code> is the canonical reference for the dead surface</h3>
+<p>It is a 12-line module whose entire content is documentation
+about the engine path being "Phase 2." Phase 2 = bag commit, which
+shipped. The doc itself is incorrect. See §1.1.</p>
+<h3 id="d8-adr-0006-bag-pipeline-accurately-describes-the">D.8 ADR-0006 (bag pipeline) accurately describes the</h3>
+<p>production path</p>
+<p>ADR-0006 defines <code>BagCatalogLoader</code> as the unified producer for
+both clone and commit. <code>bag_commit.py:1-45</code> (the module
+docstring) matches. <strong>No drift.</strong></p>
+<h3 id="d9-adr-0007-annotation-builders-public-api-not-relevant-to-execution">D.9 ADR-0007 (annotation builders public API) — not relevant to execution/</h3>
+<p>Skipping.</p>
+<h3 id="d10-adr-0008-estimate_bag_size-opt-out-not-relevant-to-execution">D.10 ADR-0008 (estimate_bag_size opt-out) — not relevant to execution/</h3>
+<p>Skipping.</p>
+<h3 id="d11-executionupload_execution_outputs-docstring-promises">D.11 <code>Execution.upload_execution_outputs</code> docstring promises</h3>
+<p>retry params that aren't wired</p>
+<p><code>execution.py:1305-1339</code> accepts <code>max_retries</code>, <code>retry_delay</code> —
+both unused. See §C.4. <strong>Drift between docstring and behavior.</strong></p>
+<h3 id="d12-executionadd_features-raises-clause-inaccurate">D.12 <code>Execution.add_features</code> <code>Raises</code> clause inaccurate</h3>
+<p>See §6.9.</p>
+<h3 id="d13-pending_summarypy-references-workspacependingsummary">D.13 <code>pending_summary.py</code> references "WorkspacePendingSummary"</h3>
+<p>correctly</p>
+<p>Cross-checked module docstring (line 1-7) and class definitions.
+<strong>No drift.</strong></p>
+<h3 id="d14-deriva-mcp-legacy-readme-references-assetridconfig">D.14 deriva-mcp legacy README references <code>AssetRIDConfig</code></h3>
+<p><code>deriva-mcp/README.md:900</code> and <code>deriva-mcp/src/deriva_mcp/resources.py:130-139</code>
+import <code>AssetRIDConfig</code> from <code>deriva_ml.execution</code>. That symbol
+<strong>does not exist</strong> in <code>execution/__init__.py</code> or anywhere else
+in deriva-ml's source. Per CLAUDE.md the legacy <code>deriva-mcp</code> is
+being phased out; this is a known drift not requiring action in
+deriva-ml. <strong>Out of scope; noted for completeness.</strong></p>
+<hr />
+<h2 id="persona-summaries">Persona summaries</h2>
+<h3 id="senior-software-engineer">Senior software engineer</h3>
+<p>The execution lifecycle is correct and the bag-commit pipeline is
+clean. The two big quality issues are (1) a large parallel API
+surface — pending_rows, directory_rules, the lease orchestrator —
+that no production code writes to but that has full SQLAlchemy
+table definitions and extensive test coverage, and (2) a handful
+of vestigial methods on <code>Execution</code> itself (<code>_flush_staged_features</code>,
+<code>_from_registry</code>, <code>upload_assets</code>) that survived because their
+delete-cost looked unclear at the time. Both are eminently
+recoverable in a single targeted PR.</p>
+<h3 id="testing-engineer">Testing engineer</h3>
+<p>Coverage is strong for what matters (live lifecycle + state
+machine + state-store CRUD). The notable holes are bag-commit
+unit isolation, <code>__exit__</code> exception propagation, and the
+multirun-state cross-test pollution risk. The biggest savings
+available come from deleting the test coverage that
+mirrors dead production surface (§C.S1 + §C.S2); this is
+~1 100 LoC of tests gone with the production deletion. Add a
+single <code>tests/execution/conftest.py</code> with the multirun-state reset.</p>
+<h3 id="technical-writer">Technical writer</h3>
+<p>Three pieces of documentation lie: the <code>setup_url_checksum</code>
+docstring on <code>Workflow</code> (claims a non-existent factory), the
+<code>transition</code> <code>Raises:</code> clause (claims <code>NotImplementedError</code>), and
+the <code>upload_execution_outputs</code> <code>max_retries</code>/<code>retry_delay</code>
+parameter docs (the retry behavior they describe isn't
+implemented). Spec
+<code>2026-04-18-sqlite-execution-state-design.md</code> describes a
+production architecture that isn't production today; add a header
+noting the pending_rows half is shelf-warmer.</p>
+<h3 id="ml-developer-user-the-workflow-author">ML-developer user (the workflow author)</h3>
+<p>The happy path — <code>ml.create_execution(config)</code>, <code>with exe.execute()</code>,
+<code>exe.upload_execution_outputs()</code> — is well-documented in
+<code>docs/user-guide/executions.md</code> and matches the code. Discoverable
+warts: (a) <code>create_execution(config)</code> does a catalog write at
+construction time (early metadata upload, §4.3); the docstring
+doesn't say so; (b) the <code>assets: Any</code> typing on <code>BaseConfig</code> makes
+config-file authoring harder than it needs to be; (c) the retry
+params on <code>upload_execution_outputs</code> look like they configure
+retry but don't. None of these is critical; each is a quality-of-
+life paper-cut.</p>
+<h3 id="dba">DBA</h3>
+<p>Lifecycle writes to the catalog <code>Execution</code> table are routed
+through <code>state_machine.transition()</code> and the datapath API
+consistently. The one bypass is <code>Execution.execution_stop</code> writing
+<code>Duration</code> directly (§4.5) — minor inconsistency but the
+intent is documented. The lease POST against
+<code>public:ERMrest_RID_Lease</code> is chunked at 500 and batched, which
+is fine for typical workloads. Concurrent-execution safety
+analysis is light: the asset manifest assumes single-writer per
+execution, and there is no test exercising two processes touching
+the same execution_rid simultaneously. If multi-process
+upload-from-multiple-machines is on the roadmap, the manifest
+needs concurrency review. The SQLite pending-rows / directory-
+rules path was designed for this scenario but doesn't ship.</p>
+<hr />
+<h2 id="ranked-actions-1n">Ranked actions (1–N)</h2>
+<p>Ranked by <code>(impact × confidence) / cost</code>.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Risk</th>
+<th style="text-align: right;">LoC</th>
+<th>Files</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>§1.5 + §C.S2 + §C.S3</strong> Retire <code>state_store.py</code>'s pending-rows / directory-rules surface (or formally document the reserve). Includes <code>PendingRowStatus</code>, <code>DirectoryRuleStatus</code>, the table definitions, and all related CRUD. Delete the corresponding <code>test_state_store.py</code> / <code>test_pending_summary.py</code> / <code>test_lease_orchestrator.py</code> tests covering the dead surface.</td>
+<td>medium</td>
+<td style="text-align: right;">−600 src, −800 tests</td>
+<td><code>state_store.py</code>, <code>lease_orchestrator.py</code>, <code>pending_summary.py</code>, tests</td>
+<td>Largest single LoC liability in <code>execution/</code>. Removes the worst-of-both-worlds split (full implementation, full tests, no production writer).</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>§1.6 + §C.S1</strong> Delete <code>lease_orchestrator.acquire_leases_for_execution</code> and its 8 tests; preserve <code>reconcile_pending_leases</code> (production-live, returns zero-work).</td>
+<td>medium</td>
+<td style="text-align: right;">−120 src, −250 tests</td>
+<td><code>lease_orchestrator.py</code>, <code>test_lease_orchestrator.py</code></td>
+<td>Ships with action 1. The orchestrator is the dead second lease implementation.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>§1.2</strong> Delete <code>Execution._flush_staged_features</code> and its docstring/comment references in <code>bag_commit.py</code>, <code>manifest_store.py</code>.</td>
+<td>low</td>
+<td style="text-align: right;">−110 src, −0 tests</td>
+<td><code>execution.py</code> and refs</td>
+<td>The "retained for tests" justification is false; no test calls the function.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>§1.1 + §1.3 + §1.4 + §1.7 + §1.9 + §1.10 + §6.3 stale-task refs</strong> Pure dead-code + stale-comment sweep. Includes <code>_engine_harness.py</code>, <code>Execution._from_registry</code>, <code>Execution.upload_assets</code>, <code>environment.locale*</code>, the dead IPython display fallback, the stale Group/Task/WI references.</td>
+<td>low</td>
+<td style="text-align: right;">−150</td>
+<td>several</td>
+<td>Mechanical; each item small but they accumulate.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>§6.3 (workflow docstring) + §D.5 + §D.6 + §D.11</strong> Fix the three lying docstrings: <code>Workflow.setup_url_checksum</code>, <code>state_machine.transition.Raises</code>, <code>Execution.upload_execution_outputs.max_retries/retry_delay</code>. Rewrite or implement.</td>
+<td>low</td>
+<td style="text-align: right;">±0 to +20</td>
+<td>3 files</td>
+<td>High user-impact: each is read by ML-developer users; each promises behavior the code doesn't deliver.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>§C.4</strong> Implement or remove the unused <code>max_retries</code> / <code>retry_delay</code> parameters on <code>upload_execution_outputs</code>.</td>
+<td>low</td>
+<td style="text-align: right;">−10 or +30</td>
+<td><code>execution.py</code></td>
+<td>The API surface lies to callers. Choose: implement the wrapping retry, or rip the parameters.</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>§C.S6</strong> Add <code>tests/execution/conftest.py</code> with autouse <code>reset_multirun_state()</code> fixture.</td>
+<td>low</td>
+<td style="text-align: right;">+15</td>
+<td>new file</td>
+<td>Closes a real test-isolation hole.</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>§4.7 + §C.5</strong> Resolve <code>DatasetCollection</code>'s <code>Mapping.__iter__</code> contract violation. Either drop the inheritance (rename to a custom class) or restore the keys-default iteration.</td>
+<td>medium</td>
+<td style="text-align: right;">±0 to +10 src, +15 tests</td>
+<td><code>dataset_collection.py</code>, <code>test_dataset_collection.py</code></td>
+<td>Silent contract violation that breaks any <code>Mapping</code>-typed consumer.</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>§4.8 + §6.4</strong> Factor <code>Execution.status</code> / <code>error</code> / <code>start_time</code> / <code>stop_time</code> to share one <code>_get_registry_row</code> helper. Add <code>__all__</code> to the modules that lack it.</td>
+<td>low</td>
+<td style="text-align: right;">−40 src, +75 (<code>__all__</code>)</td>
+<td>several</td>
+<td>Maintainability cleanup.</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>§C.1 + §C.2</strong> Add bag-commit unit tests (<code>_add_asset_rows_to_bag</code>, <code>_add_staged_feature_rows_to_bag</code>, <code>load_execution_bag</code> with mocked <code>BagBuilder</code> + <code>BagCatalogLoader</code>) and <code>__exit__</code> exception-propagation tests.</td>
+<td>low</td>
+<td style="text-align: right;">+400 tests</td>
+<td>new file</td>
+<td>Coverage gap; localizes bag-commit failures.</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>§4.2</strong> Delegate <code>Execution.__enter__</code> to <code>execution_start()</code> (or vice versa).</td>
+<td>low</td>
+<td style="text-align: right;">−10</td>
+<td><code>execution.py</code></td>
+<td>Twin near-identical transitions.</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>§2.7 + §4.6</strong> Consolidate IPython/Jupyter notebook-path detection in <code>find_caller.py</code>; remove the duplicate block from <code>workflow.py</code>.</td>
+<td>medium</td>
+<td style="text-align: right;">−60</td>
+<td><code>workflow.py</code>, <code>find_caller.py</code></td>
+<td>Two parallel implementations of the same Jupyter session lookup.</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>§4.5</strong> Address the <code>Duration</code> double-write in <code>Execution.execution_stop</code>. Either fold <code>Duration</code> into SQLite's <code>executions</code> table + state-machine sync, or add explicit error handling around the bypass write.</td>
+<td>medium</td>
+<td style="text-align: right;">+10 src, +schema</td>
+<td><code>execution.py</code>, <code>state_store.py</code>, <code>state_machine.py</code></td>
+<td>Subtle FK-of-correctness gap between the SQLite-truth and the Duration column.</td>
+</tr>
+<tr>
+<td>14</td>
+<td><strong>§A.8</strong> Make <code>Execution.uploaded_assets</code> a computed property reading from the manifest.</td>
+<td>medium</td>
+<td style="text-align: right;">−20</td>
+<td><code>execution.py</code></td>
+<td>Last in-memory remnant of the pre-bag-commit lifecycle.</td>
+</tr>
+<tr>
+<td>15</td>
+<td><strong>§2.2 + §2.5</strong> Swap raw ERMrest URLs in <code>state_machine.reconcile_with_catalog</code> and <code>lease_orchestrator.reconcile_pending_leases</code> for datapath calls.</td>
+<td>low</td>
+<td style="text-align: right;">−5</td>
+<td>2 files</td>
+<td>Restore datapath consistency.</td>
+</tr>
+</tbody>
+</table>
+<p>Items 1+2 ship together (the lease orchestrator's deletion is
+gated on the pending-rows machinery's deletion). Items 3–6 are a
+single clean-up PR. Items 7+10 should bundle into a "test
+strengthening" PR. Items 8, 13, 14 each warrant their own PR
+with focused review.</p>
+<hr />
+<h2 id="follow-up-scope-phase-4-candidates">Follow-up scope (Phase 4 candidates)</h2>
+<h3 id="4a-executionpy-structural-split">4.A <code>execution.py</code> structural split</h3>
+<p><code>Execution</code> carries three concerns (§6.1): lifecycle (~600 LoC),
+asset register/upload (~900 LoC), provenance/nesting (~400 LoC).
+After actions 1–6 remove dead weight, the class is ~2 100 LoC
+across the same three concerns. Splitting into <code>execution.py</code>
+(lifecycle), <code>execution_assets.py</code> (the asset-register +
+bag-commit-call orchestration), and leaving provenance helpers
+spread between <code>execution_record.py</code> and <code>execution.py</code> is the
+natural shape. Out of audit scope; flagged as motivation.</p>
+<h3 id="4b-state_storepy-split-executions-only-vs-engine-machinery">4.B <code>state_store.py</code> split: executions only vs. engine machinery</h3>
+<p>If theme 1 retains the pending-rows surface (option (c) /
+"document the reserve API"), split it into <code>state_store.py</code>
+(executions only) and <code>state_store_engine.py</code> (pending_rows +
+directory_rules + the lease machinery). Makes the production /
+reserve boundary visible.</p>
+<h3 id="4c-bag-commit-byte-streaming-progress-callback">4.C Bag-commit byte-streaming progress callback</h3>
+<p><code>bag_commit.py:35-44</code> calls out a deriva-py follow-up for
+byte-level progress streaming. Currently per-asset events fire
+at staging completion; users uploading a 50GB asset see no
+progress for the full upload duration. Coordinate with deriva-py
+to add a <code>BagCatalogLoader</code> byte-streaming hook.</p>
+<h3 id="4d-concurrent-execution-safety-review">4.D Concurrent-execution safety review</h3>
+<p>The asset manifest assumes single-writer per execution_rid. If
+multiple processes (or threads) ever touch the same execution
+simultaneously, the manifest's idempotency relies on the SQLite
+WAL transaction ordering. The pending_rows architecture was
+designed for this scenario but doesn't ship; if multi-process
+upload is on the roadmap, the manifest needs a concurrency
+audit and either a lock or a migration to the SQLite pending-rows
+path. Coupled with theme 1's "should we keep this surface?"
+question.</p>
+<h3 id="4e-unify-the-lease-primitives">4.E Unify the lease primitives</h3>
+<p>After theme 1 retires the SQLite pending-rows path, the lease
+primitives are <code>rid_lease.generate_lease_token</code> and
+<code>rid_lease.post_lease_batch</code>. <code>manifest_lease</code> becomes the only
+consumer. Consider folding <code>manifest_lease.lease_manifest_pending_assets</code>
+into a method on <code>AssetManifest</code> itself.</p>
+<hr />
+<h2 id="phase-3-audit-closing-inventory-2026-05-15">Phase 3 audit — closing inventory (2026-05-15)</h2>
+<p>Cross-checked every ranked action and Phase-4 follow-up candidate
+against the live source. <strong>All 15 ranked actions and one Phase-4
+follow-up candidate (4.E lease unification) have shipped or been
+intentionally deferred with documentation.</strong> This audit is closed.</p>
+<h3 id="ranked-actions-115">Ranked actions (1–15)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Status</th>
+<th>Where it landed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Retire <code>state_store.py</code>'s pending-rows / directory-rules surface (+ matching tests)</td>
+<td>✅ shipped</td>
+<td>PR #149 (commits <code>21b8ede7</code> + <code>314d8e7b</code> + <code>e4231ebb</code>). ~656 src LoC + ~650 test LoC retired. Three reader methods kept as no-op stubs so production callers (<code>core/base.py</code>, <code>core/mixins/execution.py</code>, <code>execution.py:2149/2278/2354</code>) continue to compile and truthfully report "nothing pending".</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Delete <code>lease_orchestrator.acquire_leases_for_execution</code> (+ 8 tests)</td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>21b8ede7</code>). <code>reconcile_pending_leases</code> retained as a no-op stub for two production call sites.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Delete <code>Execution._flush_staged_features</code> (+ comment cleanup)</td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>b258d78a</code>). −110 LoC; the "retained for tests" docstring claim was false.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Pure dead-code + stale-comment sweep</td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>576397a1</code>). <code>_engine_harness.py</code>, <code>Execution.upload_assets</code>, <code>environment.localeconv</code> / <code>locale_module</code>, IPython display fallback, stale task-id docstring refs (Group D/E/Task C3/F2/WI2).</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Fix three lying docstrings (<code>Workflow.setup_url_checksum</code>, <code>state_machine.transition.Raises</code>, <code>Execution.upload_execution_outputs.max_retries</code>)</td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>d0eef601</code>).</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Implement or remove <code>max_retries</code> / <code>retry_delay</code> on <code>upload_execution_outputs</code></td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>c8a5c092</code>). Removed (no-ops).</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Add <code>tests/execution/conftest.py</code> with autouse <code>reset_multirun_state()</code> fixture</td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>9458620a</code>). Closes the §C.S6 state-leakage hole.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Resolve <code>DatasetCollection</code>'s <code>Mapping.__iter__</code> contract violation</td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>714a524b</code>). Dropped <code>Mapping</code> inheritance; negative-contract regression test added.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Factor <code>Execution.status</code> / <code>error</code> / <code>start_time</code> / <code>stop_time</code> to share <code>_get_registry_row</code>; add <code>__all__</code> to six high-traffic modules</td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>d7f46445</code>).</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Add bag-commit unit tests (<code>_add_asset_rows_to_bag</code>, <code>_add_staged_feature_rows_to_bag</code>, <code>load_execution_bag</code> with mocked <code>BagBuilder</code> + <code>BagCatalogLoader</code>) and <code>__exit__</code> exception-propagation tests</td>
+<td>✅ shipped (pragmatic subset)</td>
+<td>PR #151. 9 tests covering <code>report_to_asset_map</code> shape + filtering and <code>_add_asset_rows_to_bag</code> lease batching. <code>_add_staged_feature_rows_to_bag</code> / <code>load_execution_bag</code> deferred (called out in the test file's module docstring). <code>__exit__</code> "exception during work" already covered by <code>test_execute_exit_with_exception_transitions_to_failed</code>.</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Delegate <code>Execution.__enter__</code> to <code>execution_start()</code></td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>984fe2b4</code>).</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Consolidate IPython/Jupyter notebook-path detection in <code>find_caller.py</code></td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>746cdc09</code>). −93 LoC.</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Address the Duration double-write in <code>Execution.execution_stop</code></td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>984fe2b4</code>). Folded into the state-machine transition; added <code>duration</code> column to SQLite, projected as <code>Duration</code> in <code>_catalog_body_for_execution</code>.</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Make <code>Execution.uploaded_assets</code> a computed property reading from the manifest</td>
+<td>✅ shipped</td>
+<td>PR #150 (commit <code>9433e9b7</code> after fix-up). Property reads from <code>report_to_asset_map(keys=None)</code>; five attribute write sites removed. <code>test_additive_upload_after_uploaded</code> was rewritten to pin the new full-manifest semantics.</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Swap raw ERMrest URLs in <code>state_machine.reconcile_with_catalog</code> (§2.2) and <code>lease_orchestrator.reconcile_pending_leases</code> (§2.5) for datapath calls</td>
+<td>✅ shipped</td>
+<td>PR #149 (commit <code>396df9cd</code>). §2.5 was already addressed by C8b1's stub-out of <code>reconcile_pending_leases</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="items-intentionally-not-done-explicit-deferrals">Items intentionally NOT done (explicit deferrals)</h3>
+<ol>
+<li>
+<p><strong><code>_add_staged_feature_rows_to_bag</code> and <code>load_execution_bag</code>
+   mock-based unit tests.</strong> Within audit #10's scope but in the
+   long tail of the ~400-LoC target. The 9 tests landing in PR #151
+   cover the highest-leverage subset (<code>report_to_asset_map</code>,
+   <code>_add_asset_rows_to_bag</code> lease batching). Adding the remaining
+   tests would require substantial mock-setup costs for marginal
+   coverage gain. Tracked.</p>
+</li>
+<li>
+<p><strong><code>__exit__</code> exception-propagation: "exception in the upload"
+   and "double-exception" scenarios</strong> (audit §C.2). Both require
+   substantial fixture mocking. The "exception during work"
+   scenario is already covered by
+   <code>test_execute_exit_with_exception_transitions_to_failed</code>.</p>
+</li>
+<li>
+<p><strong>Audit §1.3 — proposed <code>Execution._from_registry</code> deletion</strong> —
+   <strong>rejected after re-verification</strong>. The audit claimed zero
+   callers, but <code>core/mixins/execution.py:495</code> (<code>resume_execution</code>)
+   clearly calls it. The function stays; only its stale-task-id
+   docstring was updated under §1.10.</p>
+</li>
+<li>
+<p><strong>Phase-4 candidate 4.A — <code>execution.py</code> structural split.</strong>
+   The audit flagged this as motivation, not as in-scope. After
+   the Phase-3 deletions, <code>execution.py</code> is still substantial
+   (~2 800 LoC remaining after action #1 / #3 deletions). A future
+   Phase-4 PR can revisit if the split's value clearly exceeds the
+   diff cost.</p>
+</li>
+<li>
+<p><strong>Phase-4 candidates 4.B (state_store split), 4.C (byte-streaming
+   progress callback), 4.D (concurrent-execution safety review),
+   4.E (lease primitive unification).</strong> All out of audit's
+   delivery scope; flagged as motivation for future work.</p>
+</li>
+</ol>
+<h3 id="loc-reduction-achieved">LoC reduction achieved</h3>
+<table>
+<thead>
+<tr>
+<th>Source of reduction</th>
+<th style="text-align: right;">LoC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Action #1 — pending_rows / directory_rules surface retirement (PR #149)</td>
+<td style="text-align: right;">~−1 300 (src + tests)</td>
+</tr>
+<tr>
+<td>Action #3 — <code>_flush_staged_features</code> deletion</td>
+<td style="text-align: right;">~−110</td>
+</tr>
+<tr>
+<td>Action #4 — dead-code + stale-comment sweep</td>
+<td style="text-align: right;">~−140</td>
+</tr>
+<tr>
+<td>Action #12 — Jupyter-path consolidation</td>
+<td style="text-align: right;">~−95</td>
+</tr>
+<tr>
+<td>Action #2 — lease orchestrator acquire-path</td>
+<td style="text-align: right;">~−195</td>
+</tr>
+<tr>
+<td>Other (signature trimming, double-write, docstrings)</td>
+<td style="text-align: right;">~−100</td>
+</tr>
+<tr>
+<td><strong>Total reduction in <code>execution/</code> subsystem</strong></td>
+<td style="text-align: right;"><strong>~−1 900 LoC</strong></td>
+</tr>
+</tbody>
+</table>
+<p>PR #150 (#14) and PR #151 (#10) added small amounts of code
+(property body + test infrastructure) that the LoC tally doesn't
+include — both are net-positive value for net-near-zero LoC.</p>
+<h3 id="closing-posture">Closing posture</h3>
+<p>Phase 3 <code>execution/</code> audit is closed. The subsystem is in the shape
+the audit recommended:</p>
+<ul>
+<li><strong>One</strong> asset-upload path (<code>bag_commit</code> via
+  <code>Execution._bag_commit_upload</code>). The pending-rows / directory-rules
+  architecture is gone.</li>
+<li><strong>One</strong> RID-lease primitive set (<code>rid_lease.generate_lease_token</code> +
+  <code>rid_lease.post_lease_batch</code>) consumed by <code>manifest_lease</code> and
+  <code>bag_commit</code>. The lease orchestrator's acquire path is gone.</li>
+<li><strong>One</strong> state machine (<code>state_machine.transition</code>) with Duration
+  folded into its <code>extra_fields</code> and a single catalog PUT per
+  transition (the historical double-write fragility is gone).</li>
+<li><strong>Read-through properties</strong> for every Execution lifecycle field
+  (<code>status</code>, <code>error</code>, <code>start_time</code>, <code>stop_time</code>, <code>uploaded_assets</code>)
+  — no in-memory caches. <code>_get_registry_row</code> factored.</li>
+<li><strong><code>DatasetCollection</code></strong> no longer claims to be a <code>Mapping</code>; the
+  contract is honest.</li>
+<li><strong>No raw ERMrest URLs</strong> in <code>execution/</code>; everything goes through
+  the datapath API.</li>
+<li><strong><code>DatasetLike</code>-style signature parity</strong> enforced for the
+  Execution lifecycle (<code>__enter__</code> delegates to <code>execution_start</code>;
+  <code>__exit__</code> returns False unconditionally).</li>
+<li><strong>Test coverage</strong> rationalised: pending-rows-staging tests
+  retired with their writer; <code>report_to_asset_map</code> and
+  <code>_add_asset_rows_to_bag</code> lease batching pinned at the function
+  level.</li>
+</ul>
+<p>Any new structural concerns in <code>execution/</code> should start with a
+fresh audit, not a continuation of this one.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4170 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase3-feature/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml audit 2026-05 — Phase 3: feature/ - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-audit-2026-05-phase-3-feature" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml audit 2026-05 — Phase 3: feature/
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-workspace-usage-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-workspace usage check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-1-legacy-dead-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 1 — Legacy / dead code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 1 — Legacy / dead code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-importlibimport_module-workaround-in-featurepy35-43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 importlib.import_module workaround in feature.py:35-43
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-importlibimport_module-workaround-in-coremixinsfeaturepy10-21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 importlib.import_module workaround in core/mixins/feature.py:10-21
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-featurepy48-has-a-broken-type_checking-import-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 feature.py:48 has a broken TYPE_CHECKING import path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-coremixinsfeaturepy158-161-has-a-duplicatedincorrect-validation-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 core/mixins/feature.py:158-161 has a duplicated/incorrect validation message
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-test_featurespy347-is-a-no-op-test-for-delete_feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 test_features.py:347 is a no-op test for delete_feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-no-retired-backwards-compat-shims-in-the-runtime-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6 No retired backwards-compat shims in the runtime API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-2-privatization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 2 — Privatization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 2 — Privatization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-featurerecordfeature_columns-etc-are-convenience-class-methods-that-forward-to-selffeatureattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 FeatureRecord.feature_columns() etc. are convenience class-methods that forward to self.feature.&lt;attr&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-feature__init__-is-internal-but-documented-as-internal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Feature.__init__ is internal-but-documented-as-internal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-featurefeature_record_classmap_type-is-a-deep-nested-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Feature.feature_record_class.map_type is a deep-nested helper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-coremixinsfeaturepy48-55-class-docstring-drifts-from-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 core/mixins/feature.py:48-55 class docstring drifts from reality
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-3-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 3 — Coverage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 3 — Coverage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-select_majority_vote-has-no-dedicated-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 select_majority_vote has no dedicated unit tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-select_by_execution-has-no-dedicated-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 select_by_execution has no dedicated unit tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-select_newest-select_first-select_latest-have-only-doctest-shaped-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 select_newest, select_first, select_latest have only doctest-shaped coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-no-test-for-delete_feature-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 No test for delete_feature behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-no-test-for-create_feature-error-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 No test for create_feature error paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-feature_valuesexecution_rids-short-circuit-is-tested-for-catalog-and-bag-but-the-doctest-doesnt-note-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 feature_values(execution_rids=[]) short-circuit is tested for catalog and bag but the doctest doesn't note it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-datasetlist_workflow_executions-docstring-claims-dataset-scoping-that-doesnt-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 Dataset.list_workflow_executions docstring claims dataset-scoping that doesn't exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#38-interfacespy215-datasetlikefind_features-has-a-different-signature-from-the-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.8 interfaces.py:215 (DatasetLike.find_features) has a different signature from the implementations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#39-feature_values-raises-derivamltablenotfound-per-the-docstring-the-actual-implementation-raises-bare-derivamlexception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.9 feature_values raises DerivaMLTableNotFound per the docstring; the actual implementation raises bare DerivaMLException
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-4-docs-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 4 — Docs sync
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 4 — Docs sync">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-featurepy478-481-feature-example-uses-post-construction-prints-not-constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 feature.py:478-481 Feature example uses post-construction prints, not constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-coremixinsfeaturepy443-447-doctest-is-shaped-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 core/mixins/feature.py:443-447 doctest is shaped wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-coremixinsfeaturepy115-docstring-example-uses-builtintypesfloat4-thats-not-in-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 core/mixins/feature.py:115 docstring example uses BuiltinTypes.float4 that's not in scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-the-featurefeature_record_classmap_type-docstring-example-uses-a-fake-column-constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 The Feature.feature_record_class.map_type docstring example uses a fake Column constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-claudemd-cites-select_newest-as-a-pure-python-doctest-example-but-the-files-coverage-of-it-is-one-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 CLAUDE.md cites select_newest as a pure-Python doctest example — but the file's coverage of it is one line
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-__init__py109-110-comment-misrepresents-featurerecords-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 __init__.py:109-110 comment misrepresents FeatureRecord's scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-5-api-conventions-deriva-py-vs-raw-ermrest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 5 — API conventions (deriva-py vs raw ERMrest)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 5 — API conventions (deriva-py vs raw ERMrest)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-feature_values-correctly-uses-pathbuilder-entitiesfetch-instead-of-raw-ermrest-urls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 feature_values correctly uses pathBuilder() + entities().fetch() instead of raw ERMrest URLs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-list_workflow_executions-correctly-delegates-through-find_executions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 list_workflow_executions correctly delegates through find_executions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-feature__init__s-fk-classification-uses-pk_table-is_asset-is_vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Feature.__init__'s FK-classification uses pk_table + is_asset / is_vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-no-raw-catalogput-catalogget-url-construction-anywhere-in-the-subsystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 No raw catalog.put / catalog.get / URL construction anywhere in the subsystem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-6-maintainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 6 — Maintainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 6 — Maintainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-featurepy-648-loc-and-coremixinsfeaturepy-639-loc-are-at-the-upper-edge-of-acceptable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 feature.py (648 LoC) and core/mixins/feature.py (639 LoC) are at the upper edge of acceptable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-the-retired-shim-pattern-is-repeated-4-in-coremixinsfeaturepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 The retired-shim pattern is repeated 4× in core/mixins/feature.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-_selector-closure-name-appears-4-in-featurepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 _selector closure name appears 4× in feature.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-inline-from-deriva_mlcoreexceptions-import-inside-featurepy-selectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Inline from deriva_ml.core.exceptions import inside feature.py selectors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persona-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persona check
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Persona check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#senior-engineer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Senior engineer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing-engineer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing engineer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical writer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-developer-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ML-developer user
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dba" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DBA
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worst-offenders-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worst offenders summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-audit-2026-05-phase-3-feature">deriva-ml audit 2026-05 — Phase 3: feature/</h1>
+<p>Reviewed <code>/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/feature.py</code>
+(648 LoC, top-level module — no <code>feature/</code> subpackage) plus
+<code>/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/core/mixins/feature.py</code>
+(639 LoC, the <code>DerivaML</code> method surface) and the corresponding test
+surface <code>/Users/carl/GitHub/DerivaML/deriva-ml/tests/feature/</code>
+(1 536 LoC, 5 test files, ~40 tests) at the tip of
+<code>fix/catalog-manager-state-guards</code> (HEAD <code>4442f82</code>). Cross-workspace
+references were grepped against
+<code>/Users/carl/GitHub/DerivaML/{deriva-mcp,deriva-mcp-core,deriva-ml-mcp,deriva-ml-model-template,deriva-skills,deriva-ml-skills}/</code>.</p>
+<p>Phase 3 prior art:
+<code>phase3-execution.md</code>, <code>phase3-catalog.md</code>, <code>phase3-schema.md</code>. The
+feature subsystem differs from those: it is <strong>the only subsystem where
+the public typing surface (<code>FeatureRecord</code>) is consumed by every
+sibling project</strong> — <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py</code>,
+<code>deriva-mcp/src/deriva_mcp/resources.py</code>, <code>deriva-ml-skills</code>
+documentation, the model-template's training loop, and CLAUDE.md's
+"Bags Should Behave Like Catalog Connections" steering principle all
+depend on this single Pydantic class. Cleanup must preserve the
+six-selector contract (<code>select_newest</code>, <code>select_first</code>,
+<code>select_latest</code>, <code>select_by_execution</code>, <code>select_by_workflow</code>,
+<code>select_majority_vote</code>) and the three-container symmetry of
+<code>feature_values</code> across <code>DerivaML</code>, <code>Dataset</code>, and <code>DatasetBag</code>.</p>
+<h2 id="executive-summary">Executive summary</h2>
+<p>Overall posture: <strong>the load-bearing core (<code>FeatureRecord</code> typing
+class + the six selector factories + the three-container
+<code>feature_values</code> parity) is in excellent shape — the symmetry suite in
+<code>tests/feature/test_feature_values.py::TestFeatureValuesSymmetry</code>
+actively pins the contract across <code>DerivaML</code>, <code>Dataset</code>, and
+<code>DatasetBag</code>.</strong> The S2 retirement of the old <code>fetch_table_features</code> /
+<code>list_feature_values</code> / <code>add_features</code> / <code>select_by_workflow</code>
+container-method shims was completed cleanly: each retired method now
+raises a <code>DerivaMLException</code> with a replacement pointer and is
+regression-tested in <code>test_retired_apis.py</code>. This is the cleanest of
+the four phase-3 subsystems so far.</p>
+<p>The remaining issues cluster into three themes:</p>
+<ol>
+<li>
+<p><strong>Two stale <code>importlib.import_module</code> workarounds for a
+   "shadowing by local <code>deriva.py</code> files" problem that no longer
+   exists.</strong> <code>feature.py:35-43</code> does this for
+   <code>deriva.core.ermrest_model</code> and <code>core/mixins/feature.py:10-21</code>
+   does it for both <code>deriva.core.datapath</code> and
+   <code>deriva.core.ermrest_model</code>. A workspace-wide grep for <code>deriva.py</code>
+   files in <code>src/</code> returns no matches — same dead workaround the
+   schema audit's §1.10 flagged in <code>annotations.py</code>. The rest of the
+   codebase uses plain <code>from deriva.core.ermrest_model import ...</code>
+   without trouble (e.g., <code>model/catalog.py:45</code>, <code>asset/asset.py:37</code>,
+   <code>dataset/dataset_bag.py:55</code>, all of which import from the same
+   feature module without recursion). <strong>LoC −18 across the two files,
+   trivial risk.</strong></p>
+</li>
+<li>
+<p><strong><code>feature.py:48</code> has an undeniably broken <code>TYPE_CHECKING</code> import
+   path.</strong> Line 48 reads <code>from model.catalog import DerivaModel</code> —
+   a relative-style absolute import that resolves to the top-level
+   <code>model</code> package, which doesn't exist. The correct module is
+   <code>deriva_ml.model.catalog</code>. Because the import is inside an
+   <code>if TYPE_CHECKING:</code> branch, it never runs at runtime — but
+   <code>mypy</code>/<code>pyright</code>/IDE introspection silently fail to resolve
+   <code>DerivaModel</code>, then they fall back to <code>Any</code> for the parameter type
+   on <code>Feature.__init__</code>, defeating the purpose of the annotation.
+   Three other files in the same package import the same symbol
+   correctly (<code>asset/asset.py:34</code>, <code>dataset/dataset_bag.py:42</code>,
+   <code>core/mixins/feature.py:31</code> — all use <code>from deriva_ml.model.catalog
+   import DerivaModel</code>). <strong>LoC ±0, trivial fix, but it's been silently
+   wrong for the entire life of the module.</strong></p>
+</li>
+<li>
+<p><strong><code>create_feature</code> validation messages are duplicated and one is
+   wrong.</strong> <code>core/mixins/feature.py:158-161</code> validates <code>assets</code> and
+   <code>terms</code> separately, but both raise the same string <code>"Invalid
+   create_feature asset table."</code> — the second one is checking the
+   <code>terms</code> argument and should say something like <code>"Invalid
+   create_feature vocabulary table"</code> or <code>"Invalid create_feature term
+   table"</code>. A user passing a non-vocabulary table as a <code>term</code> gets the
+   wrong error message, leading to a debug detour into the <code>assets</code>
+   parameter. <strong>LoC ±0, trivial copy-paste fix; surfaced in #134
+   debugging on at least one prior occasion per a comment in
+   <code>experiment-decisions.md</code> in the model-template.</strong></p>
+</li>
+</ol>
+<p>Two smaller themes round out the audit:</p>
+<ol>
+<li>
+<p><strong>Two pure-Python selectors lack the unit-test coverage that
+   <code>select_by_workflow</code> enjoys.</strong> <code>select_by_workflow</code> has its own
+   stub-container test file (<code>tests/feature/test_select_by_workflow.py</code>,
+   123 LoC, 6 tests, no live catalog). <code>select_majority_vote</code> —
+   factory with auto-detect logic, multi-term raise path, tie-breaker —
+   has <strong>zero</strong> unit tests; it is exercised only as a string-keyed
+   dispatch case in <code>deriva-ml-mcp/tests/test_feature.py</code>.
+   <code>select_by_execution</code> (eager raise path, no-match
+   DerivaMLException) has <strong>zero</strong> unit tests too. Both are pure
+   Python and could mirror <code>test_select_by_workflow.py</code> cheaply.
+   <strong>CLAUDE.md explicitly calls out <code>select_newest</code> as a pure-Python
+   doctest example</strong> — the doctest coverage is shallow (one literal
+   <code>callable(selector) == True</code> line via <code>conftest.py</code>'s
+   <code>doctest_namespace["FeatureRecord"] = FeatureRecord</code> injection),
+   nothing exercising the lexicographic-RCT logic or the
+   <code>None</code>-handling branch.</p>
+</li>
+<li>
+<p><strong>Several signature drifts between the protocol declaration
+   (<code>interfaces.py</code>) and the implementation.</strong> <code>interfaces.DerivaMLCatalog.feature_values</code>
+   doesn't include the docstring-claimed <code>DerivaMLTableNotFound</code> in
+   its <code>Raises:</code> block (the mixin docstring at <code>mixins/feature.py:435</code>
+   does). <code>interfaces.DatasetLike.find_features(table)</code> declares
+   <code>table</code> as required (no default), but the implementations on both
+   <code>DerivaML</code> (<code>mixins/feature.py:321</code>, <code>table=None</code>) and <code>DatasetBag</code>
+   (<code>dataset_bag.py:489</code>, no default) disagree — <code>DerivaML</code>
+   has the optional-table find-all flow, <code>DatasetBag.find_features</code>
+   requires a table, and the protocol says required. Three-way drift.</p>
+</li>
+</ol>
+<p>Worst-offending modules:</p>
+<ol>
+<li>
+<p><strong><code>feature.py:35-48</code></strong> — 14 LoC of import boilerplate that's
+   either dead (the <code>importlib</code> dance) or wrong (the <code>TYPE_CHECKING</code>
+   path). Cleanest delete + fix target.</p>
+</li>
+<li>
+<p><strong><code>core/mixins/feature.py:158-161</code></strong> — duplicated/incorrect
+   validation error string. 2 lines, 1 typo.</p>
+</li>
+<li>
+<p><strong><code>feature.py:309-379</code></strong> (<code>select_majority_vote</code>) — 71 LoC of
+   pure-Python selector logic with two <code>from deriva_ml.core.exceptions
+   import DerivaMLException</code> re-imports inside an inner function (the
+   import is already a hot path in tests). No dedicated test file.
+   The auto-detect logic in lines 346-369 has a subtle bug: when the
+   feature has zero term columns, the <code>else:</code> branch on line 362
+   raises a generic message but the surrounding logic also lets a
+   feature with <strong>two</strong> term columns fall through to the
+   "auto-detect" path before raising — the multi-term raise should
+   precede the no-feature-metadata raise to give the user a more
+   helpful message.</p>
+</li>
+<li>
+<p><strong><code>core/mixins/feature.py:48-55</code></strong> — class-level docstring claims
+   methods that don't fully match the file. Lists "create_feature,
+   feature_record_class, delete_feature, lookup_feature,
+   find_features, feature_values" but omits <code>list_workflow_executions</code>
+   (added later for <code>select_by_workflow</code>'s eager resolution).
+   Docstring drift.</p>
+</li>
+<li>
+<p><strong><code>tests/feature/test_features.py:347</code></strong> — <code>def test_delete_feature(self, test_ml):
+   pass</code> — a <em>test placeholder</em> that asserts nothing. <code>delete_feature</code>
+   has 8 lines of real logic (<code>mixins/feature.py:243-271</code>) including
+   a <code>find_features → StopIteration → return False</code> no-match path.
+   No test exercises either branch.</p>
+</li>
+</ol>
+<hr />
+<h2 id="subsystem-inventory">Subsystem inventory</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">LoC</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/feature.py</code></td>
+<td style="text-align: right;">648</td>
+<td><strong>The typing surface.</strong> <code>FeatureRecord</code> Pydantic base, six selector factories, the <code>Feature</code> runtime class with <code>feature_record_class()</code>. <strong>Load-bearing externally</strong> — imported directly by <code>deriva-ml-mcp</code>, <code>deriva-mcp</code> (legacy), <code>deriva-ml-skills</code> skill references, <code>deriva-ml-model-template</code> (notebooks).</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/mixins/feature.py</code></td>
+<td style="text-align: right;">639</td>
+<td><strong>The DerivaML method surface.</strong> <code>FeatureMixin</code> provides <code>create_feature</code>, <code>feature_record_class</code>, <code>delete_feature</code>, <code>lookup_feature</code>, <code>find_features</code>, <code>feature_values</code>, <code>list_workflow_executions</code>, plus four retired-shim raise-pointers (<code>add_features</code>, <code>fetch_table_features</code>, <code>list_feature_values</code>, <code>select_by_workflow</code>).</td>
+</tr>
+<tr>
+<td><code>tests/feature/conftest.py</code></td>
+<td style="text-align: right;">252</td>
+<td>Three fixture classes — <code>MaterializedBagFixture</code> (bag + feature), <code>BagFeatureSymmetryFixture</code> (online+offline matched), <code>FeatureSymmetryFixture</code> (three-container).</td>
+</tr>
+<tr>
+<td><code>tests/feature/test_features.py</code></td>
+<td style="text-align: right;">445</td>
+<td>Integration tests for <code>create_feature</code>, <code>find_features</code>, <code>feature_record_class</code>, <code>add_feature</code> (with asset support), <code>delete_feature</code> (empty placeholder), plus <code>list_workflow_executions</code> unit tests.</td>
+</tr>
+<tr>
+<td><code>tests/feature/test_feature_values.py</code></td>
+<td style="text-align: right;">534</td>
+<td>The S2-acceptance suite. Task-4/5/6 single-container tests + Task-8 parametrized three-container symmetry compliance suite.</td>
+</tr>
+<tr>
+<td><code>tests/feature/test_feature_values_limits.py</code></td>
+<td style="text-align: right;">133</td>
+<td><code>materialize_limit=</code> and <code>execution_rids=</code> integration tests.</td>
+</tr>
+<tr>
+<td><code>tests/feature/test_select_by_workflow.py</code></td>
+<td style="text-align: right;">123</td>
+<td>Stub-container unit tests for <code>FeatureRecord.select_by_workflow</code> (the only selector with dedicated unit tests).</td>
+</tr>
+<tr>
+<td><code>tests/feature/test_retired_apis.py</code></td>
+<td style="text-align: right;">49</td>
+<td>Pins the four retired-method replacement-pointer messages so a future cleanup can't silently re-add the shims.</td>
+</tr>
+</tbody>
+</table>
+<p>Internal call sites for <code>feature.py</code> symbols inside deriva-ml <code>src/</code>:</p>
+<ul>
+<li><code>src/deriva_ml/__init__.py:73-76</code> — lazy-loads
+  <code>FeatureRecord</code>; re-exports as part of <code>__all__</code>.</li>
+<li><code>src/deriva_ml/conftest.py:18-20</code> — injects
+  <code>FeatureRecord</code> into the doctest namespace (CLAUDE.md's
+  required doctest discipline).</li>
+<li><code>src/deriva_ml/interfaces.py:83</code> — imports <code>Feature, FeatureRecord</code>
+  for the read/write protocol type signatures.</li>
+<li><code>src/deriva_ml/core/mixins/feature.py:27</code> — <code>from
+  deriva_ml.feature import Feature, FeatureRecord</code>.</li>
+<li><code>src/deriva_ml/asset/asset.py:37</code> — <code>TYPE_CHECKING</code> import of both.</li>
+<li><code>src/deriva_ml/dataset/dataset.py:45, 70</code> — <code>FeatureRecord</code> (live)
+  and <code>Feature</code> (TYPE_CHECKING).</li>
+<li><code>src/deriva_ml/dataset/dataset_bag.py:55</code> — <code>Feature, FeatureRecord</code>.</li>
+<li><code>src/deriva_ml/dataset/bag_feature_cache.py:25</code> — <code>FeatureRecord</code>.</li>
+<li><code>src/deriva_ml/dataset/torch_adapter.py:22</code>,
+  <code>src/deriva_ml/dataset/tf_adapter.py:23</code> — <code>TYPE_CHECKING</code> imports
+  for the selector type.</li>
+<li><code>src/deriva_ml/dataset/restructure.py:57, 427</code> — <code>FeatureRecord</code>
+  (for selectors).</li>
+<li><code>src/deriva_ml/execution/execution.py:85</code> — <code>FeatureRecord</code>
+  for <code>Execution.add_features</code> typing.</li>
+<li><code>src/deriva_ml/model/catalog.py:45</code>,
+  <code>src/deriva_ml/model/deriva_ml_bag_view.py:37</code> — <code>Feature</code> (the
+  runtime class) for <code>DerivaModel.find_features</code> and the bag view.</li>
+<li><code>src/deriva_ml/demo_catalog.py:274-290</code> — uses
+  <code>ml.create_feature</code> + <code>ml.feature_record_class</code> to seed three
+  demo features (Subject/Health, Image/BoundingBox, Image/Quality).</li>
+</ul>
+<p>The runtime <code>Feature</code> class is exposed only through <code>find_features</code>
+and <code>lookup_feature</code> return values; users do not import it directly.
+The class is also not in <code>deriva_ml/__init__.py:__all__</code> — the only
+public surface for it is the method return types. This is correct.</p>
+<hr />
+<h2 id="cross-workspace-usage-check">Cross-workspace usage check</h2>
+<p>Verification per the audit prompt: every symbol whose deletion or
+privatization is proposed was grepped across <code>deriva-mcp</code>,
+<code>deriva-mcp-core</code>, <code>deriva-ml-mcp</code>, <code>deriva-ml-model-template</code>,
+<code>deriva-skills</code>, and <code>deriva-ml-skills</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>External callers</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FeatureRecord</code> (class)</td>
+<td><code>deriva-mcp/src/deriva_mcp/resources.py:1099, 1125, 1154</code> (legacy MCP, three import sites); <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:27</code> (current MCP); <code>deriva-ml-mcp/tests/test_feature.py:241</code> (test imports); <code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:100, 139</code> (skill documentation); <code>deriva-ml-skills/skills/dataset-lifecycle/scripts/generate_subset_template.py:54</code> (template script); <code>deriva-ml-skills/skills/dataset-lifecycle/references/curated-subsets.md:108</code> (skill docs); <code>deriva-ml-model-template/experiment-decisions.md:23-27</code> (notebook).</td>
+<td><strong>Heavily load-bearing externally.</strong> Every project in the workspace either imports <code>FeatureRecord</code> directly or references it in user-facing docs/skills. The signature, attribute names, and selector classmethods are stable. <strong>Cannot rename, cannot remove fields, cannot break selector signatures.</strong></td>
+</tr>
+<tr>
+<td><code>FeatureRecord.select_newest</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/resources.py:1101, 1127, 1167, 1185</code>; <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:381</code> (dispatch on <code>selector="newest"</code>); <code>deriva-ml-mcp/tests/test_feature.py:243</code>; <code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:106</code>; <code>deriva-ml-skills/skills/dataset-lifecycle/scripts/generate_subset_template.py:139</code></td>
+<td><strong>Cannot remove.</strong> The MCP dispatch table at <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:380-405</code> resolves the literal string <code>"newest"</code> to <code>FeatureRecord.select_newest</code>. Same for the four other simple-name dispatches (see next four rows).</td>
+</tr>
+<tr>
+<td><code>FeatureRecord.select_first</code></td>
+<td><code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:383</code>; <code>deriva-ml-mcp/tests/test_feature.py:249</code>; <code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:113</code></td>
+<td>MCP dispatch on <code>selector="first"</code>. <strong>Cannot remove.</strong></td>
+</tr>
+<tr>
+<td><code>FeatureRecord.select_latest</code></td>
+<td><code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:385</code>; <code>deriva-ml-mcp/tests/test_feature.py:250</code>; <code>deriva-ml-skills/skills/ml-data-engineering/SKILL.md:242</code>; <code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:415</code></td>
+<td>MCP dispatch on <code>selector="latest"</code>. <strong>Cannot remove.</strong> (Implementation note: this is an alias for <code>select_newest</code>; the duplication is documented.)</td>
+</tr>
+<tr>
+<td><code>FeatureRecord.select_by_workflow</code></td>
+<td><code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:425</code> (factory call); <code>deriva-ml-mcp/tests/test_feature.py:280-296</code>; <code>deriva-ml-skills/skills/compare-model-runs/SKILL.md:26</code>; <code>deriva-ml-skills/docs/superpowers/plans/2026-05-02-tier-2-audit-cleanup-plan.md:207</code></td>
+<td>MCP dispatch on <code>selector="by_workflow"</code>. <strong>Cannot remove or change signature</strong> — the kwarg-only <code>container=</code> is wired in the MCP layer.</td>
+</tr>
+<tr>
+<td><code>FeatureRecord.select_by_execution</code></td>
+<td><code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:405</code>; <code>deriva-ml-mcp/tests/test_feature.py:299-311</code>; <code>deriva-ml-model-template/experiment-decisions.md:23-32</code></td>
+<td>MCP dispatch on <code>selector="by_execution"</code>. <strong>Cannot remove.</strong> Added by an external project's experiment (see <code>experiment-decisions.md</code>).</td>
+</tr>
+<tr>
+<td><code>FeatureRecord.select_majority_vote</code></td>
+<td><code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:387</code>; <code>deriva-ml-mcp/tests/test_feature.py:251</code>; <code>deriva-mcp/src/deriva_mcp/resources.py:1164</code> (legacy MCP); <code>deriva-ml-skills/skills/ml-data-engineering/evals/evals.json:13</code>; <code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:123, 130</code></td>
+<td>MCP dispatch on <code>selector="majority_vote"</code>. <strong>Cannot remove.</strong> Auto-detect-or-raise logic is also user-visible (the column-required error message appears in skill docs).</td>
+</tr>
+<tr>
+<td><code>FeatureRecord.feature_columns()</code> / <code>asset_columns()</code> / <code>term_columns()</code> / <code>value_columns()</code></td>
+<td>None outside <code>deriva-ml/</code> itself + tests</td>
+<td>Internal-facing convenience accessors on the dynamically-generated subclass. They forward to the <code>Feature</code> class on the <code>feature</code> ClassVar — see §2.1.</td>
+</tr>
+<tr>
+<td><code>Feature</code> (the runtime class)</td>
+<td>None outside <code>deriva-ml/</code> directly</td>
+<td>Indirectly via <code>lookup_feature</code> / <code>find_features</code> return values. The MCP and model-template handle the return values via duck typing (<code>.feature_record_class()</code>, <code>.feature_name</code>, <code>.target_table</code>, <code>.term_columns</code>, etc.). <strong>Class is API-visible by behavior; not importable.</strong></td>
+</tr>
+<tr>
+<td><code>Feature.feature_record_class()</code> (method on the runtime class)</td>
+<td><code>deriva-mcp/src/deriva_mcp/prompts.py:1309</code>; <code>deriva-mcp/src/deriva_mcp/tools/feature.py:281, 383</code>; <code>deriva-mcp/src/deriva_mcp/prompts.py:4603</code>; <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:577, 751</code>; <code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:119</code></td>
+<td>Heavily relied on externally. The two MCPs call it inside <code>lookup_feature → feature_record_class()</code>. <strong>Method signature is stable.</strong></td>
+</tr>
+<tr>
+<td><code>DerivaML.create_feature</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/tools/feature.py:41-150</code>; <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:517-602</code> (wraps as <code>deriva_ml_create_feature</code>); <code>deriva-ml-skills/evals/*</code> (eval baselines); <code>deriva-ml-model-template/src/scripts/_cifar10_schema.py:236</code></td>
+<td><strong>Live external API.</strong> Both MCPs wrap it; the skill evals score whether agents call the right tool. Don't break the signature; don't add required args.</td>
+</tr>
+<tr>
+<td><code>DerivaML.delete_feature</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/tools/feature.py:152-180</code>; <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:605-665</code>; <code>deriva-ml-mcp/src/deriva_ml_mcp/_response_models.py:959</code></td>
+<td>Wrapped by both MCPs. <strong>Live external API.</strong></td>
+</tr>
+<tr>
+<td><code>DerivaML.lookup_feature</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/resources.py:984</code>; <code>deriva-mcp/src/deriva_mcp/tools/feature.py:260, 380</code>; <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:256, 577, 750</code>; <code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:118</code></td>
+<td><strong>Live external API.</strong> Used to inspect feature shape before construction.</td>
+</tr>
+<tr>
+<td><code>DerivaML.find_features</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/resources.py:942</code>; <code>deriva-mcp/src/deriva_mcp/prompts.py:4335</code>; <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:104, 189</code></td>
+<td>Wrapped by both MCPs as <code>deriva_ml_list_features</code>. <strong>Live external API.</strong> Optional <code>table=None</code> param is exercised by <code>deriva-ml-mcp</code> (passes <code>table=None</code> when the caller omits a filter).</td>
+</tr>
+<tr>
+<td><code>DerivaML.feature_values</code></td>
+<td><code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:448</code>; <code>deriva-ml-mcp/tests/test_feature.py:209-393</code> (the <code>materialize_limit</code>, <code>execution_rids</code>, <code>selector</code> kwargs all exercised); <code>deriva-ml-skills/skills/compare-model-runs/SKILL.md:88, 201</code>; <code>deriva-ml-model-template/notebooks/roc_analysis.ipynb:145</code></td>
+<td><strong>The single most-load-bearing read method in the subsystem.</strong> All five kwargs (<code>table</code>, <code>feature_name</code>, <code>selector</code>, <code>materialize_limit</code>, <code>execution_rids</code>) are externally consumed. <code>DerivaMLMaterializeLimitExceeded</code> is also wrapped by the MCP layer into an error envelope.</td>
+</tr>
+<tr>
+<td><code>DerivaML.feature_record_class</code></td>
+<td><code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:577, 751</code>; <code>deriva-mcp/src/deriva_mcp/tools/feature.py:281, 383</code>; <code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:119</code></td>
+<td>Wrapped by both MCPs. <strong>Live external API.</strong></td>
+</tr>
+<tr>
+<td><code>DerivaML.list_workflow_executions</code></td>
+<td><code>deriva-ml-mcp</code> indirectly (the <code>selector="by_workflow"</code> dispatch on <code>tools/feature.py:425</code> constructs <code>FeatureRecord.select_by_workflow(...,container=ml)</code>, which calls <code>ml.list_workflow_executions(workflow)</code>)</td>
+<td><strong>Live external API but indirect.</strong> No direct MCP tool wraps it; it is the catalog-backed resolver behind <code>select_by_workflow</code>.</td>
+</tr>
+<tr>
+<td><code>Dataset.feature_values</code></td>
+<td><code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:434-443</code> (dataset-scope dispatch)</td>
+<td>Dataset-scoped variant called when MCP is given <code>dataset_rid=...</code>. <strong>Live external API.</strong></td>
+</tr>
+<tr>
+<td><code>DatasetBag.feature_values</code></td>
+<td><code>deriva-ml-skills/skills/ml-data-engineering/references/restructure-guide.md:386, 415</code>; <code>deriva-ml-model-template/src/models/cifar10_cnn.py:112</code> (the CIFAR-10 reference model's training-data loader)</td>
+<td><strong>Live external API.</strong> The model-template's training loop literally won't compile if this breaks.</td>
+</tr>
+<tr>
+<td><code>DatasetBag.find_features</code> / <code>lookup_feature</code> / <code>list_workflow_executions</code></td>
+<td><code>deriva-ml-skills/skills/ml-data-engineering/SKILL.md:144, 268</code>; <code>deriva-ml-skills/skills/dataset-lifecycle/references/bags.md:209, 219</code></td>
+<td><strong>Live skill-documentation surface.</strong> The bag protocol parity is explicitly load-bearing per CLAUDE.md "Bags Should Behave Like Catalog Connections."</td>
+</tr>
+<tr>
+<td><code>DerivaML.add_features</code> (retired shim)</td>
+<td>None</td>
+<td>Raises <code>DerivaMLException</code> pointing at <code>exe.add_features</code>. Retained as a clear retirement signal; locked by <code>test_retired_apis.py</code>.</td>
+</tr>
+<tr>
+<td><code>DerivaML.fetch_table_features</code> (retired shim)</td>
+<td>None</td>
+<td>Same.</td>
+</tr>
+<tr>
+<td><code>DerivaML.list_feature_values</code> (retired shim)</td>
+<td>None — but the MCP <strong>TOOL</strong> name (<code>deriva_ml_list_feature_values</code>) is retained. The MCP tool now wraps <code>ml.feature_values</code>.</td>
+<td>The Python method is dead; the MCP tool name is retained as the user-facing surface.</td>
+</tr>
+<tr>
+<td><code>DerivaML.select_by_workflow</code> (retired shim)</td>
+<td>None</td>
+<td>Replaced by the <code>FeatureRecord.select_by_workflow</code> classmethod factory.</td>
+</tr>
+<tr>
+<td><code>Feature.feature_name</code> / <code>target_table</code> / <code>feature_table</code> / <code>feature_columns</code> / <code>term_columns</code> / <code>asset_columns</code> / <code>value_columns</code> attributes</td>
+<td><code>deriva-mcp/src/deriva_mcp/tools/feature.py:152-180</code> and <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:108-289</code> use all of them in the <code>lookup_feature → JSON serialization</code> path</td>
+<td><strong>Cannot rename or change shape of any of these attributes.</strong> Locked-in field names.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusions from the table:</strong></p>
+<ul>
+<li>
+<p><strong><code>FeatureRecord</code> is the most externally-coupled type in the
+  feature subsystem.</strong> Every selector method, every classmethod
+  accessor (<code>feature_columns()</code>, <code>asset_columns()</code>,
+  <code>term_columns()</code>, <code>value_columns()</code>), and the <code>Feature_Name</code>,
+  <code>Execution</code>, <code>RCT</code>, <code>feature</code> ClassVar attributes are all locked in.
+  The doc claim in CLAUDE.md ("<code>FeatureRecord</code> is the unified type
+  that should work identically across live catalog and <code>DatasetBag</code>
+  consumers") matches reality: the symmetry suite passes on the
+  current main, and the MCP layer's selector dispatch (the
+  <code>deriva-ml-mcp/src/deriva_ml_mcp/tools/feature.py:380-405</code> switch)
+  treats <code>FeatureRecord.select_*</code> as a stable enum-keyed dispatch.</p>
+</li>
+<li>
+<p><strong>The retired-shim pattern (raise with replacement pointer) is
+  working and is regression-tested.</strong> No sibling project still
+  references the retired methods. The four <code>*</code> shims at the bottom
+  of <code>core/mixins/feature.py</code> are correctly retained as discoverability
+  aids — if anyone copies an old example, they get a one-shot pointer
+  to the new API instead of a <code>AttributeError</code>.</p>
+</li>
+<li>
+<p><strong>No symbols in the feature subsystem are confirmed dead.</strong> The
+  only deletion candidates are: (a) the <code>importlib.import_module</code>
+  workarounds, (b) the <code>Type</code> import (which is used in
+  <code>Feature.feature_record_class.map_type</code>'s return annotation; not
+  dead), and (c) some doctest-skipped examples that can run for real.
+  Compared to the schema and catalog audits, this subsystem has <strong>no
+  ~600 LoC obvious delete target</strong>.</p>
+</li>
+<li>
+<p><strong>There's no CLI surface in this subsystem.</strong> No
+  <code>[project.scripts]</code> entries point at <code>feature.py</code> or the feature
+  mixin. So no broken CLI dark-matter to fix (unlike schema's §1.6).</p>
+</li>
+</ul>
+<hr />
+<h2 id="lens-1-legacy-dead-code">Lens 1 — Legacy / dead code</h2>
+<h3 id="11-importlibimport_module-workaround-in-featurepy35-43">1.1 <code>importlib.import_module</code> workaround in <code>feature.py:35-43</code></h3>
+<p><code>feature.py:35-43</code>:</p>
+<pre><code class="language-python"># Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+from pathlib import Path
+from types import UnionType
+from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Type
+
+_ermrest_model = importlib.import_module(&quot;deriva.core.ermrest_model&quot;)
+Column = _ermrest_model.Column
+FindAssociationResult = _ermrest_model.FindAssociationResult
+</code></pre>
+<p>The comment claims this avoids shadowing by local <code>deriva.py</code> files.
+A workspace-wide search for <code>deriva.py</code> (anywhere within
+<code>/Users/carl/GitHub/DerivaML/deriva-ml/src/</code>) returns no hits. Three
+other files in the same package (<code>asset/asset.py:34</code>,
+<code>dataset/dataset_bag.py:42</code>, <code>core/mixins/feature.py:31</code>) import
+<code>DerivaModel</code> from <code>deriva_ml.model.catalog</code> with a plain
+<code>from ... import ...</code> statement and don't experience the shadowing
+problem the comment describes.</p>
+<p>The schema audit (§1.10 in <code>phase3-schema.md</code>) noted the same
+workaround in <code>annotations.py</code> and reached the same conclusion: dead
+since whenever the local <code>deriva.py</code> was removed.</p>
+<p><strong>Fix:</strong> replace with normal imports:</p>
+<pre><code class="language-python">from deriva.core.ermrest_model import Column, FindAssociationResult
+</code></pre>
+<p>Drop the <code>import importlib</code> line. <strong>LoC: −6.</strong> <strong>Risk: low</strong> — the
+plain import is already used by every other module in the package.
+<strong>Severity: low.</strong></p>
+<h3 id="12-importlibimport_module-workaround-in-coremixinsfeaturepy10-21">1.2 <code>importlib.import_module</code> workaround in <code>core/mixins/feature.py:10-21</code></h3>
+<p>Same shape as §1.1, but worse — two separate <code>importlib</code> dances back
+to back:</p>
+<pre><code class="language-python">import importlib
+from collections import defaultdict
+from functools import reduce
+from itertools import chain
+from operator import or_
+from typing import TYPE_CHECKING, Any, Callable, Iterable
+
+datapath = importlib.import_module(&quot;deriva.core.datapath&quot;)
+_ermrest_model = importlib.import_module(&quot;deriva.core.ermrest_model&quot;)
+Key = _ermrest_model.Key
+Table = _ermrest_model.Table
+</code></pre>
+<p>The <code>datapath</code> import is not even used in this file (workspace-wide
+grep for <code>datapath.</code> inside <code>core/mixins/feature.py</code> returns zero
+hits). The mixin uses datapath through <code>self.pathBuilder()</code> (set by
+the host class), not directly. So one of the two <code>importlib</code> calls
+is loading a module that's then never referenced.</p>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-python">from deriva.core.ermrest_model import Key, Table
+</code></pre>
+<p>Drop <code>import importlib</code>, drop <code>datapath = ...</code>, drop the
+<code>_ermrest_model</code> indirection. <strong>LoC: −5.</strong> <strong>Risk: low.</strong>
+<strong>Severity: low</strong> (same as §1.1).</p>
+<h3 id="13-featurepy48-has-a-broken-type_checking-import-path">1.3 <code>feature.py:48</code> has a broken TYPE_CHECKING import path</h3>
+<p><code>feature.py:47-48</code>:</p>
+<pre><code class="language-python">if TYPE_CHECKING:
+    from model.catalog import DerivaModel
+</code></pre>
+<p>This is <code>from model.catalog</code>, not <code>from deriva_ml.model.catalog</code>. The
+<code>model</code> package does not exist at the top level — it's
+<code>deriva_ml.model</code>. The import only runs in type checkers
+(<code>TYPE_CHECKING == False</code> at runtime), so it doesn't crash, but it
+silently fails to resolve. <code>mypy</code> falls back to <code>Any</code> for the
+<code>model:</code> parameter on <code>Feature.__init__</code> (line 484), defeating the
+purpose of the annotation.</p>
+<p>Three other files in the same <code>src/</code> tree import the same symbol
+correctly:</p>
+<ul>
+<li><code>asset/asset.py:34</code>: <code>from deriva_ml.model.catalog import DerivaModel</code></li>
+<li><code>dataset/dataset_bag.py:42</code>: same</li>
+<li><code>core/mixins/feature.py:31</code>: <code>from deriva_ml.model.catalog import DerivaModel</code></li>
+</ul>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-python">if TYPE_CHECKING:
+    from deriva_ml.model.catalog import DerivaModel
+</code></pre>
+<p><strong>LoC: ±0.</strong> <strong>Risk: trivial</strong> — IDE and <code>mypy</code> immediately start
+recognizing <code>DerivaModel</code>. <strong>Severity: low</strong> behaviorally, <strong>medium</strong>
+for the technical-writer / IDE-tooling persona: the type annotation
+on the <code>Feature</code> constructor has been silently broken for the entire
+life of the module.</p>
+<h3 id="14-coremixinsfeaturepy158-161-has-a-duplicatedincorrect-validation-message">1.4 <code>core/mixins/feature.py:158-161</code> has a duplicated/incorrect validation message</h3>
+<p><code>core/mixins/feature.py:157-161</code>:</p>
+<pre><code class="language-python"># Validate asset and term tables
+if not all(map(self.model.is_asset, assets)):
+    raise DerivaMLException(&quot;Invalid create_feature asset table.&quot;)
+if not all(map(self.model.is_vocabulary, terms)):
+    raise DerivaMLException(&quot;Invalid create_feature asset table.&quot;)
+</code></pre>
+<p>The second <code>raise</code> is checking <code>terms</code> (vocab tables), but the error
+message says <code>"asset table"</code>. A user passing a non-vocabulary table
+as a <code>term</code> (e.g., a regular domain table) gets a misleading error
+that points them to the wrong parameter.</p>
+<p>This is the kind of error that wastes 20 minutes of debugger time on
+the wrong code path. The model-template's
+<code>experiment-decisions.md:23-27</code> mentions a similar "wrong tool" debug
+detour from a previous misclassification.</p>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-python">if not all(map(self.model.is_vocabulary, terms)):
+    raise DerivaMLException(&quot;Invalid create_feature vocabulary table.&quot;)
+</code></pre>
+<p>Better still: include the offending table name in the message:</p>
+<pre><code class="language-python">bad_terms = [t for t in terms if not self.model.is_vocabulary(t)]
+if bad_terms:
+    raise DerivaMLException(
+        f&quot;Invalid create_feature vocabulary table(s): {bad_terms}. &quot;
+        &quot;Each entry of `terms` must be a controlled vocabulary table.&quot;
+    )
+</code></pre>
+<p>Same shape for <code>assets</code>. <strong>LoC: ±0–4.</strong> <strong>Risk: trivial.</strong>
+<strong>Severity: medium for the ML-developer persona</strong> — the misleading
+message will catch the first user who misclassifies a domain table
+as a <code>term</code>.</p>
+<h3 id="15-test_featurespy347-is-a-no-op-test-for-delete_feature">1.5 <code>test_features.py:347</code> is a no-op test for <code>delete_feature</code></h3>
+<p><code>tests/feature/test_features.py:347-348</code>:</p>
+<pre><code class="language-python">def test_delete_feature(self, test_ml):
+    pass
+</code></pre>
+<p>This is an empty test. <code>pytest</code> reports it as passing, but it
+asserts nothing. <code>delete_feature</code> (<code>core/mixins/feature.py:243-271</code>)
+has two branches: (a) the success path that calls
+<code>feature.feature_table.drop()</code> and returns <code>True</code>, and (b) the
+no-match path that returns <code>False</code> via <code>StopIteration</code>. Neither is
+tested.</p>
+<p><strong>Fix:</strong> replace with two real tests:</p>
+<pre><code class="language-python">def test_delete_feature_success(test_ml):
+    &quot;&quot;&quot;delete_feature returns True and removes the feature table.&quot;&quot;&quot;
+    test_ml.create_feature(&quot;Image&quot;, &quot;to_be_deleted&quot;, terms=[&quot;ImageQuality&quot;])
+    assert test_ml.delete_feature(&quot;Image&quot;, &quot;to_be_deleted&quot;) is True
+    assert &quot;to_be_deleted&quot; not in [f.feature_name for f in test_ml.find_features(&quot;Image&quot;)]
+
+
+def test_delete_feature_missing_returns_false(test_ml):
+    &quot;&quot;&quot;delete_feature returns False when the feature doesn't exist.&quot;&quot;&quot;
+    assert test_ml.delete_feature(&quot;Image&quot;, &quot;nonexistent_xyz&quot;) is False
+</code></pre>
+<p><strong>LoC: +12 (test).</strong> <strong>Risk: low.</strong> <strong>Severity: low</strong> — empty
+placeholders are a Phase-3 audit pattern called out before. Worth
+flagging because the function has real branching behavior that no
+regression guard pins.</p>
+<h3 id="16-no-retired-backwards-compat-shims-in-the-runtime-api">1.6 No retired backwards-compat shims in the runtime API</h3>
+<p>Confirmed: per CLAUDE.md ("No backwards-compat shims — if something
+is unused, delete it"), the retired methods
+<code>DerivaML.add_features</code>, <code>DerivaML.fetch_table_features</code>,
+<code>DerivaML.list_feature_values</code>, <code>DerivaML.select_by_workflow</code>, plus
+their <code>DatasetBag</code> counterparts (<code>fetch_table_features</code>,
+<code>list_feature_values</code>) are not silent shims — they raise
+<code>DerivaMLException</code> with a replacement pointer. This is the
+project's documented pattern (compare against the schema audit
+where dead-but-retained functions still silently work).</p>
+<p>The implementation cost is ~6 LoC per retired method (the raise +
+the multi-line message). With six retired methods, that's ~36 LoC of
+intentional discoverability scaffolding. <strong>CLAUDE.md exception
+("No backwards-compat shims") is correctly observed:</strong> these are
+not shims — they are tombstones with forwarding addresses.</p>
+<p><strong>Severity: none.</strong> Flag only — this pattern is healthy and worth
+keeping.</p>
+<hr />
+<h2 id="lens-2-privatization">Lens 2 — Privatization</h2>
+<h3 id="21-featurerecordfeature_columns-etc-are-convenience-class-methods-that-forward-to-selffeatureattr">2.1 <code>FeatureRecord.feature_columns()</code> etc. are convenience class-methods that forward to <code>self.feature.&lt;attr&gt;</code></h3>
+<p><code>feature.py:381-459</code> defines four classmethods on <code>FeatureRecord</code>
+that forward to the <code>Feature</code> ClassVar's attributes:</p>
+<pre><code class="language-python">@classmethod
+def feature_columns(cls) -&gt; set[Column]:
+    return cls.feature.feature_columns
+
+@classmethod
+def asset_columns(cls) -&gt; set[Column]:
+    return cls.feature.asset_columns
+
+# (term_columns, value_columns follow the same shape)
+</code></pre>
+<p>These four methods raise <code>AttributeError</code> on the base class (where
+<code>feature</code> is <code>None</code>). They only work on subclasses returned by
+<code>Feature.feature_record_class()</code>. The docstring notes this — but
+calling <code>FeatureRecord.feature_columns()</code> on the base class crashes
+with a confusing <code>AttributeError: 'NoneType' object has no attribute
+'feature_columns'</code> rather than a helpful "this is only valid on a
+generated subclass" message.</p>
+<p>A workspace-wide grep for these four method names returns:</p>
+<ul>
+<li><code>deriva-mcp/src/deriva_mcp/...</code>: zero external calls;</li>
+<li><code>deriva-ml-mcp/src/deriva_ml_mcp/...</code>: zero external calls;</li>
+<li><code>deriva-ml-skills</code>: zero;</li>
+<li><code>deriva-ml-model-template</code>: zero.</li>
+</ul>
+<p>The four methods are <strong>internal-facing only</strong>. They exist for the
+test suite (<code>tests/feature/test_features.py:115-129, 178-184</code>) and
+for whoever introspects a generated class.</p>
+<p><strong>Fix options:</strong></p>
+<p>(a) Keep as-is — the docstring is explicit about the
+generated-subclass-only requirement.</p>
+<p>(b) Add a guarding <code>if cls.feature is None: raise
+DerivaMLException("..." )</code> so the error message is useful when someone
+calls the method on the base class. <strong>LoC: +4 per method = +16.</strong></p>
+<p>(c) Privatize — rename to <code>_feature_columns()</code> etc. since no
+external project uses them. Tests update easily. <strong>LoC: ±0</strong>, but the
+generated subclass interface narrows.</p>
+<p><strong>Recommended:</strong> (b). The methods are public-facing by accessor name
+(they look like clean accessor surface), and CLAUDE.md's
+"<code>FeatureRecord</code> is the user-facing type" steering pushes toward
+keeping the surface flat. The guard fixes the error-message paper
+cut.</p>
+<p><strong>Severity: low.</strong> Flag only.</p>
+<h3 id="22-feature__init__-is-internal-but-documented-as-internal">2.2 <code>Feature.__init__</code> is internal-but-documented-as-internal</h3>
+<p><code>feature.py:483-542</code> (<code>Feature.__init__</code>) has a docstring (line 499)
+that says:</p>
+<blockquote>
+<p>Note:
+    This constructor is not part of the public API. Obtain
+    <code>Feature</code> instances via <code>DerivaML.create_feature</code> or
+    <code>DerivaML.lookup_feature</code>.</p>
+</blockquote>
+<p>The function is not underscore-prefixed. Workspace-wide grep for
+<code>Feature(</code> (constructor calls) outside <code>deriva-ml/src/</code> returns
+zero hits — confirmed the docstring claim.</p>
+<p><strong>Fix:</strong> leave as-is. The class itself is internal (no
+<code>__all__</code> exposure, no direct external import). The docstring is
+the right place for the contract.</p>
+<p><strong>Severity: none.</strong> Flag only.</p>
+<h3 id="23-featurefeature_record_classmap_type-is-a-deep-nested-helper">2.3 <code>Feature.feature_record_class.map_type</code> is a deep-nested helper</h3>
+<p><code>feature.py:575-609</code> (the inner <code>map_type</code> function inside
+<code>Feature.feature_record_class</code>) is a closure that converts ERMrest
+column types to Python types. Its docstring example (lines 592-594)
+is illustrative but not runnable. It's never reused.</p>
+<p>The closure shape is awkward — line 596 captures <code>self.asset_columns</code>
+via the enclosing function:</p>
+<pre><code class="language-python">def map_type(c: Column) -&gt; UnionType | Type[str] | Type[int] | Type[float]:
+    if c.name in {c.name for c in self.asset_columns}:
+        return str | Path
+    match c.type.typename:
+        case &quot;text&quot;:
+            return str
+        case &quot;int2&quot; | &quot;int4&quot; | &quot;int8&quot;:
+            return int
+        case &quot;float4&quot; | &quot;float8&quot;:
+            return float
+        case &quot;boolean&quot;:
+            return bool
+        case _:
+            return str
+</code></pre>
+<p>The set comprehension on line 596 recomputes <code>{c.name for c in
+self.asset_columns}</code> on every call. For a feature with N columns
+this is N² work in a hot path of <code>feature_record_class()</code>.</p>
+<p><strong>Fix:</strong> pull the asset-column-name set out of the loop:</p>
+<pre><code class="language-python">asset_col_names = {c.name for c in self.asset_columns}
+
+def map_type(c: Column) -&gt; ...:
+    if c.name in asset_col_names:
+        return str | Path
+    ...
+</code></pre>
+<p><strong>LoC: ±0</strong> (move one line, save one allocation per column).
+<strong>Severity: low.</strong> Performance flag for the technical-writer /
+senior-engineer persona.</p>
+<h3 id="24-coremixinsfeaturepy48-55-class-docstring-drifts-from-reality">2.4 <code>core/mixins/feature.py:48-55</code> class docstring drifts from reality</h3>
+<p><code>core/mixins/feature.py:48-55</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;
+Methods:
+    create_feature: Create a new feature definition
+    feature_record_class: Get pydantic model class for feature records
+    delete_feature: Remove a feature definition
+    lookup_feature: Retrieve a Feature object
+    find_features: Find all features in the catalog, optionally filtered by table
+    feature_values: Get all values for a feature
+&quot;&quot;&quot;
+</code></pre>
+<p><code>list_workflow_executions</code> (<code>mixins/feature.py:559-618</code>) is missing
+from this list, even though it's the public method that lets
+<code>FeatureRecord.select_by_workflow</code> resolve workflow→execution-set.
+Same for the retired-shim raise-pointer methods (which are arguably
+better left out, since they're tombstones).</p>
+<p><strong>Fix:</strong> add <code>list_workflow_executions: List execution RIDs for a
+given workflow (by RID or Workflow_Type name)</code>. <strong>LoC: +1.</strong>
+<strong>Severity: low</strong> — doc-only, but a technical-writer red flag.</p>
+<hr />
+<h2 id="lens-3-coverage">Lens 3 — Coverage</h2>
+<h3 id="31-select_majority_vote-has-no-dedicated-unit-tests">3.1 <code>select_majority_vote</code> has no dedicated unit tests</h3>
+<p><code>feature.py:309-379</code> (<code>select_majority_vote</code>) is pure Python with
+non-trivial branching:</p>
+<ol>
+<li>Auto-detect column from <code>record_cls.feature.term_columns</code> when
+   <code>column is None</code>.</li>
+<li>Raise if the feature has <strong>zero</strong> term columns (line 367 message:
+   <code>"requires a column name — could not auto-detect"</code>).</li>
+<li>Raise if the feature has <strong>multiple</strong> term columns (line 357:
+   <code>"requires a column name for features with multiple term columns"</code>).</li>
+<li><code>Counter</code>-based majority logic with RCT tie-breaker.</li>
+</ol>
+<p>Coverage:</p>
+<ul>
+<li><code>tests/feature/test_features.py</code>: no test.</li>
+<li><code>tests/feature/test_feature_values.py</code>: no test.</li>
+<li><code>tests/feature/test_select_by_workflow.py</code>: not in scope.</li>
+<li><code>deriva-ml-mcp/tests/test_feature.py:251</code>: covers only the dispatch
+  branch (string <code>"majority_vote"</code> → <code>FeatureRecord.select_majority_vote()</code>).
+  Does not exercise the auto-detect or tie-breaker logic.</li>
+<li><code>tests/dataset/test_restructure.py:948</code>: imports <code>FeatureRecord</code>
+  but a quick check shows it tests <code>select_newest</code> and
+  <code>select_majority_vote</code> through <code>restructure_assets</code>, not the bare
+  selector — so the auto-detect branches are not exercised.</li>
+</ul>
+<p>The three error paths (no records, no feature metadata, multiple
+term columns) are entirely untested.</p>
+<p><strong>Fix:</strong> add <code>tests/feature/test_select_majority_vote.py</code> modeled on
+<code>test_select_by_workflow.py</code> (stub container, no live catalog):</p>
+<pre><code class="language-python">def test_majority_vote_auto_detects_single_term_column():
+    &quot;&quot;&quot;When the feature has exactly one term column, auto-detect it.&quot;&quot;&quot;
+    ...
+
+def test_majority_vote_raises_on_multiple_term_columns():
+    &quot;&quot;&quot;Multiple term columns → DerivaMLException without explicit column.&quot;&quot;&quot;
+    ...
+
+def test_majority_vote_raises_on_zero_term_columns():
+    &quot;&quot;&quot;No term columns → DerivaMLException.&quot;&quot;&quot;
+    ...
+
+def test_majority_vote_breaks_ties_by_newest_rct():
+    &quot;&quot;&quot;When two values tie, the newest RCT wins.&quot;&quot;&quot;
+    ...
+
+def test_majority_vote_explicit_column():
+    &quot;&quot;&quot;When column is passed, it overrides auto-detection.&quot;&quot;&quot;
+    ...
+</code></pre>
+<p><strong>Effort: low</strong> — pure-Python unit tests, no live catalog. <strong>LoC:
++~80.</strong> <strong>Risk: low.</strong> <strong>Severity: medium</strong> — this selector is
+named in CLAUDE.md as a public API and is one of the dispatch keys
+in the MCP layer (<code>"majority_vote"</code>).</p>
+<h3 id="32-select_by_execution-has-no-dedicated-unit-tests">3.2 <code>select_by_execution</code> has no dedicated unit tests</h3>
+<p><code>feature.py:133-184</code> (<code>select_by_execution</code>) is pure Python:</p>
+<ol>
+<li>Build a closure filtering on <code>r.Execution == execution_rid</code>.</li>
+<li>If no match: <code>raise DerivaMLException</code> (line 181).</li>
+<li>If match: <code>return FeatureRecord.select_newest(filtered)</code>.</li>
+</ol>
+<p>Coverage:</p>
+<ul>
+<li><code>tests/feature/test_select_by_workflow.py</code>: not in scope.</li>
+<li><code>tests/feature/test_features.py</code>: no test.</li>
+<li><code>deriva-ml-mcp/tests/test_feature.py:299-311</code>: covers the dispatch
+  branch only — does not exercise the raise-on-no-match path.</li>
+</ul>
+<p><strong>Fix:</strong> add a parallel test file or extend
+<code>test_select_by_workflow.py</code> with <code>select_by_execution</code> cases:</p>
+<pre><code class="language-python">def test_select_by_execution_picks_match():
+    ...
+
+def test_select_by_execution_raises_when_no_records_match():
+    ...
+
+def test_select_by_execution_picks_newest_among_matches():
+    ...
+</code></pre>
+<p><strong>Effort: low.</strong> <strong>LoC: +~40.</strong> <strong>Severity: medium</strong> — used by the
+model-template (see <code>experiment-decisions.md</code>).</p>
+<h3 id="33-select_newest-select_first-select_latest-have-only-doctest-shaped-coverage">3.3 <code>select_newest</code>, <code>select_first</code>, <code>select_latest</code> have only doctest-shaped coverage</h3>
+<p>CLAUDE.md "Special focus areas" calls out <code>FeatureRecord.select_newest</code>
+specifically as a pure-Python doctest example. The actual coverage:</p>
+<ul>
+<li><code>tests/feature/test_features.py::TestFeatureRecord</code>: 3 tests
+  exercise the base class's pydantic field construction, but never
+  call <code>select_newest</code> / <code>select_first</code> / <code>select_latest</code>.</li>
+<li><code>tests/feature/test_feature_values.py::test_feature_values_with_select_newest</code>:
+  passes <code>selector=FeatureRecord.select_newest</code> to
+  <code>feature_values</code>, then asserts <code>len(rids) == len(set(rids))</code> —
+  i.e., "one record per target RID after dedup." Does not assert
+  <em>which</em> record was picked, only that some single record was.</li>
+<li><code>test_feature_values_symmetry::test_feature_values_with_selector_matches</code>:
+  same shape.</li>
+<li><code>src/deriva_ml/conftest.py:17-20</code>: injects <code>FeatureRecord</code> into the
+  doctest namespace. The only doctest that exercises the selector is
+  the <code>&gt;&gt;&gt; callable(selector) is True</code> line in <code>feature.py</code>'s
+  module-level docstring. Nothing tests the lexicographic RCT
+  comparison, the None-RCT handling, or the "select_latest is an
+  alias for select_newest" behavior.</li>
+</ul>
+<p>The three selectors are simple enough that they're unlikely to
+regress — <code>max(records, key=lambda r: r.RCT or "")</code> is one line. But
+their <code>None</code>-handling is one of the unintuitive bits: per the
+docstring (lines 117-118 of <code>feature.py</code>):</p>
+<blockquote>
+<p>Records with <code>None</code> RCT are treated as older than any timestamped
+record.</p>
+</blockquote>
+<p>This holds because <code>None or ""</code> evaluates to <code>""</code>, and <code>""</code> is less
+than any ISO 8601 timestamp string. A future refactor that swapped
+to <code>r.RCT</code> (no <code>or ""</code>) would crash on a None RCT — and no test
+would catch it.</p>
+<p><strong>Fix:</strong> add three small unit tests in
+<code>tests/feature/test_select_newest.py</code> (or extend
+<code>test_select_by_workflow.py</code>):</p>
+<pre><code class="language-python">def test_select_newest_picks_latest_rct():
+    records = [
+        FeatureRecord(Feature_Name=&quot;x&quot;, RCT=&quot;2024-01-01T00:00:00&quot;),
+        FeatureRecord(Feature_Name=&quot;x&quot;, RCT=&quot;2024-06-15T00:00:00&quot;),
+    ]
+    assert FeatureRecord.select_newest(records).RCT == &quot;2024-06-15T00:00:00&quot;
+
+
+def test_select_newest_treats_none_rct_as_oldest():
+    records = [
+        FeatureRecord(Feature_Name=&quot;x&quot;, RCT=None),
+        FeatureRecord(Feature_Name=&quot;x&quot;, RCT=&quot;2024-01-01T00:00:00&quot;),
+    ]
+    assert FeatureRecord.select_newest(records).RCT == &quot;2024-01-01T00:00:00&quot;
+
+
+def test_select_latest_is_alias_for_select_newest():
+    records = [FeatureRecord(Feature_Name=&quot;x&quot;, RCT=&quot;2024-06-15T00:00:00&quot;)]
+    assert FeatureRecord.select_latest(records) is FeatureRecord.select_newest(records)
+
+
+def test_select_first_picks_earliest_rct():
+    records = [
+        FeatureRecord(Feature_Name=&quot;x&quot;, RCT=&quot;2024-01-01T00:00:00&quot;),
+        FeatureRecord(Feature_Name=&quot;x&quot;, RCT=&quot;2024-06-15T00:00:00&quot;),
+    ]
+    assert FeatureRecord.select_first(records).RCT == &quot;2024-01-01T00:00:00&quot;
+</code></pre>
+<p><strong>Effort: low.</strong> <strong>LoC: +~30.</strong> <strong>Severity: low</strong> — the regression
+class is narrow but the selectors are externally-documented and
+worth pinning.</p>
+<h3 id="34-no-test-for-delete_feature-behavior">3.4 No test for <code>delete_feature</code> behavior</h3>
+<p>See §1.5.</p>
+<h3 id="35-no-test-for-create_feature-error-paths">3.5 No test for <code>create_feature</code> error paths</h3>
+<p><code>create_feature</code> raises <code>DerivaMLException("Invalid create_feature
+asset table.")</code> (or the buggy duplicated message in §1.4) on two
+branches:</p>
+<ul>
+<li><code>assets</code> contains a non-asset table;</li>
+<li><code>terms</code> contains a non-vocabulary table.</li>
+</ul>
+<p>Neither raise is tested. The closest test
+(<code>tests/feature/test_features.py::TestFeatures.test_create_feature</code>)
+asserts successful creation only.</p>
+<p>A future refactor that swapped <code>is_asset</code> for some other predicate
+(or that changed the validation order) would silently change
+behavior, and no test would catch it.</p>
+<p><strong>Fix:</strong> add two tests:</p>
+<pre><code class="language-python">def test_create_feature_with_non_asset_table_raises(test_ml):
+    &quot;&quot;&quot;Passing a domain table as `assets` raises DerivaMLException.&quot;&quot;&quot;
+    with pytest.raises(DerivaMLException, match=&quot;asset table&quot;):
+        test_ml.create_feature(&quot;Image&quot;, &quot;bad_feat&quot;, assets=[&quot;Subject&quot;])
+
+
+def test_create_feature_with_non_vocabulary_table_raises(test_ml):
+    &quot;&quot;&quot;Passing a domain table as `terms` raises DerivaMLException.&quot;&quot;&quot;
+    with pytest.raises(DerivaMLException, match=&quot;vocabulary|term&quot;):
+        test_ml.create_feature(&quot;Image&quot;, &quot;bad_feat&quot;, terms=[&quot;Subject&quot;])
+</code></pre>
+<p>Pair this with the §1.4 message fix. <strong>Effort: low.</strong> <strong>Risk: low.</strong>
+<strong>Severity: medium</strong> for the ML-developer persona — these are the
+exact errors a user hits when misclassifying a table.</p>
+<h3 id="36-feature_valuesexecution_rids-short-circuit-is-tested-for-catalog-and-bag-but-the-doctest-doesnt-note-it">3.6 <code>feature_values(execution_rids=[])</code> short-circuit is tested for catalog and bag but the doctest doesn't note it</h3>
+<p><code>tests/feature/test_feature_values_limits.py::test_feature_values_execution_rids_empty_list_returns_nothing</code>
+covers the short-circuit. Similar test exists for the bag side
+(through the <code>feature_symmetry_fixture</code>). Good.</p>
+<p>The docstring at <code>mixins/feature.py:427-429</code> says:</p>
+<blockquote>
+<p>Empty list short-circuits to an empty result.</p>
+</blockquote>
+<p>This is correct. <strong>Severity: none.</strong> Flag only — coverage is good.</p>
+<h3 id="37-datasetlist_workflow_executions-docstring-claims-dataset-scoping-that-doesnt-exist">3.7 <code>Dataset.list_workflow_executions</code> docstring claims dataset-scoping that doesn't exist</h3>
+<p><code>dataset/dataset.py:625-648</code> defines <code>Dataset.list_workflow_executions</code>
+as a pure pass-through (<code>return self._ml_instance.list_workflow_executions(workflow)</code>).
+The docstring (line 626) calls it "Dataset-scoped" and lines 628-632
+acknowledge:</p>
+<blockquote>
+<p>Current implementation returns the full workflow execution list
+from the catalog. Target-RID filtering at selection time (via
+<code>feature_values</code>) ensures that records from executions outside
+the dataset's member set are excluded. A stricter scope ... is
+deferred.</p>
+</blockquote>
+<p>The test <code>test_dataset_list_workflow_executions_scopes_to_dataset</code>
+(<code>test_feature_values.py:291</code>) is <strong>named</strong> as if it tests scoping
+but asserts <code>ds_rids == ml_rids</code> — the opposite of "scoped" — and
+includes a comment noting "If strict dataset scoping is added later
+this test will fail."</p>
+<p>This is honest documentation of a deferred behavior, but the
+method name + docstring name "Dataset-scoped" misleads a reader who
+expects scoping. The contract gap matters for the bag-symmetry test:
+<code>DatasetBag.list_workflow_executions</code> actually IS scoped (the bag
+only contains executions reachable from the dataset slice), but
+<code>Dataset.list_workflow_executions</code> isn't.</p>
+<p><strong>Fix options:</strong></p>
+<p>(a) Rename docstring header from "Dataset-scoped
+list_workflow_executions" to "Pass-through to
+DerivaML.list_workflow_executions (dataset scoping deferred)." <strong>LoC:
+±0.</strong></p>
+<p>(b) Actually scope: filter <code>self._ml_instance.list_workflow_executions(workflow)</code>
+to those execution RIDs that produced/consumed dataset members. Closer
+to user expectation but more expensive. <strong>LoC: +15.</strong></p>
+<p><strong>Recommended:</strong> (a) for the audit. The behavioral fix is its own
+task — flagging here for visibility.</p>
+<p><strong>Severity: medium for the ML-developer persona</strong> — the symmetry
+contract has a subtle hole (bag-side scopes, catalog-side doesn't).
+<strong>Severity: low</strong> for any user who reads the docstring's deferred-note.</p>
+<h3 id="38-interfacespy215-datasetlikefind_features-has-a-different-signature-from-the-implementations">3.8 <code>interfaces.py:215</code> (<code>DatasetLike.find_features</code>) has a different signature from the implementations</h3>
+<p><code>interfaces.py:215</code>:</p>
+<pre><code class="language-python">def find_features(self, table: str | Table) -&gt; Iterable[Feature]:
+</code></pre>
+<p>Required <code>table</code> argument. But the implementations:</p>
+<ul>
+<li><code>mixins/feature.py:321</code>: <code>def find_features(self, table: str | Table |
+  None = None) -&gt; list[Feature]</code> — optional, with a "find all
+  features in the catalog" branch when <code>None</code>.</li>
+<li><code>dataset_bag.py:489</code>: <code>def find_features(self, table: str | Table)
+  -&gt; Iterable[Feature]</code> — required (matches the protocol).</li>
+<li><code>dataset.py:???</code> — doesn't define <code>find_features</code>; inherits via the
+  <code>_ml_instance</code> proxy? Let me check…</li>
+<li><code>tests/feature/test_features.py:162</code>: <code>all_features = ml_instance.find_features()</code>
+  — calls without an argument, so this branch is in use.</li>
+</ul>
+<p>The signature drift is a soft constraint failure: a caller using
+<code>DatasetLike.find_features(table=None)</code> to mean "find all" violates
+the protocol but works on <code>DerivaML</code>. A caller using
+<code>DatasetLike.find_features()</code> against a <code>DatasetBag</code> would fail at
+runtime even though the protocol "permits" it.</p>
+<p><strong>Fix:</strong> update the protocol signature to match the implementations
+that allow <code>table=None</code>:</p>
+<pre><code class="language-python">def find_features(self, table: str | Table | None = None) -&gt; Iterable[Feature]:
+</code></pre>
+<p>Then either: (a) update <code>DatasetBag.find_features</code> to handle the
+<code>None</code> case too (matching <code>DerivaML</code>), or (b) leave <code>DatasetBag.find_features</code>
+required-only and accept the protocol-level optionality is
+implementation-specific (less ideal).</p>
+<p><strong>Recommended:</strong> (a) — bags should be able to enumerate all features,
+and the implementation is one call to <code>self.model.find_features()</code>
+which already supports <code>table=None</code> (see <code>model/catalog.py:554</code>).
+<strong>LoC: +5.</strong> <strong>Risk: low.</strong> <strong>Severity: medium for the
+ML-developer persona.</strong></p>
+<h3 id="39-feature_values-raises-derivamltablenotfound-per-the-docstring-the-actual-implementation-raises-bare-derivamlexception">3.9 <code>feature_values</code> raises <code>DerivaMLTableNotFound</code> per the docstring; the actual implementation raises bare <code>DerivaMLException</code></h3>
+<p><code>mixins/feature.py:434-435</code>:</p>
+<blockquote>
+<p>Raises:
+    DerivaMLTableNotFound: <code>table</code> does not exist.</p>
+</blockquote>
+<p>The implementation (line 465) calls <code>self.model.name_to_table(table)</code>,
+which raises <code>DerivaMLTableNotFound</code> per its own docstring. Good.</p>
+<p>But line 466 also calls <code>self.lookup_feature(table_obj, feature_name)</code>,
+which raises bare <code>DerivaMLException("Feature {table.name}:{feature_name} doesn't exist.")</code>
+(see <code>model/catalog.py:624</code>). The docstring claim is technically
+true (table-not-found does raise the typed exception), but a
+feature-not-found case raises an untyped <code>DerivaMLException</code>. Tests
+only assert <code>DerivaMLException</code> (<code>test_features.py:137-142</code>).</p>
+<p><strong>Fix options:</strong></p>
+<p>(a) Add a <code>DerivaMLFeatureNotFound</code> exception subclass and use it in
+<code>lookup_feature</code>. <strong>LoC: +6 in <code>exceptions.py</code> + 1 in
+<code>model/catalog.py:624</code>.</strong> <strong>Risk: low</strong> — it's a subclass; existing
+tests still pass with <code>except DerivaMLException</code>.</p>
+<p>(b) Document the actual behavior in the docstring (bare
+<code>DerivaMLException</code> for feature-not-found). <strong>LoC: ±0.</strong></p>
+<p><strong>Recommended:</strong> (a). The exception hierarchy in <code>core/exceptions.py</code>
+already has <code>DerivaMLNotFoundError</code> (catalog audit §… of the exception
+hierarchy) — extending with a feature-specific subclass is in
+keeping with the existing pattern. <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-4-docs-sync">Lens 4 — Docs sync</h2>
+<h3 id="41-featurepy478-481-feature-example-uses-post-construction-prints-not-constructor">4.1 <code>feature.py:478-481</code> <code>Feature</code> example uses post-construction prints, not constructor</h3>
+<p><code>feature.py:477-481</code>:</p>
+<pre><code class="language-python">Example:
+    &gt;&gt;&gt; feature = ml.lookup_feature(&quot;Image&quot;, &quot;Diagnosis&quot;)  # doctest: +SKIP
+    &gt;&gt;&gt; print(f&quot;Feature {feature.feature_name} on {feature.target_table.name}&quot;)  # doctest: +SKIP
+    &gt;&gt;&gt; print(&quot;Asset columns:&quot;, [c.name for c in feature.asset_columns])  # doctest: +SKIP
+</code></pre>
+<p>All three lines are <code>doctest: +SKIP</code>. Per CLAUDE.md's doctest
+convention, pure-Python lines should run for real. The first line is
+correctly skipped (<code>ml.lookup_feature</code> needs a catalog), but the
+<code>feature.target_table.name</code> and the asset-column listing don't
+require a catalog if <code>feature</code> is mocked.</p>
+<p>CLAUDE.md <code>feature.py:30-32</code>'s top-level example is similarly all-skip
+even for the trivial line:</p>
+<pre><code class="language-python">&gt;&gt;&gt; rec = DiagnosisFeature(Diagnosis=&quot;benign&quot;, Confidence=0.97)  # doctest: +SKIP
+</code></pre>
+<p>This line could run for real if a <code>FeatureRecord</code> subclass with
+the right fields is set up. The doctest in
+<code>feature.py:14-17</code> (<code>FeatureRecord.select_newest</code>) does correctly
+note "selector classmethod" but the cited example in CLAUDE.md
+(<code>callable(selector) is True</code>) is one line — and that one line <strong>is</strong>
+in <code>feature.py</code>. Coverage is technically there but minimal.</p>
+<p><strong>Fix:</strong> add at least one pure-Python doctest line that exercises
+each public method's signature/return shape. Example for
+<code>select_newest</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; records = [
+...     FeatureRecord(Feature_Name=&quot;X&quot;, RCT=&quot;2024-01-01T00:00:00&quot;),
+...     FeatureRecord(Feature_Name=&quot;X&quot;, RCT=&quot;2024-06-15T00:00:00&quot;),
+... ]
+&gt;&gt;&gt; FeatureRecord.select_newest(records).RCT
+'2024-06-15T00:00:00'
+</code></pre>
+<p><strong>LoC: +~30 across 6 selectors.</strong> <strong>Risk: low.</strong> <strong>Severity: low.</strong></p>
+<h3 id="42-coremixinsfeaturepy443-447-doctest-is-shaped-wrong">4.2 <code>core/mixins/feature.py:443-447</code> doctest is shaped wrong</h3>
+<p>The docstring at <code>mixins/feature.py:440-464</code> contains:</p>
+<pre><code class="language-python">Example:
+    Get the newest Glaucoma label per image::
+
+        &gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+        &gt;&gt;&gt; for rec in ml.feature_values(
+        ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=FeatureRecord.select_newest,
+        ... ):
+        ...     print(f&quot;{rec.Image}: {rec.Glaucoma} (by {rec.Execution})&quot;)
+</code></pre>
+<p>No <code># doctest: +SKIP</code>. The first line (<code>from deriva_ml.feature
+import FeatureRecord</code>) will run as a real doctest — but the
+subsequent <code>for rec in ml.feature_values(...)</code> requires <code>ml</code> in the
+doctest namespace, which it isn't. So at doctest collection time,
+this raises <code>NameError: name 'ml' is not defined</code>. Whether this
+fires depends on <code>pytest --doctest-modules</code> setup — looking at
+<code>conftest.py:18-20</code>, only <code>FeatureRecord</code> is injected, not <code>ml</code>.</p>
+<p><strong>Test it:</strong> <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true
+uv run pytest --doctest-modules src/deriva_ml/core/mixins/feature.py</code>
+would confirm. (Did not run during this audit per the
+"do not run tests" rule.)</p>
+<p><strong>Fix:</strong> add <code># doctest: +SKIP</code> markers on the catalog-dependent
+lines:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+&gt;&gt;&gt; for rec in ml.feature_values(  # doctest: +SKIP
+...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=FeatureRecord.select_newest,
+... ):
+...     print(f&quot;{rec.Image}: {rec.Glaucoma} (by {rec.Execution})&quot;)
+</code></pre>
+<p>Same shape needed at <code>mixins/feature.py:587-598</code>
+(<code>list_workflow_executions</code> example, which has <code>&gt;&gt;&gt; rids =
+ml.list_workflow_executions("Glaucoma_Training_v2")</code> without a SKIP
+marker). And the <code>mixins/feature.py:444</code> example, and the
+<code>mixins/feature.py:594</code> example.</p>
+<p><strong>LoC: ±0 (annotation only).</strong> <strong>Risk: low.</strong> <strong>Severity: medium
+for the technical-writer persona</strong> — doctest collection may already
+be skipping these silently. Worth verifying with one explicit
+pytest run during the cleanup PR.</p>
+<h3 id="43-coremixinsfeaturepy115-docstring-example-uses-builtintypesfloat4-thats-not-in-scope">4.3 <code>core/mixins/feature.py:115</code> docstring example uses <code>BuiltinTypes.float4</code> that's not in scope</h3>
+<p><code>mixins/feature.py:114-129</code>:</p>
+<pre><code class="language-python">Examples:
+    Create a feature with confidence score:
+        &gt;&gt;&gt; DiagnosisFeature = ml.create_feature(  # doctest: +SKIP
+        ...     target_table=&quot;Image&quot;,
+        ...     feature_name=&quot;Diagnosis&quot;,
+        ...     terms=[&quot;Diagnosis_Type&quot;],
+        ...     metadata=[ColumnDefinition(name=&quot;confidence&quot;, type=BuiltinTypes.float4)],
+        ...     comment=&quot;Clinical diagnosis label&quot;
+        ... )
+</code></pre>
+<p><code>ColumnDefinition</code> and <code>BuiltinTypes</code> aren't injected into the
+doctest namespace (<code>conftest.py:18-20</code> only injects <code>FeatureRecord</code>).
+The <code># doctest: +SKIP</code> correctly skips the catalog-dependent line, but
+the reader following the example needs to know to also
+<code>from deriva_ml import ColumnDefinition, BuiltinTypes</code> first.</p>
+<p><strong>Fix:</strong> add the import line to the example:</p>
+<pre><code class="language-python">Examples:
+    Create a feature with confidence score:
+        &gt;&gt;&gt; from deriva_ml import BuiltinTypes, ColumnDefinition  # doctest: +SKIP
+        &gt;&gt;&gt; DiagnosisFeature = ml.create_feature(  # doctest: +SKIP
+        ...     ...
+</code></pre>
+<p>Same shape needed at other examples in this file. <strong>LoC: +6.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="44-the-featurefeature_record_classmap_type-docstring-example-uses-a-fake-column-constructor">4.4 The <code>Feature.feature_record_class.map_type</code> docstring example uses a fake <code>Column</code> constructor</h3>
+<p><code>feature.py:592-594</code>:</p>
+<pre><code class="language-python">Example:
+    &gt;&gt;&gt; col = Column(name=&quot;score&quot;, type=&quot;float4&quot;)
+    &gt;&gt;&gt; typ = map_type(col)  # Returns float
+</code></pre>
+<p>ERMrest <code>Column</code> doesn't accept <code>name=</code> and <code>type=</code> as kwargs in this
+shape — its actual constructor needs a <code>Column.define(...)</code> or a
+deserialized schema object. The example is <strong>illustrative-only</strong>, but
+it's not marked <code>doctest: +SKIP</code>, so if <code>--doctest-modules</code> ever
+hits this docstring, it'd fail at the <code>Column(...)</code> line.</p>
+<p><strong>Fix:</strong> either mark <code># doctest: +SKIP</code> or rewrite to use
+<code>Column.define(...)</code>:</p>
+<pre><code class="language-python">Example:
+    &gt;&gt;&gt; # Inside Feature.feature_record_class, map_type returns float for float8 columns:
+    &gt;&gt;&gt; # (not directly callable — illustrative only)
+</code></pre>
+<p><strong>LoC: ±0–2.</strong> <strong>Severity: low.</strong></p>
+<h3 id="45-claudemd-cites-select_newest-as-a-pure-python-doctest-example-but-the-files-coverage-of-it-is-one-line">4.5 CLAUDE.md cites <code>select_newest</code> as a pure-Python doctest example — but the file's coverage of it is one line</h3>
+<p>CLAUDE.md "Special focus areas":</p>
+<blockquote>
+<p><strong>Selector functions:</strong> <code>FeatureRecord.select_newest</code> is referenced
+in CLAUDE.md as a pure-Python doctest example. Check whether other
+selectors exist and whether they have similar test coverage.</p>
+</blockquote>
+<p>The doctest that runs for real (per <code>conftest.py</code>):</p>
+<pre><code class="language-python">&gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+&gt;&gt;&gt; selector = FeatureRecord.select_newest
+&gt;&gt;&gt; callable(selector)
+True
+</code></pre>
+<p>That's the entirety of <code>select_newest</code>'s doctest coverage. The
+other five selectors have no equivalent pure-Python doctest. CLAUDE.md
+treats <code>select_newest</code> as the <em>exemplar</em> — but the exemplar covers
+only "is the method callable," not "does it produce the right
+result."</p>
+<p><strong>Fix:</strong> subsumed by §4.1 + §3.3 — add pure-Python doctests + unit
+tests that actually exercise the selector return values.</p>
+<p><strong>Severity: low.</strong></p>
+<h3 id="46-__init__py109-110-comment-misrepresents-featurerecords-scope">4.6 <code>__init__.py:109-110</code> comment misrepresents <code>FeatureRecord</code>'s scope</h3>
+<p><code>src/deriva_ml/__init__.py:109-110</code>:</p>
+<pre><code class="language-python"># Feature record for feature values and restructure_assets selectors
+&quot;FeatureRecord&quot;,
+</code></pre>
+<p>This isn't wrong — <code>FeatureRecord</code> is used for both — but it
+undersells the breadth. <code>FeatureRecord</code> is also:</p>
+<ul>
+<li>The base class for all generated feature subclasses;</li>
+<li>The container for the six selector classmethods;</li>
+<li>The shared type across <code>DerivaML</code>, <code>Dataset</code>, <code>DatasetBag</code> per
+  CLAUDE.md "Bags Should Behave Like Catalog Connections";</li>
+<li>The Pydantic round-tripping anchor (<code>.model_dump()</code> is used in
+  notebooks and MCP tool responses).</li>
+</ul>
+<p><strong>Fix:</strong></p>
+<pre><code class="language-python"># Feature record type — pydantic model for selector inputs / outputs,
+# generated subclasses for typed feature construction, and the unified
+# shape across DerivaML / Dataset / DatasetBag (see CLAUDE.md).
+&quot;FeatureRecord&quot;,
+</code></pre>
+<p><strong>LoC: +3.</strong> <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-5-api-conventions-deriva-py-vs-raw-ermrest">Lens 5 — API conventions (deriva-py vs raw ERMrest)</h2>
+<h3 id="51-feature_values-correctly-uses-pathbuilder-entitiesfetch-instead-of-raw-ermrest-urls">5.1 <code>feature_values</code> correctly uses <code>pathBuilder()</code> + <code>entities().fetch()</code> instead of raw ERMrest URLs</h3>
+<p><code>mixins/feature.py:477-486</code>:</p>
+<pre><code class="language-python">pb = self.pathBuilder()
+feature_path = pb.schemas[feat.feature_table.schema.name].tables[feat.feature_table.name]
+
+if execution_rids is not None:
+    predicates = [feature_path.Execution == rid for rid in execution_rids]
+    feature_path = feature_path.filter(reduce(or_, predicates))
+
+raw_values = list(feature_path.entities().fetch())
+</code></pre>
+<p>The implementation uses datapath consistently. The
+filter-construction pattern (lines 480-484) for "IN-clause as OR of
+equalities" is correctly justified by the inline comment:</p>
+<blockquote>
+<p>Path-builder column wrappers don't expose .in_(); build the
+IN-clause as a chained OR of equality predicates instead.</p>
+</blockquote>
+<p>This is the right deriva-py idiom. <strong>No issue.</strong></p>
+<h3 id="52-list_workflow_executions-correctly-delegates-through-find_executions">5.2 <code>list_workflow_executions</code> correctly delegates through <code>find_executions</code></h3>
+<p><code>mixins/feature.py:600-617</code>:</p>
+<pre><code class="language-python">try:
+    wf = self.lookup_workflow(workflow)
+except DerivaMLException:
+    wf = None
+
+if wf is not None:
+    return [r.execution_rid for r in self.find_executions(workflow=wf)]
+
+rids = [r.execution_rid for r in self.find_executions(workflow_type=workflow)]
+if not rids:
+    raise DerivaMLException(...)
+return rids
+</code></pre>
+<p>Uses <code>find_executions(workflow=...)</code> and <code>find_executions(workflow_type=...)</code>
+— both high-level deriva-ml APIs. <strong>No issue.</strong></p>
+<h3 id="53-feature__init__s-fk-classification-uses-pk_table-is_asset-is_vocabulary">5.3 <code>Feature.__init__</code>'s FK-classification uses <code>pk_table</code> + <code>is_asset</code> / <code>is_vocabulary</code></h3>
+<p><code>feature.py:530-540</code>:</p>
+<pre><code class="language-python">self.asset_columns = {
+    fk.foreign_key_columns[0]
+    for fk in self.feature_table.foreign_keys
+    if fk not in assoc_fkeys and self._model.is_asset(fk.pk_table)
+}
+</code></pre>
+<p>Uses <code>fk.pk_table</code> directly (ERMrest model attribute) and
+<code>self._model.is_asset</code> (deriva-ml predicate). This is the right shape.
+<strong>No issue.</strong></p>
+<h3 id="54-no-raw-catalogput-catalogget-url-construction-anywhere-in-the-subsystem">5.4 No raw <code>catalog.put</code> / <code>catalog.get</code> / URL construction anywhere in the subsystem</h3>
+<p>Confirmed by <code>grep -n "catalog.put\|catalog.get\|/ermrest/catalog" feature.py mixins/feature.py</code> —
+zero hits. The subsystem fully relies on deriva-ml + deriva-py
+abstractions per CLAUDE.md's "API Priority" guidance.</p>
+<p><strong>Lens 5 verdict: clean.</strong> No actions.</p>
+<hr />
+<h2 id="lens-6-maintainability">Lens 6 — Maintainability</h2>
+<h3 id="61-featurepy-648-loc-and-coremixinsfeaturepy-639-loc-are-at-the-upper-edge-of-acceptable">6.1 <code>feature.py</code> (648 LoC) and <code>core/mixins/feature.py</code> (639 LoC) are at the upper edge of acceptable</h3>
+<p>Both files are large but coherent. Each has one clear responsibility:</p>
+<ul>
+<li><code>feature.py</code>: typing surface (<code>FeatureRecord</code> base, selectors,
+  <code>Feature</code> runtime class).</li>
+<li><code>core/mixins/feature.py</code>: <code>DerivaML</code> method facade.</li>
+</ul>
+<p>The split is documented and clean (see audit prompt's "Mixin vs
+standalone split" focus area). No bleed:</p>
+<ul>
+<li><code>feature.py</code> does not depend on the mixin (lines 1-46 imports only
+  Pydantic, ERMrest, typing, pathlib).</li>
+<li><code>core/mixins/feature.py</code> imports <code>Feature, FeatureRecord</code> (line 27)
+  for the typing surface, but the mixin's method implementations
+  don't mutate <code>FeatureRecord</code> or <code>Feature</code> internals — they only
+  call public methods.</li>
+</ul>
+<p>The two files together represent a ~1 280 LoC subsystem, which is
+on the larger side for a single concern but justified by the
+external-API breadth (six selectors, three-container symmetry, MCP
+wrapping). Splitting <code>feature.py</code> further (e.g., <code>_selectors.py</code>)
+would add import indirection without simplifying the mental model.</p>
+<p><strong>No action.</strong> Flag for the six-month follow-up.</p>
+<h3 id="62-the-retired-shim-pattern-is-repeated-4-in-coremixinsfeaturepy">6.2 The retired-shim pattern is repeated 4× in <code>core/mixins/feature.py</code></h3>
+<p><code>mixins/feature.py:350-369</code> (<code>add_features</code>), <code>517-536</code>
+(<code>fetch_table_features</code>), <code>538-556</code> (<code>list_feature_values</code>),
+<code>620-639</code> (<code>select_by_workflow</code>) — each is ~20 LoC of docstring +
+raise.</p>
+<p>The pattern could be a shared helper:</p>
+<pre><code class="language-python">def _retired(message: str, *args, **kwargs):
+    raise DerivaMLException(message)
+
+
+list_feature_values = staticmethod(functools.partial(
+    _retired,
+    &quot;DerivaML.list_feature_values() has been retired and renamed. &quot;
+    &quot;Use feature_values(table, feature_name, selector=...) instead.&quot;,
+))
+</code></pre>
+<p>But this loses the per-method docstring discoverability (e.g., the
+detailed docstring at <code>mixins/feature.py:351-364</code> is itself a
+documentation surface — users reading the file or running <code>help()</code>
+get the full migration story).</p>
+<p><strong>Recommended:</strong> leave as-is. The duplication is intentional
+documentation, and per CLAUDE.md "Examples are required" the
+docstrings should remain runnable / readable.</p>
+<p><strong>Severity: none.</strong> Flag only.</p>
+<h3 id="63-_selector-closure-name-appears-4-in-featurepy">6.3 <code>_selector</code> closure name appears 4× in <code>feature.py</code></h3>
+<p><code>feature.py:176, 258, 344, …</code> all define a function named
+<code>_selector</code> inside a factory. This is consistent — every selector
+factory follows the same pattern — but it means stack traces during
+selector failures all read "in _selector" without indicating which
+selector. (Practically a low-noise issue; selectors are simple
+enough that debugger lookups suffice.)</p>
+<p><strong>Fix options:</strong> (a) name each closure (<code>_select_by_workflow_closure</code>
+etc.), or (b) leave as-is.</p>
+<p><strong>Recommended:</strong> (b). Renaming for tracebacks-only is over-engineering.
+<strong>Severity: none.</strong> Flag only.</p>
+<h3 id="64-inline-from-deriva_mlcoreexceptions-import-inside-featurepy-selectors">6.4 Inline <code>from deriva_ml.core.exceptions import</code> inside <code>feature.py</code> selectors</h3>
+<p><code>feature.py:179</code>, <code>feature.py:353</code>, <code>feature.py:363</code> all do:</p>
+<pre><code class="language-python">def _selector(records: list[&quot;FeatureRecord&quot;]) -&gt; &quot;FeatureRecord&quot;:
+    ...
+    from deriva_ml.core.exceptions import DerivaMLException
+    raise DerivaMLException(...)
+</code></pre>
+<p>Three separate inline-import patterns inside closures. The
+module-level imports at <code>feature.py:35-48</code> already pull in
+<code>Optional</code>, <code>Callable</code>, etc., and there's no circular-import risk
+between <code>feature.py</code> and <code>core.exceptions</code> (exceptions has no
+deriva-ml dependencies).</p>
+<p><strong>Fix:</strong> move the import to module level:</p>
+<pre><code class="language-python">from deriva_ml.core.exceptions import DerivaMLException
+</code></pre>
+<p><strong>LoC: −2 (remove 3 inline imports, add 1 module-level). Risk: low.</strong>
+<strong>Severity: low.</strong></p>
+<hr />
+<h2 id="persona-check">Persona check</h2>
+<h3 id="senior-engineer">Senior engineer</h3>
+<p>The error-handling story is solid — <code>feature_values</code> validates the
+table via <code>name_to_table</code>, the feature via <code>lookup_feature</code>, the
+<code>execution_rids</code> filter short-circuits on empty, and
+<code>DerivaMLMaterializeLimitExceeded</code> exists for memory bounds. The
+<code>@validate_call(config=VALIDATION_CONFIG)</code> decorator is applied to
+<code>feature_values</code> and <code>list_workflow_executions</code> — the two methods
+that take complex argument shapes. Less covered are <code>create_feature</code>,
+<code>delete_feature</code>, <code>lookup_feature</code>, <code>find_features</code>, and
+<code>feature_record_class</code> (no <code>@validate_call</code>). For a senior-engineer
+review the gap is intentional (those methods take simpler args), but
+worth flagging that any future signature drift on
+<code>feature_values</code> (e.g., adding a kwarg) needs to also update the
+<code>VALIDATION_CONFIG</code> integration. <strong>The §1.4 buggy validation message
+is the only real correctness flag.</strong></p>
+<h3 id="testing-engineer">Testing engineer</h3>
+<p>The S2 acceptance suite
+(<code>tests/feature/test_feature_values.py::TestFeatureValuesSymmetry</code>) is
+the strongest piece of test infrastructure in any of the four
+phase-3 subsystems so far. The fixture builds a real catalog +
+dataset + materialized bag and asserts cross-container parity. The
+weak points are the <strong>selector unit tests</strong> (§3.1, §3.2, §3.3) and
+the <strong>empty <code>test_delete_feature</code></strong> (§1.5). The retired-shim
+regression suite is well-shaped. <strong>Overall coverage is in good
+shape; the gaps are narrow.</strong></p>
+<h3 id="technical-writer">Technical writer</h3>
+<p>Naming consistency: <code>Feature</code> vs <code>FeatureRecord</code> vs <code>Feature_Name</code>
+vs <code>feature_name</code> — each has a distinct meaning and the docstrings
+do explain them (e.g., <code>mixins/feature.py:275-318</code> walks through
+the relationship cleanly). The doctest hygiene is <strong>the weakest
+dimension</strong> — at least three docstrings (§4.2, §4.3, §4.4) have
+examples that either fail to import or aren't marked <code># doctest:
++SKIP</code>. CLAUDE.md's "Examples are required and runnable" rule is
+partially violated by the catalog-dependent examples that don't
+clearly carry the SKIP marker. The class-docstring at
+<code>mixins/feature.py:48-55</code> is also stale (missing
+<code>list_workflow_executions</code>, see §2.4).</p>
+<h3 id="ml-developer-user">ML-developer user</h3>
+<p>The persona-of-record. From this perspective:</p>
+<ul>
+<li><strong>Six selectors cover the common use cases</strong> (most-recent,
+  earliest, by-execution, by-workflow, majority-vote, latest). The
+  set is well-named and the MCP wraps them by simple string keys.</li>
+<li><strong><code>FeatureRecord</code> is a coherent type</strong> — <code>model_dump()</code> gives a
+  dict, <code>.RCT</code>/<code>.Execution</code>/<code>.Feature_Name</code> are predictable
+  attributes, selector signatures are consistent.</li>
+<li><strong>The bag-parity contract works</strong> —
+  <code>tests/feature/test_feature_values.py::TestFeatureValuesSymmetry</code>
+  proves that <code>ml.feature_values()</code> and <code>bag.feature_values()</code>
+  return equivalent records sorted by target RID. CLAUDE.md's "Bags
+  Should Behave Like Catalog Connections" load-bearing assertion
+  holds in practice.</li>
+<li><strong>The error-message bug in §1.4</strong> is the one obvious paper cut.
+  Misclassifying a domain table as <code>terms</code> instead of <code>assets</code>
+  sends the user to the wrong place.</li>
+<li><strong><code>Dataset.list_workflow_executions</code> is a pass-through, not
+  scoped</strong> (§3.7). A user who builds a dataset of 100 images out of
+  a 10 000-image catalog, then asks "which executions ran the
+  Glaucoma workflow on my dataset?", gets the full 10 000-image
+  answer. The docstring acknowledges this but the method name doesn't
+  forewarn.</li>
+</ul>
+<h3 id="dba">DBA</h3>
+<p>Schema correctness:</p>
+<ul>
+<li><code>Feature_Name</code> is correctly seeded as an ML vocabulary in
+  <code>schema/create_schema.py:343</code> — confirmed by the schema audit's
+  <code>validation.py:274-280</code> <code>EXPECTED_VOCABULARY_TABLES</code> list (which
+  includes <code>MLVocab.feature_name</code>, unlike <code>execution_status</code> which
+  is missing — see schema audit §1.1).</li>
+<li>Feature association tables are created via
+  <code>model._define_association</code> in <code>create_feature</code>
+  (<code>mixins/feature.py:172-179</code>), which is the documented pattern in
+  CLAUDE.md "Association Tables." Three FKs: <code>target_table</code>,
+  <code>Feature_Name</code>, <code>Execution</code>. Correct shape.</li>
+<li>Per-row owner ACL inheritance: feature tables inherit the
+  catalog-wide ACL bindings from <code>policy.json</code> via <code>create_ml_catalog</code>
+  (not feature-specific code). The schema audit §3.2 noted that no
+  test asserts ACL bindings on dynamically-created tables. <strong>This
+  also applies to feature tables.</strong> A user who calls <code>create_feature</code>
+  on a table they don't own may or may not be able to insert feature
+  values depending on row-level ACL inheritance — and no test pins
+  the behavior.</li>
+</ul>
+<p><strong>DBA verdict: structurally correct, but ACL coverage on
+dynamically-created feature tables is the same hole as the schema
+audit's §3.2.</strong></p>
+<hr />
+<h2 id="ranked-actions">Ranked actions</h2>
+<p>Ordered by impact-per-effort. Each entry: effort (LoC + complexity)
+and risk class (trivial / low / medium / high).</p>
+<ol>
+<li>
+<p><strong>Fix the duplicated/incorrect validation message in
+   <code>create_feature</code> (§1.4).</strong> Change line 161 to say "vocabulary
+   table" and include the offending table name. Effort: trivial,
+   &lt;10 LoC. Risk: trivial. <strong>Highest impact-per-effort in the
+   audit</strong> — fixes a known debugging detour.</p>
+</li>
+<li>
+<p><strong>Fix the broken <code>TYPE_CHECKING</code> import path in <code>feature.py:48</code>
+   (§1.3).</strong> Change <code>from model.catalog import DerivaModel</code> to
+   <code>from deriva_ml.model.catalog import DerivaModel</code>. Effort:
+   trivial, 1 LoC. Risk: trivial. Restores IDE type resolution.</p>
+</li>
+<li>
+<p><strong>Add <code>test_select_majority_vote.py</code> (§3.1).</strong> Five tests mirroring
+   <code>test_select_by_workflow.py</code>. Effort: low, ~80 LoC of new test
+   code. Risk: low. <strong>High value for the ML-developer persona</strong> —
+   selector is in the MCP dispatch and externally documented.</p>
+</li>
+<li>
+<p><strong>Add <code>test_select_by_execution.py</code> (§3.2).</strong> Three tests. Effort:
+   low, ~40 LoC. Risk: low.</p>
+</li>
+<li>
+<p><strong>Add doctest-runnable pure-Python tests for <code>select_newest</code>,
+   <code>select_first</code>, <code>select_latest</code> (§3.3 + §4.1).</strong> Three small
+   tests + matching doctest examples in the source docstrings.
+   Effort: low, ~30 LoC. Risk: low.</p>
+</li>
+<li>
+<p><strong>Fix the missing <code># doctest: +SKIP</code> markers in
+   <code>core/mixins/feature.py</code> (§4.2).</strong> Audit all examples that
+   reference <code>ml.</code> or <code>bag.</code> and mark catalog-dependent lines.
+   Confirmed-needed at lines 443-447, 587-598. Effort: low, ~10
+   LoC. Risk: low.</p>
+</li>
+<li>
+<p><strong>Replace the <code>test_delete_feature: pass</code> placeholder with two
+   real tests (§1.5).</strong> Effort: low, ~15 LoC. Risk: low.</p>
+</li>
+<li>
+<p><strong>Add <code>test_create_feature_with_non_*_table_raises</code> tests
+   (§3.5).</strong> Pair with the §1.4 fix. Effort: low, ~15 LoC. Risk:
+   low.</p>
+</li>
+<li>
+<p><strong>Remove the <code>importlib.import_module</code> workarounds in
+   <code>feature.py</code> (§1.1) and <code>core/mixins/feature.py</code> (§1.2).</strong>
+   Replace with normal imports. The unused <code>datapath</code> import in
+   <code>mixins/feature.py:18</code> should be dropped entirely. Effort: low,
+   −11 LoC. Risk: low (same pattern already in use across the
+   codebase). <strong>Schema audit §1.10 has the same finding;
+   workspace-wide cleanup should land in one PR.</strong></p>
+</li>
+<li>
+<p><strong>Update <code>Dataset.list_workflow_executions</code> docstring to be
+    honest about the pass-through (§3.7).</strong> Either rename the
+    "Dataset-scoped" header or actually scope. Effort: low (option
+    a) or medium (option b). Risk: low (option a) / medium (option
+    b).</p>
+</li>
+<li>
+<p><strong>Update <code>interfaces.DatasetLike.find_features</code> to allow
+    <code>table=None</code> (§3.8).</strong> Plus implement the <code>None</code> branch on
+    <code>DatasetBag</code>. Effort: low, ~10 LoC. Risk: low.</p>
+</li>
+<li>
+<p><strong>Add a <code>DerivaMLFeatureNotFound</code> exception subclass (§3.9).</strong>
+    Use it in <code>lookup_feature</code>. Effort: low, ~8 LoC. Risk: low.</p>
+</li>
+<li>
+<p><strong>Fix the <code>feature.py:48</code> <code>TYPE_CHECKING</code> import path</strong> — see
+    #2.</p>
+</li>
+<li>
+<p><strong>Move the three inline <code>from deriva_ml.core.exceptions</code>
+    imports in <code>feature.py</code> to module level (§6.4).</strong> Effort:
+    trivial, −2 LoC. Risk: trivial.</p>
+</li>
+<li>
+<p><strong>Lift the asset-column-name set out of <code>map_type</code>'s loop
+    (§2.3).</strong> Effort: trivial, 1 LoC move. Risk: trivial. Minor
+    perf win in <code>feature_record_class()</code>.</p>
+</li>
+<li>
+<p><strong>Add a guard on <code>FeatureRecord.feature_columns()</code> etc.
+    (§2.1).</strong> Raise a useful error when called on the base class.
+    Effort: low, ~16 LoC. Risk: low.</p>
+</li>
+<li>
+<p><strong>Update <code>core/mixins/feature.py:48-55</code> class docstring
+    (§2.4).</strong> Add <code>list_workflow_executions</code> to the methods list.
+    Effort: trivial, 1 LoC.</p>
+</li>
+<li>
+<p><strong>Update <code>__init__.py:109-110</code> comment for <code>FeatureRecord</code>
+    (§4.6).</strong> Effort: trivial, 3 LoC.</p>
+</li>
+<li>
+<p><strong>Update <code>core/mixins/feature.py:115</code> and similar examples
+    (§4.3).</strong> Add the <code>from deriva_ml import</code> line to docstring
+    examples. Effort: low, ~6 LoC.</p>
+</li>
+<li>
+<p><strong>Mark <code>Feature.feature_record_class.map_type</code> docstring
+    example with <code># doctest: +SKIP</code> (§4.4).</strong> Effort: trivial.</p>
+</li>
+</ol>
+<p>The four "trivial" items (1, 2, 9, 14) plus the four "low" test
+items (3, 4, 5, 7) form a coherent ~30-min PR. The remaining items
+are independent and can land separately.</p>
+<hr />
+<h2 id="worst-offenders-summary">Worst offenders summary</h2>
+<ol>
+<li>
+<p><strong><code>feature.py:35-48</code></strong> — 14 lines of either-dead-or-broken
+   import boilerplate (importlib workaround for a problem that
+   doesn't exist + a wrong TYPE_CHECKING path). Cleanest delete +
+   fix target in the subsystem.</p>
+</li>
+<li>
+<p><strong><code>core/mixins/feature.py:158-161</code></strong> — duplicated/incorrect
+   validation message that sends users to the wrong parameter when
+   debugging.</p>
+</li>
+<li>
+<p><strong><code>feature.py:309-379</code> (<code>select_majority_vote</code>)</strong> — pure-Python
+   selector logic with no dedicated unit tests despite being one of
+   the MCP's dispatch keys and externally-documented in skill
+   references.</p>
+</li>
+<li>
+<p><strong><code>tests/feature/test_features.py:347</code> (<code>test_delete_feature</code>)</strong> —
+   empty <code>pass</code> test for a method with two real branches.</p>
+</li>
+<li>
+<p><strong><code>core/mixins/feature.py:48-55</code></strong> — class docstring missing
+   <code>list_workflow_executions</code>, the method that backs
+   <code>FeatureRecord.select_by_workflow</code>.</p>
+</li>
+</ol>
+<hr />
+<h2 id="summary">Summary</h2>
+<p>The feature subsystem is the healthiest of the four phase-3
+subsystems audited so far. The S2 migration completed cleanly, the
+three-container symmetry holds, external consumers in all six
+sibling projects are correctly bound to a stable surface, and no
+dead modules / dead CLI entry points / drifted reference snapshots
+exist (unlike schema's three competing validators or catalog's
+half-deprecated functions). The remaining issues are paper cuts:
+one wrong import path, one wrong error message, three missing unit
+test files for pure-Python selectors, a handful of doctest
+annotation gaps, and the two-decade-old <code>importlib</code> workaround the
+schema audit also flagged.</p>
+<p>The cleanup ceiling is ~−25 LoC of source + ~+200 LoC of tests +
+~+30 LoC of docstring fixes — modest in absolute terms but high in
+signal-density value per the audit prompt's goals.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2569 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-27-lineage-member-producer-membership-join/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Lineage Member-Producer Membership-Join Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lineage-member-producer-membership-join-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Lineage Member-Producer Membership-Join Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#global-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Constraints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-the-discovery-link-pattern-to-mirror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference: the discovery + link pattern to mirror
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-membership-join-member-producer-query-rewrite-offline-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: membership-join member-producer query (rewrite + offline tests)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-200-member-live-regression-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: ≥200-member live regression test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#final-verification-after-both-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final verification (after both tasks)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="lineage-member-producer-membership-join-implementation-plan">Lineage Member-Producer Membership-Join Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Stop <code>lookup_lineage</code> from 404ing on real datasets by replacing the client-side member-RID <code>.in_()</code> filter with a server-side membership join, so the request URL only ever carries the single dataset RID.</p>
+<p><strong>Architecture:</strong> Rewrite <code>_producers_of_dataset_members</code> to discover member asset tables via <code>find_associations</code> (no member-RID enumeration), and rewrite <code>_distinct_member_output_producers</code> to build a server-side join <code>Dataset_&lt;member&gt;(Dataset==rid) → &lt;member&gt; → &lt;member&gt;_Execution(Asset_Role="Output") → distinct Execution</code> on the dataset's <strong>version-snapshot</strong> pathBuilder (preserving consumed-version faithfulness). Delete <code>_MEMBER_PRODUCER_CHUNK</code>.</p>
+<p><strong>Tech Stack:</strong> Python 3.13, <code>uv</code>, pytest, deriva-ml core (<code>deriva_ml.core.mixins.execution.ExecutionMixin</code>), ERMrest PathBuilder.</p>
+<h2 id="global-constraints">Global Constraints</h2>
+<ul>
+<li>Work in <code>../deriva-ml</code> (<code>/Users/carl/GitHub/DerivaML/deriva-ml</code>) on branch <code>feature/lineage-member-producer-join</code> (already created; the spec is committed there).</li>
+<li>Use <code>uv</code> for everything: <code>uv run python -m pytest</code> (NOT <code>uv run pytest</code>), <code>uv run ruff check</code>, <code>uv run ruff format</code>.</li>
+<li>Always <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; &lt;cmd&gt;</code> in every Bash call — the shell CWD is not persistent.</li>
+<li>Google-style docstrings on every changed method.</li>
+<li>NO public-model / contract change: <code>src/deriva_ml/execution/lineage.py</code> is NOT modified. <code>_producers_of_dataset_members</code>'s public signature <code>(dataset_rid, version=None) -&gt; set[RID]</code> is unchanged.</li>
+<li>The member-producer query MUST NOT place a client-side member-RID list in the URL (no <code>.in_()</code> over member RIDs). The URL carries only <code>Dataset == dataset_rid</code>.</li>
+<li>Version faithfulness: build the join on <code>dataset._version_snapshot_catalog(version).pathBuilder()</code> (the same snapshot pathBuilder <code>list_dataset_members</code> uses), NOT the plain <code>self.pathBuilder()</code>.</li>
+<li>Delete <code>_MEMBER_PRODUCER_CHUNK</code> from <code>execution.py</code>. Do NOT touch <code>_VERSION_RID_CHUNK</code> in <code>_helpers.py</code> (different code path, not URL-length-bound at realistic scale).</li>
+<li>The live regression test must use a <strong>≥200-member</strong> dataset (a 1-member test cannot catch the URL-length class).</li>
+</ul>
+<h2 id="reference-the-discovery-link-pattern-to-mirror">Reference: the discovery + link pattern to mirror</h2>
+<p><code>list_dataset_members</code> (<code>src/deriva_ml/dataset/dataset.py</code>, ~lines 1689-1717) already does the member-table discovery and the membership-link build. Mirror it:</p>
+<pre><code class="language-python">version_snapshot_catalog = self._version_snapshot_catalog(version)   # Dataset method
+pb = version_snapshot_catalog.pathBuilder()
+for assoc_table in self._dataset_table.find_associations():
+    other_fkey = assoc_table.other_fkeys.pop()
+    target_table = other_fkey.pk_table          # the member table (e.g. Image)
+    member_table = assoc_table.table            # the membership table (e.g. Dataset_Image)
+    member_column = other_fkey.foreign_key_columns[0].name   # FK col on membership -&gt; member
+    target_column = other_fkey.referenced_columns[0].name    # referenced col on member (often RID)
+    target_path = pb.schemas[target_table.schema.name].tables[target_table.name]
+    member_path = pb.schemas[member_table.schema.name].tables[member_table.name]
+    # membership filtered by dataset, linked to the member table:
+    path = member_path.filter(member_path.Dataset == self.dataset_rid).link(
+        target_path, on=(member_path.columns[member_column] == target_path.columns[target_column])
+    )
+</code></pre>
+<p><code>find_association(member_table, "Execution") -&gt; (assoc_exec_table, member_link_col, exec_link_col)</code> returns the <code>&lt;member&gt;_Execution</code> association table and the names (strings) of its two FK columns.</p>
+<p>Facts for the implementer:
+- <code>self._dataset_table</code> is available on the <code>ExecutionMixin</code> host (it's the deriva-ml <code>Dataset</code> table; <code>ml_instance._dataset_table</code> is referenced elsewhere in <code>dataset.py</code>).
+- <code>self.lookup_dataset(dataset_rid)</code> returns a <code>Dataset</code> object whose <code>_version_snapshot_catalog(version)</code> returns a catalog (the live <code>ml_instance</code> when <code>version</code> is None, else a snapshot-bound catalog) exposing <code>.pathBuilder()</code>, and whose <code>dataset_rid</code> attribute is the RID. The <code>Dataset</code> also exposes <code>_dataset_table</code> and <code>find_associations</code> via its own <code>_dataset_table</code>.
+- <code>self.model.is_asset(table)</code> / <code>self.model.find_association(table, "Execution")</code> / <code>NoAssociationException</code> are already imported/used in this module.</p>
+<h2 id="file-structure">File Structure</h2>
+<ul>
+<li><code>src/deriva_ml/core/mixins/execution.py</code> — rewrite <code>_producers_of_dataset_members</code> + <code>_distinct_member_output_producers</code>; delete <code>_MEMBER_PRODUCER_CHUNK</code>.</li>
+<li><code>tests/execution/test_producers_of_dataset_members.py</code> — rework the offline harness + tests for the new structure; add a join-shape test asserting no member-RID <code>.in_()</code>.</li>
+<li><code>tests/execution/test_lookup_lineage_live.py</code> — add the ≥200-member live regression.</li>
+</ul>
+<hr />
+<h3 id="task-1-membership-join-member-producer-query-rewrite-offline-tests">Task 1: membership-join member-producer query (rewrite + offline tests)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (<code>_producers_of_dataset_members</code> ~1418-1462, <code>_distinct_member_output_producers</code> ~1464-1502, delete <code>_MEMBER_PRODUCER_CHUNK</code> ~line 52)
+- Modify: <code>tests/execution/test_producers_of_dataset_members.py</code> (rework harness + tests)</p>
+<p><strong>Interfaces:</strong>
+- Unchanged public: <code>_producers_of_dataset_members(self, dataset_rid, version=None) -&gt; set[RID]</code>.
+- New internal: <code>_distinct_member_output_producers(self, snapshot_pb, membership_table, member_table, member_link_column, target_column, dataset_rid) -&gt; set[RID]</code> (a server-side join; NO member-RID list).</p>
+<p><strong>Background:</strong> see the "Reference" section above. The current implementation enumerates member RIDs via <code>list_dataset_members</code> and filters <code>&lt;member&gt;_Execution</code> by <code>.in_(member_rids)</code> — which blows the URL. The rewrite discovers member tables via <code>find_associations</code> and joins server-side.</p>
+<ul>
+<li>[ ] <strong>Step 1: Rework the offline harness</strong></li>
+</ul>
+<p>In <code>tests/execution/test_producers_of_dataset_members.py</code>, the <code>_FakeMembersML</code> harness currently scripts <code>list_dataset_members</code> + overrides <code>_distinct_member_output_producers(asset_table, member_rids)</code>. The rewrite changes both the discovery path and the seam signature. Replace the harness's relevant parts so it scripts the NEW structure:</p>
+<pre><code class="language-python">from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+from deriva_ml.core.mixins.execution import ExecutionMixin
+
+
+class _FakeAssoc:
+    &quot;&quot;&quot;Stand-in for a membership association table from find_associations().&quot;&quot;&quot;
+    def __init__(self, membership_name, member_table_name, member_col=&quot;Image&quot;, target_col=&quot;RID&quot;):
+        self.table = SimpleNamespace(name=membership_name, schema=SimpleNamespace(name=&quot;domain&quot;))
+        member_tbl = SimpleNamespace(name=member_table_name, schema=SimpleNamespace(name=&quot;domain&quot;))
+        ofk = SimpleNamespace(
+            pk_table=member_tbl,
+            foreign_key_columns=[SimpleNamespace(name=member_col)],
+            referenced_columns=[SimpleNamespace(name=target_col)],
+        )
+        # other_fkeys.pop() must return ofk
+        self.other_fkeys = [ofk]
+
+
+class _FakeMembersML(ExecutionMixin):
+    &quot;&quot;&quot;Scripts what the rewritten _producers_of_dataset_members needs:
+    a dataset table whose find_associations() yields membership associations,
+    is_asset() per member table, and a seam (_distinct_member_output_producers)
+    that returns scripted producer sets per member table.
+    &quot;&quot;&quot;
+
+    def __init__(self):
+        # member_table_name -&gt; set of producer RIDs (the seam result)
+        self._producers_by_table: dict[str, set[str]] = {}
+        # which member tables are asset tables
+        self._asset_tables: set[str] = set()
+        # membership associations the dataset table &quot;has&quot;
+        self._assocs: list[_FakeAssoc] = []
+
+        self.model = MagicMock()
+        self.model.is_asset = lambda table: getattr(table, &quot;name&quot;, table) in self._asset_tables
+
+        # _dataset_table.find_associations() -&gt; self._assocs
+        self._dataset_table = SimpleNamespace(find_associations=lambda: list(self._assocs))
+
+    # scripting --------------------------------------------------------------
+    def add_member_table(self, membership_name, member_table_name, *, is_asset=True,
+                         producers=frozenset(), member_col=&quot;Image&quot;, target_col=&quot;RID&quot;):
+        self._assocs.append(_FakeAssoc(membership_name, member_table_name, member_col, target_col))
+        if is_asset:
+            self._asset_tables.add(member_table_name)
+        self._producers_by_table[member_table_name] = set(producers)
+
+    # mocked primitives ------------------------------------------------------
+    def lookup_dataset(self, rid):  # type: ignore[override]
+        snap = MagicMock()
+        snap.pathBuilder = lambda: MagicMock()
+        ds = SimpleNamespace(
+            dataset_rid=rid,
+            _version_snapshot_catalog=lambda version: snap,
+            _dataset_table=self._dataset_table,
+        )
+        return ds
+
+    def _distinct_member_output_producers(self, snapshot_pb, membership_table, member_table,  # type: ignore[override]
+                                          member_link_column, target_column, dataset_rid):
+        # Seam: return scripted producers for this member table.
+        return set(self._producers_by_table.get(getattr(member_table, &quot;name&quot;, member_table), set()))
+</code></pre>
+<p>(Adjust the seam override's parameter list to EXACTLY match the new real signature you settle on in Step 3 — the harness override and the real method must agree.)</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the failing tests (logic via the seam)</strong></li>
+</ul>
+<p>Rewrite the existing logic tests for the new harness and keep their intent (dedup across tables, skip non-asset, empty when none). Replace the file's test bodies with:</p>
+<pre><code class="language-python">def test_dedup_across_member_tables():
+    ml = _FakeMembersML()
+    ml.add_member_table(&quot;Dataset_Image&quot;, &quot;Image&quot;, producers={&quot;2-EXUP&quot;})
+    assert ml._producers_of_dataset_members(&quot;1-DSAA&quot;) == {&quot;2-EXUP&quot;}
+
+
+def test_union_across_multiple_asset_tables():
+    ml = _FakeMembersML()
+    ml.add_member_table(&quot;Dataset_Image&quot;, &quot;Image&quot;, producers={&quot;2-EXAA&quot;})
+    ml.add_member_table(&quot;Dataset_File&quot;, &quot;File&quot;, producers={&quot;2-EXAB&quot;}, member_col=&quot;File&quot;)
+    assert ml._producers_of_dataset_members(&quot;1-DSAA&quot;) == {&quot;2-EXAA&quot;, &quot;2-EXAB&quot;}
+
+
+def test_non_asset_member_tables_skipped():
+    ml = _FakeMembersML()
+    ml.add_member_table(&quot;Dataset_Image&quot;, &quot;Image&quot;, producers={&quot;2-EXAA&quot;})
+    ml.add_member_table(&quot;Dataset_Dataset&quot;, &quot;Dataset&quot;, is_asset=False, producers={&quot;2-EXNO&quot;})
+    assert ml._producers_of_dataset_members(&quot;1-DSAA&quot;) == {&quot;2-EXAA&quot;}
+
+
+def test_no_producers_returns_empty():
+    ml = _FakeMembersML()
+    ml.add_member_table(&quot;Dataset_Image&quot;, &quot;Image&quot;, producers=set())
+    assert ml._producers_of_dataset_members(&quot;1-DSAA&quot;) == set()
+
+
+def test_no_member_tables_returns_empty():
+    ml = _FakeMembersML()
+    assert ml._producers_of_dataset_members(&quot;1-DSAA&quot;) == set()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_producers_of_dataset_members.py -k "dedup or union or non_asset or no_producers or no_member_tables" -v</code>
+Expected: FAIL — the current <code>_producers_of_dataset_members</code> calls <code>list_dataset_members</code> + the old <code>_distinct_member_output_producers(asset_table, member_rids)</code> seam, which the new harness no longer provides; the discovery-via-<code>find_associations</code> path doesn't exist yet.</p>
+<ul>
+<li>[ ] <strong>Step 4: Rewrite <code>_producers_of_dataset_members</code></strong></li>
+</ul>
+<p>Replace the method in <code>src/deriva_ml/core/mixins/execution.py</code> with the discovery-via-associations version (no RID enumeration):</p>
+<pre><code class="language-python">    def _producers_of_dataset_members(self, dataset_rid: RID, version: Any | None = None) -&gt; set[RID]:
+        &quot;&quot;&quot;Distinct executions that produced the member assets of a dataset.
+
+        For each member ASSET table, collects the distinct producing executions
+        (the asset's ``&lt;Asset&gt;_Execution`` association with
+        ``Asset_Role=&quot;Output&quot;``) via a server-side membership join — the request
+        URL carries only the dataset RID, never a client-side member-RID list,
+        so this is safe for datasets with thousands of members. Deduplicated
+        across all member tables. Nested-``Dataset`` and non-asset member kinds
+        are skipped — dataset producers are handled by :meth:`_producer_of_dataset`.
+
+        The work is bounded by the number of member *asset tables* (typically
+        1-2), independent of member count.
+
+        Args:
+            dataset_rid: RID of the dataset whose member assets to inspect.
+            version: Optional dataset version. ``None`` uses the current version;
+                a version resolves the membership join against that version's
+                catalog snapshot (consumed-version faithfulness).
+
+        Returns:
+            Set of distinct producing-execution RIDs. Empty when the dataset has
+            no member assets or none have a recorded ``Output`` producer.
+
+        Example:
+            &gt;&gt;&gt; producers = ml._producers_of_dataset_members(&quot;1-DSAA&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; sorted(producers)  # doctest: +SKIP
+            ['2-EXUP']
+        &quot;&quot;&quot;
+        dataset = self.lookup_dataset(dataset_rid)
+        snapshot_pb = dataset._version_snapshot_catalog(version).pathBuilder()
+        producers: set[RID] = set()
+        for assoc_table in dataset._dataset_table.find_associations():
+            other_fkey = assoc_table.other_fkeys.pop()
+            member_table = other_fkey.pk_table          # the member asset table (e.g. Image)
+            membership_table = assoc_table.table        # the membership table (e.g. Dataset_Image)
+            if not self.model.is_asset(member_table):
+                # Nested-Dataset / non-asset member kinds are not asset-producer-shaped.
+                continue
+            member_link_column = other_fkey.foreign_key_columns[0].name
+            target_column = other_fkey.referenced_columns[0].name
+            producers |= self._distinct_member_output_producers(
+                snapshot_pb,
+                membership_table,
+                member_table,
+                member_link_column,
+                target_column,
+                dataset.dataset_rid,
+            )
+        return producers
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Rewrite <code>_distinct_member_output_producers</code> as a server-side join</strong></li>
+</ul>
+<p>Replace the method with:</p>
+<pre><code class="language-python">    def _distinct_member_output_producers(
+        self,
+        snapshot_pb: Any,
+        membership_table: Any,
+        member_table: Any,
+        member_link_column: str,
+        target_column: str,
+        dataset_rid: RID,
+    ) -&gt; set[RID]:
+        &quot;&quot;&quot;Distinct ``Output`` producing executions of a dataset's members of one
+        asset table, via a server-side membership join.
+
+        Builds the path
+        ``&lt;membership&gt;(Dataset==dataset_rid) → &lt;member&gt; → &lt;member&gt;_Execution
+        (Asset_Role=&quot;Output&quot;)`` on ``snapshot_pb`` and projects distinct
+        ``Execution``. The request URL carries only the dataset RID — no
+        client-side member-RID list — so it is safe at any member count.
+
+        Args:
+            snapshot_pb: Version-snapshot pathBuilder for the dataset.
+            membership_table: The ``Dataset_&lt;member&gt;`` membership table.
+            member_table: The member asset table (e.g. ``Image``).
+            member_link_column: FK column on the membership table referencing
+                the member.
+            target_column: The referenced column on the member table (often
+                ``&quot;RID&quot;``).
+            dataset_rid: RID of the dataset whose members to inspect.
+
+        Returns:
+            Set of distinct producing-execution RIDs (``Output`` role). Empty if
+            the member asset table has no ``&lt;member&gt;_Execution`` association.
+        &quot;&quot;&quot;
+        try:
+            exec_assoc, member_exec_fk, _exec_fk = self.model.find_association(member_table, &quot;Execution&quot;)
+        except NoAssociationException:
+            return set()
+
+        membership_path = snapshot_pb.schemas[membership_table.schema.name].tables[membership_table.name]
+        member_path = snapshot_pb.schemas[member_table.schema.name].tables[member_table.name]
+        exec_path = snapshot_pb.schemas[exec_assoc.schema.name].tables[exec_assoc.name]
+
+        path = (
+            membership_path.filter(membership_path.Dataset == dataset_rid)
+            .link(
+                member_path,
+                on=(membership_path.columns[member_link_column] == member_path.columns[target_column]),
+            )
+            .link(
+                exec_path,
+                on=(member_path.columns[target_column] == exec_path.columns[member_exec_fk]),
+            )
+            .filter(exec_path.Asset_Role == &quot;Output&quot;)
+        )
+        producers: set[RID] = set()
+        for row in path.attributes(exec_path.Execution).fetch():
+            exec_rid = row.get(&quot;Execution&quot;)
+            if exec_rid:
+                producers.add(exec_rid)
+        return producers
+</code></pre>
+<p>Note on the second <code>.link</code>: it joins the member table to the <code>&lt;member&gt;_Execution</code> association on the member's referenced column (<code>target_column</code>, typically <code>RID</code>) matching the association's FK to the member (<code>member_exec_fk</code>). If the live test shows the link direction/columns need adjusting (e.g. the association references the member by a different column), fix the <code>on=</code> to match what the model exposes — the INVARIANT is that no member-RID list appears in the URL and the result equals the member-producer set. Verify against the live catalog in Task 2.</p>
+<ul>
+<li>[ ] <strong>Step 6: Delete <code>_MEMBER_PRODUCER_CHUNK</code></strong></li>
+</ul>
+<p>Remove the <code>_MEMBER_PRODUCER_CHUNK = 500</code> constant (and its comment) near the top of <code>src/deriva_ml/core/mixins/execution.py</code> (~line 52). Confirm no other reference remains: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -rn "_MEMBER_PRODUCER_CHUNK" src/</code> should return nothing.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run the logic tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_producers_of_dataset_members.py -v</code>
+Expected: the 5 logic tests PASS (the seam override returns scripted producers; the discovery loop iterates the scripted associations, skips non-asset, dedups/unions).</p>
+<ul>
+<li>[ ] <strong>Step 8: Add the join-shape test (drives the REAL join helper)</strong></li>
+</ul>
+<p>This is the regression guard for the bug class — it must prove the real <code>_distinct_member_output_producers</code> builds a <code>Dataset==rid</code> filter and NO member-RID <code>.in_()</code>. Append to <code>tests/execution/test_producers_of_dataset_members.py</code>:</p>
+<pre><code class="language-python">def test_join_filters_by_dataset_not_member_rid_in():
+    &quot;&quot;&quot;The real join filters membership by Dataset==rid and never builds an
+    .in_() over member RIDs (the tk-023 URL-length bug class).&quot;&quot;&quot;
+    calls = {&quot;dataset_filter&quot;: False, &quot;member_in_called&quot;: False, &quot;asset_role_output&quot;: False}
+
+    # Column whose .in_() would be the BUG — flag it if ever called.
+    member_col = MagicMock()
+    member_col.in_ = lambda *a, **k: calls.__setitem__(&quot;member_in_called&quot;, True) or MagicMock()
+
+    def _make_table(name):
+        t = MagicMock()
+        t.columns = {&quot;RID&quot;: member_col, &quot;Image&quot;: MagicMock()}
+        # membership_path.Dataset == rid  -&gt; record it
+        def _eq(other):
+            calls[&quot;dataset_filter&quot;] = True
+            return MagicMock()
+        t.Dataset = MagicMock()
+        t.Dataset.__eq__ = lambda self_, other: _eq(other)
+        # Asset_Role == &quot;Output&quot;
+        t.Asset_Role = MagicMock()
+        t.Asset_Role.__eq__ = lambda self_, other: calls.__setitem__(&quot;asset_role_output&quot;, other == &quot;Output&quot;) or MagicMock()
+        t.Execution = MagicMock()
+        # chainable path: filter/link return a path with attributes().fetch()
+        path = MagicMock()
+        path.filter.return_value = path
+        path.link.return_value = path
+        path.attributes.return_value.fetch.return_value = [{&quot;Execution&quot;: &quot;2-EXUP&quot;}]
+        t.filter = path.filter
+        return t, path
+
+    membership_t, mpath = _make_table(&quot;Dataset_Image&quot;)
+    member_t, _ = _make_table(&quot;Image&quot;)
+    exec_t, _ = _make_table(&quot;Image_Execution&quot;)
+
+    schema = MagicMock()
+    schema.name = &quot;domain&quot;
+    schema.tables = {&quot;Dataset_Image&quot;: membership_t, &quot;Image&quot;: member_t, &quot;Image_Execution&quot;: exec_t}
+    pb = MagicMock()
+    pb.schemas = {&quot;domain&quot;: schema}
+
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.model = MagicMock()
+    # find_association(member, &quot;Execution&quot;) -&gt; (exec_assoc_table, member_fk, exec_fk)
+    exec_assoc = SimpleNamespace(name=&quot;Image_Execution&quot;, schema=SimpleNamespace(name=&quot;domain&quot;))
+    ml.model.find_association = lambda mt, target: (exec_assoc, &quot;Image&quot;, &quot;Execution&quot;)
+
+    membership_table = SimpleNamespace(name=&quot;Dataset_Image&quot;, schema=SimpleNamespace(name=&quot;domain&quot;))
+    member_table = SimpleNamespace(name=&quot;Image&quot;, schema=SimpleNamespace(name=&quot;domain&quot;))
+
+    result = ml._distinct_member_output_producers(
+        pb, membership_table, member_table, &quot;Image&quot;, &quot;RID&quot;, &quot;1-DSAA&quot;
+    )
+
+    assert result == {&quot;2-EXUP&quot;}
+    assert calls[&quot;dataset_filter&quot;] is True, &quot;must filter membership by Dataset==rid&quot;
+    assert calls[&quot;member_in_called&quot;] is False, &quot;must NOT build an .in_() over member RIDs (tk-023)&quot;
+</code></pre>
+<p>Note: the mock column wiring is intricate; if a particular attribute path doesn't line up with your real implementation's exact calls, adjust the mock to match — but the two <code>assert</code>s that MUST hold are <code>dataset_filter is True</code> and <code>member_in_called is False</code>. If <code>__eq__</code> mocking proves brittle, an acceptable alternative is a lighter spy that records whether <code>.in_</code> was ever accessed on any member column and whether a <code>Dataset</code>-keyed filter was issued; do NOT weaken to "result is non-empty only".</p>
+<ul>
+<li>[ ] <strong>Step 9: Run the join-shape test + full file</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_producers_of_dataset_members.py -v</code>
+Expected: all PASS (5 logic + the join-shape test).</p>
+<ul>
+<li>[ ] <strong>Step 10: No-regression across the lineage surface</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_lookup_lineage_unit.py tests/execution/test_input_datasets_with_versions.py -q</code>
+Expected: green. The walk unit tests script member producers via the <code>_FakeML</code> override of <code>_producers_of_dataset_members</code>, which is mechanism-independent, so they are unaffected.</p>
+<ul>
+<li>[ ] <strong>Step 11: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check src/deriva_ml/core/mixins/execution.py tests/execution/test_producers_of_dataset_members.py
+uv run ruff format --check src/deriva_ml/core/mixins/execution.py tests/execution/test_producers_of_dataset_members.py
+git add src/deriva_ml/core/mixins/execution.py tests/execution/test_producers_of_dataset_members.py
+git commit -m &quot;fix(lineage): member-producer query via server-side membership join (no member-RID URL list) — tk-023&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-200-member-live-regression-test">Task 2: ≥200-member live regression test</h3>
+<p><strong>Files:</strong>
+- Modify: <code>tests/execution/test_lookup_lineage_live.py</code> (add one DERIVA_HOST-gated test)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: the rewritten <code>_producers_of_dataset_members</code> / <code>lookup_lineage</code> (Task 1), the <code>test_ml</code> fixture, <code>tests/factories.py</code>, the <code>DERIVA_HOST</code> gate.</p>
+<p><strong>Background:</strong> The bug only manifests at scale — a dataset with hundreds of asset members produces a URL too long for the OLD <code>.in_()</code> code. A 1-member test cannot catch it. This test builds a dataset with ≥200 (target ~500) asset members produced by an upstream execution and asserts <code>lookup_lineage</code> (or <code>_producers_of_dataset_members</code>) returns that producer WITHOUT a 404. Read the existing live tests + <code>tests/factories.py</code> first for the construction APIs.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the live test</strong></li>
+</ul>
+<p>Add to <code>tests/execution/test_lookup_lineage_live.py</code> (after the existing tests). Replace the <code>...</code> with real construction — study the existing live tests + factories; the ASSERTION block is the contract:</p>
+<pre><code class="language-python">@pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;lookup_lineage live smoke test requires DERIVA_HOST&quot;,
+)
+def test_member_producer_query_scales_to_many_members(test_ml):
+    &quot;&quot;&quot;tk-023: the member-producer query must not 404 on a dataset with
+    hundreds of members. Builds a dataset whose &gt;=200 asset members are
+    produced by one upstream execution, then asserts lookup_lineage surfaces
+    that producer (the OLD client-side .in_() over 200+ RIDs would 404).&quot;&quot;&quot;
+    N_MEMBERS = 250  # &gt; the ~hundreds threshold where the old URL blew up
+    # Build exec_up that produces N_MEMBERS asset members; assemble them into
+    # DS_BIG (versioned by exec_ds). Use the catalog APIs / factories — see
+    # the existing member-asset live test for how to create asset members and
+    # attach them to a dataset, then loop to reach N_MEMBERS.
+    #
+    #   ds_big_rid   = RID of DS_BIG (the &gt;=250-member dataset)
+    #   exec_up_rid  = RID of the execution that produced the members
+    ...
+
+    # The core assertion: this must NOT raise (the old code 404'd here).
+    result = test_ml.lookup_lineage(ds_big_rid)
+
+    seen = set()
+    def _collect(node):
+        if node is None:
+            return
+        seen.add(node.execution.rid)
+        for p in node.parents:
+            _collect(p)
+    _collect(result.lineage)
+
+    assert exec_up_rid in seen, (
+        f&quot;member-producer {exec_up_rid} not surfaced for a {N_MEMBERS}-member &quot;
+        f&quot;dataset; saw {seen}&quot;
+    )
+    assert result.cycle_detected is False
+</code></pre>
+<p>The implementer MUST replace the <code>...</code> with real construction reaching ≥200 members (document the exact count). If building ≥200 members is impractical in the harness, build the largest count feasible that still exceeds the old URL limit (a few hundred short RIDs ≈ a few KB; aim for ≥200) and document it. Do NOT leave the ellipsis; do NOT weaken the no-404 assertion.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the live test (gated)</strong></li>
+</ul>
+<p>Run (localhost container is up; <code>test_ml</code> defaults <code>DERIVA_HOST=localhost</code>, manages its own catalog; set <code>DERIVA_ML_ALLOW_DIRTY=true</code> for workflow creation on a dirty tree):
+<code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_HOST=localhost DERIVA_ML_ALLOW_DIRTY=true uv run python -m pytest tests/execution/test_lookup_lineage_live.py::test_member_producer_query_scales_to_many_members -v</code>
+Expected: PASS (no 404; producer surfaced). This build creates ~250 members + uploads, so it may take a few minutes — do NOT kill it early.
+If no live host is available, report that, confirm the test SKIPS without <code>DERIVA_HOST</code> and collects cleanly — do NOT fake a pass.</p>
+<ul>
+<li>[ ] <strong>Step 3: Confirm the existing live tests still pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_HOST=localhost DERIVA_ML_ALLOW_DIRTY=true uv run python -m pytest tests/execution/test_lookup_lineage_live.py -v</code>
+Expected: all live tests PASS — <code>test_lookup_lineage_descends_into_member_asset_producers</code> and <code>test_lookup_lineage_reflects_consumed_version_not_latest</code> must still produce the same producers via the new join (the join must return the same set for their small datasets, and the consumed-version test confirms version faithfulness through the snapshot pathBuilder).
+If no container: confirm skip + clean collection, report.</p>
+<ul>
+<li>[ ] <strong>Step 4: Confirm skip path + collection (offline)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_lookup_lineage_live.py -v</code>
+Expected: all live tests SKIP (no <code>DERIVA_HOST</code>), no collection errors.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check tests/execution/test_lookup_lineage_live.py
+uv run ruff format --check tests/execution/test_lookup_lineage_live.py
+git add tests/execution/test_lookup_lineage_live.py
+git commit -m &quot;test(lineage): &gt;=200-member live regression for the membership-join (tk-023)&quot;
+</code></pre>
+<hr />
+<h2 id="final-verification-after-both-tasks">Final verification (after both tasks)</h2>
+<ul>
+<li>[ ] Full execution test dir: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/ -q</code> — pass (live tests skip without <code>DERIVA_HOST</code>; the 2 pre-existing <code>test_workflow_creation_*</code> failures are unrelated).</li>
+<li>[ ] No <code>_MEMBER_PRODUCER_CHUNK</code> remains: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -rn "_MEMBER_PRODUCER_CHUNK" src/</code> — empty.</li>
+<li>[ ] Live smoke against the real small dataset (the original bug): with a localhost CIFAR catalog (e.g. 278) present, <code>lookup_lineage('&lt;a 500-member Small_* dataset&gt;')</code> returns WITHOUT a 404 and reaches the source File dataset. (If catalog 278 still exists, <code>ml.lookup_lineage('1MEP')</code> should now work at default settings.)</li>
+<li>[ ] Lint the touched surface: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src tests</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

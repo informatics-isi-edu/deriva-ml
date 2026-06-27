@@ -1,0 +1,3917 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase3-catalog/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml audit 2026-05 — Phase 3: catalog/ - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-audit-2026-05-phase-3-catalog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml audit 2026-05 — Phase 3: catalog/
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-workspace-usage-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-workspace usage check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-1-dead-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 1 — Dead code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 1 — Dead code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-localize_assets-has-zero-callers-and-zero-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 localize_assets has zero callers and zero tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-_extract_hatrac_path-has-an-unreachable-branch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 _extract_hatrac_path has an unreachable branch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-clonedetails-is-never-instantiated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 CloneDetails is never instantiated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-_warn_about_legacy_params-walks-11-dead-parameter-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 _warn_about_legacy_params walks 11 dead parameter names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-create_ml_workspace-is-a-back-compat-shim-with-no-working-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 create_ml_workspace is a back-compat shim with no working callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-orphanstrategy-is-an-alias-of-danglingfkstrategy-with-no-in-repo-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6 OrphanStrategy is an alias of DanglingFKStrategy with no in-repo callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-set_catalog_provenance-cannot-record-clone-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.7 set_catalog_provenance cannot record clone details
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-internal-re-exports-route-through-clonepy-instead-of-provenancepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.8 Internal re-exports route through clone.py instead of provenance.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-__init__py-package-docstring-lies-about-orphanstrategys-home" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.9 __init__.py package docstring lies about OrphanStrategy's home
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-2-privatization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 2 — Privatization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 2 — Privatization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-_coerce_asset_mode-_coerce_orphan_strategy-_warn_about_legacy_params-are-already-private-fine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 _coerce_asset_mode, _coerce_orphan_strategy, _warn_about_legacy_params are already private — fine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-_extract_hatrac_path-_ensure_hatrac_namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 _extract_hatrac_path, _ensure_hatrac_namespace,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-_materialize_bag_dir-_materialize_bag_assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 _materialize_bag_dir, _materialize_bag_assets,
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-_write_provenance_annotation-is-correctly-private-fine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 _write_provenance_annotation is correctly private — fine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-orphanstrategy-is-public-named-but-should-be-private-until-deleted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 OrphanStrategy is public-named but should be private until deleted
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-3-test-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 3 — Test coverage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 3 — Test coverage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-no-orphan-strategy-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 No orphan-strategy integration tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-localize_assets-has-zero-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 localize_assets has zero tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-create_ml_workspace-has-zero-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 create_ml_workspace has zero tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-catalogprovenancefrom_dict-to_dict-round-trip-has-zero-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 CatalogProvenance.from_dict / to_dict round-trip has zero tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-two-unit-tests-rely-on-private-symbol-imports-fine-but-flag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Two unit tests rely on private-symbol imports — fine, but flag
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-4-docs-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 4 — Docs sync
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 4 — Docs sync">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-__init__py-docstring-claims-feature-parity-that-isnt-accurate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 __init__.py docstring claims feature parity that isn't accurate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-localize_assets-docstring-still-references-deleted-asset_moderefs-spelling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 localize_assets docstring still references deleted asset_mode="refs" spelling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-provenancepy-docstring-describes-a-feature-that-doesnt-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 provenance.py docstring describes a feature that doesn't work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-docstring-examples-missing-doctest-skip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Docstring examples missing # doctest: +SKIP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-clone_via_bag-example-uses-default-dataset-table-assumption-fine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 clone_via_bag Example uses default Dataset table assumption — fine
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-5-deriva-py-api-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 5 — deriva-py API conventions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 5 — deriva-py API conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-_collect_nested_dataset_rids-uses-datapath-in_-fine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 _collect_nested_dataset_rids uses datapath .in_() — fine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-_fetch_asset_records-uses-datapath-in_-fine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 _fetch_asset_records uses datapath .in_() — fine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-provenancepy-uses-raw-catalogput-and-catalogget-for-annotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 provenance.py uses raw catalog.put and catalog.get for annotations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-_get_catalog_info-uses-hasattr-to-discriminate-types-fine-but-brittle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 _get_catalog_info uses hasattr to discriminate types — fine, but brittle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-6-inconsistencies-dataclass-vs-pydantic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 6 — Inconsistencies / dataclass-vs-Pydantic
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 6 — Inconsistencies / dataclass-vs-Pydantic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-provenance-types-should-be-pydantic-per-claudemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Provenance types should be Pydantic per CLAUDE.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-clone_via_bag-policy-merge-silently-overrides-explicit-fail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 clone_via_bag policy-merge silently overrides explicit FAIL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-localizepy-line-252-shadows-the-outer-source_hostname-parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 localize.py line 252 shadows the outer source_hostname parameter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-localizepy-or-patterns-confuse-empty-with-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 localize.py or patterns confuse "empty" with "missing"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-localizepy-chunk_size-or-default_chunk_size-ignores-explicit-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 localize.py chunk_size or default_chunk_size ignores explicit 0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-_extract_hatrac_path-does-not-validate-the-url-is-https" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 _extract_hatrac_path does not validate the URL is HTTP(S)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-7-maintainability-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 7 — Maintainability / naming
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 7 — Maintainability / naming">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-ermrestcatalog-forward-ref-string-with-no-underlying-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 "ErmrestCatalog" forward-ref string with no underlying import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-_collect_nested_dataset_rids-catches-bare-exception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 _collect_nested_dataset_rids catches bare Exception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-localizepy-uses-f-string-interpolation-in-loggerinfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 localize.py uses f-string interpolation in logger.info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-cloneviabagresult-is-a-dataclass-localizeresult-is-a-dataclass-should-be-pydantic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 CloneViaBagResult is a @dataclass; LocalizeResult is a @dataclass — should be Pydantic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-module-docstring-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 Module docstring sizes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persona-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persona check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worst-offender-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worst-offender modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-audit-2026-05-phase-3-catalog">deriva-ml audit 2026-05 — Phase 3: catalog/</h1>
+<p>Reviewed <code>/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/catalog/</code>
+(1 665 LoC across 5 Python files: <code>clone.py</code> 359, <code>clone_via_bag.py</code>
+457, <code>localize.py</code> 464, <code>provenance.py</code> 319, <code>__init__.py</code> 66) and the
+corresponding test surface
+<code>/Users/carl/GitHub/DerivaML/deriva-ml/tests/catalog/</code> (754 LoC, 2 test
+files, ~10 tests) at the tip of <code>main</code> (HEAD <code>e8d20a5b</code>).
+Cross-workspace references were grepped against
+<code>/Users/carl/GitHub/DerivaML/{deriva-mcp,deriva-mcp-core,deriva-ml-mcp,deriva-ml-model-template,deriva-skills,deriva-ml-skills}/</code>.</p>
+<p>The Phase 1 audit flagged <code>catalog/</code> as "recently rewritten" and
+deferred deep review: <code>clone.py</code> had shrunk from ~1 900 LoC to 412
+(now 359), <code>clone_via_bag</code> was clean, and the worst legacy items
+(<code>CloneReport</code>, <code>CloneIssue</code>, the three-stage clone) were deleted in
+ADR-0006's wake. That call was correct — the active code path
+(<code>clone_via_bag</code> → <code>CatalogBagBuilder</code> → <code>BagCatalogLoader</code>) is in
+good shape. The dragging tail here is <strong>everything that exists
+<em>around</em> that path</strong>: a back-compat wrapper (<code>create_ml_workspace</code>)
+with no in-repo callers, a localization module with no callers at
+all, a provenance dataclass family that's never populated, and a
+package re-export tree that routes through the back-compat shim
+instead of the canonical module.</p>
+<h2 id="executive-summary">Executive summary</h2>
+<p>Overall posture: <strong>the clone path is healthy and load-bearing; the
+surface around it is mostly archaeology.</strong> <code>clone_via_bag</code> is the
+canonical implementation, well-tested at the unit level, and has
+three live-catalog integration smoke tests. The four other public
+surfaces — <code>create_ml_workspace</code>, <code>localize_assets</code>, the
+<code>CatalogProvenance</code>/<code>CloneDetails</code> dataclass pair, and the legacy
+<code>OrphanStrategy</code> alias — have zero callers in the deriva-ml <code>src/</code>
+tree and zero callers in any active sibling project. The single
+external consumer (<code>deriva-mcp/src/deriva_mcp/tools/catalog.py</code>) is
+<strong>already broken at runtime</strong> against the current
+<code>create_ml_workspace</code> — it imports a non-existent <code>AssetCopyMode</code>
+and reads attributes (<code>result.hostname</code>, <code>result.report.summary.*</code>)
+that <code>CloneViaBagResult</code> does not provide. Per CLAUDE.md
+("MCP cut-over (Phase 4)"), <code>deriva-mcp</code> is legacy and slated for
+replacement by <code>deriva-mcp-core + deriva-ml-mcp</code>; the new MCP path
+does not call any catalog/ symbol.</p>
+<p>Top themes ranked by impact:</p>
+<ol>
+<li>
+<p><strong><code>localize_assets</code> has zero callers across the entire workspace
+   and zero tests.</strong> <code>catalog/localize.py:54</code> is a 350-LoC public
+   function exported from <code>catalog/__init__.py:38</code> and documented in
+   the module docstring of <code>catalog/__init__.py</code>. A workspace-wide
+   grep for <code>localize_assets</code> returns hits only inside <code>localize.py</code>
+   itself and the package <code>__init__.py</code>. No <code>src/</code>, no <code>tests/</code>, no
+   sibling project. The dataclass <code>LocalizeResult</code> is in the same
+   state. This is the largest single LoC liability in <code>catalog/</code>.
+   Either land an integration test (it's a real feature that
+   ML-developer users would want after a clone with
+   <code>asset_mode=ROWS_ONLY</code>) or delete it.</p>
+</li>
+<li>
+<p><strong><code>create_ml_workspace</code> is a back-compat shim whose only consumer
+   is broken.</strong> <code>catalog/clone.py:93</code> exists per its module
+   docstring to keep the pre-bag-pipeline call shape working. The
+   one consumer (<code>deriva-mcp/src/deriva_mcp/tools/catalog.py:557</code>)
+   imports a name that doesn't exist (<code>AssetCopyMode</code>) and expects
+   the old <code>CloneCatalogResult</code> shape, not <code>CloneViaBagResult</code>. The
+   shim's <code>_warn_about_legacy_params</code> walks 11 dead parameter names
+   to emit warnings; the <code>_coerce_asset_mode</code> / <code>_coerce_orphan_strategy</code>
+   helpers translate string spellings nobody actually passes. None
+   of this is exercised by deriva-ml's own tests. CLAUDE.md's
+   "No backwards-compat shims" rule applies cleanly: <code>clone.py</code> is
+   the textbook example.</p>
+</li>
+<li>
+<p><strong><code>CloneDetails</code> is a 20-field dataclass that nothing ever
+   populates.</strong> <code>provenance.py:62-157</code> defines a structural record
+   for clone provenance with explicit <code>to_dict</code> / <code>from_dict</code>
+   round-trip support and 20 fields covering legacy clone knobs
+   (<code>truncate_oversized</code>, <code>prune_hidden_fkeys</code>, <code>orphan_rows_nullified</code>,
+   <code>fkeys_pruned</code>, ...). A workspace-wide grep for <code>CloneDetails(</code>
+   (constructor calls) returns <strong>zero</strong> hits — no production code,
+   no test code, no sibling project. The bag pipeline records its
+   provenance in the bag's <code>metadata/</code> directory, not on the
+   catalog annotation; the dataclass is fossil scaffolding. The
+   <code>CatalogProvenance.is_clone</code> property (line 219-222) always
+   returns False as a consequence.</p>
+</li>
+<li>
+<p><strong>Internal imports route through <code>clone.py</code> instead of
+   <code>provenance.py</code>.</strong> <code>core/base.py:70</code> and <code>core/base.py:1037</code>,
+   plus all five <code>__init__.py</code> lazy-import branches (lines 86, 90,
+   94, 98, 102), import <code>CatalogProvenance</code> / <code>get_catalog_provenance</code>
+   / etc. from <code>deriva_ml.catalog.clone</code>. The actual implementation
+   lives in <code>deriva_ml.catalog.provenance</code>; <code>clone.py:66-72</code> re-exports
+   it with a <code># noqa: F401</code> marker for back-compat. Since the
+   re-export path is internal, there is no compatibility concern —
+   these imports should point at <code>provenance.py</code> directly, and the
+   re-export should be deleted.</p>
+</li>
+<li>
+<p><strong><code>clone_via_bag</code>'s policy-merge silently overrides explicit
+   <code>DanglingFKStrategy.FAIL</code>.</strong> <code>clone_via_bag.py:372-375</code> reads
+   "if the caller's policy has <code>dangling_fk_strategy == FAIL</code>,
+   replace it with <code>DELETE</code> because that's the library default."
+   The same logic at line 368-369 overrides explicit
+   <code>VocabExport.REFERENCED_ONLY</code> with <code>FULL</code>. The merge can't
+   distinguish "left at default" from "set to this value
+   deliberately" — Pydantic doesn't surface <code>model_fields_set</code> on
+   model_copy. A DBA-persona user who picks FAIL intentionally for
+   strict-mode safety has no way to express it through
+   <code>clone_via_bag</code>. The unit test pins this surprising behavior
+   (<code>test_clone_via_bag_merges_defaults_into_partial_policy</code>)
+   rather than catching it.</p>
+</li>
+</ol>
+<p>Worst-offending modules within <code>catalog/</code>:</p>
+<ol>
+<li>
+<p><strong><code>localize.py</code></strong> (464 LoC). Zero callers, zero tests, public
+   function, top-level import in package <code>__init__.py</code>. Either it
+   needs an integration test that ML-developer users would
+   recognize as serving them, or it needs to be deleted. The body
+   of the function has its own quality issues (variable
+   shadowing at line 252, unreachable branch in <code>_extract_hatrac_path</code>
+   at line 446, <code>or "..."</code> patterns at lines 178/256/257 that
+   confuse empty-string vs missing-column).</p>
+</li>
+<li>
+<p><strong><code>clone.py</code></strong> (359 LoC). Pure shim. Only callers are deriva-mcp
+   (legacy, broken) and itself. The wrapper carries 11 dead
+   parameter names, two coercion helpers for legacy string
+   spellings, and a deprecation-warning emitter that walks the
+   same 11 names. None of it is tested.</p>
+</li>
+<li>
+<p><strong><code>provenance.py</code></strong> (319 LoC). Healthy core (the
+   <code>CatalogProvenance</code> annotation read/write does what it says).
+   But <code>CloneDetails</code> (95 LoC counting dataclass + to_dict +
+   from_dict) is uninstantiated dead code; <code>set_catalog_provenance</code>
+   doesn't accept a <code>clone_details</code> argument; <code>is_clone</code> always
+   returns False. The whole "clone-specific provenance" half of
+   the module is unwired.</p>
+</li>
+<li>
+<p><strong><code>clone_via_bag.py</code></strong> (457 LoC). The healthy one. The policy
+   merge (lines 339-377) is the only design wart — it silently
+   rewrites caller-explicit values.</p>
+</li>
+</ol>
+<hr />
+<h2 id="subsystem-inventory">Subsystem inventory</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">LoC</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__.py</code></td>
+<td style="text-align: right;">66</td>
+<td>Public surface; <code>__all__</code> includes everything. Module docstring describes the bag-pipeline reorganization. <strong>Mostly healthy</strong> but exports <code>localize_assets</code>, <code>LocalizeResult</code>, <code>create_ml_workspace</code>, <code>OrphanStrategy</code> that nothing in-repo uses.</td>
+</tr>
+<tr>
+<td><code>clone.py</code></td>
+<td style="text-align: right;">359</td>
+<td>Back-compat wrapper over <code>clone_via_bag</code>. <code>create_ml_workspace</code>, <code>_coerce_asset_mode</code>, <code>_coerce_orphan_strategy</code>, <code>_warn_about_legacy_params</code>. Re-exports provenance API. <strong>No internal callers.</strong></td>
+</tr>
+<tr>
+<td><code>clone_via_bag.py</code></td>
+<td style="text-align: right;">457</td>
+<td>The canonical clone path. <code>clone_via_bag()</code>, plus helpers <code>_materialize_bag_dir</code>, <code>_materialize_bag_assets</code>, <code>_expand_nested_dataset_anchors</code>, <code>_collect_nested_dataset_rids</code>. <strong>Load-bearing and healthy.</strong></td>
+</tr>
+<tr>
+<td><code>localize.py</code></td>
+<td style="text-align: right;">464</td>
+<td><code>localize_assets()</code> + <code>LocalizeResult</code> + 5 private helpers. <strong>No callers anywhere; no tests.</strong></td>
+</tr>
+<tr>
+<td><code>provenance.py</code></td>
+<td style="text-align: right;">319</td>
+<td><code>CatalogProvenance</code>, <code>CloneDetails</code>, <code>CatalogCreationMethod</code>, <code>set_catalog_provenance</code>, <code>get_catalog_provenance</code>, <code>CATALOG_PROVENANCE_URL</code>. <code>CloneDetails</code> is fossil.</td>
+</tr>
+</tbody>
+</table>
+<p>Cross-module dependencies inside <code>catalog/</code>:</p>
+<ul>
+<li><code>clone.py:194</code> lazy-imports <code>clone_via_bag.clone_via_bag</code> — the
+  shim's whole purpose.</li>
+<li><code>clone.py:66-72</code> re-exports the provenance API from
+  <code>provenance.py</code> for back-compat.</li>
+<li><code>clone_via_bag.py</code> has no internal imports from other <code>catalog/</code>
+  modules. Independent of <code>provenance.py</code> (a fresh clone does NOT
+  write a provenance annotation, even though
+  <code>CatalogCreationMethod.CLONE</code> exists for exactly this).</li>
+<li><code>localize.py</code> has no internal imports from other <code>catalog/</code>
+  modules. Standalone.</li>
+</ul>
+<p>External (deriva-ml internal) call sites:</p>
+<ul>
+<li><code>src/deriva_ml/__init__.py:85-104</code> — lazy-loads
+  <code>CatalogProvenance</code>, <code>CatalogCreationMethod</code>, <code>CloneDetails</code>,
+  <code>get_catalog_provenance</code>, <code>set_catalog_provenance</code> (all from
+  <code>clone.py</code> re-export, not from <code>provenance.py</code> directly).</li>
+<li><code>src/deriva_ml/core/base.py:70</code> — type-only import of
+  <code>CatalogProvenance</code> (under <code>TYPE_CHECKING</code>).</li>
+<li><code>src/deriva_ml/core/base.py:1037</code> — calls
+  <code>get_catalog_provenance</code> inside the <code>DerivaML.catalog_provenance</code>
+  property. Imports from <code>clone.py</code>, not <code>provenance.py</code>.</li>
+</ul>
+<p>That's the entirety of internal usage. <code>create_ml_workspace</code>,
+<code>clone_via_bag</code>, <code>localize_assets</code>, <code>OrphanStrategy</code>, and
+<code>set_catalog_provenance</code> have zero in-repo callers outside the
+catalog/ package itself.</p>
+<hr />
+<h2 id="cross-workspace-usage-check">Cross-workspace usage check</h2>
+<p>Verification discipline per the audit prompt: every symbol whose
+deletion or privatization is proposed below was grepped across
+<code>deriva-mcp</code>, <code>deriva-mcp-core</code>, <code>deriva-ml-mcp</code>,
+<code>deriva-ml-model-template</code>, <code>deriva-skills</code>, and <code>deriva-ml-skills</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>External callers</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_ml_workspace</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/tools/catalog.py:557, 569</code>, <code>deriva-mcp/src/deriva_mcp/tools/background_tasks.py:122, 156</code>, <code>deriva-mcp/tests/test_catalog.py</code> (7 mock-target references)</td>
+<td><strong>Broken at runtime</strong> — <code>deriva-mcp</code> also imports <code>AssetCopyMode</code> (which does not exist in <code>deriva_ml.catalog</code>; grep confirms) and reads attributes <code>result.hostname</code>, <code>result.catalog_id</code>, <code>result.source_snapshot</code>, <code>result.datasets_reinitialized</code>, <code>result.ml_schema_added</code>, <code>result.report.summary.*</code>, <code>result.truncated_values</code> that <code>CloneViaBagResult</code> does not provide. The <code>deriva-mcp/tests/test_catalog.py</code> references are mock-targets (<code>patch("deriva_ml.catalog.create_ml_workspace", ...)</code>) — the legacy MCP's own tests stub out the function, so they pass without ever invoking it.</td>
+</tr>
+<tr>
+<td><code>OrphanStrategy</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/tools/catalog.py:557, 561</code>, <code>deriva-mcp/src/deriva_mcp/tools/background_tasks.py:122, 136</code></td>
+<td>Same broken legacy MCP.</td>
+</tr>
+<tr>
+<td><code>AssetCopyMode</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/tools/catalog.py:557</code>, <code>deriva-mcp/src/deriva_mcp/tools/background_tasks.py:122</code></td>
+<td><strong>Does not exist in <code>deriva_ml.catalog</code>.</strong> <code>grep -rn 'AssetCopyMode' deriva-ml/</code> returns zero hits. The legacy MCP import is broken.</td>
+</tr>
+<tr>
+<td><code>clone_via_bag</code></td>
+<td>None</td>
+<td>No external callers; zero hits in any sibling project.</td>
+</tr>
+<tr>
+<td><code>CloneViaBagResult</code></td>
+<td>None</td>
+<td>Same.</td>
+</tr>
+<tr>
+<td><code>localize_assets</code></td>
+<td>None</td>
+<td>Zero hits anywhere in workspace.</td>
+</tr>
+<tr>
+<td><code>LocalizeResult</code></td>
+<td>None</td>
+<td>Same.</td>
+</tr>
+<tr>
+<td><code>set_catalog_provenance</code></td>
+<td><code>deriva-ml-model-template/src/scripts/_cifar10_schema.py:44, 120</code>, <code>deriva-ml-model-template/docs/superpowers/plans/2026-05-13-e2e-platform-test.md:1242</code> (doc example)</td>
+<td><strong>Live external consumer.</strong> The model-template uses it at catalog-creation time.</td>
+</tr>
+<tr>
+<td><code>get_catalog_provenance</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td><code>DerivaML.catalog_provenance</code> is the indirect surface; no sibling project queries provenance directly.</td>
+</tr>
+<tr>
+<td><code>CatalogProvenance</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Same.</td>
+</tr>
+<tr>
+<td><code>CloneDetails</code></td>
+<td><strong>Never instantiated anywhere in the workspace.</strong> <code>grep -rn 'CloneDetails('</code> returns zero hits across all six sibling projects + deriva-ml itself.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>CatalogCreationMethod</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Indirectly visible through <code>set_catalog_provenance(creation_method=...)</code> but the model-template caller doesn't pass it explicitly.</td>
+</tr>
+<tr>
+<td><code>CATALOG_PROVENANCE_URL</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Only used inside <code>provenance.py</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusions from the table:</strong></p>
+<ul>
+<li><code>localize_assets</code> / <code>LocalizeResult</code> / <code>CloneDetails</code> have <strong>zero
+  callers anywhere in the workspace</strong> (not even doc examples).
+  Deletion or test-or-die is the call.</li>
+<li><code>create_ml_workspace</code> / <code>OrphanStrategy</code> are kept alive only for a
+  legacy MCP server that is already broken against them and is
+  scheduled for replacement per the workspace cut-over plan. Once
+  <code>deriva-mcp</code> retires, this whole surface deletes cleanly. Until
+  then, the wrapper exists and ships warnings nobody sees.</li>
+<li><code>set_catalog_provenance</code> is the one externally-load-bearing
+  symbol. <strong>Don't break it.</strong> It's used by the model-template's
+  catalog bootstrap script — keep the signature stable, keep the
+  three-arg call form (<code>name=</code>, <code>description=</code>, optionally
+  <code>workflow_url=</code> / <code>workflow_version=</code>) working.</li>
+</ul>
+<hr />
+<h2 id="lens-1-dead-code">Lens 1 — Dead code</h2>
+<h3 id="11-localize_assets-has-zero-callers-and-zero-tests">1.1 <code>localize_assets</code> has zero callers and zero tests</h3>
+<p><code>catalog/localize.py:54-330</code> defines a 277-LoC public function that
+downloads assets from remote Hatrac and uploads them to local
+Hatrac. The module docstring (<code>localize.py:1-15</code>) describes a
+post-clone workflow: clone with <code>asset_mode=REFERENCES</code>, then run
+<code>localize_assets</code> to copy bytes locally. The package docstring
+mentions it (<code>catalog/__init__.py:36-39</code> imports + <code>__all__:64-65</code>
+exports), but nothing else in the workspace ever calls it.</p>
+<p>Verification:</p>
+<pre><code>$ grep -rn 'localize_assets\|LocalizeResult' \
+       deriva-ml/src/ deriva-ml/tests/ \
+       deriva-mcp/ deriva-mcp-core/ deriva-ml-mcp/ \
+       deriva-ml-model-template/ deriva-skills/ \
+       deriva-ml-skills/ 2&gt;/dev/null
+deriva-ml/src/deriva_ml/catalog/__init__.py:36-39  (package re-export)
+deriva-ml/src/deriva_ml/catalog/__init__.py:64-65  (__all__)
+deriva-ml/src/deriva_ml/catalog/localize.py        (the file itself)
+</code></pre>
+<p>The function is plausible — an ML-developer user who clones a
+catalog with <code>AssetMode.ROWS_ONLY</code> (the cheap-clone mode) would
+want a follow-up step to copy the bytes locally. But (a) no
+integration test pins the behavior, (b) the existing comment in
+the function's docstring still refers to the deleted
+<code>asset_mode="refs"</code> spelling, and (c) the bag pipeline now offers
+<code>AssetMode.UPLOAD_IF_MISSING</code> which copies during clone instead
+of after. The follow-up workflow this module serves may not be
+necessary anymore.</p>
+<p>Additionally, the function body has implementation-quality issues
+(see §1.2, §3.2, §3.4) — without callers exercising it, those
+have gone unnoticed.</p>
+<p><strong>Fix:</strong> three options, in order of preference:</p>
+<p>(a) <strong>Delete the module.</strong> <code>localize_assets</code>, <code>LocalizeResult</code>,
+the 5 helper functions, the <code>catalog/__init__.py</code> imports +
+<code>__all__</code> entries. <strong>LoC: −464.</strong> <strong>Risk: low</strong> — no callers
+break.</p>
+<p>(b) <strong>Add an integration test</strong> that clones with <code>ROWS_ONLY</code>
+and then runs <code>localize_assets</code> end-to-end against the demo
+catalog. If the test passes, the module is live; if it doesn't,
+delete the module. The test would belong in
+<code>tests/catalog/test_localize_integration.py</code> with the
+<code>@pytest.mark.integration</code> marker that
+<code>test_clone_via_bag_integration.py</code> uses.</p>
+<p>(c) <strong>Rename to underscore-private and move inside
+<code>clone_via_bag.py</code></strong> — turn it into a localize-after-clone
+helper that the canonical clone function exposes. This makes
+sense only if someone is going to use it; otherwise (a).</p>
+<p><strong>Recommended:</strong> (b) first to test market fit; (a) if no test
+materializes. <strong>Severity: high</strong> — by LoC, this is the single
+biggest dead-code candidate in the audit.</p>
+<h3 id="12-_extract_hatrac_path-has-an-unreachable-branch">1.2 <code>_extract_hatrac_path</code> has an unreachable branch</h3>
+<p><code>localize.py:438-449</code>:</p>
+<pre><code class="language-python">def _extract_hatrac_path(url: str) -&gt; str | None:
+    parsed = urlparse(url)
+    path = parsed.path
+
+    if &quot;/hatrac/&quot; in path:
+        idx = path.find(&quot;/hatrac/&quot;)
+        return path[idx:]
+
+    if path.startswith(&quot;/hatrac/&quot;):
+        return path
+
+    return None
+</code></pre>
+<p>The second <code>if path.startswith("/hatrac/")</code> is unreachable: any
+path that starts with <code>/hatrac/</code> necessarily contains <code>/hatrac/</code>,
+so the first branch always wins. The dead branch returns the
+same value the first branch would have anyway.</p>
+<p><strong>Fix:</strong> delete lines 446-447. <strong>Risk: trivial. LoC: −3.</strong>
+<strong>Severity: low</strong> but symbolic — it suggests the function was
+written without tests.</p>
+<h3 id="13-clonedetails-is-never-instantiated">1.3 <code>CloneDetails</code> is never instantiated</h3>
+<p><code>provenance.py:62-157</code> defines a 95-LoC dataclass with 20 fields
+covering legacy clone knobs: <code>orphan_strategy</code>, <code>truncate_oversized</code>,
+<code>prune_hidden_fkeys</code>, <code>schema_only</code>, <code>asset_mode</code>, <code>exclude_schemas</code>,
+<code>exclude_objects</code>, <code>add_ml_schema</code>, <code>copy_annotations</code>,
+<code>copy_policy</code>, <code>reinitialize_dataset_versions</code>, <code>rows_copied</code>,
+<code>rows_skipped</code>, <code>skipped_rids</code>, <code>truncated_count</code>,
+<code>orphan_rows_removed</code>, <code>orphan_rows_nullified</code>, <code>fkeys_pruned</code>,
+<code>source_hostname</code>, <code>source_catalog_id</code>, <code>source_snapshot</code>,
+<code>source_schema_url</code>. With <code>to_dict</code> and <code>from_dict</code> round-trip
+helpers.</p>
+<p>A workspace-wide grep for <code>CloneDetails(</code> (the constructor call,
+not the type reference) returns <strong>zero</strong> hits — nothing
+populates it. The fields exist solely to be deserialized back
+out of <code>from_dict</code> if someone ever wrote them, which they never
+did. <code>CatalogProvenance.is_clone</code> (line 219-222) returns
+<code>self.creation_method == CLONE and self.clone_details is not None</code>
+— since the second clause is always False in practice, the
+property always returns False.</p>
+<p>The bag pipeline records clone provenance in the bag's
+<code>metadata/</code> directory (per <code>clone_via_bag.py</code>'s <code>producer=</code>
+parameter on <code>CatalogBagBuilder</code>). The dataclass is fossil
+scaffolding from the legacy three-stage clone era.</p>
+<p><strong>Fix:</strong> delete <code>CloneDetails</code>, remove the
+<code>clone_details</code> field from <code>CatalogProvenance</code>, remove the
+<code>is_clone</code> property, drop the relevant <code>to_dict</code>/<code>from_dict</code>
+branches, drop the <code>CloneDetails</code> symbol from <code>__all__</code> and
+package re-export and <code>deriva_ml/__init__.py</code> lazy loader.
+<strong>LoC: −110.</strong> <strong>Risk: low</strong> — zero callers. <strong>Severity: medium</strong>
+(largest single dead-block in <code>provenance.py</code>).</p>
+<p>A more conservative option: keep <code>CloneDetails</code> but
+add a <code>clone_details: CloneDetails | None = None</code> parameter to
+<code>set_catalog_provenance</code> so the field can actually be
+populated. The catalog provenance API would then describe what
+the bag pipeline records, and <code>is_clone</code> would mean something.
+This is the option (b)-style answer — useful only if someone
+intends to wire it.</p>
+<h3 id="14-_warn_about_legacy_params-walks-11-dead-parameter-names">1.4 <code>_warn_about_legacy_params</code> walks 11 dead parameter names</h3>
+<p><code>clone.py:314-348</code> accepts kwargs of 11 known legacy names and
+emits a <code>DeprecationWarning</code> when any is set to a non-default
+value. Master audit Lens 5.3 (<code>deriva-ml-audit-2026-05.md:765</code>)
+already flagged this: "walks 11 named kwargs and emits a
+[warning]." The constants are duplicated between the function's
+signature (<code>clone.py:93-119</code>) and the defaults dict
+(<code>clone.py:323-335</code>). The <code>_LEGACY_ONLY_PARAMS</code> constant the
+master audit referenced has since been removed, but the parallel
+defaults dict pattern persists.</p>
+<p>The whole purpose of these warnings is to nudge callers off the
+legacy parameter set. With <code>deriva-mcp</code> already broken on
+<code>AssetCopyMode</code> (the import fails before any warning fires) and
+the new MCP not calling this surface at all, <strong>the warnings have
+no audience</strong>.</p>
+<p><strong>Fix:</strong> subsumed by §1.5 (delete the whole shim). If the shim
+must stay during the legacy-MCP retirement window, replace the
+11-name walk with a single <code>**kwargs</code> capture + a one-line
+"these kwargs are ignored" warning. <strong>Severity: low</strong> — code
+quality only; semantic correctness is fine.</p>
+<h3 id="15-create_ml_workspace-is-a-back-compat-shim-with-no-working-callers">1.5 <code>create_ml_workspace</code> is a back-compat shim with no working callers</h3>
+<p><code>clone.py:93-267</code> is a 175-LoC wrapper around <code>clone_via_bag</code>.
+Per its own module docstring (lines 1-50), it exists to keep the
+legacy pre-bag-pipeline call shape working. Verification of
+external callers (see §"Cross-workspace usage check"):</p>
+<ul>
+<li><code>deriva-mcp/src/deriva_mcp/tools/catalog.py:557</code>,
+  <code>deriva-mcp/src/deriva_mcp/tools/background_tasks.py:122</code> —
+  both import <code>AssetCopyMode, OrphanStrategy, create_ml_workspace</code>.
+  <strong><code>AssetCopyMode</code> does not exist in <code>deriva_ml.catalog</code>.</strong>
+  Workspace-wide grep returns zero hits. The import statement
+  itself raises <code>ImportError</code>.</li>
+<li>Both call sites then read <code>result.hostname</code>,
+  <code>result.catalog_id</code>, <code>result.source_snapshot</code>,
+  <code>result.datasets_reinitialized</code>, <code>result.ml_schema_added</code>,
+  <code>result.report.summary.*</code>, <code>result.truncated_values</code> — none
+  of which <code>CloneViaBagResult</code> provides (<code>CloneViaBagResult</code> has
+  only <code>source_catalog_id</code>, <code>dest_catalog_id</code>, <code>bag_path</code>,
+  <code>load_report</code>).</li>
+<li><code>deriva-mcp/tests/test_catalog.py</code> mocks the function name
+  (<code>patch("deriva_ml.catalog.create_ml_workspace", ...)</code>) — the
+  tests stub the function out, so they pass without ever calling
+  the real implementation. The tests don't tell us anything
+  about real-world callers.</li>
+<li>New MCP (<code>deriva-mcp-core</code> + <code>deriva-ml-mcp</code>): zero hits.</li>
+<li>Model template: zero hits.</li>
+<li>Skills plugins: zero hits.</li>
+</ul>
+<p>In other words: <strong>the shim is preserved for a caller that doesn't
+work and is being deleted.</strong> Per CLAUDE.md ("No backwards-compat
+shims — if something is unused, delete it"), this is the textbook
+case.</p>
+<p><strong>Fix:</strong> delete <code>clone.py</code> in its entirety after the legacy MCP
+retires. Move the back-compat provenance re-exports
+(<code>CatalogProvenance</code>, <code>CatalogCreationMethod</code>, <code>CloneDetails</code>,
+<code>get_catalog_provenance</code>, <code>set_catalog_provenance</code>) directly into
+<code>catalog/__init__.py</code> from <code>provenance.py</code> (already the case for
+the package re-export; the <code>clone.py:66-72</code> re-export becomes
+unneeded once <code>__init__.py</code> and <code>core/base.py</code> import directly
+from <code>provenance.py</code>). <strong>LoC: −359.</strong> <strong>Risk: medium</strong> —
+breaks any out-of-tree caller that imports
+<code>deriva_ml.catalog.clone</code>. Per the cross-workspace check above,
+there is no such caller that isn't already broken. <strong>Severity:
+medium</strong> — symbolically high (largest cleanup candidate).</p>
+<p>If the legacy MCP retirement is months away, the conservative
+option is to keep <code>clone.py</code> but mark it <code>_clone.py</code> and rewrite
+the public symbols' re-export through <code>__init__.py</code>. This buys
+nothing — the broken caller stays broken — and adds a rename
+churn cost. (a) is cleaner.</p>
+<h3 id="16-orphanstrategy-is-an-alias-of-danglingfkstrategy-with-no-in-repo-callers">1.6 <code>OrphanStrategy</code> is an alias of <code>DanglingFKStrategy</code> with no in-repo callers</h3>
+<p><code>clone.py:85</code>:</p>
+<pre><code class="language-python">OrphanStrategy = _DanglingFKStrategy
+</code></pre>
+<p>Used only by <code>deriva-mcp</code> (which is already broken — see §1.5)
+and by <code>create_ml_workspace</code>'s default parameter (<code>clone.py:111</code>).
+Inside deriva-ml, every test and live code path uses
+<code>DanglingFKStrategy</code> directly (see <code>test_clone_via_bag.py:22</code>,
+<code>test_clone_via_bag.py:202</code>, <code>test_bag_commit_poc.py:39</code> etc.).</p>
+<p><strong>Fix:</strong> subsumed by §1.5. Delete with <code>clone.py</code>. <strong>Severity:
+low.</strong></p>
+<h3 id="17-set_catalog_provenance-cannot-record-clone-details">1.7 <code>set_catalog_provenance</code> cannot record clone details</h3>
+<p><code>provenance.py:225-280</code> accepts <code>name</code>, <code>description</code>, <code>workflow_url</code>,
+<code>workflow_version</code>, and <code>creation_method</code>. Notably absent:
+<code>clone_details</code>. So even when a caller passes
+<code>creation_method=CatalogCreationMethod.CLONE</code>, the resulting
+<code>CatalogProvenance.clone_details</code> is <code>None</code>. The
+<code>CatalogProvenance.is_clone</code> property at <code>provenance.py:219-222</code>
+returns False as a consequence:</p>
+<pre><code class="language-python">@property
+def is_clone(self) -&gt; bool:
+    return self.creation_method == CatalogCreationMethod.CLONE \
+        and self.clone_details is not None
+</code></pre>
+<p>This is internally inconsistent: the enum says "this catalog is a
+clone," but the property says "no it isn't." Pair this with §1.3
+(nothing populates <code>CloneDetails</code>) and the whole clone-provenance
+half of the module is unwired.</p>
+<p><strong>Fix:</strong> either (a) add <code>clone_details: CloneDetails | None = None</code>
+to <code>set_catalog_provenance</code> so the field can be populated, then
+wire <code>clone_via_bag</code> to call <code>set_catalog_provenance(... creation_method=CLONE, clone_details=CloneDetails(...))</code> at the end of a successful clone, or (b) delete the whole
+clone-provenance leg per §1.3. <strong>Risk: low.</strong> <strong>Severity:
+medium</strong> — bug, not just dead code; <code>is_clone</code> is a public
+property that promises something the API can't deliver.</p>
+<h3 id="18-internal-re-exports-route-through-clonepy-instead-of-provenancepy">1.8 Internal re-exports route through <code>clone.py</code> instead of <code>provenance.py</code></h3>
+<p><code>src/deriva_ml/__init__.py:86-104</code> lazy-loads 5 names from
+<code>deriva_ml.catalog.clone</code>:</p>
+<pre><code class="language-python">elif name == &quot;CatalogProvenance&quot;:
+    from deriva_ml.catalog.clone import CatalogProvenance
+    return CatalogProvenance
+elif name == &quot;CatalogCreationMethod&quot;:
+    from deriva_ml.catalog.clone import CatalogCreationMethod
+    return CatalogCreationMethod
+elif name == &quot;CloneDetails&quot;:
+    from deriva_ml.catalog.clone import CloneDetails
+    return CloneDetails
+elif name == &quot;get_catalog_provenance&quot;:
+    from deriva_ml.catalog.clone import get_catalog_provenance
+    return get_catalog_provenance
+elif name == &quot;set_catalog_provenance&quot;:
+    from deriva_ml.catalog.clone import set_catalog_provenance
+    return set_catalog_provenance
+</code></pre>
+<p><code>core/base.py:70, 1037</code> does the same. The actual definitions
+live in <code>provenance.py</code>; <code>clone.py:66-72</code> re-exports them with
+<code># noqa: F401</code>. Since these are internal imports, there is no
+external compatibility concern — and routing through the
+back-compat shim is the opposite of what a clean module
+boundary looks like.</p>
+<p><strong>Fix:</strong> change every internal import from
+<code>deriva_ml.catalog.clone</code> to <code>deriva_ml.catalog.provenance</code>. Drop
+the re-export at <code>clone.py:66-72</code>. <strong>Risk: trivial. LoC: ±0</strong>
+(literally a path swap). <strong>Severity: low</strong> — code quality, not
+correctness.</p>
+<h3 id="19-__init__py-package-docstring-lies-about-orphanstrategys-home">1.9 <code>__init__.py</code> package docstring lies about <code>OrphanStrategy</code>'s home</h3>
+<p><code>catalog/__init__.py:16-17</code>:</p>
+<blockquote>
+<p>:data:<code>~deriva_ml.catalog.clone.OrphanStrategy</code> is an alias of
+:class:<code>deriva.bag.traversal.DanglingFKStrategy</code>.</p>
+</blockquote>
+<p><code>DanglingFKStrategy</code> is the canonical type, exported from the
+upstream <code>deriva.bag.traversal</code> package. <code>OrphanStrategy</code> is the
+back-compat alias maintained for the legacy MCP. New code should
+import <code>DanglingFKStrategy</code> directly (per the test suite's own
+convention). The docstring doesn't tell readers this — it implies
+<code>OrphanStrategy</code> is the preferred deriva-ml spelling.</p>
+<p><strong>Fix:</strong> rewrite the docstring entry to say "use
+<code>deriva.bag.traversal.DanglingFKStrategy</code> directly; <code>OrphanStrategy</code>
+is a legacy alias retained for back-compat." Or, with §1.5
+landed, just delete the entry. <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-2-privatization">Lens 2 — Privatization</h2>
+<h3 id="21-_coerce_asset_mode-_coerce_orphan_strategy-_warn_about_legacy_params-are-already-private-fine">2.1 <code>_coerce_asset_mode</code>, <code>_coerce_orphan_strategy</code>, <code>_warn_about_legacy_params</code> are already private — fine</h3>
+<p>These are correctly underscore-prefixed in <code>clone.py</code> (lines 275,
+298, 314). No fix.</p>
+<h3 id="22-_extract_hatrac_path-_ensure_hatrac_namespace">2.2 <code>_extract_hatrac_path</code>, <code>_ensure_hatrac_namespace</code>,</h3>
+<p><code>_fetch_asset_records</code>, <code>_find_asset_table_path</code>,
+<code>_get_catalog_info</code> in <code>localize.py</code> are correctly private — fine</p>
+<p>All five helpers are underscore-prefixed. No fix. (If the whole
+module deletes per §1.1, moot.)</p>
+<h3 id="23-_materialize_bag_dir-_materialize_bag_assets">2.3 <code>_materialize_bag_dir</code>, <code>_materialize_bag_assets</code>,</h3>
+<p><code>_expand_nested_dataset_anchors</code>, <code>_collect_nested_dataset_rids</code>
+in <code>clone_via_bag.py</code> are correctly private — fine</p>
+<p>All four helpers are underscore-prefixed. The test file imports
+two of them
+(<code>from deriva_ml.catalog.clone_via_bag import _expand_nested_dataset_anchors</code>
+at <code>test_clone_via_bag.py:439, 465, 482</code>) — accessing private
+symbols from tests is the documented pattern in the deriva-ml
+test suite. No fix.</p>
+<h3 id="24-_write_provenance_annotation-is-correctly-private-fine">2.4 <code>_write_provenance_annotation</code> is correctly private — fine</h3>
+<p><code>provenance.py:297</code>. No fix.</p>
+<h3 id="25-orphanstrategy-is-public-named-but-should-be-private-until-deleted">2.5 <code>OrphanStrategy</code> is public-named but should be private until deleted</h3>
+<p>Until §1.5/§1.6 ship, the public name <code>OrphanStrategy</code> invites
+external callers to import it. The single existing external
+import (deriva-mcp, already broken) doesn't justify keeping it
+publicly visible.</p>
+<p><strong>Fix:</strong> subsumed by §1.5. If §1.5 is deferred, rename to
+<code>_OrphanStrategy</code> and drop from <code>__all__</code>. <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-3-test-coverage">Lens 3 — Test coverage</h2>
+<h3 id="31-no-orphan-strategy-integration-tests">3.1 No orphan-strategy integration tests</h3>
+<p><code>tests/catalog/test_clone_via_bag_integration.py</code> covers three
+end-to-end scenarios: default policy (which becomes DELETE via
+the merge), <code>AssetMode.ROWS_ONLY</code>, and a single-RID anchor scope.
+None of the three exercises an orphan path with rows that would
+genuinely dangle. The integration suite cannot tell whether
+<code>DanglingFKStrategy.FAIL</code> aborts a clone with dangling FKs, or
+whether <code>DanglingFKStrategy.NULLIFY</code> actually nullifies rather
+than deletes them.</p>
+<p>Unit tests cover the <em>pass-through</em> of the orphan-strategy
+parameter (<code>test_clone_via_bag.py:202</code> constructs a policy with
+<code>NULLIFY</code> and asserts the loader receives the same instance) but
+do not assert on real loader behavior — they mock the loader.</p>
+<p>Per the audit prompt's specific call-out: orphan strategies
+(FAIL/DELETE/NULLIFY) are a load-bearing correctness feature, and
+the audit should flag this as a coverage gap. <strong>It is a gap.</strong></p>
+<p><strong>Fix:</strong> add three integration tests:</p>
+<ol>
+<li><code>test_clone_via_bag_fail_strategy_aborts_on_orphan</code> — set up
+   the source with a row whose FK target lies outside the slice,
+   anchor the clone such that the orphan would be reached, and
+   assert <code>clone_via_bag</code> raises <code>OrphanError</code> (or whatever the
+   loader raises with FAIL).</li>
+<li><code>test_clone_via_bag_delete_strategy_prunes_orphan</code> — same
+   setup, anchor the same slice, expect the clone to succeed
+   with the orphan-bearing row deleted. Assert the row is
+   absent at the destination.</li>
+<li><code>test_clone_via_bag_nullify_strategy_nulls_fk</code> — same setup,
+   expect the row to be present at the destination with the FK
+   column null. Assert column is null.</li>
+</ol>
+<p>Each test requires the demo fixture to produce a slice with a
+known dangling FK, which the current <code>catalog_with_datasets</code>
+fixture probably doesn't. May need a new
+<code>catalog_with_orphan_fk</code> fixture.</p>
+<p><strong>Effort: medium-high.</strong> <strong>Severity: high</strong> for <code>DBA</code> /
+<code>Testing engineer</code> personas — the orphan strategies are exactly
+the kind of feature whose subtle behavior differences need
+end-to-end pinning, and we don't have it.</p>
+<h3 id="32-localize_assets-has-zero-tests">3.2 <code>localize_assets</code> has zero tests</h3>
+<p>Subsumed by §1.1. The 277-LoC function has no unit tests, no
+integration tests, no doctest coverage. Anything that exists in
+the workspace exercises it via "is this file syntactically
+valid" alone.</p>
+<h3 id="33-create_ml_workspace-has-zero-tests">3.3 <code>create_ml_workspace</code> has zero tests</h3>
+<p>The shim function (<code>clone.py:93</code>), the legacy-parameter warning
+emitter (<code>clone.py:314</code>), the asset-mode coercion (<code>clone.py:275</code>),
+and the orphan-strategy coercion (<code>clone.py:298</code>) have zero unit
+tests in deriva-ml's own suite. The legacy MCP's
+<code>tests/test_catalog.py</code> mocks the function out (<code>patch(...)</code>).</p>
+<p>This is fine if the shim deletes per §1.5. If it stays, it needs
+at least:</p>
+<ul>
+<li>A test that <code>_coerce_asset_mode("refs")</code> returns
+  <code>AssetMode.ROWS_ONLY</code>.</li>
+<li>A test that <code>_coerce_asset_mode(AssetMode.UPLOAD_FORCE)</code> returns
+  the same enum member.</li>
+<li>A test that <code>_coerce_asset_mode("bogus")</code> raises <code>TypeError</code>.</li>
+<li>A test that <code>_warn_about_legacy_params(truncate_oversized=True)</code>
+  emits a <code>DeprecationWarning</code>.</li>
+<li>A test that <code>create_ml_workspace(... dest_catalog_id=None)</code>
+  raises <code>ValueError</code>.</li>
+</ul>
+<p><strong>Effort: low</strong> (mechanical). <strong>Severity: low</strong> if §1.5 ships;
+<strong>medium</strong> if it doesn't.</p>
+<h3 id="34-catalogprovenancefrom_dict-to_dict-round-trip-has-zero-tests">3.4 <code>CatalogProvenance.from_dict</code> / <code>to_dict</code> round-trip has zero tests</h3>
+<p><code>provenance.py:180-217</code> defines round-trip serialization for the
+annotation payload. No tests anywhere assert the round-trip works
+or that defaults are preserved. The model-template's caller
+(<code>_cifar10_schema.py:120</code>) writes a provenance but never reads
+one back; deriva-ml's own <code>DerivaML.catalog_provenance</code> property
+reads but the property itself has no test.</p>
+<p><strong>Fix:</strong> add unit tests in a new file
+<code>tests/catalog/test_provenance.py</code>:</p>
+<ul>
+<li><code>test_catalog_provenance_round_trip</code> — construct a
+  <code>CatalogProvenance</code> with every field set, <code>to_dict()</code>, then
+  <code>from_dict()</code>, and assert equality.</li>
+<li><code>test_catalog_provenance_unknown_method_falls_back</code> — pass a
+  dict with <code>creation_method="bogus"</code>, assert
+  <code>CatalogCreationMethod.UNKNOWN</code> results.</li>
+<li><code>test_set_catalog_provenance_writes_annotation</code> — mock
+  <code>catalog.put</code>, call <code>set_catalog_provenance</code>, assert the
+  expected JSON payload.</li>
+<li><code>test_get_catalog_provenance_handles_missing_annotation</code> —
+  mock <code>catalog.getCatalogModel().annotations.get</code> returning
+  None, assert <code>get_catalog_provenance</code> returns None.</li>
+</ul>
+<p><strong>Effort: low.</strong> <strong>Severity: medium</strong> — <code>CatalogProvenance</code> is
+ostensibly a stable public API for an external consumer
+(model-template); the round-trip semantics shouldn't be
+verified only by inspection.</p>
+<h3 id="35-two-unit-tests-rely-on-private-symbol-imports-fine-but-flag">3.5 Two unit tests rely on private-symbol imports — fine, but flag</h3>
+<p><code>test_clone_via_bag.py:439, 465, 482</code> each begin with:</p>
+<pre><code class="language-python">from deriva_ml.catalog.clone_via_bag import (
+    _expand_nested_dataset_anchors,
+)
+</code></pre>
+<p>This is the documented test convention. It does however mean the
+private helper is part of an implicit test contract — renaming
+or refactoring <code>_expand_nested_dataset_anchors</code> will break the
+tests. Not a fix; a note for future refactor.</p>
+<hr />
+<h2 id="lens-4-docs-sync">Lens 4 — Docs sync</h2>
+<h3 id="41-__init__py-docstring-claims-feature-parity-that-isnt-accurate">4.1 <code>__init__.py</code> docstring claims feature parity that isn't accurate</h3>
+<p><code>catalog/__init__.py:10-15</code> describes <code>create_ml_workspace</code> as
+"the legacy spelling, reimplemented on top of <code>clone_via_bag</code>"
+and says legacy-only parameters "emit a deprecation warning when
+set away from default." Accurate as far as it goes — but the
+docstring doesn't mention that the function's return type is now
+<code>CloneViaBagResult</code>, completely different from what legacy
+callers expect. A reader who trusted the docstring would assume
+they could swap call sites with no further changes.</p>
+<p>Master audit <code>5.6</code> (<code>deriva-ml-audit-2026-05.md:782</code> neighborhood)
+made the same observation about <code>clone_via_bag</code> itself. Same
+finding here, doubled.</p>
+<p><strong>Fix:</strong> add a sentence: "Return type is
+<code>CloneViaBagResult</code>, not the legacy <code>CloneCatalogResult</code> —
+callers that read <code>result.report.summary.*</code> will not work
+unchanged. See the function docstring for the new attribute
+set." <strong>Severity: low.</strong></p>
+<h3 id="42-localize_assets-docstring-still-references-deleted-asset_moderefs-spelling">4.2 <code>localize_assets</code> docstring still references deleted <code>asset_mode="refs"</code> spelling</h3>
+<p><code>localize.py:67-72</code>:</p>
+<blockquote>
+<p>This is useful after cloning a catalog with <code>asset_mode="refs"</code>
+where the asset URLs still point to the source server...</p>
+</blockquote>
+<p><code>AssetMode.REFERENCES</code> was renamed to <code>AssetMode.ROWS_ONLY</code> in
+the bag pipeline; the string spelling <code>"refs"</code> is now a legacy
+coercion target in <code>_coerce_asset_mode</code> (<code>clone.py:287</code>). The
+docstring instructs users to use a value that the canonical clone
+path doesn't accept anymore.</p>
+<p><strong>Fix:</strong> rewrite to: "useful after cloning with
+<code>AssetMode.ROWS_ONLY</code> where the bag's asset URLs still point to
+the source." Subsumed by §1.1 if the module deletes. <strong>Severity:
+low.</strong></p>
+<h3 id="43-provenancepy-docstring-describes-a-feature-that-doesnt-work">4.3 <code>provenance.py</code> docstring describes a feature that doesn't work</h3>
+<p><code>provenance.py:65-69</code> describes <code>CloneDetails</code>:</p>
+<blockquote>
+<p>Populated only when <code>CatalogProvenance.creation_method</code> is
+<code>CatalogCreationMethod.CLONE</code>.</p>
+</blockquote>
+<p>The "populated only when ..." formulation implies the field is
+<em>ever</em> populated. Per §1.3 / §1.7, it isn't. Reader is misled.</p>
+<p><strong>Fix:</strong> subsumed by §1.3 or §1.7. <strong>Severity: low.</strong></p>
+<h3 id="44-docstring-examples-missing-doctest-skip">4.4 Docstring examples missing <code># doctest: +SKIP</code></h3>
+<p><code>core/base.py:1028-1036</code> (the <code>DerivaML.catalog_provenance</code>
+property example):</p>
+<pre><code class="language-python">Example:
+    &gt;&gt;&gt; ml = DerivaML('localhost', '45')
+    &gt;&gt;&gt; prov = ml.catalog_provenance
+    &gt;&gt;&gt; if prov:
+    ...     print(f&quot;Created: {prov.created_at} by {prov.created_by}&quot;)
+    ...     print(f&quot;Method: {prov.creation_method.value}&quot;)
+    ...     if prov.is_clone:
+    ...         print(f&quot;Cloned from: {prov.clone_details.source_hostname}&quot;)
+</code></pre>
+<p>No <code># doctest: +SKIP</code> markers. Per CLAUDE.md's "Docstring
+Examples (Doctest)" section: "Catalog-dependent examples must
+carry <code># doctest: +SKIP</code> on the first interactive line." This
+example creates a <code>DerivaML</code> instance — catalog-dependent. The
+doctest collection at <code>pytest --doctest-modules</code> time will try
+to execute it.</p>
+<p>The same risk exists for <code>localize.py:104-133</code> — the
+<code>Example:</code> block has three sub-examples; the first
+(<code>&gt;&gt;&gt; ml = DerivaML("localhost", "42")</code>) is <code># doctest: +SKIP</code>'d
+implicitly because the line before it has the marker, but
+<code>&gt;&gt;&gt; result = localize_assets(ml, asset_table="Image", ...)</code>
+in the next paragraph (line 108) does <em>not</em> — it's a follow-on
+line in a paragraph whose first line has the SKIP, which means
+pytest-doctest will still try to run it.</p>
+<p><strong>Fix:</strong> audit every catalog-dependent example block; add
+<code># doctest: +SKIP</code> to the first interactive line of every
+paragraph that touches a live catalog. <strong>Risk: trivial.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="45-clone_via_bag-example-uses-default-dataset-table-assumption-fine">4.5 <code>clone_via_bag</code> Example uses default <code>Dataset</code> table assumption — fine</h3>
+<p><code>clone_via_bag.py:293-306</code> example shows <code>root_rid="1-ABCD"</code> and
+the convenience <code>Dataset</code> anchor mapping. The example has
+<code># doctest: +SKIP</code> correctly applied. <strong>No fix.</strong></p>
+<hr />
+<h2 id="lens-5-deriva-py-api-conventions">Lens 5 — deriva-py API conventions</h2>
+<h3 id="51-_collect_nested_dataset_rids-uses-datapath-in_-fine">5.1 <code>_collect_nested_dataset_rids</code> uses datapath <code>.in_()</code> — fine</h3>
+<p><code>clone_via_bag.py:170</code> uses <code>dd.filter(dd.Dataset.in_(sorted(frontier))).entities().fetch()</code>.
+Master audit Lens 2.1 flagged the predecessor of this code for
+rolling its own ERMrest URL; <strong>the rewrite is now datapath-native</strong>.
+Good shape. <strong>No fix.</strong></p>
+<h3 id="52-_fetch_asset_records-uses-datapath-in_-fine">5.2 <code>_fetch_asset_records</code> uses datapath <code>.in_()</code> — fine</h3>
+<p><code>localize.py:416</code> uses
+<code>table_path.path.filter(table_path.RID.in_(list(rids))).entities().fetch()</code>.
+Master audit Lens 2.2 flagged the predecessor (which built an OR
+chain); <strong>the rewrite is now datapath-native</strong>. Good. The
+<code>DataPathException</code> fallback at line 418 is overcautious — the
+<code>.in_()</code> operator has been in deriva-py for years — but
+defensive. <strong>No fix.</strong></p>
+<h3 id="53-provenancepy-uses-raw-catalogput-and-catalogget-for-annotations">5.3 <code>provenance.py</code> uses raw <code>catalog.put</code> and <code>catalog.get</code> for annotations</h3>
+<p><code>provenance.py:251</code> — <code>catalog.get("/authn/session")</code> — necessary,
+no datapath equivalent.</p>
+<p><code>provenance.py:259</code> — <code>catalog.get("/")</code> — necessary, no datapath
+equivalent.</p>
+<p><code>provenance.py:303-306</code>:</p>
+<pre><code class="language-python">catalog.put(
+    f&quot;/annotation/{urlquote(CATALOG_PROVENANCE_URL)}&quot;,
+    json=provenance.to_dict(),
+)
+</code></pre>
+<p>The deriva-py model-API alternative is:</p>
+<pre><code class="language-python">model = catalog.getCatalogModel()
+model.annotations[CATALOG_PROVENANCE_URL] = provenance.to_dict()
+model.apply()
+</code></pre>
+<p>Both work. The model-API form is one network round trip (fetch
+schema, modify, apply), the raw-URL form is one round trip too.
+The model-API form is what <code>model/annotations.py</code> uses elsewhere
+in the codebase — <code>apply_catalog_annotations</code> (<code>core/base.py:1043</code>)
+goes through the model API.</p>
+<p>Inconsistency: the <strong>read</strong> path (<code>get_catalog_provenance</code> at
+<code>provenance.py:288-289</code>) goes through the model API
+(<code>catalog.getCatalogModel().annotations.get(...)</code>), but the
+<strong>write</strong> path goes raw. Not wrong, just asymmetric.</p>
+<p><strong>Fix:</strong> swap the write to the model API form to match the read.
+Optional; doesn't affect correctness. <strong>Risk: low.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="54-_get_catalog_info-uses-hasattr-to-discriminate-types-fine-but-brittle">5.4 <code>_get_catalog_info</code> uses <code>hasattr</code> to discriminate types — fine, but brittle</h3>
+<p><code>localize.py:333-360</code> uses <code>hasattr(catalog, "catalog") and
+hasattr(catalog, "host_name")</code> to discriminate <code>DerivaML</code> from
+<code>ErmrestCatalog</code>. The protocol-checking idiom isn't great
+(a future <code>DerivaML</code> refactor that renames <code>host_name</code> to
+<code>hostname</code> silently breaks this); <code>isinstance</code> would be cleaner.</p>
+<p><strong>Fix:</strong> replace with <code>if isinstance(catalog, DerivaML):</code> and a
+TYPE_CHECKING import. <strong>Risk: low.</strong> <strong>LoC: ±0.</strong> <strong>Severity:
+low.</strong> Subsumed by §1.1 if <code>localize.py</code> deletes.</p>
+<hr />
+<h2 id="lens-6-inconsistencies-dataclass-vs-pydantic">Lens 6 — Inconsistencies / dataclass-vs-Pydantic</h2>
+<h3 id="61-provenance-types-should-be-pydantic-per-claudemd">6.1 Provenance types should be Pydantic per CLAUDE.md</h3>
+<p>CLAUDE.md "Class idiom choice — Pydantic vs <code>@dataclass</code>" rules:</p>
+<blockquote>
+<p>Use Pydantic BaseModel when ANY of these apply: ... The class
+may be serialized or cross a boundary (JSON I/O, logs, cache,
+API, bag metadata). Users should reach for one API
+(.model_dump()) rather than juggling dataclasses.asdict()
+depending on type.</p>
+</blockquote>
+<p><code>CatalogProvenance</code> and <code>CloneDetails</code> (<code>provenance.py:62, 160</code>)
+are:</p>
+<ul>
+<li>Returned to users (boundary type — <code>DerivaML.catalog_provenance</code>
+  property).</li>
+<li>JSON-serialized (the entire point — they're an annotation
+  payload).</li>
+<li>Carry explicit <code>to_dict</code> / <code>from_dict</code> round-trip code that
+  duplicates what Pydantic does for free.</li>
+</ul>
+<p>Per CLAUDE.md's "When in doubt, pick Pydantic," these are
+unambiguous Pydantic cases. The explicit <code>to_dict</code> methods are
+40 LoC of manual serialization that Pydantic's <code>.model_dump()</code>
+would replace.</p>
+<p>The same applies to <code>CloneViaBagResult</code> (<code>clone_via_bag.py:217</code>)
+and <code>LocalizeResult</code> (<code>localize.py:35</code>) — both are boundary-type
+return values; both should be Pydantic.</p>
+<p><strong>Fix:</strong> convert all four dataclasses to Pydantic <code>BaseModel</code>s.
+Replace <code>to_dict</code>/<code>from_dict</code> with <code>model_dump</code>/<code>model_validate</code>.
+<strong>Risk: medium</strong> (external API change; callers that did
+<code>asdict(provenance)</code> would need to use <code>model_dump()</code>). Since
+the model-template caller uses <code>set_catalog_provenance(...)</code> and
+doesn't directly call <code>asdict</code>, the actual breaking surface is
+near zero. <strong>LoC: −80</strong> (the <code>to_dict</code>/<code>from_dict</code> methods
+disappear). <strong>Severity: medium</strong> — explicit CLAUDE.md
+convention violation, but the cost-of-change is real.</p>
+<h3 id="62-clone_via_bag-policy-merge-silently-overrides-explicit-fail">6.2 <code>clone_via_bag</code> policy-merge silently overrides explicit FAIL</h3>
+<p><code>clone_via_bag.py:367-377</code> merges deriva-ml clone defaults into a
+caller-supplied policy when the caller "left them at library
+defaults." The merge predicate:</p>
+<pre><code class="language-python">if policy.dangling_fk_strategy == DanglingFKStrategy.FAIL:
+    # The library default. Caller almost certainly didn't
+    # think about it; replace with the clone default.
+    merge_kwargs[&quot;dangling_fk_strategy&quot;] = DanglingFKStrategy.DELETE
+</code></pre>
+<p>The same logic applies at line 368-369 for
+<code>VocabExport.REFERENCED_ONLY</code> → <code>VocabExport.FULL</code>.</p>
+<p>This is the classic "you can't distinguish default from explicit"
+trap. A caller who:</p>
+<ul>
+<li>Genuinely wants FAIL (strict-mode clone where any orphan should
+  abort the clone for safety) gets silently switched to DELETE.</li>
+<li>Genuinely wants REFERENCED_ONLY (minimal vocab footprint) gets
+  silently switched to FULL.</li>
+</ul>
+<p>The unit test
+<code>test_clone_via_bag_merges_defaults_into_partial_policy</code>
+(<code>test_clone_via_bag.py:244-302</code>) pins this behavior:</p>
+<pre><code class="language-python">user_policy = FKTraversalPolicy(asset_mode=AssetMode.ROWS_ONLY)
+# ...
+assert merged.dangling_fk_strategy == DanglingFKStrategy.DELETE
+</code></pre>
+<p>This test verifies the merge happens. It does not verify the
+merge respects an explicit FAIL choice — because the merge
+doesn't. A different test
+<code>test_clone_via_bag_passes_policy_through</code>
+(<code>test_clone_via_bag.py:189-241</code>) takes a fully-specified policy
+with <code>dangling_fk_strategy=NULLIFY</code> and asserts pass-through —
+but only because NULLIFY isn't the library default. There is no
+test asserting that explicit <code>dangling_fk_strategy=FAIL</code>
+survives — because it doesn't.</p>
+<p>Pydantic exposes <code>model_fields_set</code> on a model instance — the
+set of field names that were explicitly passed at construction
+time. The merge could use this to distinguish:</p>
+<pre><code class="language-python">if &quot;dangling_fk_strategy&quot; not in policy.model_fields_set:
+    merge_kwargs[&quot;dangling_fk_strategy&quot;] = DanglingFKStrategy.DELETE
+</code></pre>
+<p>This requires <code>FKTraversalPolicy</code> to be Pydantic (it is — see
+<code>test_clone_via_bag.py:23</code>).</p>
+<p><strong>Fix:</strong> switch the three merge predicates from "field equals
+library default" to "field name not in <code>model_fields_set</code>."
+Update the existing test to reflect the new semantics; add a new
+test asserting that explicit FAIL survives. <strong>Risk: low</strong>
+(localized to <code>clone_via_bag.py:367-377</code>). <strong>LoC: ±0.</strong>
+<strong>Severity: high</strong> for a DBA persona — silent semantic override
+on a safety-critical flag.</p>
+<h3 id="63-localizepy-line-252-shadows-the-outer-source_hostname-parameter">6.3 <code>localize.py</code> line 252 shadows the outer <code>source_hostname</code> parameter</h3>
+<p><code>localize.py:54-66</code> declares <code>source_hostname</code> as a function
+parameter. Line 252 inside the per-asset loop:</p>
+<pre><code class="language-python">source_hostname = asset_info[&quot;source_hostname&quot;]
+</code></pre>
+<p>reassigns the local name to the per-asset value. The intent is
+clear (each asset can have a different source host), but using
+the same identifier as the function parameter makes the
+asset-level meaning collide with the function-level meaning.
+Code reading this needs to know which <code>source_hostname</code> is in
+scope at line 264-267:</p>
+<pre><code class="language-python">source_cred = get_credential(source_hostname)
+remote_hatrac_cache[source_hostname] = HatracStore(...)
+</code></pre>
+<p>— the per-asset one. Confusing.</p>
+<p><strong>Fix:</strong> rename the inner variable to <code>asset_source_host</code> (also
+used at line 186 — <code>asset_source_hostname</code>). <strong>LoC: ±0.</strong>
+<strong>Severity: low.</strong> Subsumed by §1.1 if the module deletes.</p>
+<h3 id="64-localizepy-or-patterns-confuse-empty-with-missing">6.4 <code>localize.py</code> <code>or</code> patterns confuse "empty" with "missing"</h3>
+<p><code>localize.py:178, 256, 257</code> use the same idiom:</p>
+<pre><code class="language-python">current_url = record.get(&quot;URL&quot;) or record.get(&quot;url&quot;)
+filename = record.get(&quot;Filename&quot;) or record.get(&quot;filename&quot;)
+md5 = record.get(&quot;MD5&quot;) or record.get(&quot;md5&quot;)
+</code></pre>
+<p>This is the pattern master audit Lens 5.7 flagged in the broader
+audit (<code>deriva-ml-audit-2026-05.md:789-792</code>). The semantic
+problem: an empty-string value (an actual catalog row with
+<code>URL=""</code>) collapses to the second branch identically to a
+truly-missing column. Either:</p>
+<ul>
+<li>The catalog will never have empty strings (in which case the
+  pattern works; the failure mode is invisible).</li>
+<li>The catalog can have empty strings (in which case the code
+  silently picks the wrong field).</li>
+</ul>
+<p>The right test is <code>record.get("URL") if "URL" in record else
+record.get("url")</code>. Cleaner: detect the column name once
+(line 162-166 already does this) and use the detected name.
+Lines 178 and 256-257 then become <code>record.get(url_column)</code> —
+but the detection logic at 162-166 only runs once on the first
+record, so subsequent records use the same <code>url_column</code>. Good
+— except line 178 still uses <code>or</code>. Line 178 fires inside the
+loop where the detection has already happened; using
+<code>record.get(url_column)</code> would work and respect the detection.</p>
+<p><strong>Fix:</strong> use the detected column name uniformly. For <code>filename</code>
+and <code>md5</code>, apply the same detection-once pattern. <strong>Risk: low.</strong>
+<strong>LoC: ±0.</strong> <strong>Severity: low.</strong> Subsumed by §1.1 if the module
+deletes.</p>
+<h3 id="65-localizepy-chunk_size-or-default_chunk_size-ignores-explicit-0">6.5 <code>localize.py</code> <code>chunk_size or default_chunk_size</code> ignores explicit 0</h3>
+<p><code>localize.py:283</code>:</p>
+<pre><code class="language-python">actual_chunk_size = chunk_size or default_chunk_size
+</code></pre>
+<p>If the caller passes <code>chunk_size=0</code> (a plausible "no chunking"
+spelling), it silently falls back to 50 MB. The function
+signature comment says "Optional chunk size in bytes for large
+file uploads. If None, uses default chunking behavior." — the
+intended sentinel is None, not 0. The current code treats both
+the same.</p>
+<p><strong>Fix:</strong> <code>actual_chunk_size = default_chunk_size if chunk_size is
+None else chunk_size</code>. <strong>Severity: low.</strong> Subsumed by §1.1.</p>
+<h3 id="66-_extract_hatrac_path-does-not-validate-the-url-is-https">6.6 <code>_extract_hatrac_path</code> does not validate the URL is HTTP(S)</h3>
+<p><code>localize.py:438</code>: <code>parsed = urlparse(url)</code> runs without checking
+<code>parsed.scheme</code>. A <code>file:///hatrac/...</code> URL would parse and the
+function would return a misleading "hatrac path." This is
+unlikely in practice (catalog URLs are HTTPS) but the function
+is public-ish.</p>
+<p><strong>Fix:</strong> add <code>if parsed.scheme not in ("http", "https", ""):
+return None</code>. <strong>Severity: low.</strong> Subsumed by §1.1.</p>
+<hr />
+<h2 id="lens-7-maintainability-naming">Lens 7 — Maintainability / naming</h2>
+<h3 id="71-ermrestcatalog-forward-ref-string-with-no-underlying-import">7.1 <code>"ErmrestCatalog"</code> forward-ref string with no underlying import</h3>
+<p><code>clone_via_bag.py:117, 155</code>:</p>
+<pre><code class="language-python">def _expand_nested_dataset_anchors(
+    anchors: list[Anchor], source_catalog: &quot;ErmrestCatalog&quot;
+) -&gt; list[Anchor]:
+</code></pre>
+<p>The annotation is a string forward-ref, but <code>ErmrestCatalog</code> is
+never imported anywhere in the module — not in <code>TYPE_CHECKING</code>,
+not in the module body. With <code>from __future__ import annotations</code>
+(which the module has, line 53), the annotation is never
+evaluated at runtime, so this works. But:</p>
+<ul>
+<li>Type-checkers (mypy, pyright) cannot resolve the symbol.</li>
+<li>IDE go-to-definition fails.</li>
+<li>A future contributor who tries to evaluate the annotation
+  (e.g., for runtime validation) gets a <code>NameError</code>.</li>
+</ul>
+<p><strong>Fix:</strong> add an <code>if TYPE_CHECKING: from deriva.core import
+ErmrestCatalog</code> block. <strong>Risk: trivial. LoC: +3.</strong> <strong>Severity:
+low.</strong> Compare <code>localize.py:29-30</code> which does exactly this for
+the <code>DerivaML</code> forward-ref.</p>
+<h3 id="72-_collect_nested_dataset_rids-catches-bare-exception">7.2 <code>_collect_nested_dataset_rids</code> catches bare <code>Exception</code></h3>
+<p><code>clone_via_bag.py:171-177</code>:</p>
+<pre><code class="language-python">try:
+    rows = list(dd.filter(dd.Dataset.in_(sorted(frontier))).entities().fetch())
+except Exception as e:
+    logger.warning(
+        &quot;Could not expand nested datasets from %s: %s; proceeding with the seed RID set only&quot;,
+        sorted(frontier),
+        e,
+    )
+    return collected
+</code></pre>
+<p><code>Exception</code> swallows everything: network errors, programmer
+errors (typo in column name), interrupts. The function silently
+falls back to "use only the seed set" — which then produces a
+bag missing nested datasets, which then loads silently with
+dangling FKs (mitigated only by the DELETE default per §6.2).
+The error gets logged at warning level, but a user inspecting the
+clone result has no way to know nested-dataset expansion silently
+failed.</p>
+<p><strong>Fix:</strong> narrow to expected exception types (<code>DataPathException</code>,
+<code>requests.HTTPError</code>); re-raise programmer errors. <strong>Risk:
+low-medium.</strong> <strong>Severity: low</strong> — the failure path is rare and
+the warning log catches it.</p>
+<h3 id="73-localizepy-uses-f-string-interpolation-in-loggerinfo">7.3 <code>localize.py</code> uses f-string interpolation in <code>logger.info</code></h3>
+<p><code>localize.py:156, 173, 180, 193, 195, 200, 207, 222, 225, 230,
+259, 296, 312, 316, 319, 324, 326, 329</code> — every log call uses
+f-strings. The deriva-ml convention (per master audit Lens 6 and
+<code>core/logging_config.py</code>) is <code>logger.info("msg %s", value)</code> so
+the formatting only happens if the log level admits the message.</p>
+<p>Counter-example in the same audit scope: <code>clone_via_bag.py:172,
+213, 406, 437</code> use <code>logger.info("msg %s", value)</code> correctly.</p>
+<p><code>provenance.py:256, 263, 293, 307, 309</code> are split (some f-strings,
+some not).</p>
+<p><strong>Fix:</strong> convert f-string logger calls to lazy-format. <strong>Risk:
+trivial.</strong> <strong>LoC: ±0.</strong> <strong>Severity: low</strong> — code quality only.
+Subsumed by §1.1 for <code>localize.py</code>.</p>
+<h3 id="74-cloneviabagresult-is-a-dataclass-localizeresult-is-a-dataclass-should-be-pydantic">7.4 <code>CloneViaBagResult</code> is a <code>@dataclass</code>; <code>LocalizeResult</code> is a <code>@dataclass</code> — should be Pydantic</h3>
+<p>Subsumed by §6.1.</p>
+<h3 id="75-module-docstring-sizes">7.5 Module docstring sizes</h3>
+<p><code>localize.py:1-15</code> is 14 lines. <code>provenance.py:1-25</code> is 24 lines.
+<code>clone_via_bag.py:1-51</code> is 50 lines (the longest, with a feature
+parity table). <code>clone.py:1-51</code> is 50 lines. All reasonable —
+no fix.</p>
+<hr />
+<h2 id="persona-check">Persona check</h2>
+<p><strong>Senior engineer:</strong>
+- §1.7 (<code>is_clone</code> always returns False) is a public-API bug, not
+  just dead code. Important.
+- §6.2 (policy merge silently overrides explicit FAIL) is the most
+  significant correctness concern in the module. The merge logic
+  needs <code>model_fields_set</code>, not value comparison.
+- §1.5 (<code>create_ml_workspace</code> shim with no working callers) is
+  the clearest deletion candidate, but blocked behind the legacy
+  MCP retirement timeline.</p>
+<p><strong>Testing engineer:</strong>
+- §3.1 (no orphan-strategy integration tests) is the biggest
+  coverage gap. The three strategies (FAIL/DELETE/NULLIFY) need
+  end-to-end pinning.
+- §3.4 (no <code>CatalogProvenance</code> round-trip tests) is a smaller
+  but cheap gap to close.
+- §3.2 (no <code>localize_assets</code> tests) — gate the module's
+  existence on whether anyone is willing to write a test.</p>
+<p><strong>Technical writer:</strong>
+- §4.1 (docstring claim of feature parity is misleading) and §4.2
+  (stale <code>asset_mode="refs"</code> reference) are user-facing.
+- §1.3 / §1.7 / §4.3 — the docstring of <code>CloneDetails</code> and
+  <code>is_clone</code> describes behavior the code doesn't deliver.</p>
+<p><strong>ML-developer user:</strong>
+- The clone-then-localize-assets workflow that <code>localize_assets</code>
+  exists to serve isn't tested and isn't documented anywhere
+  outside the module itself. A user wanting this workflow has
+  to read the source. Either fix that or delete it.
+- <code>create_ml_workspace</code>'s docstring promises legacy compatibility
+  but the return type makes the promise empty. A user migrating
+  from pre-bag-pipeline code gets surprised at the first
+  <code>result.report.summary.errors</code> access.
+- <code>clone_via_bag</code>'s policy merge surprise (§6.2): a user who
+  passes a policy expecting their choices to be respected gets
+  silent overrides on three fields. Documentation should
+  explicitly call out the merge defaults <em>and</em> the user should
+  be able to opt out.</p>
+<p><strong>DBA:</strong>
+- §3.1 (no orphan-strategy integration tests) and §6.2 (silent
+  FAIL → DELETE override) compound: the strict-mode clone is
+  both untested and unreachable through the documented API.
+- §1.7 — clone provenance recording is half-built; cloned
+  catalogs cannot be reliably distinguished from
+  freshly-created ones by reading their annotation.</p>
+<hr />
+<h2 id="ranked-actions">Ranked actions</h2>
+<p>Numbered by recommended landing order, balancing impact, risk,
+and whether one item subsumes another.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Effort</th>
+<th>Risk</th>
+<th>LoC</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>§6.2 — Switch policy merge to <code>model_fields_set</code>.</strong> Replace the "value == library default" predicates with "field name not in <code>model_fields_set</code>." Update the existing test to reflect; add a new test asserting explicit FAIL survives.</td>
+<td>low</td>
+<td>low</td>
+<td>±0</td>
+<td>high</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>§1.8 — Route internal provenance imports through <code>provenance.py</code> directly.</strong> <code>src/deriva_ml/__init__.py</code> (5 paths), <code>core/base.py:70, 1037</code> — change the import sources, drop the <code>clone.py:66-72</code> re-export.</td>
+<td>low</td>
+<td>trivial</td>
+<td>−10</td>
+<td>low</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>§3.4 — Add <code>tests/catalog/test_provenance.py</code>.</strong> Round-trip test, unknown-method-fallback test, set/get test with mocked catalog.</td>
+<td>low</td>
+<td>trivial</td>
+<td>+80 (tests)</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>§3.1 — Add orphan-strategy integration tests.</strong> Three tests covering FAIL/DELETE/NULLIFY against a deliberately-constructed dangling-FK fixture.</td>
+<td>medium-high</td>
+<td>low</td>
+<td>+200 (tests + fixture)</td>
+<td>high</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>§1.7 — Decide on the <code>CloneDetails</code> future.</strong> Either wire it into <code>set_catalog_provenance</code> (param) + <code>clone_via_bag</code> (call site at end of clone) OR delete the whole leg per §1.3. The "do nothing" answer is what we have now and is the worst option.</td>
+<td>medium</td>
+<td>medium</td>
+<td>depends</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>§1.1 — Decide on <code>localize_assets</code>' future.</strong> Add a single integration test (§1.1.b) or delete the module (§1.1.a).</td>
+<td>medium</td>
+<td>low</td>
+<td>−464 (delete) or +60 (test)</td>
+<td>high</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>§6.1 — Convert <code>CatalogProvenance</code>, <code>CloneDetails</code>, <code>CloneViaBagResult</code>, <code>LocalizeResult</code> to Pydantic.</strong> Drops the manual <code>to_dict</code>/<code>from_dict</code> boilerplate.</td>
+<td>medium</td>
+<td>medium</td>
+<td>−80</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>§5.3 — Switch <code>_write_provenance_annotation</code> to model-API form.</strong> Symmetric with the read path.</td>
+<td>low</td>
+<td>low</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>§4.4 — Audit doctest examples for <code># doctest: +SKIP</code>.</strong> <code>core/base.py:1028</code>, <code>localize.py:104-133</code>.</td>
+<td>low</td>
+<td>trivial</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>§1.5 + §1.6 + §1.4 + §1.9 — Delete <code>clone.py</code> (or rename to <code>_clone.py</code>).</strong> Wait for the legacy MCP retirement signal. Drop <code>create_ml_workspace</code>, <code>_coerce_*</code>, <code>_warn_about_legacy_params</code>, <code>OrphanStrategy</code>, the legacy re-exports.</td>
+<td>low</td>
+<td>medium (timing)</td>
+<td>−359</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>§1.2 — Delete unreachable branch in <code>_extract_hatrac_path</code>.</strong> Subsumed by §1.1 if delete; otherwise standalone.</td>
+<td>trivial</td>
+<td>trivial</td>
+<td>−3</td>
+<td>low</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>§6.3 / §6.4 / §6.5 / §6.6 / §7.3 — <code>localize.py</code> quality fixes.</strong> Variable shadowing, <code>or</code> ambiguity, chunk_size sentinel, URL scheme check, lazy-format logging. Subsumed by §1.1.a if delete.</td>
+<td>low</td>
+<td>low</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>§7.1 — Add <code>ErmrestCatalog</code> TYPE_CHECKING import in <code>clone_via_bag.py</code>.</strong></td>
+<td>trivial</td>
+<td>trivial</td>
+<td>+3</td>
+<td>low</td>
+</tr>
+<tr>
+<td>14</td>
+<td><strong>§7.2 — Narrow bare <code>except Exception</code> in <code>_collect_nested_dataset_rids</code>.</strong></td>
+<td>low</td>
+<td>low</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+</tbody>
+</table>
+<p>Items 1, 2, 3 are quick wins for the next cleanup PR. Item 4 wants
+its own PR because the fixture is non-trivial. Items 5 and 6 are
+product decisions (wire or delete) — they should go to the user
+as ⏸ NEED INPUT questions before a follow-up audit-action PR.
+Items 7-14 are smaller follow-ups.</p>
+<p>Combined cleanup ceiling if every "delete" branch lands:
+<strong>−460 to −920 LoC</strong> (depending on §1.1 outcome and §1.5 timing),
+plus <strong>+280 LoC of tests.</strong> Net is comfortably negative.</p>
+<hr />
+<h2 id="worst-offender-modules">Worst-offender modules</h2>
+<ol>
+<li>
+<p><strong><code>localize.py</code></strong> (464 LoC) — zero callers, zero tests,
+   exported as public, doc-stale, several quality issues
+   inside. Cleanest delete-or-test target in the audit.</p>
+</li>
+<li>
+<p><strong><code>clone.py</code></strong> (359 LoC) — pure back-compat shim, no
+   working external caller, no internal callers, no tests.
+   Delete on the legacy-MCP retirement signal.</p>
+</li>
+<li>
+<p><strong><code>provenance.py</code></strong> (319 LoC) — healthy <code>CatalogProvenance</code>
+   half (the load-bearing read/write API the model template
+   uses); fossil <code>CloneDetails</code> half (95 LoC dead
+   scaffolding) plus a broken <code>is_clone</code> property.</p>
+</li>
+<li>
+<p><strong><code>clone_via_bag.py</code></strong> (457 LoC) — the load-bearing module.
+   One design wart (§6.2 silent merge override) and one
+   forward-ref import gap (§7.1). Otherwise in good shape.</p>
+</li>
+<li>
+<p><strong><code>__init__.py</code></strong> (66 LoC) — fine in shape, but exports
+   four symbols (<code>localize_assets</code>, <code>LocalizeResult</code>,
+   <code>create_ml_workspace</code>, <code>OrphanStrategy</code>) that nothing in
+   the workspace uses live. The docstring sells the package's
+   surface as larger than it functionally is.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

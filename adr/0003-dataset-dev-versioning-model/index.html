@@ -1,0 +1,2510 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/adr/0003-dataset-dev-versioning-model/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>ADR-0003: Dataset dev versioning — every mutation lands on dev, release is the only path to a released version - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-0003-dataset-dev-versioning-every-mutation-lands-on-dev-release-is-the-only-path-to-a-released-version" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-0003: Dataset dev versioning — every mutation lands on dev, release is the only path to a released version
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#considered-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Considered Options
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Considered Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-b-rejected-computed-dev-versions-no-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B (rejected): Computed dev versions, no persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-c-rejected-explicit-dev-mode-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option C (rejected): Explicit dev-mode entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-abac-rejected-insert-new-released-row-at-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A.b/A.c (rejected): Insert new released row at release;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-side-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read-side surface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration impact
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-creation-and-validation-touch-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema-creation and validation touch points
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="adr-0003-dataset-dev-versioning-every-mutation-lands-on-dev-release-is-the-only-path-to-a-released-version">ADR-0003: Dataset dev versioning — every mutation lands on dev, release is the only path to a released version</h1>
+<p>Date: 2026-05-09
+Status: Accepted</p>
+<h2 id="context">Context</h2>
+<p>DerivaML datasets carry a semantic version (<code>current_version</code>) that
+points at a row in <code>Dataset_Version</code>. Today, every member-mutation
+operation (<code>add_dataset_members</code>, <code>delete_dataset_members</code>) auto-bumps
+to a new released <code>Dataset_Version</code> row with a stamped catalog
+<code>Snapshot</code>. Three problems with that model:</p>
+<ol>
+<li><strong>No representation of "modified since last release but not yet
+   re-released."</strong> Every mutation is its own release, so the dataset
+   is always pointing at a frozen snapshot — there's no notational
+   space for "the dataset has drifted, but I haven't decided what kind
+   of release that warrants."</li>
+<li><strong>No way to record indirect drift.</strong> When a feature value is added
+   to a member of a dataset, the dataset's <code>Dataset</code> row and member
+   list are unchanged, but the bag's content has changed. Today's
+   model has nowhere to put that fact.</li>
+<li><strong><code>Dataset.cite()</code> cannot distinguish frozen from live state.</strong> A
+   citation URL for "the current version" can only ever be a
+   snapshot-pinned URL, even when the catalog has drifted underneath.</li>
+</ol>
+<p>The shape of the fix: introduce a <em>dev</em> version state, separate from
+released versions. The hard design questions are <em>which mutations
+land on dev versus release</em>, <em>how dev rows are stored</em>, and <em>what
+happens at release time</em>.</p>
+<h2 id="decision">Decision</h2>
+<p><strong>Every mutation lands on the dev version. Release is the only
+operation that produces a released version.</strong></p>
+<p>Concretely:</p>
+<ul>
+<li>A dataset's <code>current_version</code> is either a <em>released</em> PEP 440
+  version (<code>0.4.0</code>) pinning a catalog <code>Snapshot</code>, or a <em>dev</em> PEP 440
+  version (<code>0.4.0.post1.devN</code>) with <code>Snapshot=NULL</code>.</li>
+<li><code>add_dataset_members</code>, <code>delete_dataset_members</code>, <code>mark_dev</code>, and
+  any future drift-recording operation flip the dataset to a dev
+  version. They never produce a released version.</li>
+<li><code>release(bump, description, execution=None)</code> is the only
+  operation that produces a released version. It promotes the dev
+  row in place by setting <code>Version</code> to the released label, stamping
+  <code>Snapshot</code>, replacing <code>Description</code> with release notes, and
+  overwriting the dev row's <code>Execution</code> link with the supplied
+  <code>execution</code> (or <code>NULL</code> if none). The released row's <code>Execution</code>
+  link records "the execution that called <code>release()</code>", not "the
+  most recent mutator" — mutator authorship during the dev period
+  is recoverable from the audit trail (<code>RMT</code>, per-feature-value
+  provenance) and doesn't need the version row to carry it.</li>
+<li><code>release()</code> raises <code>DerivaMLValidationError</code> when called on a
+  dataset with no dev row. Users wanting a no-op release call
+  <code>mark_dev</code> first to declare a dev period, then <code>release</code> to
+  promote it. The error message points at this resolution path.</li>
+<li>Dev rows are <em>lazy</em>: a dev row exists only while the dataset is
+  in dev state. Releases do not preemptively create the next dev row.</li>
+<li>Dev rows are <em>mutable</em>: one row per (dataset, dev period). The
+  <code>.devN</code> counter advances by <code>UPDATE</code>, not by <code>INSERT</code>. The
+  <code>Description</code> column is <strong>replaced</strong> on each mutation with the
+  most recently supplied description (not appended). Prior values
+  are recoverable from the catalog's audit log if needed.</li>
+<li><strong>A dev label resolves if and only if it matches the dataset's
+  current dev row's <code>Version</code>.</strong> The dev row is mutable, so
+  <code>Version="0.4.0.post1.dev2"</code> is observable only at the moment
+  that's its current value; afterward, the same row's <code>Version</code>
+  says <code>.dev3</code>, <code>.dev4</code>, etc. The rule is "dev labels resolve to
+  the live present, and only when they describe it accurately" —
+  not "dev labels never resolve". As a corollary: methods that
+  produce a dev label (e.g., <code>mark_dev</code>) <strong>return <code>None</code>, not
+  <code>DatasetVersion</code></strong> — a returned dev label can't be passed to
+  any version-accepting API later (the next mutation makes it
+  unaddressable), so returning it would invite caller mistakes.
+  Callers who want to display the new label read
+  <code>current_version</code> after the call. <code>release()</code>, by contrast,
+  returns <code>DatasetVersion</code> because a released label <em>is</em>
+  addressable across time.
+  APIs that accept a <code>version=</code> argument:</li>
+<li>Treat <code>version=None</code> (or omitted) as "current version" —
+     whichever the dataset has at request time, dev or released.</li>
+<li>Accept any released label as today (snapshot-pinned).</li>
+<li>Accept the current dev label (matches the dev row's current
+     <code>Version</code>) and resolve it to the live catalog (no
+     <code>@snaptime</code>).</li>
+<li>Reject a dev label that does <strong>not</strong> match the current dev
+     row's <code>Version</code> — raise a clear error: dev versions are
+     mutable and historical or post-release <code>.devN</code> values are
+     not addressable.</li>
+<li>The <code>.devN</code> counter is a generation number, not a handle to
+  historical state. Its purpose is notational change-detection —
+  two reads of <code>current_version</code> at different times can be told
+  apart by their <code>.devN</code>. It is not a stable identifier across
+  time.</li>
+<li>Bag downloads of the current dev version use live catalog
+  state with no <code>@snaptime</code> pin. Two downloads of the same dev
+  label may differ if the catalog drifted between them. The
+  cite-URL form follows the same rule (no <code>@snaptime</code> for dev
+  versions).</li>
+<li>The <code>.devN</code> counter advances <strong>per call</strong> that actually changes
+  at least one row — <code>add_dataset_members</code>, <code>delete_dataset_members</code>,
+  <code>mark_dev</code>, or any future drift-recording operation. A call that
+  no-ops (e.g., <code>add_dataset_members([])</code>) does not advance the
+  counter and does not create a dev row. The first effective
+  mutation after a release creates the dev row at <code>.dev1</code>; there
+  is no <code>.dev0</code>. Per-call granularity matches setuptools-scm's
+  <code>.devN</code> semantics — one commit equals one increment regardless
+  of how many files it touched.</li>
+<li><code>create_dataset</code> initializes a new dataset at <code>0.1.0</code> released
+  (no dev row). The "every mutation lands on dev" rule applies after
+  creation, where it's load-bearing — at creation time there's no
+  drift to record.</li>
+<li><strong>A dev version must never appear as the recorded version of an
+  <code>Execution</code>'s consumed dataset.</strong> Dev versions are notational, not
+  citational. Executions consume released versions; live-state
+  consumption is recorded as live, not as a moving dev label.</li>
+</ul>
+<p>There is <strong>no schema migration</strong>.
+<code>Dataset_Version.Snapshot</code> is already nullable in the existing
+schema (verified in <code>create_schema.py</code> and <code>validation.py</code>); the
+dev-versioning work just makes that nullability load-bearing
+instead of incidental. No DDL change. No data migration (no dev
+rows exist yet, so nothing to backfill). The relevant code change
+in <code>create_schema.py</code> is to update the <code>Snapshot</code> column's comment
+to reflect its new contract — <code>NULL</code> means "live state, dev row" —
+and to update the schema-validator's expected-columns map
+(<code>validation.py</code>) where any expectations need sharpening.</p>
+<h2 id="considered-options">Considered Options</h2>
+<h3 id="option-b-rejected-computed-dev-versions-no-persistence">Option B (rejected): Computed dev versions, no persistence</h3>
+<p><code>Dataset_Version</code> would be unchanged. <code>current_version</code> would return
+a synthetic dev label after every released bump. <strong>Rejected</strong>
+because there'd be nothing to attach a description, an execution
+link, or accumulated drift information to. The "notational clarity"
+that motivated the work would be lost — the version label would
+exist in name only.</p>
+<h3 id="option-c-rejected-explicit-dev-mode-entry">Option C (rejected): Explicit dev-mode entry</h3>
+<p>Member-mutations would keep auto-bumping to a real release as today;
+dev versions would only be reached via an explicit <code>start_dev()</code>
+call. <strong>Rejected</strong> because mixed semantics (mutations bump to
+release, but feature drift bumps to dev) are impossible to remember,
+and the <code>start_dev</code>/<code>end_dev</code> API surface is the same shape as
+<code>mark_dev</code> once we already need that — the explicit mode entry
+collapses into something we already have.</p>
+<h3 id="option-abac-rejected-insert-new-released-row-at-release">Option A.b/A.c (rejected): Insert new released row at release;</h3>
+<p>delete or archive the dev row</p>
+<p><code>release()</code> would <code>INSERT</code> a new released <code>Dataset_Version</code> row and
+either delete the dev row or keep it as a "superseded" record.
+<strong>Rejected</strong> because dev rows are already established as mutable
+(advancing <code>.devN</code> is a row update). One more update at release —
+to set <code>Version</code> to released and stamp <code>Snapshot</code> — is consistent
+with that pattern. Insert-and-delete tells the same story with
+extra steps; archive-superseded is the over-engineering the
+notational-clarity goal was supposed to avoid.</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li><code>increment_dataset_version</code> is renamed to <code>release(bump,
+  description, execution=None)</code> and moves to <code>Dataset</code> as an
+  instance method. The argument formerly known as <code>component</code> is
+  renamed to <code>bump</code> to match the workspace's <code>bump-version</code> CLI
+  vocabulary. The <code>execution</code> argument changes type from <code>RID |
+  None</code> to <code>Execution | None</code> to match the rest of the new API
+  surface (typed objects, not bare RIDs). This is a breaking
+  change for callers of the previous public API and ships in
+  1.34 with the migration guide. No deprecated alias is provided —
+  CLAUDE.md's "no backwards-compat shims" rule applies.</li>
+<li>A new <code>Dataset.is_dirty()</code> / <code>Dataset.release_diff()</code> /
+  <code>Dataset.compare_versions(v_a, v_b)</code> trio detects catalog drift
+  by walking the same FK paths used to generate the dataset bag
+  (via <code>CatalogGraph</code>), filtering by an <code>RMT</code> time predicate. The
+  drift walk <em>is</em> the bag walk plus an <code>RMT</code> filter. The three
+  methods all flow through one internal
+  <code>_diff_between(t_lower, t_upper)</code> helper; they differ only in
+  what they pass to it:</li>
+<li><code>is_dirty()</code> — fast <code>bool</code> predicate, short-circuits on first
+     non-zero count. Calls <code>_diff_between(t_last_release, None)</code>
+     where <code>None</code> means "live state, no upper bound."</li>
+<li><code>release_diff()</code> — per-table change counts. <strong>Implemented as
+     a thin wrapper around</strong> <code>compare_versions(self.last_released_version,
+     self.current_version)</code>. When the dataset is in dev,
+     <code>current_version</code> is the dev label, which resolves to live
+     state. When the dataset is at its last release with no
+     drift, both endpoints coincide and the result is <code>{}</code>. This
+     is the right answer in both cases.</li>
+<li><code>compare_versions(v_a, v_b)</code> — per-table change counts
+     between any two endpoints. Each argument may independently
+     be a released label (resolves to that snapshot's timestamp)
+     or the current dev label (resolves to live state). Stale or
+     post-release dev labels error per the addressability rule.
+     The predicate is <code>min(t_a, t_b) &lt; RMT &lt;= max(t_a, t_b)</code>;
+     order is symmetric for the result set.</li>
+</ul>
+<p>All three live on <code>Dataset</code> only, not on <code>DatasetLike</code> — bags
+  can never be dirty.
+- Deletions of catalog rows referenced by a dataset are <strong>not</strong>
+  detected by any of these methods (a deleted row is invisible to
+  the bag walk too). Users who delete content rows must call
+  <code>mark_dev</code> manually. Closing this gap would require querying
+  the snapshots' RID sets directly and computing set differences
+  — a separate, deferred operation with a different cost profile.
+- Cite-URL routing falls out: released versions get
+  snapshot-pinned URLs; dev versions get no-snapshot URLs. The
+  check is the PEP 440 <code>is_devrelease</code> property — see ADR-0004 for
+  why we use PEP 440.</p>
+<h2 id="read-side-surface">Read-side surface</h2>
+<p><code>dataset_history()</code> and <code>current_version</code> are unchanged in shape but
+gain new behaviors implied by dev rows being first-class
+<code>Dataset_Version</code> entries:</p>
+<ul>
+<li><code>dataset_history()</code> returns <strong>all</strong> <code>Dataset_Version</code> rows for
+  the dataset, dev or released, with no filtering. Callers who want
+  released-only filter by the PEP 440 typed property:
+  <code>[h for h in ds.dataset_history() if not
+  h.dataset_version.is_devrelease]</code>. Hiding the filter inside the
+  method would make the API disagree with the catalog; we don't.</li>
+<li><code>dataset_history()</code> results are <strong>sorted by <code>dataset_version</code>
+  ascending</strong>. Reads forward in time; <code>[0.1.0, 0.2.0, ...,
+  0.4.0.post1.dev3]</code>. Today's order is whatever the catalog
+  returns — that's a fragile contract and the change is net
+  positive.</li>
+<li><code>current_version</code> keeps using <code>max(history)</code>. Under PEP 440
+  ordering (ADR-0004), the dev version sorts after the last
+  released version, so <code>max</code> correctly returns the dev version
+  when there is one.</li>
+<li><code>current_version</code>'s defensive fallback to <code>DatasetVersion(0, 1,
+  0)</code> for empty history is <strong>removed</strong>. <code>create_dataset</code> always
+  inserts a version row, so empty history is a catalog
+  inconsistency — raise rather than silently invent a version.
+  This matches CLAUDE.md's "no defensive code for impossible
+  cases" rule.</li>
+<li>No new read methods. No <code>current_dev_version()</code>, no
+  <code>released_history()</code> filter helper. Dev rows are not
+  second-class; they're a different state of the same row type.</li>
+<li>Display methods (<code>to_markdown</code>, etc.) render PEP 440 version
+  strings literally. <code>"0.4.0.post1.dev3"</code> is what the version
+  <em>is</em>; introducing a separate display form would require keeping
+  it in sync with the canonical form.</li>
+</ul>
+<h2 id="concurrency-model">Concurrency model</h2>
+<p><code>release()</code> and dev-row mutations both modify the same row (the
+dev row). Concurrent writers are reconciled at the database level
+via ERMrest's row-level conditional updates, not by application
+locking:</p>
+<ul>
+<li>Each writer reads the dev row's <code>RMT</code> (row-modified time) before
+  acting.</li>
+<li>Each writer's <code>UPDATE</code> carries <code>WHERE RID=&lt;dev_row_rid&gt; AND
+  RMT=&lt;observed&gt;</code>. If a competing writer landed first, the
+  predicate matches zero rows; the update is a no-op and the
+  caller raises a clear "concurrent modification" error pointing
+  at re-reading the dataset.</li>
+<li>The framework does <strong>not</strong> auto-retry. A concurrent release
+  between read and write may change the <em>meaning</em> of the caller's
+  operation (they thought they were mutating the dev period after
+  <code>0.4.0</code>; the dataset has since been released to <code>0.5.0</code> and any
+  new mutation would land on a fresh dev period after that). The
+  caller decides whether the new state is still what they want.</li>
+<li>A mutation that arrives on a <em>just-released</em> dataset is <strong>not</strong> a
+  conflict — it's the normal lazy-dev-row case. The mutation
+  observes a released row, creates a new dev row at
+  <code>&lt;just_released&gt;.post1.dev1</code>, and proceeds.</li>
+</ul>
+<p>The key reason for using ERMrest's row-level concurrency rather
+than an application-level <code>Status</code> column or a <code>Dataset</code> row
+generation counter: the database already solves this; introducing
+a parallel locking scheme adds schema and bug surface for a corner
+that the conditional-update primitive handles cleanly.</p>
+<h2 id="migration-impact">Migration impact</h2>
+<p>This work is a breaking change shipped in 1.34 (the renamed
+<code>release()</code> method, the dev-flip behavior change for
+<code>add_dataset_members</code> / <code>delete_dataset_members</code>, and the changed
+<code>Dataset.current_version</code> / <code>dataset_history()</code> semantics). There
+is no DDL change (the
+schema's <code>Snapshot</code> column is already nullable), but the
+<em>semantics</em> of several existing public methods change. The
+behavior-change inventory:</p>
+<table>
+<thead>
+<tr>
+<th>Existing call</th>
+<th>Today</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_dataset_members</code> / <code>delete_dataset_members</code></td>
+<td>Bumps to a new released version</td>
+<td>Lands on a dev version (creates <code>.dev1</code> if needed, advances <code>.devN</code> if existing)</td>
+</tr>
+<tr>
+<td><code>increment_dataset_version(component, description, execution_rid=None)</code></td>
+<td>Public mixin method on <code>DerivaML</code>, creates a released row</td>
+<td>Renamed to <code>Dataset.release(bump, description, execution=None)</code>. Instance method on <code>Dataset</code>. Errors if no dev row. <code>execution_rid: RID</code> → <code>execution: Execution</code>.</td>
+</tr>
+<tr>
+<td><code>Dataset.current_version</code></td>
+<td>Returns latest released</td>
+<td>Returns dev when present, else latest released</td>
+</tr>
+<tr>
+<td><code>Dataset.dataset_history()</code></td>
+<td>Released rows in unspecified order</td>
+<td>All rows (dev + released) sorted ascending</td>
+</tr>
+</tbody>
+</table>
+<p>Downstream callers must:</p>
+<ol>
+<li><strong>Find every call to <code>increment_dataset_version</code></strong> and rewrite
+   to <code>Dataset.release()</code>. Mechanical rename plus signature
+   update.</li>
+<li><strong>Audit any logic that assumes "the version after a mutation
+   is the released version"</strong> — that's no longer true. To produce
+   a released version, follow the mutation with an explicit
+   <code>release()</code> call.</li>
+<li><strong>Audit any <code>find_datasets</code>/<code>dataset_history</code> consumers</strong> that
+   filter on "released versions" — they'll need to add an explicit
+   <code>is_devrelease</code> filter rather than relying on every version
+   being released.</li>
+</ol>
+<p>Out-of-repo blast radius (handled in dependent PRs, not this ADR):
+<code>deriva-ml-mcp</code>'s tool that exposes <code>increment_dataset_version</code>,
+the model-template workflows, and any user notebooks. The 1.34
+changelog and migration guide are written at PR-ready time and
+point users at this ADR.</p>
+<h2 id="schema-creation-and-validation-touch-points">Schema-creation and validation touch points</h2>
+<p>Implementation must update these places to reflect the new
+contract on <code>Dataset_Version</code>, even though the column types do not
+change:</p>
+<ul>
+<li><strong><code>src/deriva_ml/schema/create_schema.py</code></strong> — the <code>Snapshot</code>
+  column's <code>comment</code> should make the new contract explicit:
+  populated for released rows, <code>NULL</code> for dev rows. The comment
+  today is "Catalog Snapshot ID for dataset", which is silent on
+  the nullable case.</li>
+<li><strong><code>src/deriva_ml/schema/create_schema.py</code></strong> — the <code>Version</code>
+  column's <code>comment</code> ("Semantic version of dataset") and <code>default</code>
+  ("0.1.0") should be updated. The label is no longer "semantic
+  version" (that's semver-specific); it's a PEP 440 version string.
+  Released rows carry <code>MAJOR.MINOR.PATCH</code>; dev rows carry
+  <code>&lt;last_release&gt;.post1.devN</code>.</li>
+<li><strong><code>src/deriva_ml/schema/validation.py</code></strong> —
+  <code>EXPECTED_TABLE_COLUMNS[MLTable.dataset_version]["Snapshot"]</code> is
+  already <code>("text", True)</code> (nullable). Confirm this is the expected
+  contract; no change needed unless a stricter expectation is
+  desired for released rows (which would require splitting the
+  validator's view into "released-row expectation" vs
+  "dev-row expectation" — out of scope for this ADR).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

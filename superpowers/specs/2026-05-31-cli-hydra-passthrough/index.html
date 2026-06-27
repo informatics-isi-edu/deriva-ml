@@ -1,0 +1,2734 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-05-31-cli-hydra-passthrough/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Plan: native-Hydra CLI passthrough for deriva-ml-run and deriva-ml-run-notebook - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plan-native-hydra-cli-passthrough-for-deriva-ml-run-and-deriva-ml-run-notebook" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plan: native-Hydra CLI passthrough for deriva-ml-run and deriva-ml-run-notebook
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#goal-user-stated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal (user-stated)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-we-verified-corrects-the-findings-premise" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we verified (corrects the finding's premise)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions-approved-by-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design decisions (approved by user)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-cli-operations-the-canonical-table-all-docstests-are-written-against" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three CLI operations — the canonical table all docs/tests are written against
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-a-model-runner-run_modelpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part A — model runner (run_model.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part A — model runner (run_model.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a1-switch-to-parse_known_args" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A1. Switch to parse_known_args
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a2-forward-the-remainder-into-the-hydra-argv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A2. Forward the remainder into the Hydra argv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a3-the-guard-now-runs-only-on-genuine-bare-positionals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A3. The guard now runs only on genuine bare positionals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a4-_show_hydra_info-disposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A4. _show_hydra_info() disposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-b-notebook-runner-run_notebookpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part B — notebook runner (run_notebook.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part B — notebook runner (run_notebook.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#b1-hydra-vocabulary-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B1. Hydra-vocabulary --info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b2-cfg-equivalent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B2. --cfg-equivalent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b3-the-p-collision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B3. The -p collision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b4-papermill-flags-untouched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B4. Papermill flags untouched
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-c-shared-clishow_infopy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part C — shared cli/show_info.py
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#touch-points-three-repos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Touch points (three repos)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Touch points (three repos)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-code-tests-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml (code + tests + docs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml-skills
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-model-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml-model-template
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-strategy-tdd-red-first-comprehensive-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test strategy (TDD, RED first) — comprehensive matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test strategy (TDD, RED first) — comprehensive matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model-runner-argv-construction-testsclitest_run_model_argvpy-unit-mock-the-hydra-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model-runner argv construction (tests/cli/test_run_model_argv.py) — unit, mock the Hydra boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notebook-runner-testsclitest_run_notebook_clipy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notebook-runner (tests/cli/test_run_notebook_cli.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-helper-testsclitest_show_infopy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared helper (tests/cli/test_show_info.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-existing-testsclitest_hydra_overridespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard (existing tests/cli/test_hydra_overrides.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#doctest-full-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Doctest + full suite
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-repo-verification-manual-scripted-in-the-e2e-worktree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-repo verification (manual / scripted, in the e2e worktree)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-refinements-discovered-during-tdd-these-are-now-decided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation refinements (discovered during TDD — these are now decided)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-resolve-at-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions (resolve at implementation)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="plan-native-hydra-cli-passthrough-for-deriva-ml-run-and-deriva-ml-run-notebook">Plan: native-Hydra CLI passthrough for <code>deriva-ml-run</code> and <code>deriva-ml-run-notebook</code></h1>
+<p><strong>Date:</strong> 2026-05-31
+<strong>Origin:</strong> e2e finding <code>evaluator/01</code> (+ <code>modeler/01</code>) — <code>deriva-ml-run --info experiment</code> and <code>... --cfg job</code> rejected by the wrapper.
+<strong>Status:</strong> Plan — awaiting approval before implementation.</p>
+<h2 id="goal-user-stated">Goal (user-stated)</h2>
+<blockquote>
+<p>"Hydra's documentation should just work against our runners to the maximum
+extent possible." Notebook is more complex (Hydra + papermill); there,
+prioritize Hydra for consistency.</p>
+</blockquote>
+<h2 id="what-we-verified-corrects-the-findings-premise">What we verified (corrects the finding's premise)</h2>
+<ul>
+<li>Hydra <strong>does</strong> have <code>--info</code> (<code>hydra/_internal/utils.py:586-594</code>): <code>-i</code>,
+  <code>nargs="?"</code>, <code>const="all"</code>, <code>choices=[all, config, defaults, defaults-tree,
+  plugins, searchpath]</code>. There is <strong>no</strong> <code>--info &lt;group-name&gt;</code> form — so
+  <code>--info experiment</code> is not a real Hydra feature and was never going to "just
+  work." The finding's headline symptom was a false target.</li>
+<li>The <em>real</em> loss: deriva-ml's wrapper <code>--info</code> is <code>store_true</code> + a custom
+  <code>_show_hydra_info()</code> that only lists config groups, <strong>fully shadowing</strong>
+  Hydra's six native <code>--info</code> modes and all its other flags
+  (<code>--cfg/-c</code>, <code>--resolve</code>, <code>--package/-p</code>, <code>--config-name/-cn</code>,
+  <code>--config-dir/-cd</code>, <code>--experimental-rerun</code>, <code>--shell-completion</code>).</li>
+<li><strong>Model runner</strong> (<code>run_model.py</code>) replaces <code>sys.argv</code> and calls
+  <code>zen(run_model).hydra_main(...)</code> → <code>hydra.main</code> re-parses that argv with
+  Hydra's <em>full</em> parser. So anything we put in that argv is honored by Hydra.</li>
+<li><strong>Notebook runner</strong> (<code>run_notebook.py</code>) never hands argv to Hydra. It
+  serializes overrides to <code>DERIVA_ML_HYDRA_OVERRIDES</code> (JSON env var); the
+  kernel calls <code>hydra_zen.launch(config, overrides=[...])</code>, which takes an
+  overrides list + multirun bool and <strong>no</strong> flag parameters. Papermill owns
+  <code>--parameter/-p</code> (collides with Hydra's <code>--package/-p</code>), <code>--kernel</code>,
+  <code>--file</code>, <code>--log-output</code>, and the <code>notebook_file</code> positional.</li>
+<li>Both runners use <code>parse_args</code> (via <code>BaseCLI.parse_cli</code>), not
+  <code>parse_known_args</code>, so unknown flags are rejected before Hydra runs.</li>
+</ul>
+<h2 id="design-decisions-approved-by-user">Design decisions (approved by user)</h2>
+<ol>
+<li><strong>Model runner → <code>parse_known_args</code> passthrough (max native).</strong> Stop
+   intercepting Hydra's flags. Keep only deriva-ml-specific flags explicit;
+   forward the unrecognized remainder into the Hydra argv. Every Hydra-doc flag
+   works, present and future, with no per-flag maintenance.</li>
+<li><strong>Notebook runner → Hydra-vocabulary inspection, kernel-side.</strong> Implement
+   <code>--info &lt;mode&gt;</code> (Hydra's choices) and a <code>--cfg</code>-equivalent by routing through
+   Hydra's compose/render in the kernel; papermill keeps its orthogonal flags.
+   Full flag-passthrough is architecturally out of reach (no argv) and not
+   attempted.</li>
+<li><strong>Rename the hydra-zen group menu <code>--info</code> → <code>--list-configs</code></strong> (both
+   runners). This frees the <code>--info</code> name to flow natively to Hydra. Clean
+   break, no compat alias (workspace rule: no backwards-compat shims). This is
+   a deliberate behavior change documented across all three repos.</li>
+<li><strong>One coordinated change across three repos:</strong> deriva-ml (code + tests +
+   docstrings + user-guide), deriva-ml-skills (configure-experiment +
+   experiment-lifecycle), deriva-ml-model-template (docs that mention <code>--info</code>).</li>
+</ol>
+<h2 id="the-three-cli-operations-the-canonical-table-all-docstests-are-written-against">The three CLI operations — the canonical table all docs/tests are written against</h2>
+<table>
+<thead>
+<tr>
+<th>Intent</th>
+<th>Command</th>
+<th>What it does</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"What <code>group=value</code> can I pass?"</td>
+<td><code>deriva-ml-run --list-configs</code></td>
+<td>Lists hydra-zen registered config groups + their options + named multiruns. <strong>deriva-ml-specific; Hydra has no equivalent.</strong></td>
+<td>deriva-ml wrapper</td>
+</tr>
+<tr>
+<td>"What config will actually run?"</td>
+<td><code>deriva-ml-run +experiment=X --cfg job</code></td>
+<td>Hydra renders the fully-composed/resolved config for the given overrides, without executing.</td>
+<td><strong>Hydra native</strong></td>
+</tr>
+<tr>
+<td>"Show Hydra internals"</td>
+<td><code>deriva-ml-run --info config\|defaults\|searchpath\|...</code></td>
+<td>Hydra's own info modes (composed config, defaults tree, search path, plugins).</td>
+<td><strong>Hydra native</strong></td>
+</tr>
+<tr>
+<td>"Resolve + validate against the live catalog"</td>
+<td><code>deriva-ml-run +experiment=X dry_run=true</code></td>
+<td>deriva-ml resolves config AND checks every RID/term against the catalog; stops before training. Heavier (downloads bag).</td>
+<td>deriva-ml</td>
+</tr>
+<tr>
+<td>"List notebook params"</td>
+<td><code>deriva-ml-run-notebook nb.ipynb --inspect</code></td>
+<td>papermill parameter-cell inspection.</td>
+<td>papermill</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The doc bug this fixes:</strong> <code>configure-experiment/SKILL.md:39</code> currently says
+<code>+experiment=X --info</code> "inspects resolved config." It does NOT — old <code>--info</code>
+ignored the override and listed the menu. After this change, the correct command
+for "inspect resolved config" is <code>--cfg job</code>; the menu is <code>--list-configs</code>.</p>
+<hr />
+<h2 id="part-a-model-runner-run_modelpy">Part A — model runner (<code>run_model.py</code>)</h2>
+<h3 id="a1-switch-to-parse_known_args">A1. Switch to <code>parse_known_args</code></h3>
+<p><code>BaseCLI.parse_cli()</code> calls <code>self.parser.parse_args()</code>. We need the unknown
+remainder. Options:
+- Add a <code>parse_known</code> path. Cleanest: call
+  <code>args, unknown = self.parser.parse_known_args()</code> directly in <code>ModelRunner</code>
+  rather than <code>BaseCLI.parse_cli()</code>, OR have <code>parse_cli</code> expose a
+  <code>return_unknown</code> switch. Prefer a local <code>parse_known_args</code> in the runner to
+  avoid changing the shared deriva-py <code>BaseCLI</code> (out of our repo).
+- Keep all current explicit args: <code>--catalog</code>, <code>--config-dir/-c</code>,
+  <code>--config-name</code>, <code>--multirun/-m</code>, <code>--allow-dirty</code>, and the <code>hydra_overrides</code>
+  positional, plus inherited BaseCLI args (<code>--host</code>, <code>--debug</code>, etc.).</p>
+<p><strong>Collision audit (deriva-ml flags vs Hydra flags):</strong>
+- <code>--config-dir/-c</code>: deriva-ml uses <code>-c</code> for config-dir (preloads the configs
+  package); Hydra uses <code>-c</code> for <code>--cfg</code>. <strong>Collision.</strong> Resolution: deriva-ml's
+  <code>-c</code> is consumed by our argparse (explicit), so it never reaches Hydra. A user
+  wanting Hydra's <code>--cfg</code> must spell it <code>--cfg</code> (long form), which our
+  <code>parse_known_args</code> won't recognize → forwarded to Hydra → works. Document:
+  "<code>-c</code> is deriva-ml's config-dir; use <code>--cfg</code> (long) for Hydra's config dump."
+- <code>--config-name</code>: deriva-ml owns it (passed to <code>hydra_main(config_name=...)</code>).
+  Hydra's <code>--config-name/-cn</code> would be redundant; if a user passes <code>--config-name</code>
+  it's ours. Fine.
+- <code>--multirun/-m</code>: deriva-ml owns it (drives <code>+multirun=</code> expansion + inserts
+  <code>--multirun</code> into argv). A user passing <code>-m</code>/<code>--multirun</code> directly still ends
+  up with <code>--multirun</code> in the Hydra argv. Consistent.
+- <code>--info/-i</code>: <strong>remove deriva-ml's <code>store_true</code> <code>--info</code></strong> and let Hydra's own
+  <code>--info</code> flow through (so <code>--info config</code>, <code>--info searchpath</code>, bare <code>--info</code>
+  → all, all work natively). BUT we lose the group-listing convenience. Keep it
+  as a deriva-ml-specific spelling that does NOT collide: see A3.</p>
+<h3 id="a2-forward-the-remainder-into-the-hydra-argv">A2. Forward the remainder into the Hydra argv</h3>
+<p>Current argv build (<code>run_model.py:244-251</code>):</p>
+<pre><code class="language-python">hydra_argv = [sys.argv[0]] + hydra_overrides
+if use_multirun:
+    hydra_argv.insert(1, &quot;--multirun&quot;)
+</code></pre>
+<p>New: append the <code>unknown</code> remainder (the Hydra-native flags argparse didn't
+recognize) so Hydra re-parses them:</p>
+<pre><code class="language-python">hydra_argv = [sys.argv[0]] + hydra_overrides + unknown
+if use_multirun and &quot;--multirun&quot; not in unknown and &quot;-m&quot; not in unknown:
+    hydra_argv.insert(1, &quot;--multirun&quot;)
+</code></pre>
+<p>Ordering: overrides first, then flags — argparse-style flags can appear anywhere;
+Hydra's parser handles interleaving. Keep <code>+multirun=</code> expansion BEFORE this
+(it operates on <code>hydra_overrides</code>, not <code>unknown</code>).</p>
+<h3 id="a3-the-guard-now-runs-only-on-genuine-bare-positionals">A3. The guard now runs only on genuine bare positionals</h3>
+<p><code>validate_hydra_overrides(args.hydra_overrides, ...)</code> stays, but with
+<code>parse_known_args</code>, Hydra-native flags land in <code>unknown</code>, not <code>hydra_overrides</code>.
+So a bare <code>roc_analysis</code> still lands in <code>hydra_overrides</code> and is still caught;
+<code>--cfg job</code> lands in <code>unknown</code> and is forwarded. The guard's false positive
+(Gap C) disappears because <code>--info experiment</code> is no longer our concern — if a
+user types <code>--info experiment</code>, Hydra's own <code>choices=</code> rejects <code>experiment</code>
+with a clean "invalid choice" message. <strong>Net: the guard keeps its real job
+(catch bare positionals) and loses its bug.</strong></p>
+<h3 id="a4-_show_hydra_info-disposition">A4. <code>_show_hydra_info()</code> disposition</h3>
+<p>Hydra's native <code>--info</code> now reaches Hydra. The wrapper's group-listing is still
+useful (Hydra has no "list my registered groups + multirun configs" mode). Keep
+it under a non-colliding deriva-ml spelling — proposal: <code>--list-configs</code>
+(or keep a deriva-ml <code>--info</code> that we intercept and Hydra never sees, but that
+re-shadows Hydra's <code>--info</code>, defeating the goal). <strong>Decision needed at impl
+time</strong> (see Open Questions). Move the implementation into a shared
+<code>cli/show_info.py</code> helper (Part C) so both runners share it.</p>
+<hr />
+<h2 id="part-b-notebook-runner-run_notebookpy">Part B — notebook runner (<code>run_notebook.py</code>)</h2>
+<h3 id="b1-hydra-vocabulary-info">B1. Hydra-vocabulary <code>--info</code></h3>
+<p>Make <code>--info</code> accept Hydra's choices (<code>nargs="?"</code>, <code>const="all"</code>,
+<code>choices=[all, config, defaults, defaults-tree, plugins, searchpath]</code>) plus the
+deriva-ml group-listing spelling (shared helper). Because the kernel uses
+<code>launch()</code>, "native" here means: when <code>--info config</code> is requested, resolve the
+config the kernel <em>would</em> use (compose the registered config with the same
+overrides via <code>hydra.compose</code> / hydra-zen's config) and print it in Hydra's
+format — implemented in the runner/kernel boundary, not by forwarding argv.</p>
+<h3 id="b2-cfg-equivalent">B2. <code>--cfg</code>-equivalent</h3>
+<p>Add <code>--cfg [job|hydra|all]</code>. Implement by composing the config with the
+resolved overrides and printing — the same render Hydra's <code>--cfg</code> produces —
+without executing the notebook. This is the "resolve &amp; show, don't run" preflight
+the Modeler wanted, far cheaper than the current <code>dry_run=true</code> workaround
+(which downloads the dataset bag).</p>
+<h3 id="b3-the-p-collision">B3. The <code>-p</code> collision</h3>
+<p>Papermill's <code>--parameter/-p</code> stays as-is (notebook param injection). We do NOT
+introduce Hydra's <code>--package/-p</code> on the notebook runner (no argv to forward to
+anyway). Document that <code>-p</code> on the notebook runner is papermill parameters; the
+model runner's <code>-p</code> (if forwarded) is Hydra's <code>--package</code>. Asymmetry is
+inherent and documented.</p>
+<h3 id="b4-papermill-flags-untouched">B4. Papermill flags untouched</h3>
+<p><code>--kernel</code>, <code>--file</code>, <code>--log-output</code>, <code>--inspect</code>, <code>notebook_file</code> positional —
+all unchanged.</p>
+<hr />
+<h2 id="part-c-shared-clishow_infopy">Part C — shared <code>cli/show_info.py</code></h2>
+<p>Collapse the two drifted <code>_show_hydra_info()</code> copies (<code>run_model.py:269-327</code>,
+<code>run_notebook.py:448-522</code>) into one helper:
+<code>render_config_groups(*, include_multirun: bool) -&gt; str</code>. Model runner passes
+<code>include_multirun=True</code>; notebook passes <code>False</code>. Removes the dependency on
+hydra-zen's private <code>store._queue</code> being reimplemented twice.</p>
+<hr />
+<h2 id="touch-points-three-repos">Touch points (three repos)</h2>
+<h3 id="deriva-ml-code-tests-docs">deriva-ml (code + tests + docs)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/run_model.py</code></td>
+<td><code>parse_known_args</code>; drop <code>store_true --info</code>; add <code>--list-configs</code>; forward <code>unknown</code> into argv; call shared show-configs helper</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/run_notebook.py</code></td>
+<td><code>parse_known_args</code>; <code>--list-configs</code>; <code>--info [mode]</code> + <code>--cfg [job\|hydra\|all]</code> rendered kernel-side; call shared helper; papermill flags untouched</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/cli/show_info.py</code> (new)</td>
+<td>shared <code>render_config_groups(*, include_multirun)</code> helper (collapses the 2 drifted copies)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/cli/hydra_overrides.py</code></td>
+<td>unchanged (guard keeps its real job: catch bare positionals)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/base_config.py</code></td>
+<td>kernel-side <code>--cfg</code>/<code>--info &lt;mode&gt;</code> compose+render entry point</td>
+</tr>
+<tr>
+<td><code>docs/user-guide/hydra-zen.md</code></td>
+<td>the canonical 3-operation table; <code>--list-configs</code> vs <code>--info</code>/<code>--cfg</code>; link hydra.cc override-grammar + flags docs; note <code>-c</code>/<code>-p</code> collisions + model/notebook asymmetry</td>
+</tr>
+<tr>
+<td>runner module + class docstrings</td>
+<td>correct "Hydra config options" → the precise meaning; runnable <code>Example:</code> blocks for <code>--list-configs</code>, <code>--cfg job</code>, <code>--info config</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="deriva-ml-skills">deriva-ml-skills</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>skills/configure-experiment/SKILL.md</code></td>
+<td>FIX line 39 error (<code>--info</code> ≠ resolved config); detail the 3 operations; link Hydra docs</td>
+</tr>
+<tr>
+<td><code>skills/experiment-lifecycle/SKILL.md</code></td>
+<td>line 50 gate: <code>--list-configs</code> to see the menu / <code>--cfg job</code> to inspect the resolved config / <code>dry_run=true</code> to validate against catalog</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deriva-ml-model-template">deriva-ml-model-template</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docs/**</code> mentioning <code>--info</code> (configuration/<em>, getting-started/</em>, quick-start)</td>
+<td><code>--info</code> → <code>--list-configs</code> where the menu is meant; add Hydra-flag pointers</td>
+</tr>
+<tr>
+<td><code>CLAUDE.md</code> "Notebook runner specifics"</td>
+<td>reconcile with new flag surface</td>
+</tr>
+</tbody>
+</table>
+<h2 id="test-strategy-tdd-red-first-comprehensive-matrix">Test strategy (TDD, RED first) — comprehensive matrix</h2>
+<p>The user explicitly requires comprehensive test cases. Organize as a new
+<code>tests/cli/</code> package. Use a lightweight approach where possible: assert on the
+<strong>argv handed to Hydra</strong> (mock/capture the <code>zen(...).hydra_main</code> boundary) so
+most cases are fast unit tests, not full catalog runs. Reserve a few live cases
+for the genuinely end-to-end paths.</p>
+<h3 id="model-runner-argv-construction-testsclitest_run_model_argvpy-unit-mock-the-hydra-boundary">Model-runner argv construction (<code>tests/cli/test_run_model_argv.py</code>) — unit, mock the Hydra boundary</h3>
+<ol>
+<li><code>--cfg job</code> → appears in the forwarded argv (and NOT in <code>hydra_overrides</code>/guard).</li>
+<li><code>--cfg hydra</code> / <code>--cfg all</code> → forwarded verbatim.</li>
+<li><code>--info config</code> / <code>--info defaults</code> / <code>--info searchpath</code> → forwarded.</li>
+<li>bare <code>--info</code> → forwarded (Hydra defaults to <code>all</code>).</li>
+<li><code>--resolve</code>, <code>--package model_config</code> → forwarded.</li>
+<li><code>--list-configs</code> → intercepted by the wrapper, NOT forwarded, prints the menu, exits 0.</li>
+<li><code>model_config=cifar10_quick</code> (override) → in argv, passes guard.</li>
+<li><code>+experiment=X --cfg job</code> → both the override AND <code>--cfg job</code> reach Hydra.</li>
+<li><code>+multirun=&lt;name&gt;</code> → expands to the named overrides AND inserts <code>--multirun</code>.</li>
+<li><code>--multirun model=a,b</code> → <code>--multirun</code> survives, sweep override forwarded.</li>
+<li>bare positional <code>roc_analysis</code> → guard raises the diagnostic ValueError (exit 1).</li>
+<li>typo flag <code>--catlog</code> → forwarded to Hydra (Hydra errors), NOT silently swallowed — assert non-zero/Hydra-error, proving loud-wrong not silent-wrong.</li>
+<li><code>--catalog 45</code> → injects <code>deriva_ml.catalog_id=45</code>; <code>--host h</code> → <code>deriva_ml.hostname=h</code>.</li>
+<li><code>--allow-dirty</code> → sets env, not forwarded.</li>
+<li>ordering: overrides + forwarded flags coexist (interleave) without loss.</li>
+</ol>
+<h3 id="notebook-runner-testsclitest_run_notebook_clipy">Notebook-runner (<code>tests/cli/test_run_notebook_cli.py</code>)</h3>
+<ol>
+<li><code>--list-configs</code> → prints menu (shared helper), no notebook execution.</li>
+<li><code>--info config</code> → renders composed config kernel-side, no execution, exit 0.</li>
+<li><code>--cfg job</code> → renders resolved config, no execution.</li>
+<li><code>--parameter foo 1</code> / <code>-p foo 1</code> → papermill param injected; NO collision with Hydra <code>--package</code> (papermill <code>-p</code> wins on this runner, by design).</li>
+<li><code>--kernel</code>, <code>--file params.json</code>, <code>--inspect</code>, <code>--log-output</code> → unchanged behavior.</li>
+<li>bare positional → guard raises.</li>
+<li>overrides still serialize to <code>DERIVA_ML_HYDRA_OVERRIDES</code> and reach <code>launch()</code>.</li>
+</ol>
+<h3 id="shared-helper-testsclitest_show_infopy">Shared helper (<code>tests/cli/test_show_info.py</code>)</h3>
+<ol>
+<li><code>render_config_groups(include_multirun=True)</code> → lists groups + options + multirun section.</li>
+<li><code>render_config_groups(include_multirun=False)</code> → groups + options, NO multirun section.</li>
+<li>handles empty store / no groups without crashing.</li>
+</ol>
+<h3 id="guard-existing-testsclitest_hydra_overridespy">Guard (existing <code>tests/cli/test_hydra_overrides.py</code>)</h3>
+<ol>
+<li>unchanged behavior — still catches bare positionals; regression-guard that Hydra flags are NOT passed to it (they're in <code>unknown</code> now).</li>
+</ol>
+<h3 id="doctest-full-suite">Doctest + full suite</h3>
+<ol>
+<li>New runnable docstring <code>Example:</code> blocks for <code>--list-configs</code>/<code>--cfg job</code> pass the doctest harness (or are clearly <code># doctest: +SKIP</code> where a live catalog is needed).</li>
+<li>Full <code>uv run python -m pytest</code> + doctest harness green.</li>
+</ol>
+<h3 id="cross-repo-verification-manual-scripted-in-the-e2e-worktree">Cross-repo verification (manual / scripted, in the e2e worktree)</h3>
+<ol>
+<li><code>deriva-ml-run --list-configs</code> prints the menu (was <code>--info</code>).</li>
+<li><code>deriva-ml-run +experiment=cifar10_quick --cfg job</code> prints resolved config (the thing the skill claimed <code>--info</code> did).</li>
+<li>Skills + model-template docs grep-clean of stale <code>--info</code>-means-menu usage.</li>
+</ol>
+<h2 id="implementation-refinements-discovered-during-tdd-these-are-now-decided">Implementation refinements (discovered during TDD — these are now decided)</h2>
+<ul>
+<li><strong>Drop the <code>nargs="*"</code> positional entirely.</strong> A greedy <code>nargs="*"</code> positional
+  STEALS the value of an interleaved unknown flag (<code>--cfg job model=x</code> →
+  <code>unknown=['--cfg']</code>, <code>'job'</code> wrongly absorbed as an override). Verified. Fix:
+  define only deriva-ml-specific flags on the parser, call <code>parse_known_args</code>,
+  and treat the <strong>entire ordered remainder</strong> as overrides+Hydra-flags. Hydra's
+  own parser handles them in any order, so we hand it the remainder verbatim
+  (order preserved). <code>--catalog</code>/<code>--host</code> are still consumed by our explicit
+  flags and injected as <code>deriva_ml.*</code> overrides.</li>
+<li><strong>Guard = flag-value-aware (Option 3), self-maintaining.</strong> The friendly
+  bare-positional error (PR #247) is kept and works regardless of flag
+  position. The guard derives Hydra's flag→arity map at runtime from
+  <code>hydra._internal.utils.get_args_parser()</code> (NOT hardcoded — auto-tracks new
+  Hydra flags), walks the remainder skipping each known Hydra flag and its
+  value(s), and only flags a genuine bare positional (no <code>=</code>/<code>~</code>, not a flag,
+  not a flag's value). Arity map observed: <code>--cfg/-c</code>=1, <code>--package/-p</code>=1,
+  <code>--info/-i</code>=0-or-1, <code>--resolve</code>=0, <code>--config-name/-cn</code>=1, <code>--config-dir/-cd</code>=1,
+  <code>--config-path/-cp</code>=1, <code>--experimental-rerun</code>=1, <code>--multirun/-m</code>=0,
+  <code>--run/-r</code>=0, <code>--shell-completion/-sc</code>=0.</li>
+</ul>
+<h2 id="open-questions-resolve-at-implementation">Open questions (resolve at implementation)</h2>
+<ol>
+<li><strong>Model runner group-listing spelling.</strong> Hydra's <code>--info</code> now flows through,
+   so we can't keep deriva-ml's <code>--info</code> for group-listing without re-shadowing.
+   Options: <code>--list-configs</code> (clear, no collision) / <code>--info groups</code> as a
+   deriva-ml <em>extension</em> intercepted before forwarding (risks confusion since
+   <code>groups</code> isn't a Hydra choice) / drop the wrapper listing entirely and tell
+   users <code>--info defaults</code>. Leaning <code>--list-configs</code>.</li>
+<li><strong>Does <code>parse_known_args</code> swallow <code>--debug</code>/BaseCLI flags into <code>unknown</code>?</strong>
+   No — they're registered on the parser, so they're recognized. Only truly
+   unregistered flags land in <code>unknown</code>. Verify in impl.</li>
+<li><strong>Notebook <code>--cfg</code> rendering path.</strong> Confirm hydra-zen exposes a compose-only
+   entry (so we render without <code>launch()</code> executing the task). If not, use
+   <code>hydra.compose</code> against the registered config name.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

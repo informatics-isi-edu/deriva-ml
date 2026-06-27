@@ -1,0 +1,2411 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-27-add-files-dataset-input-edge/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>add_files Dataset-Input Edge Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#add_files-dataset-input-edge-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              add_files Dataset-Input Edge Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#global-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Constraints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-the-canonical-dataset_execution-input-insert-pattern-to-mirror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference: the canonical Dataset_Execution input-insert (pattern to mirror)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-the-current-add_files-per-file-insert-the-thing-to-remove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference: the current add_files per-file insert (the thing to remove)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference: the current add_files per-file insert (the thing to remove)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-swap-the-per-file-edge-for-one-dataset_execution-input-edge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: swap the per-file edge for one Dataset_Execution input edge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-update-the-localfile-input-test-any-other-per-file-edge-assertions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: update the LocalFile-input test + any other per-file-edge assertions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-live-lineage-regression-large-add_files-dataset-shows-no-per-file-asset-bloat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: live lineage regression — large add_files dataset shows no per-file asset bloat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#final-verification-after-all-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final verification (after all tasks)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="add_files-dataset-input-edge-implementation-plan">add_files Dataset-Input Edge Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Make <code>add_files</code> record input provenance in O(1) — one <code>Dataset_Execution</code> input row (the registered source dataset) instead of N per-file <code>File_Execution</code> Input rows.</p>
+<p><strong>Architecture:</strong> Remove the per-file <code>File_Execution</code> <code>Asset_Role="Input"</code> insert from <code>add_files</code>. After the nested dataset tree is built, insert ONE <code>Dataset_Execution</code> row linking the root source dataset to the execution as an input (the same shape <code>Execution.add_input_dataset</code> / the <code>datasets=</code> path uses). The dataset's producer edge (<code>Dataset_Version.Execution</code>), membership (<code>Dataset_File</code>), and file rows are untouched. Provenance stays complete (<code>_execution_has_input</code> returns True via the dataset edge) with no enforcement change; the tk-022 self-parent guard already makes the dataset-is-its-own-producer self-loop lineage-safe.</p>
+<p><strong>Tech Stack:</strong> Python 3.13, <code>uv</code>, pytest, deriva-ml core (<code>deriva_ml.core.mixins.file.FileMixin</code>, <code>deriva_ml.execution.execution.Execution</code>).</p>
+<h2 id="global-constraints">Global Constraints</h2>
+<ul>
+<li>Work in <code>../deriva-ml</code> (<code>/Users/carl/GitHub/DerivaML/deriva-ml</code>) on branch <code>feature/add-files-dataset-input-edge</code> (already created; the spec is committed there).</li>
+<li>Use <code>uv</code> for everything: <code>uv run python -m pytest</code> (NOT <code>uv run pytest</code>), <code>uv run ruff check</code>, <code>uv run ruff format</code>.</li>
+<li>Always <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; &lt;cmd&gt;</code> in every Bash call — the shell CWD is not persistent.</li>
+<li>Google-style docstrings on changed methods.</li>
+<li>NO public-model change: <code>src/deriva_ml/execution/lineage.py</code> is NOT modified. The <code>add_files</code> signatures (FileMixin + Execution wrapper) are UNCHANGED (no new parameter — this is a default behavior change).</li>
+<li>The change applies UNIFORMLY to every <code>add_files</code> call (incl. the <code>LocalFile</code> execution-input path at <code>execution.py:716</code>).</li>
+<li><strong><code>Dataset_Execution</code> has NO <code>Asset_Role</code> column</strong> — it is input-only by design (<code>execution.py:1903-1908</code>: "Dataset_Execution association table has no role column"; authorship is inferred from <code>Dataset_Version.Execution</code>). The new edge row is <code>{"Dataset": &lt;root rid&gt;, "Execution": execution_rid, "Dataset_Version": &lt;version rid or None&gt;}</code> — do NOT add an <code>Asset_Role</code> key.</li>
+<li>Keep UNCHANGED: the <code>File</code> row inserts, <code>File_Asset_Type</code> tags, the nested <code>Dataset</code> tree, <code>Directory_Dataset</code> rows, <code>Dataset_Version.Execution</code> (via <code>create_dataset(execution_rid=...)</code>), and the chunked-streaming behavior.</li>
+<li>Other <code>File_Execution</code> writers (<code>asset_upload.update_asset_execution_table</code>, <code>provenance_enforcement._link_file_sentinel_as_input</code>) and all readers are NOT touched — <code>File_Execution</code> remains a live table.</li>
+<li>Release as deriva-ml 1.53.0 (behavior change), done by the controller after merge — NOT part of these tasks.</li>
+</ul>
+<h2 id="reference-the-canonical-dataset_execution-input-insert-pattern-to-mirror">Reference: the canonical Dataset_Execution input-insert (pattern to mirror)</h2>
+<p><code>Execution.add_input_dataset</code> (<code>execution.py:2013-2065</code>) writes a single input edge:</p>
+<pre><code class="language-python">schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
+dataset_exec = schema_path.Dataset_Execution
+# de-dupe: skip if this Dataset is already linked to this Execution
+already_linked = {row[&quot;Dataset&quot;] for row in
+    dataset_exec.filter(dataset_exec.Execution == self.execution_rid).entities().fetch()}
+if dataset_rid in already_linked:
+    return
+version_rid = self._ml_object._version_rid(dataset_rid, version) if version is not None else None
+dataset_exec.insert([{&quot;Dataset&quot;: dataset_rid, &quot;Execution&quot;: self.execution_rid, &quot;Dataset_Version&quot;: version_rid}])
+</code></pre>
+<p>The <code>datasets=</code> batch path (<code>execution.py:673</code>) uses the same row shape. <code>Dataset_Version</code> may be <code>None</code> (the FK is nullable — the existing code passes <code>None</code> when no version is given).</p>
+<h2 id="reference-the-current-add_files-per-file-insert-the-thing-to-remove">Reference: the current <code>add_files</code> per-file insert (the thing to remove)</h2>
+<p><code>core/mixins/file.py</code>:
+- Line ~270: <code>file_execution_path = pb.schemas[self.ml_schema].File_Execution</code>
+- Lines ~300-308: per-batch insert of <code>{"File": rid, "Execution": execution_rid, "Asset_Role": "Input"}</code> for every file in the batch.
+- The root dataset is <code>node_dataset[ingest_root]</code>, returned at the end of <code>add_files</code> (<code>return node_dataset[ingest_root]</code>, ~line 382). <code>node_dataset[ingest_root].dataset_rid</code> is the root RID.</p>
+<hr />
+<h3 id="task-1-swap-the-per-file-edge-for-one-dataset_execution-input-edge">Task 1: swap the per-file edge for one Dataset_Execution input edge</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/file.py</code> (remove per-file <code>File_Execution</code> insert ~lines 270, 300-308; add one <code>Dataset_Execution</code> insert after the tree is built, before <code>return</code>; update docstring)
+- Modify: <code>src/deriva_ml/execution/execution.py</code> (update the <code>Execution.add_files</code> wrapper docstring only — no code change)
+- Modify: <code>tests/core/test_file.py</code> (rewrite <code>test_add_files_links_as_input</code> to the dataset-edge contract; confirm other add_files tests still pass)</p>
+<p><strong>Interfaces:</strong>
+- Unchanged public: <code>add_files(files, execution_rid, dataset_types=None, description="", chunk_size=500, *, root_name=None) -&gt; Dataset</code> (FileMixin) and <code>Execution.add_files(files, dataset_types=None, description="", chunk_size=500, *, root_name=None) -&gt; Dataset</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Rewrite the failing unit test to the new contract</strong></li>
+</ul>
+<p>In <code>tests/core/test_file.py</code>, replace <code>test_add_files_links_as_input</code> (currently asserts per-file <code>File_Execution</code> Input rows) with the dataset-edge contract. Read the existing test's setup (<code>file_table_setup</code> fixture, how it builds filespecs + runs <code>exe.add_files</code>) and keep that; change only the assertions:</p>
+<pre><code class="language-python">    def test_add_files_links_dataset_as_input(self, file_table_setup):
+        &quot;&quot;&quot;add_files records ONE Dataset_Execution input edge (the root source
+        dataset), not per-file File_Execution Input rows. The execution is
+        input-complete via the dataset edge; producer + membership intact.&quot;&quot;&quot;
+        ml_instance, filespecs, exe_or_ctx = file_table_setup  # adapt to the fixture's actual unpacking
+        # Build/obtain the execution context exactly as the existing add_files
+        # tests in this file do, then:
+        with ml_instance.create_execution(...) as exe:   # mirror the existing add_files tests' execution setup
+            root = exe.add_files(filespecs)
+
+        pb = ml_instance.pathBuilder()
+
+        # (a) ZERO File_Execution Input rows were written by add_files.
+        fe = pb.schemas[ml_instance.ml_schema].File_Execution
+        fe_input_rows = [
+            r for r in fe.filter(fe.Execution == exe.execution_rid).entities().fetch()
+            if r.get(&quot;Asset_Role&quot;) == &quot;Input&quot;
+        ]
+        assert fe_input_rows == [], (
+            f&quot;add_files must NOT write per-file File_Execution Input rows; got {len(fe_input_rows)}&quot;
+        )
+
+        # (b) EXACTLY ONE Dataset_Execution input edge: the root dataset.
+        de = pb.schemas[ml_instance.ml_schema].Dataset_Execution
+        de_rows = list(de.filter(de.Execution == exe.execution_rid).entities().fetch())
+        assert len(de_rows) == 1, f&quot;expected exactly one Dataset_Execution input edge, got {len(de_rows)}&quot;
+        assert de_rows[0][&quot;Dataset&quot;] == root.dataset_rid
+
+        # (c) Producer edge intact: the root dataset's current version is produced
+        #     by this execution (Dataset_Version.Execution).
+        assert ml_instance._producer_of_dataset(root.dataset_rid) == exe.execution_rid
+
+        # (d) Membership intact: the root dataset still transitively contains the files.
+        members = root.list_dataset_members(recurse=True)
+        assert members.get(&quot;File&quot;), &quot;root dataset should contain File members&quot;
+</code></pre>
+<p>Note: <code>file_table_setup</code> and the exact execution-creation idiom vary — copy them verbatim from a working add_files test in the SAME file (e.g. <code>test_add_files</code> at line 104). The assertion block (a)-(d) is the contract; adapt only the setup/unpacking to match the fixture.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/test_file.py -k "links_dataset_as_input" -v</code>
+Expected: FAIL — <code>add_files</code> currently writes N File_Execution Input rows (assertion (a) fails) and zero Dataset_Execution rows (assertion (b) fails).
+(If <code>test_file.py</code> is live-gated and needs a catalog, run with the project's live env, e.g. <code>DERIVA_HOST=localhost DERIVA_ML_ALLOW_DIRTY=true</code>. Check the top of the file for the gate and mirror it.)</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the edge swap in <code>add_files</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/file.py</code>:</p>
+<p>(a) DELETE the per-file <code>File_Execution</code> insert. Remove the block (~lines 300-308):</p>
+<pre><code class="language-python">            # Link each file to the execution as an INPUT. ...
+            file_execution_path.insert(
+                [
+                    {&quot;File&quot;: file_record[&quot;RID&quot;], &quot;Execution&quot;: execution_rid, &quot;Asset_Role&quot;: &quot;Input&quot;}
+                    for file_record in file_records
+                ]
+            )
+</code></pre>
+<p>and remove the now-unused <code>file_execution_path = pb.schemas[self.ml_schema].File_Execution</code> line (~270) IF it is not referenced elsewhere in the method (grep within the function; if used only by the deleted block, remove it).</p>
+<p>(b) ADD one <code>Dataset_Execution</code> input edge after the membership-wiring loop, immediately before <code>return node_dataset[ingest_root]</code> (~line 382):</p>
+<pre><code class="language-python">        # Record ONE input edge: the root source dataset is this execution's
+        # input (consumed by reference). This replaces the per-file
+        # File_Execution Input rows — O(1) instead of O(N). The dataset is also
+        # this execution's OUTPUT (Dataset_Version.Execution, written by
+        # create_dataset above); the self-loop is lineage-safe (the lookup_lineage
+        # self-parent guard skips producer == the expanding execution). Dataset_
+        # Execution has no Asset_Role column — every row is an input edge.
+        root_dataset = node_dataset[ingest_root]
+        try:
+            root_version_rid = self._version_rid(root_dataset.dataset_rid, root_dataset.current_version)
+        except Exception:
+            root_version_rid = None
+        de_assoc = pb.schemas[self.ml_schema].Dataset_Execution
+        de_assoc.insert(
+            [
+                {
+                    &quot;Dataset&quot;: root_dataset.dataset_rid,
+                    &quot;Execution&quot;: execution_rid,
+                    &quot;Dataset_Version&quot;: root_version_rid,
+                }
+            ],
+            on_conflict_skip=True,
+        )
+        return root_dataset
+</code></pre>
+<p>Notes:
+- <code>_version_rid</code> and <code>current_version</code> exist (used by <code>add_input_dataset</code> and <code>Dataset</code> respectively). If <code>current_version</code> raises (no version row yet) or <code>_version_rid</code> returns None, pass <code>Dataset_Version=None</code> — the FK is nullable and the existing input-edge code tolerates None.
+- <code>on_conflict_skip=True</code> makes the insert idempotent (mirrors <code>add_input_dataset</code> / <code>_link_file_sentinel_as_input</code>).
+- <code>pb</code> is already bound earlier in <code>add_files</code>; reuse it (don't re-call <code>self.pathBuilder()</code> if <code>pb</code> is in scope — verify the variable name in the method).</p>
+<p>(c) UPDATE the <code>add_files</code> docstring (FileMixin, ~lines 176-200): replace the "links each file to the execution as an <strong>input</strong> (<code>File_Execution.Asset_Role="Input"</code>)" sentences with language stating the registered <strong>source dataset</strong> is recorded as the execution's input (one <code>Dataset_Execution</code> edge) — per-file consumption edges are intentionally not written (find consumers via the dataset). Keep the "references not Hatrac uploads; produced files use asset_file_path" framing.</p>
+<ul>
+<li>[ ] <strong>Step 4: Update the <code>Execution.add_files</code> wrapper docstring</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution.py</code> (<code>Execution.add_files</code>, ~line 2067), apply the same docstring correction (dataset-input edge, not per-file). No code change in the wrapper.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run the rewritten test + the full add_files test class</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/test_file.py -v</code> (use the live env if the file is gated).
+Expected: PASS — the new <code>test_add_files_links_dataset_as_input</code> passes, and the other add_files tests (<code>test_add_files</code>, <code>test_add_files_tags_datasets_as_directory</code>, <code>test_add_files_directory_datasets_record_path</code>, <code>test_add_files_returns_single_root_for_forest</code>, <code>test_add_files_chunked_streaming_matches_single_batch</code>) still pass (they assert tree/membership/Directory_Dataset shape, which is unchanged).</p>
+<ul>
+<li>[ ] <strong>Step 6: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check src/deriva_ml/core/mixins/file.py src/deriva_ml/execution/execution.py tests/core/test_file.py
+uv run ruff format --check src/deriva_ml/core/mixins/file.py src/deriva_ml/execution/execution.py tests/core/test_file.py
+git add src/deriva_ml/core/mixins/file.py src/deriva_ml/execution/execution.py tests/core/test_file.py
+git commit -m &quot;feat(add_files): record one Dataset_Execution input edge, not N per-file File_Execution rows (tk-024)&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-update-the-localfile-input-test-any-other-per-file-edge-assertions">Task 2: update the LocalFile-input test + any other per-file-edge assertions</h3>
+<p><strong>Files:</strong>
+- Modify: <code>tests/execution/test_local_file_input.py</code> (the LocalFile input now links the dataset, not the file)
+- Modify: <code>tests/core/test_asset_table.py</code> (IF it asserts add_files per-file File_Execution Input rows — check and update)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: the new <code>add_files</code> behavior from Task 1.</p>
+<p><strong>Background:</strong> <code>LocalFile</code> execution inputs go through <code>add_files</code> (<code>execution.py:716</code>), so a <code>LocalFile</code> input now becomes a small File dataset with one <code>Dataset_Execution</code> input edge instead of a <code>File_Execution</code> Input row. <code>test_local_file_input.py:120-126</code> currently asserts a <code>File_Execution</code> <code>Asset_Role="Input"</code> row exists — that assertion must move to the dataset edge. The execution must still be input-complete.</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the current LocalFile test + update the assertion</strong></li>
+</ul>
+<p>Read <code>tests/execution/test_local_file_input.py</code> in full. The test (around line 96-126) runs an execution with a <code>LocalFile</code> in <code>assets=</code>/<code>configuration</code> and asserts a <code>File_Execution</code> Input row. Replace that assertion block with the dataset-edge contract while keeping the rest of the test (setup, execution run) intact:</p>
+<pre><code class="language-python">    # The LocalFile input is registered via add_files, which now records ONE
+    # Dataset_Execution input edge (the file's dataset) rather than a per-file
+    # File_Execution Input row. The execution must be input-complete via that edge.
+    pb = ml.pathBuilder()
+
+    # No per-file File_Execution Input row from the LocalFile registration.
+    fe = pb.schemas[ml.ml_schema].File_Execution
+    fe_inputs = [r for r in fe.filter(fe.Execution == &lt;exec_rid&gt;).entities().fetch()
+                 if r.get(&quot;Asset_Role&quot;) == &quot;Input&quot;]
+    assert fe_inputs == [], &quot;LocalFile input must not create a per-file File_Execution Input row&quot;
+
+    # A Dataset_Execution input edge exists (the LocalFile's dataset).
+    de = pb.schemas[ml.ml_schema].Dataset_Execution
+    de_rows = list(de.filter(de.Execution == &lt;exec_rid&gt;).entities().fetch())
+    assert de_rows, &quot;LocalFile input must be recorded as a Dataset_Execution input edge&quot;
+
+    # The execution is input-complete (no unknown-provenance sentinel needed).
+    from deriva_ml.execution.provenance_enforcement import _execution_has_input
+    assert _execution_has_input(ml_instance=ml, execution_rid=&lt;exec_rid&gt;) is True
+</code></pre>
+<p>Replace <code>&lt;exec_rid&gt;</code> with however the test references the execution's RID (read the test to find the variable). Keep the test's docstring accurate (update the "linked as Input (File_Execution Asset_Role=Input)" wording to "recorded as a Dataset_Execution input edge").</p>
+<ul>
+<li>[ ] <strong>Step 2: Check <code>test_asset_table.py</code> and any other File_Execution assertions</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -rn "File_Execution" tests/core/test_asset_table.py</code>
+- If it asserts add_files per-file Input rows, update those assertions to the dataset-edge contract (or remove if they were specifically testing the per-file behavior that no longer exists — but prefer re-expressing the provenance assertion at dataset granularity, do NOT silently drop coverage).
+- If its <code>File_Execution</code> references are about Output/uploaded assets (NOT add_files Input edges), leave them — only the add_files Input path changed.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run the updated tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_local_file_input.py tests/core/test_asset_table.py -v</code> (live env if gated).
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 4: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check tests/execution/test_local_file_input.py tests/core/test_asset_table.py
+uv run ruff format --check tests/execution/test_local_file_input.py tests/core/test_asset_table.py
+git add tests/execution/test_local_file_input.py tests/core/test_asset_table.py
+git commit -m &quot;test(add_files): LocalFile + asset-table tests assert dataset-input edge (tk-024)&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-live-lineage-regression-large-add_files-dataset-shows-no-per-file-asset-bloat">Task 3: live lineage regression — large add_files dataset shows no per-file asset bloat</h3>
+<p><strong>Files:</strong>
+- Modify: <code>tests/execution/test_lookup_lineage_live.py</code> (add one DERIVA_HOST-gated test)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: the new <code>add_files</code> behavior (Task 1), the <code>test_ml</code> fixture, <code>tests/factories.py</code>, the <code>DERIVA_HOST</code> gate.</p>
+<p><strong>Background:</strong> The point of the change is that <code>lookup_lineage</code> of an <code>add_files</code>-registered dataset no longer carries N per-file <code>consumed_assets</code> on the registration execution. This test registers a dataset with a meaningful number of files via <code>add_files</code>, walks its lineage, and asserts the registration execution has empty <code>consumed_assets</code>, the source dataset as its one consumed dataset, and no false cycle.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the live test</strong></li>
+</ul>
+<p>Add to <code>tests/execution/test_lookup_lineage_live.py</code> (after the existing tests). Read the existing live tests + <code>tests/factories.py</code> (and <code>FileSpec.create_filespecs</code>) for how to build filespecs and run <code>add_files</code> live; the assertion block is the contract:</p>
+<pre><code class="language-python">@pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;lookup_lineage live smoke test requires DERIVA_HOST&quot;,
+)
+def test_add_files_lineage_has_no_per_file_asset_bloat(test_ml, tmp_path):
+    &quot;&quot;&quot;tk-024: lookup_lineage of an add_files-registered dataset shows the
+    registration execution with ZERO consumed_assets (no per-file File Inputs)
+    and the source dataset as its single consumed dataset; the self-loop
+    (dataset is both produced and consumed) does not flag a cycle.&quot;&quot;&quot;
+    N_FILES = 60  # enough that the OLD code would attach &gt;=60 consumed_assets
+    # Create N_FILES local files in tmp_path, build FileSpecs, run an execution
+    # that add_files them, capture the root dataset RID + the execution RID.
+    # (Study the existing live tests + FileSpec.create_filespecs + factories.)
+    #
+    #   src_dataset_rid = the dataset add_files returned
+    #   reg_exec_rid    = the execution that ran add_files
+    ...
+
+    result = test_ml.lookup_lineage(src_dataset_rid)
+
+    assert result.cycle_detected is False
+    assert result.lineage is not None
+    # The registration execution is the producer of the source dataset.
+    assert result.root.producing_execution is not None
+    reg_node = result.lineage
+    assert reg_node.execution.rid == reg_exec_rid
+
+    # No per-file File Inputs on the registration execution.
+    assert reg_node.consumed_assets == [], (
+        f&quot;expected zero consumed_assets, got {len(reg_node.consumed_assets)}&quot;
+    )
+    # The source dataset is recorded as the one consumed dataset (the input edge).
+    consumed = {d.rid for d in reg_node.consumed_datasets}
+    assert src_dataset_rid in consumed, (
+        f&quot;source dataset {src_dataset_rid} not in consumed_datasets {consumed}&quot;
+    )
+</code></pre>
+<p>The implementer MUST replace <code>...</code> with real construction (≥~50 files so the old behavior would have bloated the node). Do NOT leave the ellipsis; do NOT weaken the <code>consumed_assets == []</code> or <code>cycle_detected is False</code> assertions. If a live host is unavailable, report it, confirm the test SKIPS cleanly and collects without error — do NOT fake a pass.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the live test (gated)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_HOST=localhost DERIVA_ML_ALLOW_DIRTY=true uv run python -m pytest tests/execution/test_lookup_lineage_live.py::test_add_files_lineage_has_no_per_file_asset_bloat -v</code>
+Expected: PASS (the registration execution's consumed_assets is empty; the source dataset is its consumed dataset; no cycle). Building ~60 files + add_files is quick (no Hatrac upload — by reference). If no container, report + confirm skip.</p>
+<ul>
+<li>[ ] <strong>Step 3: Confirm existing live tests still pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_HOST=localhost DERIVA_ML_ALLOW_DIRTY=true uv run python -m pytest tests/execution/test_lookup_lineage_live.py -v</code>
+Expected: all live tests pass (the prior lineage tests don't use add_files Input edges, so they're unaffected). If no container: confirm clean skip + collection.</p>
+<ul>
+<li>[ ] <strong>Step 4: Confirm skip path (offline)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/execution/test_lookup_lineage_live.py -v</code>
+Expected: all live tests SKIP (no DERIVA_HOST), no collection errors.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+uv run ruff check tests/execution/test_lookup_lineage_live.py
+uv run ruff format --check tests/execution/test_lookup_lineage_live.py
+git add tests/execution/test_lookup_lineage_live.py
+git commit -m &quot;test(lineage): live add_files dataset has no per-file consumed_assets bloat (tk-024)&quot;
+</code></pre>
+<hr />
+<h2 id="final-verification-after-all-tasks">Final verification (after all tasks)</h2>
+<ul>
+<li>[ ] No add_files per-file <code>File_Execution</code> Input writer remains: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -n "File_Execution" src/deriva_ml/core/mixins/file.py</code> — should show only docstring/removed references, no per-file Input insert. (The constant/lookup line should be gone if unused.)</li>
+<li>[ ] Other <code>File_Execution</code> writers untouched: <code>grep -rn "File_Execution" src/deriva_ml/execution/asset_upload.py src/deriva_ml/execution/provenance_enforcement.py</code> still present (Output/downloaded-Input/sentinel paths unchanged).</li>
+<li>[ ] Full core + execution test dirs: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/ tests/execution/ -q</code> — green (live tests skip without DERIVA_HOST; the 2 pre-existing <code>test_workflow_creation_*</code> failures are unrelated).</li>
+<li>[ ] Lint the touched surface: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src tests</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

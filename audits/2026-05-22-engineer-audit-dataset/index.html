@@ -1,0 +1,3290 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/audits/2026-05-22-engineer-audit-dataset/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Engineer audit — dataset/ subsystem (2026-05-22) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#engineer-audit-dataset-subsystem-2026-05-22" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Engineer audit — dataset/ subsystem (2026-05-22)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-by-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings by module
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Findings by module">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetdatasetpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/dataset.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/dataset.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-add_dataset_members-cycle-check-is-structurally-broken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] add_dataset_members cycle check is structurally broken
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-_version_snapshot_catalog-has-a-dead-and-str-clause" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] _version_snapshot_catalog has a dead and str: clause
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-datasetestimate_bag_size-is-a-220-line-god-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Dataset.estimate_bag_size is a 220-line god-function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-dataset-has-retired-api-surface-that-should-be-deleted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Dataset has retired-API surface that should be deleted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasetlist_workflow_executions-is-misleadingly-named" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Dataset.list_workflow_executions is misleadingly named
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-feature_values-selector-grouping-is-duplicated-between-dataset-and-datasetbag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] feature_values selector grouping is duplicated between Dataset and DatasetBag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-add_dataset_types-redoes-lookups-already-done-by-add_dataset_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] add_dataset_types redoes lookups already done by add_dataset_type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_create_or_advance_dev_row-is-a-120-line-method-that-mixes-lifecycle-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _create_or_advance_dev_row is a 120-line method that mixes lifecycle paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasethistory-model-docstring-drifts-from-current-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DatasetHistory model docstring drifts from current attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasetcache_denormalized-lacks-raises-and-exception-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Dataset.cache_denormalized lacks Raises: and exception docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_increment_dataset_version-docs-say-internal-but-its-the-catalog-clone-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _increment_dataset_version docs say "Internal" but it's the catalog-clone path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-release-120-line-body-could-thin-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] release() 120-line body could thin out
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-datasetto_markdown-display_markdown-get_chaise_url-have-no-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Dataset.to_markdown / display_markdown / get_chaise_url have no tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-dataset__init__-description-arg-is-stored-but-dataset_types-is-fetched-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Dataset.__init__ description arg is stored but dataset_types is fetched live
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-_get_dataset_type_association_table-returns-tuple-but-caller-usually-only-uses-second-element" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] _get_dataset_type_association_table returns tuple but caller usually only uses second element
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-_estimate_csv_bytes-static-helper-has-no-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] _estimate_csv_bytes static helper has no test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetdataset_bagpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/dataset_bag.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/dataset_bag.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-datasetbag-re-implements-selector-grouping-rather-than-sharing-with-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] DatasetBag re-implements selector + grouping rather than sharing with Dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-retired-api-shims-on-datasetbag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Retired-API shims on DatasetBag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_dataset_table_view-sql-is-opaque" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _dataset_table_view SQL is opaque
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasetbaglist_tables-has-no-tests-no-raises-section" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DatasetBag.list_tables has no tests, no Raises section
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-as_torch_dataset-as_tf_dataset-docstrings-are-130-lines-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] as_torch_dataset / as_tf_dataset docstrings are 130+ lines each
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-datasetbag-fetches-execution_rid-at-init-time-not-lazily" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] DatasetBag fetches execution_rid at init time, not lazily
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-current_version-property-docstring-claims-immutability-but-doesnt-enforce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] current_version property docstring claims immutability but doesn't enforce
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetaux_classespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/aux_classes.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/aux_classes.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasethistory-model-fields-dont-all-appear-in-docstring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DatasetHistory model fields don't all appear in docstring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-datasetversionparse-re-runs-version__init__-redundantly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] DatasetVersion.parse re-runs Version.__init__ redundantly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-datasetminiddataset_snapshot-docstring-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] DatasetMinid.dataset_snapshot docstring missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetbag_builderpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/bag_builder.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/bag_builder.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasetbagbuilderbuild_bag-has-no-direct-unitintegration-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DatasetBagBuilder.build_bag has no direct unit/integration test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_dataset_nesting_depth-is-computed-but-only-annotation-flow-uses-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _dataset_nesting_depth is computed but only annotation flow uses it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-_snapshotawarecatalogbagbuilder-is-documented-as-workaround-for-upstream-114-should-track-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] _SnapshotAwareCatalogBagBuilder is documented as workaround for upstream #114 — should track resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-anchors_for-walks-descendants-twice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] anchors_for walks descendants twice
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetbag_cachepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/bag_cache.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/bag_cache.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p3-cachestatuscached_incomplete-aliased-but-never-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] CacheStatus.cached_incomplete aliased but never tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-bagcache_is_fully_materialized-is-a-static-method-but-reaches-via-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] BagCache._is_fully_materialized is a static method but reaches via class
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetbag_downloadpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/bag_download.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/bag_download.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-get_dataset_minid-is-a-220-line-monolith" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] get_dataset_minid is a 220-line monolith
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-create_dataset_minid-spec-arg-is-vestigial-on-the-non-minid-arm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] create_dataset_minid spec arg is "vestigial on the non-MINID arm"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-fetch_minid_metadata-dataset-arg-is-unused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] fetch_minid_metadata dataset arg is unused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-download_dataset_minid-mixes-three-source-types-with-no-dispatch-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] download_dataset_minid mixes three source types with no dispatch helper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetrestructurepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/restructure.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/restructure.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-restructure_assets-is-a-500-line-function-with-docstring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] restructure_assets is a 500-line function (with docstring)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-asset-source-path-fallback-to-_catalog_database_modelbag_path-is-private-api-reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Asset source-path fallback to _catalog._database_model.bag_path is private-API reach
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_default_dir_name_from_target-skip-cols-set-is-hardcoded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _default_dir_name_from_target skip-cols set is hardcoded
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-_get_reachable_assets-dict-conversion-is-fragile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] _get_reachable_assets dict-conversion is fragile
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetsplitpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/split.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/split.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p1-split_dataset-is-a-590-line-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] split_dataset is a 590-line function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-split_dataset-cli-main-is-320-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] split_dataset CLI main() is 320 lines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-stratified_split-three-way-path-hardcodes-testingtrainingvalidation-partition-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] stratified_split three-way path hardcodes "Testing"/"Training"/"Validation" partition names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-_resolve_sizes-raises-valueerror-but-type-hints-dont-say-so" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _resolve_sizes raises ValueError but type hints don't say so
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-_ensure_dataset_types-silently-swallows-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] _ensure_dataset_types silently swallows errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasettorch_adapterpy-and-tf_adapterpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/torch_adapter.py and tf_adapter.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/torch_adapter.py and tf_adapter.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-adapter-helpers-_bag_element_is_asset-_build_row_lookup-_resolve_asset_path-duplicated-character-for-character" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Adapter helpers _bag_element_is_asset, _build_row_lookup, _resolve_asset_path duplicated character-for-character
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-both-adapters-catch-exception-in-_bag_element_is_asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Both adapters catch Exception in _bag_element_is_asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetbag_feature_cachepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/bag_feature_cache.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/bag_feature_cache.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-_ensure_cache_populated-parameter-feat-lacks-type-annotation-and-record_class-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] _ensure_cache_populated parameter feat lacks type annotation and record_class: type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-cache-table-stores-everything-as-text-type-round-tripping-relies-on-pydantic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Cache table stores everything as TEXT — type round-tripping relies on Pydantic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasettarget_resolutionpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/target_resolution.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetvalidationpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/validation.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="src/deriva_ml/dataset/validation.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p3-validation-models-duplicate-the-dual-track-shape-across-datasetassetworkflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Validation models duplicate the dual-track shape across Dataset/Asset/Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcderiva_mldatasetinitpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/deriva_ml/dataset/init.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-coverage-gaps-cross-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test coverage gaps (cross-module)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duplication-candidates-cross-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplication candidates (cross-module)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#severity-tag-legend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Severity tag legend
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="engineer-audit-dataset-subsystem-2026-05-22">Engineer audit — dataset/ subsystem (2026-05-22)</h1>
+<p>Pre-release audit of <code>src/deriva_ml/dataset/</code> and its tests against
+release v1.37.1. Four lenses: test coverage, duplication, logic
+clarity, docstring quality.</p>
+<h2 id="summary">Summary</h2>
+<ul>
+<li>14 source modules audited (22k+ LoC counting tests).</li>
+<li>42 findings: <strong>0 P0</strong>, <strong>6 P1</strong>, <strong>22 P2</strong>, <strong>14 P3</strong>.</li>
+<li>Top themes:</li>
+<li><strong>Two correctness bugs in <code>Dataset.add_dataset_members</code> cycle check</strong> — <code>set(self.dataset_rid)</code> produces character-set, not a singleton; recursion path is dead. P1.</li>
+<li><strong>God-functions</strong> in <code>Dataset.estimate_bag_size</code> (220 lines), <code>split_dataset</code> (590 lines), <code>restructure_assets</code> (~250 lines body), <code>get_dataset_minid</code> (220 lines). Each does I/O, planning, and result assembly in a single body. P1/P2.</li>
+<li><strong>Parallel torch/tf adapters</strong> — <code>_bag_element_is_asset</code>, <code>_build_row_lookup</code>, <code>_resolve_asset_path</code> are duplicated character-for-character across <code>torch_adapter.py</code> and <code>tf_adapter.py</code>. The selector-grouping in <code>Dataset.feature_values</code> / <code>DatasetBag.feature_values</code> is also parallel. P2.</li>
+<li><strong>Retired-API shims</strong> (<code>fetch_table_features</code>, <code>list_feature_values</code> on <code>DatasetBag</code>) violate the workspace "no backwards-compat shims" rule. P2.</li>
+<li><strong>Test gaps</strong> for public methods: <code>Dataset.to_markdown</code>, <code>Dataset.display_markdown</code>, <code>Dataset.get_chaise_url</code>, <code>DatasetBag.list_tables</code>, <code>DatasetBagBuilder.build_bag</code> (the heaviest method in the class). P2.</li>
+</ul>
+<hr />
+<h2 id="findings-by-module">Findings by module</h2>
+<h3 id="srcderiva_mldatasetdatasetpy">src/deriva_ml/dataset/dataset.py</h3>
+<h4 id="p1-add_dataset_members-cycle-check-is-structurally-broken">[P1] <code>add_dataset_members</code> cycle check is structurally broken</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:1922-1933, 1965</code>
+<strong>Issue:</strong> Two bugs in <code>check_dataset_cycle</code>:</p>
+<ol>
+<li><code>path = path or set(self.dataset_rid)</code> calls <code>set()</code> on a string,
+   producing <code>{"4", "H", "M"}</code> from RID <code>"4HM"</code> instead of the
+   intended <code>{"4HM"}</code> singleton. Cycle detection therefore false-
+   positives on any single-character match with the dataset RID's
+   characters and misses every real cycle.</li>
+<li>The <code>path</code> parameter is never recursively threaded — the only
+   call site (<code>check_dataset_cycle(rid_info.rid)</code>) supplies one
+   argument, so the second-arg branch is dead code; there's no
+   actual graph walk.</li>
+</ol>
+<p>The "Creating cycle of datasets is not allowed" path is effectively
+never hit on real inputs, and a cycle check with this shape was
+clearly never working correctly. The CLAUDE.md "RIDs are opaque:
+equality only" rule applies — <code>set(rid_string)</code> is parsing.</p>
+<p><strong>Evidence:</strong></p>
+<pre><code class="language-python">def check_dataset_cycle(member_rid, path=None):
+    path = path or set(self.dataset_rid)   # bug: char-set, not RID-set
+    return member_rid in path
+# Caller:
+if rid_info.table == self._dataset_table and check_dataset_cycle(rid_info.rid):
+    raise DerivaMLException(&quot;Creating cycle of datasets is not allowed&quot;)
+</code></pre>
+<p><strong>Suggested fix:</strong> Either implement a real graph walk (traverse
+<code>list_dataset_children(recurse=True)</code> on each candidate Dataset
+member and reject if <code>self.dataset_rid</code> appears), or delete the
+nested helper and document that cycles must be prevented downstream.
+Add a regression test that nests A→B→A and asserts the raise.</p>
+<h4 id="p1-_version_snapshot_catalog-has-a-dead-and-str-clause">[P1] <code>_version_snapshot_catalog</code> has a dead <code>and str:</code> clause</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:2779</code>
+<strong>Issue:</strong> Truthiness check appends the literal <code>str</code> class to the
+condition. <code>str</code> is always truthy, so the clause is dead; the
+intended guard was presumably <code>isinstance(dataset_version, str) and
+dataset_version</code> (non-empty). Mostly benign — <code>DatasetVersion.parse("")</code>
+would raise — but it's a clear bug that signals the codepath wasn't
+exercised when written.</p>
+<p><strong>Evidence:</strong></p>
+<pre><code class="language-python">if isinstance(dataset_version, str) and str:
+    dataset_version = DatasetVersion.parse(dataset_version)
+</code></pre>
+<p><strong>Suggested fix:</strong> <code>if isinstance(dataset_version, str) and dataset_version:</code>,
+or drop the second clause entirely.</p>
+<h4 id="p1-datasetestimate_bag_size-is-a-220-line-god-function">[P1] <code>Dataset.estimate_bag_size</code> is a 220-line god-function</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:2415-2633</code>
+<strong>Issue:</strong> Single method does (1) snapshot resolution, (2)
+async catalog construction with manual URL parsing, (3) URI-to-path
+extraction via a nested helper, (4) query-item list construction,
+(5) async query orchestration, (6) RID/length/sample
+post-processing, (7) per-table aggregation, (8) final dict
+assembly. Two nested helpers (<code>_extract_path</code>, <code>_run_query</code>,
+<code>_run_all_queries</code>) live inside the method.</p>
+<p>Tests rely entirely on integration-level fixtures
+(<code>test_estimate_bag_size.py</code> is 600 lines of demo-catalog
+exercises). The fine-grained steps — URI extraction, sample CSV
+estimation, asset/non-asset detection — are not unit-testable
+without standing up a live catalog.</p>
+<p><strong>Suggested fix:</strong> Extract three helpers: <code>_build_estimate_queries(table_queries) -&gt; list[_QueryItem]</code>, <code>_run_estimate_queries(catalog, items) -&gt; tuple[rids_by_table, lengths_by_table, samples_by_table]</code>, <code>_assemble_estimate(...) -&gt; dict</code>. The async machinery already lives behind <code>run_async</code>; pulling it out makes the orchestration testable with a mock catalog.</p>
+<h4 id="p1-dataset-has-retired-api-surface-that-should-be-deleted">[P1] <code>Dataset</code> has retired-API surface that should be deleted</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset_bag.py:654-690</code>
+<strong>Issue:</strong> <code>DatasetBag.fetch_table_features</code> and
+<code>DatasetBag.list_feature_values</code> are stubs that raise with a
+"renamed to feature_values" message. Workspace <code>CLAUDE.md</code>:
+"No backwards-compat shims — if something is unused, delete it."
+There's an entire <code>tests/feature/test_retired_apis.py</code> keeping
+them alive. Same shape appears for <code>DerivaML.fetch_table_features</code>
+/ <code>list_feature_values</code> in <code>core/mixins/feature.py</code> and
+<code>Asset.list_feature_values</code> — but the dataset audit owns only the
+bag pair.</p>
+<p><strong>Suggested fix:</strong> Delete both methods and the corresponding
+<code>test_retired_apis.py::test_bag_*</code> entries. Anyone still calling
+the old names will get the standard <code>AttributeError</code>, which is
+the workspace's documented stance.</p>
+<h4 id="p2-datasetlist_workflow_executions-is-misleadingly-named">[P2] Dataset.list_workflow_executions is misleadingly named</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:629-660</code>
+<strong>Issue:</strong> The method's own docstring acknowledges: "Despite the name,
+the live Dataset implementation does <strong>not</strong> filter the returned
+execution list to executions whose outputs touch the dataset's
+member set — it returns every execution of the workflow." Meanwhile
+<code>DatasetBag.list_workflow_executions</code> <em>is</em> dataset-scoped. The two
+implementations of the same protocol method have divergent semantics
+that callers have to read the docstring to discover.</p>
+<p><strong>Suggested fix:</strong> Either (a) implement the dataset-scoping filter
+in the live <code>Dataset</code> (preferred — symmetry with the bag), or
+(b) rename to <code>list_workflow_executions_unscoped</code> and add a
+scoped variant. Continuing to ship two methods with the same name
+and different semantics is a footgun.</p>
+<h4 id="p2-feature_values-selector-grouping-is-duplicated-between-dataset-and-datasetbag">[P2] <code>feature_values</code> selector grouping is duplicated between Dataset and DatasetBag</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:591-604</code> and
+<code>src/deriva_ml/dataset/dataset_bag.py:637-652</code>
+<strong>Issue:</strong> Both implementations end with the identical pattern:
+group by target RID, call selector once per group, yield non-None
+choices. The grouping step is verbatim parallel code.</p>
+<p><strong>Suggested fix:</strong> Move the selector-application loop into
+<code>deriva_ml.feature</code> (alongside <code>FeatureRecord.select_newest</code>) as a
+free function <code>apply_selector(records, target_col, selector)</code>.
+Both call sites become a one-liner. Reduces drift risk if
+selector semantics change.</p>
+<h4 id="p2-add_dataset_types-redoes-lookups-already-done-by-add_dataset_type">[P2] <code>add_dataset_types</code> redoes lookups already done by <code>add_dataset_type</code></h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:414-424</code>
+<strong>Issue:</strong> Loop calls <code>lookup_term</code> to get the term name, then
+<code>add_dataset_type</code> re-runs <code>lookup_term</code> internally. Double
+catalog round-trip per type.</p>
+<p><strong>Evidence:</strong></p>
+<pre><code class="language-python">for term in types_to_add:
+    if isinstance(term, VocabularyTerm):
+        term_name = term.name
+    else:
+        term_name = self._ml_instance.lookup_term(MLVocab.dataset_type, term).name
+    if term_name not in self.dataset_types:
+        self.add_dataset_type(term, _skip_version_increment=True)  # re-looks up
+        added_types.append(term_name)
+</code></pre>
+<p><strong>Suggested fix:</strong> Resolve all terms once at the top, then call a
+shared internal <code>_add_dataset_type_unchecked(vocab_term, ...)</code> that
+takes a <code>VocabularyTerm</code> and skips the lookup.</p>
+<h4 id="p2-_create_or_advance_dev_row-is-a-120-line-method-that-mixes-lifecycle-paths">[P2] <code>_create_or_advance_dev_row</code> is a 120-line method that mixes lifecycle paths</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:1303-1421</code>
+<strong>Issue:</strong> Single method handles both create-new-dev-row and
+advance-existing-dev-row, with the branch determined inline at
+the top. Two distinct write paths with different conditional
+logic for RMT/Snapshot/Version share one body. The
+fault-injection comment on line 1418 also references the <em>wrong</em>
+exception message variable substitution — the f-string starts at
+<code>f"Concurrent modification of dev row {current_dev.version_rid} "</code>
+and then a regular string <code>"for dataset {self.dataset_rid}: ..."</code>
+follows it on lines 1417-1420 (<code>self.dataset_rid</code> is not
+interpolated).</p>
+<p><strong>Evidence (interpolation bug):</strong></p>
+<pre><code class="language-python">raise DerivaMLException(
+    f&quot;Concurrent modification of dev row {current_dev.version_rid} &quot;
+    &quot;for dataset {self.dataset_rid}: another writer advanced the &quot;  # not an f-string
+    &quot;row between this call's read and write. Re-read the dataset &quot;
+    &quot;and retry if the new state is still what you intended.&quot;
+)
+</code></pre>
+<p>The literal text <code>{self.dataset_rid}</code> is shown to the user
+verbatim. Compare with the same message in <code>release()</code> (line 1043)
+which uses <code>f"... {self.dataset_rid}: ..."</code> correctly. P1
+candidate for the interpolation bug specifically — file as P2 since
+the user can still tell which dataset (the <code>version_rid</code> resolves
+it).</p>
+<p><strong>Suggested fix:</strong> Split into <code>_insert_dev_row</code> and <code>_advance_dev_row</code>;
+share the concurrency-detection raise via a helper.</p>
+<h4 id="p2-datasethistory-model-docstring-drifts-from-current-attributes">[P2] <code>DatasetHistory</code> model docstring drifts from current attributes</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/aux_classes.py:204-235</code>
+<strong>Issue:</strong> Class docstring lists <code>dataset_version</code>, <code>dataset_rid</code>,
+<code>version_rid</code>, <code>minid</code>, <code>snapshot</code> but the actual model has
+<code>execution_rid</code>, <code>description</code>, <code>spec_hash</code> too. Critical detail:
+the docstring says "Catalog snapshot ID of when the version
+record was created" but doesn't mention that <code>snapshot</code> is
+<code>None</code> for dev rows — this is the load-bearing semantic from
+ADR-0003 and callers need to know it.</p>
+<p><strong>Suggested fix:</strong> Add <code>execution_rid</code>, <code>description</code>, <code>spec_hash</code>
+to the Attributes list. Annotate <code>snapshot</code> with "None for dev
+rows; only released rows pin a snapshot."</p>
+<h4 id="p2-datasetcache_denormalized-lacks-raises-and-exception-docs">[P2] <code>Dataset.cache_denormalized</code> lacks <code>Raises:</code> and exception docs</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:1774-1849</code>
+<strong>Issue:</strong> Docstring documents Args/Returns/Example but no
+<code>Raises:</code> block. The denormalizer raises
+<code>DerivaMLDenormalizeUnrelatedAnchor</code> (referenced in arg
+description but not in <code>Raises:</code>), and the underlying paged
+client can raise on snapshot resolution failure. Mirrors the same
+gap in <code>get_denormalized_as_dataframe</code> / <code>get_denormalized_as_dict</code>.</p>
+<p><strong>Suggested fix:</strong> Add <code>Raises:</code> with the documented exceptions
+(<code>DerivaMLDenormalizeUnrelatedAnchor</code>, <code>DerivaMLException</code>).</p>
+<h4 id="p2-_increment_dataset_version-docs-say-internal-but-its-the-catalog-clone-path">[P2] <code>_increment_dataset_version</code> docs say "Internal" but it's the catalog-clone path</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:877-924</code>
+<strong>Issue:</strong> The docstring labels this "Internal helper preserved
+from the pre-dev-versioning model... Not for user-facing release
+work; use release() for that." The leading underscore in the name
+matches that. But the only caller is <code>catalog/clone.py</code>, which is
+a public surface. The leading-underscore convention typically
+means "package-private", which is correct here, but the docstring
+says "Internal" and <code>release()</code> is the user path — the boundary
+is fuzzy. Worth promoting to a public-named helper with a clear
+"clone-only" caveat, or moving it to <code>dataset.aux_classes</code> /
+<code>catalog.clone</code> to make ownership obvious.</p>
+<h4 id="p2-release-120-line-body-could-thin-out">[P2] <code>release()</code> 120-line body could thin out</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:926-1049</code>
+<strong>Issue:</strong> Method does (1) dev-entry validation, (2) released-entry
+anchor lookup, (3) catalog snapshot stamp, (4) RMT-correlated
+update, (5) raise on contention. The <code>_create_or_advance_dev_row</code>
+helper already encapsulates a similar pattern but isn't reused —
+extract <code>_promote_dev_to_release(...)</code> symmetric with
+<code>_create_or_advance_dev_row</code> so the dev-vs-release lifecycle reads
+as parallel methods.</p>
+<h4 id="p3-datasetto_markdown-display_markdown-get_chaise_url-have-no-tests">[P3] <code>Dataset.to_markdown</code> / <code>display_markdown</code> / <code>get_chaise_url</code> have no tests</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:757-821</code>
+<strong>Issue:</strong> Three public methods with no test coverage. Each is
+small and pure (no catalog write) — easy to test with a fake
+<code>_ml_instance</code>.</p>
+<h4 id="p3-dataset__init__-description-arg-is-stored-but-dataset_types-is-fetched-live">[P3] <code>Dataset.__init__</code> description arg is stored but <code>dataset_types</code> is fetched live</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:113-139</code>
+<strong>Issue:</strong> <code>description</code> is cached on the instance; <code>dataset_types</code>
+is a property that re-queries the catalog every access. The
+asymmetry isn't documented anywhere, and the description on the
+object can drift from the catalog (e.g. if another writer updates
+the Dataset row). Tests should at minimum acknowledge this.</p>
+<h4 id="p3-_get_dataset_type_association_table-returns-tuple-but-caller-usually-only-uses-second-element">[P3] <code>_get_dataset_type_association_table</code> returns tuple but caller usually only uses second element</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:173-187</code>
+<strong>Issue:</strong> Returns <code>(atable_name, atable_path)</code>. Callers
+(<code>dataset_types</code>, <code>add_dataset_type</code>, <code>remove_dataset_type</code>) use only
+<code>atable_path</code>. The name is computed via <code>find_associations()[0].name</code>
+in case of multiple associations — but that pop-the-first behavior
+is suspect; if there are multiple Dataset_Type associations, the
+choice is arbitrary.</p>
+<h4 id="p3-_estimate_csv_bytes-static-helper-has-no-test">[P3] <code>_estimate_csv_bytes</code> static helper has no test</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:2713-2749</code>
+<strong>Issue:</strong> Pure function — sample rows → estimated byte count.
+Could be unit-tested with synthetic rows. Currently exercised
+only through <code>estimate_bag_size</code> integration tests.</p>
+<h3 id="srcderiva_mldatasetdataset_bagpy">src/deriva_ml/dataset/dataset_bag.py</h3>
+<h4 id="p1-datasetbag-re-implements-selector-grouping-rather-than-sharing-with-dataset">[P1] <code>DatasetBag</code> re-implements selector + grouping rather than sharing with Dataset</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset_bag.py:532-652</code>
+<strong>Issue:</strong> See dataset.py finding above — selector grouping is
+parallel. Bag also has extra logic (over-reach filtering,
+execution_rids Python-side filter, materialize_limit check) that
+makes the parallel less clean but the selector tail is identical.</p>
+<p><strong>Suggested fix:</strong> Same — shared helper in <code>deriva_ml.feature</code>.</p>
+<h4 id="p2-retired-api-shims-on-datasetbag">[P2] Retired-API shims on DatasetBag</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset_bag.py:654-690</code>
+<strong>Issue:</strong> Delete per workspace convention.</p>
+<h4 id="p2-_dataset_table_view-sql-is-opaque">[P2] <code>_dataset_table_view</code> SQL is opaque</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset_bag.py:307-352</code>
+<strong>Issue:</strong> 45-line method builds a SQL UNION across all paths
+from Dataset to the target table by introspecting
+<code>self.model._schema_to_paths()</code>. The dataset RID list construction
+includes "all nested datasets" silently — there's no path filter
+to scope nested-dataset inclusion. Comments are sparse, and the
+method is consumed only by <code>restructure._get_reachable_assets</code>
+(restructure.py:200) — moving it to <code>restructure.py</code> as a private
+helper would tighten ownership.</p>
+<h4 id="p2-datasetbaglist_tables-has-no-tests-no-raises-section">[P2] DatasetBag.list_tables has no tests, no Raises section</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset_bag.py:221-230</code>
+<strong>Issue:</strong> Public method, undocumented exceptions, no tests in
+<code>tests/dataset/test_bag_api_coverage.py</code>.</p>
+<h4 id="p2-as_torch_dataset-as_tf_dataset-docstrings-are-130-lines-each">[P2] <code>as_torch_dataset</code> / <code>as_tf_dataset</code> docstrings are 130+ lines each</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset_bag.py:1130-1302</code>,
+<code>1304-1483</code>
+<strong>Issue:</strong> The two docstrings are near-identical prose (target
+arity, missing policy, RID-last contract) — drift risk is high.
+The <code>as_torch_dataset</code> Returns section and the <code>as_tf_dataset</code>
+Returns section describe the same shape contract twice.</p>
+<p><strong>Suggested fix:</strong> Either accept the duplication and add a
+docstring-style invariant test (test that both methods'
+parameters and Args texts share the matching prose), or extract
+the shared sections into a module-level constant referenced by
+both. Given how big they are, a shared "design contract" link
+in each docstring plus per-method specifics would be cleaner.</p>
+<h4 id="p3-datasetbag-fetches-execution_rid-at-init-time-not-lazily">[P3] DatasetBag fetches execution_rid at init time, not lazily</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset_bag.py:151-153</code>
+<strong>Issue:</strong> <code>self.execution_rid = execution_rid or (self._catalog._get_dataset_execution(self.dataset_rid) or {}).get("Execution")</code> runs an unconditional SQLite query at <code>__init__</code>, accessing a private method on the catalog (<code>_get_dataset_execution</code>). Lazy property would avoid the cost when callers don't read it.</p>
+<h4 id="p3-current_version-property-docstring-claims-immutability-but-doesnt-enforce">[P3] <code>current_version</code> property docstring claims immutability but doesn't enforce</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset_bag.py:181-192</code>
+<strong>Issue:</strong> "Unlike the live Dataset class, this value is immutable" — <code>self._current_version</code> is set in <code>__init__</code> but a writer could <code>bag._current_version = ...</code>. Add <code>@property</code> setter that raises, or document the convention more honestly.</p>
+<h3 id="srcderiva_mldatasetaux_classespy">src/deriva_ml/dataset/aux_classes.py</h3>
+<h4 id="p2-datasethistory-model-fields-dont-all-appear-in-docstring">[P2] <code>DatasetHistory</code> model fields don't all appear in docstring</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/aux_classes.py:204-215</code>
+<strong>Issue:</strong> See above.</p>
+<h4 id="p3-datasetversionparse-re-runs-version__init__-redundantly">[P3] <code>DatasetVersion.parse</code> re-runs <code>Version.__init__</code> redundantly</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/aux_classes.py:138-165</code>
+<strong>Issue:</strong> <code>Version(version)</code> parses; then a new <code>cls</code> instance has <code>Version.__init__(instance, str(v))</code> called on it (re-parses). Could <code>__new__</code> and copy <code>__dict__</code> directly. Minor perf, but the two-parse round-trip is a code smell.</p>
+<h4 id="p3-datasetminiddataset_snapshot-docstring-missing">[P3] <code>DatasetMinid.dataset_snapshot</code> docstring missing</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/aux_classes.py:268-276</code>
+<strong>Issue:</strong> Computed-field property has only an inline comment ("<code>version_rid</code> is <code>{rid}</code> or <code>{rid}@{snapshot}</code>") — no docstring. Same for <code>dataset_rid</code> at line 262-266.</p>
+<h3 id="srcderiva_mldatasetbag_builderpy">src/deriva_ml/dataset/bag_builder.py</h3>
+<h4 id="p2-datasetbagbuilderbuild_bag-has-no-direct-unitintegration-test">[P2] <code>DatasetBagBuilder.build_bag</code> has no direct unit/integration test</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_builder.py:240-334</code>
+<strong>Issue:</strong> The heaviest method in the class (95 lines), responsible for the snapshot-aware CatalogBagBuilder dance and zip-path recovery. <code>tests/dataset/test_bag_builder.py</code> only covers spec generation, annotations, aggregate queries, and policy. The <code>_SnapshotAwareCatalogBagBuilder._run_export</code> override and the timeout-restoration <code>try/finally</code> are entirely uncovered.</p>
+<p><strong>Suggested fix:</strong> Add at least one test that calls <code>build_bag</code> against a small demo dataset and asserts (a) returned path is a <code>.zip</code> that exists, (b) bag name is <code>Dataset_{rid}</code>, (c) timeout restoration happens on exception.</p>
+<h4 id="p2-_dataset_nesting_depth-is-computed-but-only-annotation-flow-uses-it">[P2] <code>_dataset_nesting_depth</code> is computed but only annotation flow uses it</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_builder.py:686-717</code>
+<strong>Issue:</strong> Method exists and is documented but isn't called anywhere in <code>bag_builder.py</code> or under <code>src/deriva_ml/</code>. Likely dead.</p>
+<p><strong>Evidence:</strong></p>
+<pre><code class="language-bash">$ grep -rn &quot;_dataset_nesting_depth&quot; src/deriva_ml/
+# only the definition matches
+</code></pre>
+<p><strong>Suggested fix:</strong> Delete unless an external skill uses it. Per workspace rule "if something is unused, delete it."</p>
+<h4 id="p3-_snapshotawarecatalogbagbuilder-is-documented-as-workaround-for-upstream-114-should-track-resolution">[P3] <code>_SnapshotAwareCatalogBagBuilder</code> is documented as workaround for upstream #114 — should track resolution</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_builder.py:71-119</code>
+<strong>Issue:</strong> Inline note "See issue #114" — track upstream so this can be retired when the upstream fix lands.</p>
+<h4 id="p3-anchors_for-walks-descendants-twice">[P3] <code>anchors_for</code> walks descendants twice</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_builder.py:723-754</code>
+<strong>Issue:</strong> <code>_iter_descendant_rids</code> walks; later <code>_exclude_empty_associations</code> also walks descendants (<code>rids_to_scan</code>). Both walks are full traversals via <code>list_dataset_children</code>. Cache the descendant set per build call.</p>
+<h3 id="srcderiva_mldatasetbag_cachepy">src/deriva_ml/dataset/bag_cache.py</h3>
+<h4 id="p3-cachestatuscached_incomplete-aliased-but-never-tested">[P3] <code>CacheStatus.cached_incomplete</code> aliased but never tested</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_cache.py:67-71</code>
+<strong>Issue:</strong> Back-compat alias for <code>cached_holey</code>. No test exercises the alias (only the canonical value). If it's a load-bearing back-compat surface, pin a test; otherwise delete per workspace convention.</p>
+<h4 id="p3-bagcache_is_fully_materialized-is-a-static-method-but-reaches-via-class">[P3] <code>BagCache._is_fully_materialized</code> is a static method but reaches via class</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_cache.py:174-206</code>
+<strong>Issue:</strong> Called as <code>BagCache._is_fully_materialized(bag_path)</code> from <code>bag_download.py:657</code>. Promote to a module-level free function (since it has no class state) — easier to test, easier to import.</p>
+<h3 id="srcderiva_mldatasetbag_downloadpy">src/deriva_ml/dataset/bag_download.py</h3>
+<h4 id="p1-get_dataset_minid-is-a-220-line-monolith">[P1] <code>get_dataset_minid</code> is a 220-line monolith</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_download.py:389-605</code>
+<strong>Issue:</strong> Single function does (a) version-record resolution, (b) spec hash computation, (c) Tier-1 cache lookup, (d) Tier-2 MINID branch, (e) Tier-3 client-side bag branch, (f) DatasetMinid construction with shared snapshot-vs-None RID guard repeated twice (lines 531, 599). The three-tier comment headers help reading but the cyclomatic complexity is high.</p>
+<p><strong>Suggested fix:</strong> Extract <code>_resolve_version_record</code>, <code>_tier1_local_cache_lookup</code>, <code>_tier2_minid_path</code>, <code>_tier3_client_path</code>, and <code>_build_dataset_minid(rid, snapshot, version, location, checksum)</code> helper for the duplicated RID-vs-snapshot construction.</p>
+<h4 id="p2-create_dataset_minid-spec-arg-is-vestigial-on-the-non-minid-arm">[P2] <code>create_dataset_minid</code> <code>spec</code> arg is "vestigial on the non-MINID arm"</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_download.py:340-352</code>
+<strong>Issue:</strong> The comment at 343-352 explicitly says the spec parameter is unused on the <code>use_minid=False</code> branch ("CatalogBagBuilder recomputes its own spec from the same anchors/policy"). Carrying a parameter that's silently ignored on one branch is a footgun.</p>
+<p><strong>Suggested fix:</strong> Either pass the precomputed spec into <code>build_bag</code> so both branches honor it, or drop <code>spec</code> from this function's signature on the <code>use_minid=False</code> path (route through a different helper).</p>
+<h4 id="p2-fetch_minid_metadata-dataset-arg-is-unused">[P2] <code>fetch_minid_metadata</code> <code>dataset</code> arg is unused</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_download.py:101-119</code>
+<strong>Issue:</strong> <code>del dataset</code> on line 116. The parameter is kept "for future logging / auth context" per the inline comment. Per workspace "no over-engineering" rule, drop it; re-add when actually needed.</p>
+<h4 id="p3-download_dataset_minid-mixes-three-source-types-with-no-dispatch-helper">[P3] <code>download_dataset_minid</code> mixes three source types with no dispatch helper</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_download.py:184-194</code>
+<strong>Issue:</strong> Three <code>if/elif/else</code> branches choose archive source by sniffing <code>minid.bag_url</code> (<code>use_minid</code>, <code>file://</code>, else). The dispatch is fine but each branch contributes to a method that's already 130 lines; extract <code>_fetch_archive(minid, use_minid, tmp_dir) -&gt; Path</code> to keep this method focused on cache placement.</p>
+<h3 id="srcderiva_mldatasetrestructurepy">src/deriva_ml/dataset/restructure.py</h3>
+<h4 id="p1-restructure_assets-is-a-500-line-function-with-docstring">[P1] <code>restructure_assets</code> is a 500-line function (with docstring)</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/restructure.py:250-746</code>
+<strong>Issue:</strong> Pure function but its body (post-docstring) is still ~250 lines covering: input validation, asset-table detection, type-path map, asset-to-dataset map, feature/column target classification, per-asset processing with branch on <code>missing</code> policy, file placement (symlink/copy/transform).</p>
+<p><strong>Suggested fix:</strong> Extract <code>_resolve_grouping_path(asset, targets, ..., missing)</code>, <code>_place_asset(source, target_path, file_transformer, use_symlinks)</code>. The current shape works but is hard to navigate.</p>
+<h4 id="p2-asset-source-path-fallback-to-_catalog_database_modelbag_path-is-private-api-reach">[P2] Asset source-path fallback to <code>_catalog._database_model.bag_path</code> is private-API reach</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/restructure.py:611-614</code>
+<strong>Issue:</strong> <code>bag._catalog._database_model.bag_path</code> — reaching through two private attributes on the catalog. The bag already exposes <code>bag.path</code> (per dataset_bag.py:195). Use that.</p>
+<p><strong>Evidence:</strong></p>
+<pre><code class="language-python">try:
+    bag_root = Path(bag._catalog._database_model.bag_path)
+    source_path = bag_root / &quot;data&quot; / &quot;asset&quot; / asset.get(&quot;RID&quot;, &quot;&quot;) / asset_table / Path(filename).name
+except AttributeError:
+    pass  # catalog doesn't have _database_model (e.g. in tests)
+</code></pre>
+<p><strong>Suggested fix:</strong> Replace with <code>bag_root = bag.path</code>. The <code>try/except AttributeError</code> becomes unnecessary.</p>
+<h4 id="p2-_default_dir_name_from_target-skip-cols-set-is-hardcoded">[P2] <code>_default_dir_name_from_target</code> skip-cols set is hardcoded</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/restructure.py:104-105</code>
+<strong>Issue:</strong> <code>_skip_cols = {"RID", "RCT", "RMT", "RCB", "RMB", "Feature_Name", "Execution"}</code> — the catalog's system columns are listed in
+<code>deriva_ml.core.definitions.SYSTEM_COLUMNS</code> or similar; duplicating
+the set here means it drifts if Deriva adds another (e.g. a future
+<code>RVT</code> or system tag). Pull from the canonical constant.</p>
+<h4 id="p3-_get_reachable_assets-dict-conversion-is-fragile">[P3] <code>_get_reachable_assets</code> dict-conversion is fragile</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/restructure.py:220-221</code>
+<strong>Issue:</strong> <code>rows = [dict(row._mapping) for row in result]</code> — accesses
+SQLAlchemy's private <code>_mapping</code>. Use <code>.mappings().all()</code> instead
+(public API; same shape).</p>
+<h3 id="srcderiva_mldatasetsplitpy">src/deriva_ml/dataset/split.py</h3>
+<h4 id="p1-split_dataset-is-a-590-line-function">[P1] <code>split_dataset</code> is a 590-line function</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/split.py:482-1069</code>
+<strong>Issue:</strong> Single function does validation, member listing, size resolution, denormalization, partition computation, dry-run early return, vocab provisioning, dataset hierarchy creation, member assignment, and result construction. The bulk (200 lines) is the docstring; the body is ~250 lines and contains seven inline log-info calls, a 5-section commented-block structure, and a nested loop for member batching.</p>
+<p><strong>Suggested fix:</strong> Extract <code>_compute_partitions(source_ds, ...) -&gt; (partition_rids, strategy_desc)</code> and <code>_create_split_hierarchy(exe, source_dataset_rid, partition_rids, ...) -&gt; SplitResult</code>. The dry-run path returns before the hierarchy creation, so the split is clean.</p>
+<h4 id="p2-split_dataset-cli-main-is-320-lines">[P2] <code>split_dataset</code> CLI <code>main()</code> is 320 lines</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/split.py:1077-1402</code>
+<strong>Issue:</strong> Argparse setup (170 lines), dry-run vs real-run branching, two large duplicated parameter blocks (the same <code>split_dataset</code> call appears twice with <code>dry_run=True</code> and <code>dry_run=False</code>), and print formatting.</p>
+<p><strong>Suggested fix:</strong> Build kwargs dict once, pass <code>dry_run=args.dry_run</code> through it. Halves the body.</p>
+<h4 id="p2-stratified_split-three-way-path-hardcodes-testingtrainingvalidation-partition-names">[P2] <code>stratified_split</code> three-way path hardcodes "Testing"/"Training"/"Validation" partition names</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/split.py:338-364</code>
+<strong>Issue:</strong> The three-way branch accesses <code>partition_sizes["Testing"]</code> directly by string. Two-way path keys by ordered list. Inconsistency makes it harder to extend (e.g. four-way splits). At minimum document the keying convention; ideally use the same key-by-list pattern in both branches.</p>
+<h4 id="p2-_resolve_sizes-raises-valueerror-but-type-hints-dont-say-so">[P2] <code>_resolve_sizes</code> raises <code>ValueError</code> but type hints don't say so</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/split.py:374-438</code>
+<strong>Issue:</strong> Function raises on negative/zero sizes and on totals exceeding the dataset. Docstring documents Args/Returns/Raises correctly, but the more general issue is that the validation happens during normal execution, not at the <code>validate_call</code> boundary. Consider a Pydantic model for the partition spec so the validation surface is one named class.</p>
+<h4 id="p3-_ensure_dataset_types-silently-swallows-errors">[P3] <code>_ensure_dataset_types</code> silently swallows errors</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/split.py:472-474</code>
+<strong>Issue:</strong> <code>if "already exists" not in str(e).lower(): logger.warning(...)</code> — string-matching on the exception message is brittle. Use exception type instead, or catch a specific <code>DerivaMLException</code> subclass.</p>
+<h3 id="srcderiva_mldatasettorch_adapterpy-and-tf_adapterpy">src/deriva_ml/dataset/torch_adapter.py and tf_adapter.py</h3>
+<h4 id="p2-adapter-helpers-_bag_element_is_asset-_build_row_lookup-_resolve_asset_path-duplicated-character-for-character">[P2] Adapter helpers <code>_bag_element_is_asset</code>, <code>_build_row_lookup</code>, <code>_resolve_asset_path</code> duplicated character-for-character</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/torch_adapter.py:160-195</code> and
+<code>src/deriva_ml/dataset/tf_adapter.py:185-220</code>
+<strong>Issue:</strong> Three helpers (35 lines per file) are verbatim identical
+across the two adapter modules. Validation block (element_type in
+bag, asset-table sample_loader check) and target-resolution
+(<code>_resolve_targets</code> + RID-list construction) are also duplicated.</p>
+<p><strong>Suggested fix:</strong> Move helpers and the validation block into
+<code>deriva_ml.dataset.target_resolution</code> (already shared) or a new
+sibling <code>adapter_common.py</code>. Each adapter becomes ~30 lines of
+framework-specific dataset construction.</p>
+<h4 id="p3-both-adapters-catch-exception-in-_bag_element_is_asset">[P3] Both adapters catch <code>Exception</code> in <code>_bag_element_is_asset</code></h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/torch_adapter.py:167, 173</code> and same in tf_adapter
+<strong>Issue:</strong> Broad <code>except Exception</code> silently swallows. Narrow to <code>(AttributeError, KeyError)</code> (already listed alongside) and let other exceptions propagate.</p>
+<h3 id="srcderiva_mldatasetbag_feature_cachepy">src/deriva_ml/dataset/bag_feature_cache.py</h3>
+<h4 id="p2-_ensure_cache_populated-parameter-feat-lacks-type-annotation-and-record_class-type">[P2] <code>_ensure_cache_populated</code> parameter <code>feat</code> lacks type annotation and <code>record_class: type</code></h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_feature_cache.py:121-180</code>
+<strong>Issue:</strong> <code>feat</code> is untyped, <code>record_class: type</code> is overly broad. The actual types are <code>Feature</code> and <code>type[FeatureRecord]</code>. Add them.</p>
+<h4 id="p3-cache-table-stores-everything-as-text-type-round-tripping-relies-on-pydantic">[P3] Cache table stores everything as TEXT — type round-tripping relies on Pydantic</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/bag_feature_cache.py:159-163</code>
+<strong>Issue:</strong> Comment "Store everything as TEXT; Pydantic reifies types at FeatureRecord construction time" — fine, but if a feature column has e.g. JSON-stringified array values, the SQLite layer would store the str representation and Pydantic would re-parse. Document the constraint that all FeatureRecord field types must accept str-deserialization, or pin a regression test.</p>
+<h3 id="srcderiva_mldatasettarget_resolutionpy">src/deriva_ml/dataset/target_resolution.py</h3>
+<p>(No findings — module is well-scoped, single-purpose, well-documented, and tested via <code>tests/dataset/test_target_resolution.py</code>.)</p>
+<h3 id="srcderiva_mldatasetvalidationpy">src/deriva_ml/dataset/validation.py</h3>
+<h4 id="p3-validation-models-duplicate-the-dual-track-shape-across-datasetassetworkflow">[P3] Validation models duplicate the dual-track shape across Dataset/Asset/Workflow</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/validation.py:71-150</code>
+<strong>Issue:</strong> <code>DatasetSpecResult</code>, <code>AssetSpecResult</code>, <code>WorkflowSpecResult</code> all carry <code>valid: bool</code>, <code>reasons: list[...]</code>, <code>actual_table: str | None</code>. A base class would tighten the contract. Low-priority — current shape works.</p>
+<h3 id="srcderiva_mldatasetinitpy">src/deriva_ml/dataset/<strong>init</strong>.py</h3>
+<p>(No findings — minimal re-exports, correctly documented.)</p>
+<hr />
+<h2 id="test-coverage-gaps-cross-module">Test coverage gaps (cross-module)</h2>
+<ol>
+<li><strong><code>Dataset.to_markdown</code> / <code>Dataset.display_markdown</code> / <code>Dataset.get_chaise_url</code></strong> — no tests.</li>
+<li><strong><code>DatasetBag.list_tables</code></strong> — no tests in <code>test_bag_api_coverage.py</code>.</li>
+<li><strong><code>DatasetBagBuilder.build_bag</code></strong> — no direct test (only spec/annotation/aggregate-query coverage).</li>
+<li><strong><code>Dataset._estimate_csv_bytes</code></strong> — pure helper, only exercised through end-to-end <code>estimate_bag_size</code> tests.</li>
+<li><strong><code>BagCache.cached_incomplete</code></strong> alias — no test exercises the back-compat alias.</li>
+<li><strong><code>Dataset.list_workflow_executions</code></strong> unscoped semantic — no test asserts that it returns all executions (not just dataset-scoped ones). Risk: future drift toward scoped semantics goes undetected.</li>
+<li><strong><code>test_prefetch_is_alias_for_cache</code></strong> — tests <code>cache()</code> (not <code>prefetch()</code>); since <code>prefetch</code> doesn't exist, the test is meaningless. Either delete the test or implement <code>prefetch()</code> as an alias.</li>
+<li><strong><code>add_dataset_members</code> cycle path</strong> — no test catches the broken <code>set(self.dataset_rid)</code> bug; covered with a real A→B→A cycle test.</li>
+<li><strong><code>_create_or_advance_dev_row</code> concurrent-write race</strong> — error path is documented but no test injects an RMT mismatch. Add with a model-side fixture that mutates the row between <code>dataset_history()</code> and the update call.</li>
+<li><strong>Snapshot-suffix preservation in <code>_SnapshotAwareCatalogBagBuilder._run_export</code></strong> — overrides upstream for issue #114 but no regression test pins the snapshot suffix on the export URL.</li>
+</ol>
+<h2 id="duplication-candidates-cross-module">Duplication candidates (cross-module)</h2>
+<ol>
+<li><strong><code>feature_values</code> selector + grouping pattern</strong> — <code>dataset.py:591-604</code> and <code>dataset_bag.py:637-652</code>. Extract to <code>deriva_ml.feature</code>.</li>
+<li><strong><code>_bag_element_is_asset</code>, <code>_build_row_lookup</code>, <code>_resolve_asset_path</code></strong> — <code>torch_adapter.py:160-195</code> and <code>tf_adapter.py:185-220</code> are verbatim parallel.</li>
+<li><strong><code>DatasetMinid</code> construction with conditional snapshot suffix</strong> — <code>bag_download.py:531-537</code> and <code>bag_download.py:599-605</code>. Extract to <code>_build_dataset_minid(...)</code>.</li>
+<li><strong><code>as_torch_dataset</code> / <code>as_tf_dataset</code> docstring prose</strong> — same target-arity, missing-policy, RID-last contract repeated. Extract to module docstring or shared constant.</li>
+<li><strong>Retired-API shim shape</strong> — <code>DatasetBag.fetch_table_features</code> / <code>list_feature_values</code> repeat the same pattern as the DerivaML / Asset retired pairs. Delete all three per workspace convention.</li>
+</ol>
+<hr />
+<h2 id="severity-tag-legend">Severity tag legend</h2>
+<ul>
+<li><strong>P0</strong> — blocks release.</li>
+<li><strong>P1</strong> — should-fix this cycle. Correctness bugs or extraction needed for sustainable maintenance.</li>
+<li><strong>P2</strong> — nice-to-have. Real findings but the system functions correctly today.</li>
+<li><strong>P3</strong> — note-only. Style/clarity nudges.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

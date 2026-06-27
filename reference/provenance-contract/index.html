@@ -1,0 +1,3777 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/reference/provenance-contract/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Provenance contract - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#in-brief" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Provenance contract
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#in-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-execution-state-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The execution state model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The execution state model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        States
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#allowed-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Allowed transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-each-lifecycle-step-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each lifecycle step writes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scope">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-contract-requires" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the contract requires
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failed-executions-are-first-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failed executions are first-class
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-provenance-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The provenance model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The provenance model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#every-artifact-has-a-producing-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every artifact has a producing execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Every artifact has a producing execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#artifacts-with-no-producing-execution-the-unknown-provenance-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts with no producing execution → the unknown-provenance execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#idempotency-concurrency-and-re-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idempotency, concurrency, and re-runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consumed-a-dataset-is-defined-by-the-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Consumed a dataset" is defined by the configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow-reproducibility-enforceable-vs-verifiable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow reproducibility: enforceable vs. verifiable
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Workflow reproducibility: enforceable vs. verifiable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#timing-of-the-artifact-producer-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing of the artifact-producer rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#external-resource-ingest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External-resource ingest
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="External-resource ingest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-minting-a-file-rid-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What minting a File RID records
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enforcement-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement &amp; verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enforcement &amp; verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#write-time-edge-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write-time edge guarantees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-no-input-commit-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The no-input commit check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-two-unknown-provenance-sentinels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two unknown-provenance sentinels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#honest-termination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Honest termination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enforcement-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducibility-what-the-graph-does-and-does-not-give-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility: what the graph does and does not give you
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reproducibility: what the graph does and does not give you">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-execution-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended execution metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conformance-and-versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conformance and versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#illustrative-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Illustrative example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Provenance contract</h1>
+
+<p>r# Execution Provenance Contract</p>
+<p>This is the specification for execution provenance in DerivaML: the data
+model that records how every artifact came to exist, and the completeness
+contract that every execution must satisfy. It is the single normative
+reference for what provenance <em>is</em> and what <em>must</em> be true of it; it
+consolidates what was previously implicit across the catalog schema,
+<a href="../../adr/0001-lineage-walks-data-flow-not-orchestration/">ADR-0001</a>, and
+the Asset_Role note in <code>CLAUDE.md</code>.</p>
+<p>The document has two parts: <strong>the model</strong> — the entities, edges, and roles
+that constitute complete provenance — and <strong>the contract + enforcement</strong> —
+what must hold for every execution, how it is guaranteed at write time, and
+how violations are detected.</p>
+<h2 id="in-brief">In brief</h2>
+<p>If you are writing an execution, this is the whole contract in practice. The
+framework records the rest.</p>
+<ul>
+<li><strong>Wrap the work in the context manager:</strong> <code>with ml.create_execution(config)
+  as exe:</code>. This drives the lifecycle and guarantees the run reaches an
+  honest terminal state.</li>
+<li><strong>Declare your inputs in the config</strong> — datasets in <code>datasets=</code>, assets in
+  <code>assets=</code> (a RID, or <code>LocalFile("/path")</code> for a local file the framework
+  registers; a bare string is always a RID, never a path). Declared inputs
+  become provenance edges automatically; nothing you read off disk without
+  declaring is recorded.</li>
+<li><strong>Run from committed code.</strong> A workflow needs a real URL and a non-empty
+  checksum, which you get by running a committed script — not by pasting into
+  a REPL.</li>
+<li><strong>The framework writes the edges</strong>: which workflow ran, what was consumed
+  (input), what was produced (output: datasets, assets, features), and the
+  configuration. You don't write these by hand.</li>
+<li><strong>Failures are kept, not hidden.</strong> A failed run is recorded as <code>Failed</code>
+  with a reason and whatever it established before failing.</li>
+</ul>
+<p>Everything below is the precise statement of these rules, why they are drawn
+where they are, and how they are enforced and audited.</p>
+<h2 id="goals">Goals</h2>
+<p>The contract serves five standing aims. Every rule below follows from them,
+and future changes should be judged against them.</p>
+<ol>
+<li><strong>Traceable from the catalog alone — for <em>every</em> artifact.</strong> For any
+   artifact (dataset version, feature value, asset, file), the catalog
+   answers "what produced this, from what declared inputs, with what code
+   (workflow URL + checksum) and configuration?" — without access to
+   anyone's disk, shell history, or memory of a session. <em>Every</em> artifact
+   traces to a producing execution; when an artifact has no real producer (it
+   was inserted outside any run), it attributes to the <strong>unknown-provenance
+   execution</strong> sentinel so the answer is an explicit "unknown origin," never
+   a dead end (see <em>Artifacts with no producing execution</em>). The question
+   always returns <em>something</em>.</li>
+</ol>
+<p><strong>Scope: this contract guarantees a complete provenance <em>graph</em>, not
+   bit-for-bit reproduction.</strong> It records <em>what</em> produced an artifact and
+   <em>what</em> it depended on, traceably. It does <strong>not</strong> by itself guarantee you
+   can re-run and get the identical result — that additionally needs
+   environment capture (dependency lockfile, container/image digest, random
+   seeds, hardware, pinned dataset <em>snapshots</em> rather than dev versions),
+   which this contract treats as <em>recommended</em> <code>Execution_Metadata</code>, not
+   mandated fields. See <em>Reproducibility: what the graph does and does not
+   give you</em> for the precise boundary. Closing that gap (mandatory structured
+   reproduction metadata) is named as a v2 follow-on, not v1.</p>
+<ol>
+<li>
+<p><strong>Record what a run logically depended on — not which API calls it
+   made.</strong> Provenance tracks a run's actual dependencies (the dataset it
+   consumed, the external file it ingested), even when the code reached them
+   indirectly. This is why "consumed" is defined by the <em>declared
+   configuration</em>: an undeclared dependency is an authoring error, not an
+   accepted gap.</p>
+</li>
+<li>
+<p><strong>Every driven execution terminates honestly.</strong> A run that started leaves
+   a terminal state telling the truth about its outcome — success, failure
+   (with a reason), or abandonment. Non-terminal-forever and "failed with no
+   reason" are both forbidden. Failures are kept, not discarded.</p>
+</li>
+<li>
+<p><strong>Enforce what DerivaML controls; verify or detect the rest; never fake
+   it.</strong> The trust boundary is explicit. DerivaML <em>guarantees</em> what it records
+   locally: the checksum it captured, the edges it wrote from your
+   declarations, the context-manager lifecycle. It can only <em>verify or
+   detect</em> what lives outside its control: whether an external host still has
+   the code, whether a human declared a dataset instead of a loose file,
+   whether a human drove an interactive session to completion.</p>
+</li>
+</ol>
+<p>Crucially, the contract never papers over a gap. It does not manufacture
+   provenance, and it does not silently rewrite a record on a heuristic.
+   Instead: a true gap is recorded as <em>explicitly unknown</em>; a record that is
+   honest but cannot be re-verified later is <em>complete-but-unverifiable</em>; and
+   any genuine ambiguity is left for a human to resolve.</p>
+<ol>
+<li><strong>The honest path is the easy path.</strong> Compliance comes from making the
+   <em>blessed path</em> — the context manager plus declared inputs, the supported
+   way to run a recorded execution — the path of least resistance, backed by
+   loud warnings on the gross failure mode. It does not come from hard gates
+   that punish legitimate work and push authors toward untracked interactive
+   runs. ("Blessed path" is used throughout for this context-manager-driven
+   way of running.)</li>
+</ol>
+<h2 id="the-execution-state-model">The execution state model</h2>
+<p>Provenance is anchored to an execution's lifecycle state, so the state
+machine is part of this specification. There are <strong>7 states</strong> (canonical
+source: <code>deriva_ml.execution.state_store.ExecutionStatus</code>; transitions:
+<code>deriva_ml.execution.state_machine.ALLOWED_TRANSITIONS</code>). All transitions go
+through the state machine; a direct write to <code>Execution.Status</code> is a bug.</p>
+<h3 id="states">States</h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Meaning</th>
+<th>Terminal?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Created</code></td>
+<td>Row exists; lifecycle not yet started. Set by <code>create_execution()</code>.</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>Running</code></td>
+<td><code>__enter__</code>/<code>execution_start()</code> ran; <code>start_time</code> set; work in progress.</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>Stopped</code></td>
+<td>Algorithm finished cleanly; <code>duration</code> computed. Terminal unless it advances to <code>Pending_Upload</code> (see tiebreaker).</td>
+<td>Conditional</td>
+</tr>
+<tr>
+<td><code>Pending_Upload</code></td>
+<td>Outputs staged; upload in progress / retryable.</td>
+<td>No (transient)</td>
+</tr>
+<tr>
+<td><code>Uploaded</code></td>
+<td>Outputs uploaded; clean end for an artifact-producer.</td>
+<td>Yes (success)</td>
+</tr>
+<tr>
+<td><code>Failed</code></td>
+<td>The run failed. Carries a <strong>mandatory reason</strong> (<code>Status_Detail</code>).</td>
+<td>Yes (failure)</td>
+</tr>
+<tr>
+<td><code>Aborted</code></td>
+<td>Did not finish; closed without success. Set on explicit / <code>__del__</code> / operator abort.</td>
+<td>Yes (abandoned)</td>
+</tr>
+</tbody>
+</table>
+<p>A <strong>driven</strong> execution left in a non-terminal <code>Running</code> or <code>Pending_Upload</code>
+state violates the honest-termination obligation — it started and never
+honestly finished. A row still in <code>Created</code> was never driven (the obligation
+never attached); it is an abandoned draft for cleanup, not a violation (see
+<em>Definitions</em>).</p>
+<p><strong><code>Stopped</code> is dual-purpose</strong> — it is both a <em>terminal</em> state (a clean run
+with nothing to upload) and a <em>transit</em> state on the happy path
+(<code>Stopped → Pending_Upload</code>). The row alone does not distinguish them.</p>
+<p>The tiebreaker must be evaluable from durable catalog state. Whether outputs
+are still staged for upload is known only to the running process, not to a
+catalog-side audit, so it cannot be the discriminator. The tiebreaker is
+therefore framed on the catalog:</p>
+<blockquote>
+<p>A <code>Stopped</code> execution is treated as <strong>terminal</strong> unless it later
+transitions to <code>Pending_Upload</code>. While the producing process is live, that
+process owns the <code>Stopped → Pending_Upload → Uploaded</code> advance; a
+catalog-side audit cannot tell "Stopped, done" from "Stopped, about to
+upload" from the row alone, so it uses the execution's <code>last_activity</code>
+heartbeat — a <code>Stopped</code> row with no recent activity is treated as a
+terminal clean stop, not as stranded mid-upload.</p>
+</blockquote>
+<p>The practical consequence: an artifact-producing run is expected to reach
+<code>Uploaded</code> (its outputs imply staged assets), so a <em>long-idle</em> <code>Stopped</code>
+artifact-producer is a likely "stopped before uploading" gap the audit
+surfaces for review; a <code>Stopped</code> <strong>probe</strong> (no outputs) is a clean terminal
+state. This is a heuristic, not a hard signal — which is why resolution is
+human-invoked (see <em>Honest termination</em>), never an automatic re-transition.</p>
+<h3 id="allowed-transitions">Allowed transitions</h3>
+<pre><code class="language-mermaid">stateDiagram-v2
+    [*] --&gt; Created
+    Created --&gt; Running
+    Running --&gt; Stopped
+    Stopped --&gt; Pending_Upload
+    Pending_Upload --&gt; Uploaded
+
+    Running --&gt; Pending_Upload : hard-crash recovery
+    Running --&gt; Failed
+    Pending_Upload --&gt; Failed
+    Failed --&gt; Pending_Upload : retry upload
+    Uploaded --&gt; Pending_Upload : additive upload
+
+    Created --&gt; Aborted
+    Running --&gt; Aborted
+    Stopped --&gt; Aborted
+    Failed --&gt; Aborted
+
+    Stopped --&gt; [*]
+    Uploaded --&gt; [*]
+    Failed --&gt; [*]
+    Aborted --&gt; [*]
+
+    note right of Uploaded
+        Terminal (success).
+    end note
+    note right of Failed
+        Terminal (failure);
+        mandatory reason.
+    end note
+    note left of Created
+        Never driven = abandoned
+        draft (cleanup, not a
+        violation).
+    end note
+</code></pre>
+<p>The happy path is <code>Created → Running → Stopped → Pending_Upload →
+Uploaded</code>. Terminal states are <code>Uploaded</code> (success), <code>Stopped</code> (clean, no
+outputs to upload), <code>Failed</code>, and <code>Aborted</code>. The non-obvious edges:</p>
+<ul>
+<li><strong><code>Running → Pending_Upload</code> (hard-crash recovery)</strong> — the process was
+  killed mid-run, so <code>__exit__</code> never fired to move it to <code>Stopped</code>; the run
+  is resumed straight into upload.</li>
+<li><strong><code>Failed → Pending_Upload</code> (retry upload)</strong> — an upload that failed is
+  retried after the staged outputs are intact.</li>
+<li><strong><code>Uploaded → Pending_Upload</code> (additive upload)</strong> — a second output batch
+  from a different lifecycle owner is uploaded against an already-completed
+  execution.</li>
+<li><strong><code>→ Aborted</code></strong> is legal from any pre-terminal state (<code>Created</code>,
+  <code>Running</code>, <code>Stopped</code>, <code>Failed</code>) but <strong>not</strong> from <code>Uploaded</code> — a
+  successfully completed run is not abandoned.</li>
+</ul>
+<h3 id="what-each-lifecycle-step-writes">What each lifecycle step writes</h3>
+<ul>
+<li><strong><code>create_execution()</code></strong> — creates the Execution row at <code>Created</code> with the
+  Workflow FK and the configuring <code>Execution_Metadata</code>.</li>
+<li><strong><code>__enter__</code> / <code>execution_start()</code></strong> — <code>Created → Running</code>, sets
+  <code>start_time</code>. Materializes <code>datasets=</code> inputs and writes their
+  <code>Dataset_Execution</code> input edges; resolves <code>assets=</code> input edges.</li>
+<li><strong><code>__exit__</code> / <code>execution_stop()</code></strong> — <code>Running → Stopped</code> (clean, computes
+  <code>duration</code>) or <code>Running → Failed</code> (exception, records the reason).</li>
+<li><strong><code>commit_output_assets()</code></strong> — <code>Stopped → Pending_Upload → Uploaded</code>;
+  writes output assets (<code>Asset_Role="Output"</code>), authored dataset versions
+  (<code>Dataset_Version.Execution</code>), and feature values. Performs the
+  no-input commit check (see Enforcement).</li>
+</ul>
+<p><code>Execution_Duration</code>, <code>Download_Duration</code>, <code>Upload_Duration</code>, <code>Status</code>, and
+<code>Status_Detail</code> are catalog columns. <code>start_time</code> / <code>stop_time</code> are
+SQLite-only — they read as null over the catalog read APIs for every
+execution; the <code>duration</code> columns are the catalog-visible timing record.</p>
+<p><strong>A deliberate Goal-1 carve-out:</strong> absolute wall-clock timestamps are
+therefore <em>not</em> reconstructable from the catalog alone — only elapsed
+<code>duration</code> is. This is an accepted exception. Absolute start/stop time is an
+operational detail of where the run executed, not part of its data
+provenance (what it consumed and produced); the reproducibility question
+Goal 1 protects is answered by workflow + inputs + outputs + duration, none
+of which depends on a wall-clock timestamp. Catalog row-creation time
+(<code>RCT</code>) remains available as a coarse "when" if needed.</p>
+<h2 id="scope">Scope</h2>
+<p>The terms below build on the state model above; states named here
+(<code>Created</code>, <code>Running</code>, <code>Stopped</code>, <code>Uploaded</code>, <code>Failed</code>, <code>Aborted</code>) are
+defined in that section.</p>
+<h3 id="definitions">Definitions</h3>
+<ul>
+<li><strong>Driven execution</strong> — an execution that left <code>Created</code> for <code>Running</code>;
+  i.e. its lifecycle was actually started (<code>__enter__</code> / <code>execution_start()</code>
+  ran). An execution that was created but never started (still <code>Created</code>) is
+  <em>not</em> driven, so the per-execution obligations below — which apply to
+  driven executions — do not attach to it. A never-driven <code>Created</code> row is
+  not a <em>violation</em> of those obligations (there was no run to terminate); it
+  is an <strong>abandoned draft</strong>. The audit reports long-idle <code>Created</code> rows so an
+  operator can garbage-collect them (<code>ml.gc_executions(...)</code>), but they are a
+  cleanup item, not a contract breach. (Contrast: an execution that <em>was</em>
+  driven and then stranded in <code>Running</code>/<code>Pending_Upload</code> <strong>is</strong> an
+  honest-termination violation — it started and never honestly finished.)</li>
+<li><strong>Terminal state</strong> — a lifecycle end state: <code>Uploaded</code>, <code>Stopped</code> (clean,
+  with nothing to upload), <code>Failed</code>, or <code>Aborted</code>. The non-terminal states
+  are <code>Created</code>, <code>Running</code>, and <code>Pending_Upload</code>.</li>
+<li><strong>Artifact-producing execution</strong> — a driven execution that produces a
+  durable output: a dataset version, a feature value, or an uploaded asset.
+  This is an <strong>outcome property, determined at commit</strong> — an execution is
+  treated as a probe until it writes its first durable artifact, at which
+  point it becomes artifact-producing and the artifact-producer rules (below)
+  are checked. The classification is therefore not known at
+  <code>create_execution()</code> time; see <em>Timing of the artifact-producer rules</em>.</li>
+<li><strong>Probe</strong> (read/exploratory execution) — a driven execution that produces
+  no durable artifact. Determined at commit (an execution that produced
+  nothing).</li>
+<li><strong>Complete provenance</strong> (the checkable predicate). A <strong>successful</strong>
+  artifact-producing execution (terminal <code>Uploaded</code>, or <code>Stopped</code> with
+  nothing to upload) has complete provenance iff <strong>all</strong> of:</li>
+<li>its <strong>Workflow</strong> has a well-formed URL <strong>and</strong> a non-empty checksum;</li>
+<li>it has <strong>at least one declared input</strong> — a <code>datasets=</code> dataset, an
+     <code>assets=</code> asset, or a registered input <code>File</code> — <strong>or</strong> the
+     unknown-provenance sentinel input (see Enforcement);</li>
+<li><strong>every produced artifact is role-tagged</strong> as output
+     (<code>Dataset_Version.Execution</code> authorship, or <code>Asset_Role="Output"</code>).</li>
+</ul>
+<p><code>Failed</code> and <code>Aborted</code> are <strong>honestly-terminated but not
+  complete-provenance</strong> producers: a failed or abandoned run records what it
+  established up to the failure/abort (and, for <code>Failed</code>, a mandatory
+  reason), but its outputs are <em>partial and not to be trusted as finished</em> —
+  so it is not asserting the complete record a successful run does. The
+  obligations on them are honest termination + (for <code>Failed</code>) the reason, not
+  the full predicate. This predicate is what the audit (below) tests for
+  successful producers; each clause maps to one audit query.</p>
+<h3 id="what-the-contract-requires">What the contract requires</h3>
+<p>The contract applies to <strong>every driven execution</strong>. A driven execution MUST
+reach a <strong>terminal state</strong> that honestly records its outcome; it may not be
+abandoned mid-lifecycle.</p>
+<ul>
+<li><strong>Success</strong> → <code>Uploaded</code> (or <code>Stopped</code> if it produced nothing to upload),
+  with <strong>complete provenance</strong> for what it consumed and produced.</li>
+<li><strong>Failure</strong> → <code>Failed</code>, with the failure recorded (see below).</li>
+<li>A <strong>probe</strong> must still terminate honestly, but is exempt from the
+  <em>output-artifact</em> clauses.</li>
+</ul>
+<p>Two obligations are deliberately distinguished:</p>
+<ul>
+<li><strong>Honest termination</strong> — reach a terminal state. Applies to every driven
+  execution.</li>
+<li><strong>Complete provenance</strong> — record all consumed/produced edges with roles.
+  Applies to every artifact-producing execution.</li>
+</ul>
+<h3 id="failed-executions-are-first-class">Failed executions are first-class</h3>
+<p>Failure is a provenance outcome to <strong>keep</strong>, not discard. A failed execution
+records <strong>everything established up to the point of failure</strong>:</p>
+<ul>
+<li><code>Failed</code> status.</li>
+<li><strong>The failure reason is mandatory</strong> — persisted durably on the Execution
+  row (<code>Status_Detail</code> / error). A <code>Failed</code> row with no reason is itself a
+  violation.</li>
+<li>The Workflow FK and configuring metadata (<code>Execution_Metadata</code>).</li>
+<li><strong>All inputs consumed before the failure</strong> (<code>Dataset_Execution</code> rows and
+  input assets), each with its role.</li>
+<li><strong>Any outputs durably written before the failure</strong> (partial feature
+  values, a partial dataset version, uploaded assets), each with its role —
+  recorded under the <code>Failed</code> execution so a consumer knows not to trust
+  them as finished.</li>
+</ul>
+<p>Failure can strike before any work, mid-run, or during upload; the rule is
+uniform — the recorded provenance is <em>as complete as the run actually got</em>.</p>
+<h2 id="the-provenance-model">The provenance model</h2>
+<p><strong>Provenance is recorded by executions and the relationships between an
+execution and the other entities it touches.</strong> The Execution is the hub:
+every artifact in the catalog points back to the execution that produced it,
+and every execution points at what it depended on. Provenance is exactly the
+set of these relationships. An execution relates to:</p>
+<ul>
+<li><strong>a Workflow</strong> — the code that ran (exactly one; the <em>how</em>).</li>
+<li><strong>configuring metadata</strong> — the configuration that parameterized the run
+  (the <em>with what settings</em>), captured as <code>Execution_Metadata</code>.</li>
+<li><strong>datasets</strong> — consumed (input) and/or produced (output).</li>
+<li><strong>assets</strong> — consumed (input) and/or produced (output). <em>Files are a kind
+  of asset</em> — the <code>File</code> table is an asset table whose <code>URL</code> <em>may</em> be an
+  external reference rather than object-store-hosted bytes. A <code>File</code> is the
+  reference-capable rung of the asset relationship, not a separate one (it
+  may also hold hosted bytes; what distinguishes it is that it <em>can</em> be a
+  pure reference).</li>
+<li><strong>features</strong> — typed per-row values produced as output (e.g. labels,
+  scores), written with the execution's provenance.</li>
+<li><strong>other executions</strong> — orchestration / nesting links
+  (<code>Execution_Execution</code>). These are recorded but are <strong>not</strong> part of
+  data-flow lineage; see
+  <a href="../../adr/0001-lineage-walks-data-flow-not-orchestration/">ADR-0001</a>.</li>
+</ul>
+<p>The rest of this section makes each relationship precise.</p>
+<p>Each relationship is recorded as a foreign key or, where it carries its own
+attributes (notably the input/output role), as a row in an <strong>association
+table</strong> that links the two entities. The asset relationship is the clearest
+example: an asset is tied to an execution by an <code>&lt;Asset&gt;_Execution</code> /
+<code>File_Execution</code> row whose <strong><code>Asset_Role</code> column</strong> (<code>Input</code> / <code>Output</code>)
+records the direction. The role is a property of <em>that association row</em>, not
+of the asset or the execution.</p>
+<pre><code class="language-mermaid">flowchart LR
+    WF[Workflow&lt;br/&gt;&lt;i&gt;the code&lt;/i&gt;]
+    CFG[Execution_Metadata&lt;br/&gt;&lt;i&gt;configuring config&lt;/i&gt;]
+    DS[(Datasets)]
+    AS[(Assets / Files)]
+    DV[(Dataset versions)]
+    FEAT[(Feature values)]
+    OTHER[Other Executions]
+
+    EX((Execution))
+
+    %% association tables that carry attributes (incl. the role)
+    AEX{{&quot;&amp;lt;Asset&amp;gt;_Execution / File_Execution&lt;br/&gt;· Asset_Role = Input | Output ·&quot;}}
+    DEX{{&quot;Dataset_Execution&lt;br/&gt;· version-pinned ·&quot;}}
+
+    %% describing relationships (FKs on the Execution row)
+    WF -. &quot;Execution.Workflow FK&quot; .-&gt; EX
+    CFG -. &quot;Execution_Metadata&quot; .-&gt; EX
+
+    %% dataset input: via the Dataset_Execution association
+    DS --&gt; DEX
+    DEX -- &quot;input&quot; --&gt; EX
+
+    %% asset input/output: via the &lt;Asset&gt;_Execution association,
+    %% direction carried by the Asset_Role column ON that row
+    AS --- AEX
+    AEX -- &quot;Asset_Role=Input&quot; --&gt; EX
+    EX -- &quot;Asset_Role=Output&quot; --&gt; AEX
+
+    %% dataset output: authorship FK on the version row
+    EX -- &quot;output: Dataset_Version.Execution&quot; --&gt; DV
+
+    %% feature output: written with the execution's provenance
+    EX -- &quot;output: feature provenance&quot; --&gt; FEAT
+
+    %% orchestration: recorded, NOT data-flow lineage
+    EX -. &quot;Execution_Execution&lt;br/&gt;(orchestration, not lineage)&quot; .-&gt; OTHER
+
+    classDef hub fill:#1f6feb,stroke:#0b3d91,color:#fff,font-weight:bold;
+    classDef artifact fill:#e6f0ff,stroke:#1f6feb,color:#0b3d91;
+    classDef code fill:#fff4e6,stroke:#d9822b,color:#7a4a12;
+    classDef assoc fill:#f3e8ff,stroke:#8250df,color:#3b1f6b;
+    class EX hub;
+    class DS,AS,DV,FEAT artifact;
+    class WF,CFG,OTHER code;
+    class AEX,DEX assoc;
+</code></pre>
+<p><em>The Execution is the hub. Relationships that carry their own attributes are
+reified as </em><em>association rows</em><em> (hexagons): <code>Dataset_Execution</code> pins the
+consumed dataset version, and <code>&lt;Asset&gt;_Execution</code> / <code>File_Execution</code> carries
+the </em><em><code>Asset_Role</code></em><em> column that records whether the asset was an <code>Input</code> to
+or an <code>Output</code> of the execution — the role lives on the association row, not
+on the asset or the execution. Dataset-version output is the authorship FK
+<code>Dataset_Version.Execution</code>. Dotted edges describe the run (code, config) or
+orchestration. Data-flow lineage (ADR-0001) walks the input/output edges
+backward; it does not follow the <code>Execution_Execution</code> link.</em></p>
+<p>For every <strong>driven</strong> execution the catalog records:</p>
+<ol>
+<li><strong>Workflow</strong> — exactly one Workflow (FK <code>Execution.Workflow</code>, mandatory).
+   For an artifact-producer the workflow must additionally carry a
+   well-formed URL and a non-empty checksum (see <em>Workflow reproducibility</em>).</li>
+<li><strong>Configuring metadata</strong> — the configuration that parameterized the run,
+   captured as <code>Execution_Metadata</code> assets (e.g. the resolved
+   hydra/experiment config).</li>
+<li><strong>Consumed inputs</strong> (role = input):</li>
+<li><strong>Datasets</strong> — exactly those declared in <code>datasets=</code>, as version-pinned
+     <code>Dataset_Execution</code> rows.</li>
+<li><strong>Assets</strong> — input assets via <code>&lt;Asset&gt;_Execution</code> with
+     <code>Asset_Role="Input"</code> and an <code>Input_File</code> Asset_Type tag.</li>
+<li><strong>Produced outputs</strong> (role = output):</li>
+<li><strong>Dataset versions</strong> — via <code>Dataset_Version.Execution</code> authorship.</li>
+<li><strong>Assets</strong> — via <code>&lt;Asset&gt;_Execution</code> with <code>Asset_Role="Output"</code> and an
+     <code>Output_File</code> Asset_Type tag.</li>
+<li><strong>Feature values</strong> — written with this execution's provenance.</li>
+<li><strong>Role is unambiguous, and is always derived from context — never
+   specified by the caller.</strong> Where the role is <em>recorded</em> differs by
+   artifact kind, but in every case it follows from <em>what the execution did</em>,
+   not from a user-supplied flag:</li>
+<li><strong>Datasets</strong> — role is <strong>structural</strong>: an input is a row in
+     <code>Dataset_Execution</code>; an output is <code>Dataset_Version.Execution</code>
+     authorship. Different tables, so role cannot be misstated and there is
+     nothing to specify.</li>
+<li><strong>Assets / files</strong> — role is the <strong><code>Asset_Role</code> column</strong> on the
+     <code>&lt;Asset&gt;_Execution</code> / <code>File_Execution</code> association row, set by the
+     <strong>operation</strong>: materializing a declared input (download at execution
+     start, or a <code>LocalFile</code>/asset declared in <code>assets=</code>) writes
+     <code>Asset_Role="Input"</code>; producing a file (the commit / output-staging
+     path, including <code>add_files</code> in the execution body) writes
+     <code>Asset_Role="Output"</code>. The framework assigns the role from the call
+     context; the user never passes it.</li>
+</ol>
+<p>A single artifact is never silently both. <strong>The contract requirement: an
+   asset's role is determined by context (consume ⇒ Input, produce ⇒
+   Output), exactly as for datasets. APIs must not ask the caller to name a
+   role.</strong></p>
+<p>Per <a href="../../adr/0001-lineage-walks-data-flow-not-orchestration/">ADR-0001</a>,
+data-flow lineage is <em>derived</em> by walking these edges
+(<code>Dataset_Version.Execution</code> and <code>&lt;Asset&gt;_Execution</code> Output edges backward
+to producing executions); it does not walk <code>Execution_Execution</code>
+orchestration links.</p>
+<h3 id="every-artifact-has-a-producing-execution">Every artifact has a producing execution</h3>
+<p>The execution is the <strong>unit of provenance</strong>: the contract's obligations hang
+off executions, and the model above records what each execution produced. The
+converse is what makes Goal 1 hold for <em>every</em> artifact, not just those that
+happen to be execution-authored:</p>
+<blockquote>
+<p><strong>Every durable artifact (dataset version, feature value, asset, file)
+MUST attribute to a producing execution</strong> — via the same output edges
+above (<code>Dataset_Version.Execution</code>, <code>&lt;Asset&gt;_Execution</code> with
+<code>Asset_Role="Output"</code>). An artifact with a null producer is a contract
+violation.</p>
+</blockquote>
+<p>Most data is produced by a real, driven execution and this is automatic.
+But data also enters a catalog <strong>outside any run</strong> — <code>add_files</code> called
+standalone, direct API / Chaise inserts, bulk loads. Such an artifact has no
+real producer, yet Goal 1 still requires "how did this come to exist?" to
+return <em>something</em>.</p>
+<h4 id="artifacts-with-no-producing-execution-the-unknown-provenance-execution">Artifacts with no producing execution → the unknown-provenance execution</h4>
+<p>For this the contract seeds a <strong>second sentinel: a canonical
+<em>unknown-provenance Execution</em></strong> (the producer-side counterpart to the
+unknown-provenance <code>File</code> of the no-input case). An artifact created with no
+real producer attributes to it through the ordinary output edge
+(<code>Dataset_Version.Execution = &lt;unknown-exec&gt;</code>, or an <code>Asset_Role="Output"</code>
+link to it). The lineage walk then terminates at this sentinel and reports
+<strong>"unknown origin"</strong> — an explicit, queryable answer rather than a null
+dead-end. The two sentinels are duals:</p>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Sentinel</th>
+<th>Edge</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Execution declared no input</td>
+<td>unknown-provenance <strong><code>File</code></strong></td>
+<td>input (<code>Asset_Role="Input"</code>)</td>
+</tr>
+<tr>
+<td>Artifact has no producing execution</td>
+<td>unknown-provenance <strong>Execution</strong></td>
+<td>output (authorship / <code>Asset_Role="Output"</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>This rule applies to <strong>every</strong> artifact, new and existing — not just
+artifacts created after the contract is adopted. New artifacts carry a
+producer (real or sentinel) by construction. Existing artifacts with null
+producers (on an established catalog, the large majority of dataset
+versions) are brought into conformance by a one-time <strong>backfill</strong> that
+attributes them to the unknown-provenance execution sentinel (see <em>Adoption
+and backfill</em>); the backfill is part of adopting the contract, not a separate
+optional cleanup. The audit reports any remaining null-producer artifact as a
+violation.</p>
+<p><strong>Exemption.</strong> Platform/bootstrap rows seeded by catalog initialization
+itself — controlled-vocabulary terms (<code>Asset_Role</code>, <code>Dataset_Type</code>, …),
+schema-seed rows, the two sentinels — are <em>not</em> artifacts in this sense and
+carry no producer obligation. They are the catalog's substrate, not data
+produced within it.</p>
+<h3 id="idempotency-concurrency-and-re-runs">Idempotency, concurrency, and re-runs</h3>
+<ul>
+<li><strong>Executions are not idempotent; each run is a distinct execution.</strong>
+  Running the same committed script twice produces <strong>two</strong> Execution rows,
+  each with its own inputs, outputs, and timing. This is intentional: the
+  two runs are distinct events in time and each is its own provenance record
+  (they may consume different dataset versions, or one may fail). Provenance
+  records <em>what happened</em>, and two runs happened.</li>
+<li><strong>Workflows <em>are</em> deduplicated, by checksum.</strong> Identical source (same
+  URL + checksum) resolves to the same Workflow row, so the two executions
+  above share one Workflow — correctly, since it is the same code. Dedup is
+  on the immutable code identity, not on the run.</li>
+<li><strong>Outputs are not auto-deduplicated against prior runs.</strong> A re-run that
+  authors a new dataset version creates a new version; one that writes
+  feature values writes new rows under the new execution. Detecting that a
+  re-run "produced the same thing" is out of scope — the contract records
+  each production under its own execution and leaves equivalence judgments to
+  the consumer.</li>
+<li><strong>Association edges are unique per (entity, execution).</strong> The
+  <code>&lt;entity&gt;_Execution</code> association tables carry a <code>(entity, Execution)</code>
+  unique key, so the same input/output cannot be double-recorded against one
+  execution; a retried edge-write reconciles to the existing row rather than
+  duplicating it.</li>
+<li><strong>Single-writer per execution is assumed.</strong> One execution is driven by one
+  lifecycle owner (the context manager in one process). The lone exception
+  is the <strong>additive-upload</strong> edge (<code>Uploaded → Pending_Upload → Uploaded</code>),
+  where a second owner uploads a follow-on asset batch against an
+  already-completed execution; the <code>(entity, Execution)</code> unique key keeps
+  that safe. Concurrent drivers racing the <em>same</em> execution's lifecycle
+  transitions are not a supported pattern and the contract makes no
+  guarantees about the result.</li>
+</ul>
+<h3 id="consumed-a-dataset-is-defined-by-the-configuration">"Consumed a dataset" is defined by the configuration</h3>
+<p><strong>An execution consumed a dataset if and only if that dataset appears in the
+<code>datasets=</code> parameter of its <code>ExecutionConfiguration</code>.</strong> Consumption is
+defined by the declared configuration — not by what the code happened to
+read off disk, and never by post-hoc RID-set inference.</p>
+<p>The model is authorship-canonical: input and output live in <em>different</em>
+tables, so a dataset's role is never ambiguous.</p>
+<ul>
+<li><strong>Input edge</strong> = a <code>Dataset_Execution</code> row (<code>Dataset</code>, <code>Dataset_Version</code>,
+  <code>Execution</code>), written for each dataset in <code>datasets=</code>, version-pinned to a
+  <code>Dataset_Version</code> RID.</li>
+<li><strong>Output edge</strong> = <code>Dataset_Version.Execution</code> authorship.</li>
+</ul>
+<p>This yields a hard, airtight runtime invariant:</p>
+<blockquote>
+<p>On a <strong>successful</strong> run: every dataset in <code>ExecutionConfiguration.datasets</code>
+⟹ exactly one version-pinned <code>Dataset_Execution</code> input edge. No dataset in
+<code>datasets=</code> ⟹ no input edge. An author cannot declare a dataset input and
+have the edge dropped, nor obtain an input edge without declaring it.</p>
+</blockquote>
+<p><strong>Bad input fails fast — no partial state.</strong> A declared input RID is
+<strong>validated up front</strong>, in <code>Execution.__init__</code>, <em>before</em> the Execution row
+is created and before any dataset is materialized. If any declared input does
+not resolve, the run fails immediately with <strong>no Execution row and no input
+edges written at all</strong> — there is no partial-input state to record, because
+nothing was created. This is the stronger guarantee (validate-not-dry-run,
+<a href="../../adr/0002-validate-not-dryrun-pre-flight/">ADR-0002</a>): a bad input is
+caught with zero side effects, rather than leaving a half-recorded run to
+clean up. Consequently the <code>datasets= ⟺ input-edges</code> equivalence is total —
+either all declared inputs resolve and all edges are written, or the run
+never starts. (This supersedes an earlier "record the resolved prefix on a
+mid-materialization failure" draft: upfront validation makes a partial
+materialization of <em>declared</em> inputs unreachable.)</p>
+<p>The author's obligation — <em>not</em> machine-enforceable — is to express a
+dataset-shaped input <em>as</em> a dataset (in <code>datasets=</code>) rather than as, say, a
+CSV dump of its RIDs. DerivaML cannot tell that an opaque file "is really
+dataset X," so this is upheld by convention, review, and making the
+<code>datasets=</code> path the path of least resistance.</p>
+<h3 id="workflow-reproducibility-enforceable-vs-verifiable">Workflow reproducibility: enforceable vs. verifiable</h3>
+<p>Reproducibility of the <em>code</em> is a goal that <strong>cannot be guaranteed</strong>,
+because the code lives in an external system (e.g. GitHub) outside DerivaML's
+trust boundary — repos are deleted, made private, force-pushed, commits
+garbage-collected. The requirement splits along that boundary:</p>
+<ul>
+<li><strong>Enforceable (DerivaML's responsibility, a hard invariant):</strong> an
+  artifact-producing execution's workflow MUST carry a <strong>well-formed URL</strong>
+  and a <strong>non-empty checksum</strong> captured from the code that actually ran.
+  Recording these is fully within DerivaML's control; a degenerate URL (e.g.
+  a <code>&lt;stdin&gt;</code> placeholder) or empty checksum on an artifact-producer is a
+  <strong>hard violation</strong> — the <em>recording</em> failed.</li>
+<li><strong>Verifiable but not enforceable (a best-effort health signal):</strong> whether
+  the URL <em>still resolves</em> and the fetched bytes <em>still match the checksum</em>.
+  The external host may have dropped the commit. A resolution failure is a
+  flagged health concern, never a contract violation and never retroactive —
+  an honestly-recorded workflow stays compliant even if the host later loses
+  the bytes.</li>
+</ul>
+<p>Probe/exploratory executions (Scope-exempt) MAY carry a degenerate workflow.</p>
+<p><strong>How a violation is handled — one consistent rule.</strong> "Hard violation" names
+<em>what is wrong</em>, not <em>how the framework reacts</em>. The reaction is uniform
+across the contract and matches the no-input check: at the point an
+artifact-producer commits, a violated invariant (degenerate workflow, no
+declared input, untagged output) produces a <strong>loud, structured warning and a
+durable mark</strong> — it does <strong>not</strong> fail the commit or roll back the work. The
+work already happened; refusing to record it would lose provenance, not
+improve it (Goal 4: never fake, never destroy). The durable mark is what
+makes the violation <em>findable</em> by the audit afterward. The schema does not
+hard-enforce these as NOT-NULL constraints (the columns are nullable today),
+by design — enforcement is the warn-and-mark-and-audit stack, not a database
+constraint that would block legitimate edge cases. An operator who wants a
+hard gate (e.g. "reject a release if any artifact-producer has a degenerate
+workflow") layers that on top of the audit; the contract does not mandate it.</p>
+<h4 id="timing-of-the-artifact-producer-rules">Timing of the artifact-producer rules</h4>
+<p>Because "artifact-producing" is an <strong>outcome property determined at commit</strong>
+(see Definitions), the rules gated on it — the workflow URL+checksum
+requirement and the complete-provenance predicate — cannot be checked at
+<code>create_execution()</code> or <code>__enter__</code>: at those points the run may still turn
+out to be a probe, and the workflow row (deduplicated by URL/checksum) was
+created before the run's intent was known. <strong>All artifact-producer rules are
+therefore checked at the point the execution writes its first durable
+artifact.</strong> An execution is held to probe-level obligations until that
+moment, then to artifact-producer obligations from it.</p>
+<p>There is <strong>more than one such write path</strong>, and the check must fire at each —
+not only at <code>commit_output_assets()</code>. A durable artifact is created by any of:
+<code>commit_output_assets()</code> (uploaded assets), dataset-version authorship
+(<code>Dataset_Version.Execution</code>), and feature-value writes (each feature row
+carries its own <code>Execution</code> FK and is written outside the asset-commit path).
+Whichever fires first is the moment the execution becomes an
+artifact-producer, and the artifact-producer checks must be applied
+consistently at all three. A single check wired only into
+<code>commit_output_assets()</code> would miss a run that authors a dataset version or
+writes features but uploads no assets.</p>
+<p>A consequence to accept explicitly: a run can do real work under a
+degenerate workflow and only discover at commit that the workflow is a hard
+violation. That is the correct time to surface it — the alternative
+(demanding artifact-producer intent up front) would force a declaration that
+is frequently wrong (a "declared" producer that produces nothing, or a
+"probe" that ends up writing an artifact) and would gate exploratory work
+that should stay friction-free (Goal 5). The cost is that the diagnostic
+arrives at commit rather than at start; the benefit is that the
+classification is always <em>correct</em> because it reflects what actually
+happened.</p>
+<h3 id="external-resource-ingest">External-resource ingest</h3>
+<p>An execution whose input originates <strong>outside the catalog</strong> — an external
+labels file, a chart-review CSV — is consuming an <strong>asset</strong>, not a dataset.
+This is the key framing: such a file is content (a file with bytes and a
+hash), so it belongs in the <code>File</code> table as an input asset; it is <strong>not</strong> a
+dataset (a curated collection of catalog rows). The correct provenance shape
+for "build a dataset from an external file" is therefore:</p>
+<blockquote>
+<p><code>File</code> (input asset) → Execution → <code>Dataset</code> (output)</p>
+</blockquote>
+<p>— a complete, ordinary input→output record. A common point of confusion:
+when the external file is a <em>list of RIDs</em> that happen to match some
+dataset's members, it is tempting to think the run "consumed that dataset."
+It did not. It consumed a <strong>file</strong>; the RID overlap is a coincidence of
+contents, not a provenance edge. The dataset is the run's <strong>output</strong>, and
+its input is the file. Modeling the file as an input asset makes the
+provenance honest and complete with no special case.</p>
+<p>Files are assets, so an external file behaves <strong>like any input asset</strong> — in
+the config, to application code, and in the provenance graph. It is declared
+as an input either by <strong><code>File</code> RID</strong> (already registered) or by an
+<strong>explicit local-file spec</strong> (<code>LocalFile(...)</code>, which the framework
+registers). In the config it sits in <code>assets=</code> next to any other input
+asset:</p>
+<pre><code class="language-python">ExecutionConfiguration(
+    assets=[
+        AssetSpec(&quot;&lt;asset-rid&gt;&quot;),         # a catalog asset, by RID
+        &quot;&lt;file-rid&gt;&quot;,                     # an already-registered File, by RID
+        LocalFile(&quot;/data/labels.csv&quot;),    # a local file — framework registers it
+    ],
+    datasets=[DatasetSpec(&quot;&lt;dataset-rid&gt;@&lt;version&gt;&quot;)],
+    ...,
+)
+</code></pre>
+<p>(RID strings are shown as <code>&lt;…&gt;</code> placeholders; real RIDs come from a catalog
+lookup, never a hard-coded literal.)</p>
+<p><strong>A bare string in <code>assets=</code> is <em>always</em> a RID — never a path.</strong> A local
+file must be wrapped in an explicit <code>LocalFile(...)</code> spec; the framework does
+<strong>not</strong> type-sniff a bare string to decide "RID or path." This is a
+deliberate safety boundary, not just style:</p>
+<ul>
+<li><strong>No silent reinterpretation.</strong> A mistyped RID fails as a bad RID; it can
+  never be silently re-read as a filesystem path (or vice versa). The
+  declaration means exactly one thing.</li>
+<li><strong>Filesystem reads are explicitly marked.</strong> Because a path becomes an
+  input only when the author wrote <code>LocalFile(...)</code>, a config populated from
+  a less-trusted source (a shared-runner Hydra override, a sweep parameter,
+  another user's config) cannot turn an arbitrary string into "read and
+  catalog this file." A reviewer can see every local-file read as a typed
+  declaration. (A runner that wants defense-in-depth MAY additionally
+  restrict <code>LocalFile</code> reads to a configured root directory — a deployment
+  policy the contract notes but does not mandate.)</li>
+</ul>
+<p>This mirrors the dataset rule (Goal 2: declare, don't infer): intent is
+declared by <em>type</em>, never recovered by inspecting a string's shape.</p>
+<p>For a <code>LocalFile</code>, deriva-ml does the rest — computes the checksum (reusing
+<code>FileSpec.create_filespecs</code>), mints the <code>File</code> row, and writes the
+<code>&lt;File&gt;_Execution</code> edge with <strong><code>Asset_Role="Input"</code> derived from context</strong>:
+because the file is declared in <code>assets=</code>, it is a consumed input, so the
+Input edge is written by the same input-edge mechanism the asset <em>download</em>
+path already uses. The caller never names the role. Inside the run, the file
+is read through the <strong>same <code>asset_paths</code> surface</strong> as any input asset. The
+<em>implementation model</em> (the thin config spec, the on-the-fly registration
+hook, the input-edge write, the download-skip for references) is in
+<em>Implementation notes</em>; no user-side checksum work and no role flag is
+imposed (Goal 5; role-from-context).</p>
+<p><strong>Rule:</strong> an external file consumed by an execution MUST be declared as an
+input — a <code>File</code>-table row (mandatory <code>MD5</code>) linked via <code>&lt;File&gt;_Execution</code>
+with <code>Asset_Role="Input"</code>. The role is assigned by context (the file is in
+<code>assets=</code>), not specified by the caller. Only an <strong>un-declared loose file</strong> —
+read off disk with no <code>File</code> row at all — violates the rule.</p>
+<h4 id="what-minting-a-file-rid-records">What minting a <code>File</code> RID records</h4>
+<p>Registering an external file <strong>mints a catalog identity (a RID) for a file
+the catalog does not host.</strong> The <code>File</code> row carries three things, on the two
+sides of the trust boundary (Goal 4):</p>
+<ul>
+<li><strong>RID + MD5 — durable, inside the boundary.</strong> DerivaML mints the RID and
+  <strong>computes the MD5 from the file's bytes at registration</strong> (the existing
+  <code>FileSpec.create_filespecs</code> already does this). The MD5 is the content
+  anchor: it records exactly <em>what</em> was consumed. The MD5 is <em>computed</em>,
+  never caller-supplied — a caller-provided hash would defeat the one
+  guarantee the row makes. (<strong>Exemption:</strong> the unknown-provenance <code>File</code>
+  sentinel — see <em>The two unknown-provenance sentinels</em> — is bootstrap
+  substrate, not a registered file. It carries a fixed marker MD5 and
+  represents <em>no bytes</em>; the computed-from-bytes rule does not apply to it,
+  precisely because it asserts "unknown content," not specific content.)</li>
+<li><strong>URL — a non-dereferenceable identity annotation, outside the boundary.</strong>
+  The <code>URL</code> column is <strong>always populated</strong> (never null). For a local file it
+  is <strong>not</strong> a <code>file://</code> path but a <strong><code>tag:</code> URI</strong> — the existing <code>FileSpec</code>
+  convention (<code>core/filespec.py</code>), which normalizes a local path to
+  <code>tag://&lt;hostname&gt;,&lt;date&gt;:file://&lt;path&gt;</code>. A <code>tag:</code> URI (RFC 4151) is <em>by
+  design a unique name, not a retrieval address</em>: the scheme itself encodes
+  "this identifies the file's origin; it is not a URL you fetch." So the
+  "provenance annotation, not a retrieval path" property is carried by the
+  URI scheme, not just by convention. The MD5 remains the only content
+  guarantee; a <code>File</code> row minted this way is <em>complete-but-unverifiable</em>
+  provenance by construction.</li>
+</ul>
+<p><strong>Identity is URL-keyed (existing schema; no change).</strong> The <code>File</code> table's
+unique key is on <code>URL</code>, with <code>MD5</code> mandatory. Because the tag URI embeds
+<code>(hostname, date, path)</code>, identity is scoped to that tuple:</p>
+<ul>
+<li><strong>Same tag URL, changed content → conflict.</strong> Re-registering the same
+  <code>(host, date, path)</code> after the bytes change collides on the URL key (it
+  already binds that tag to a different MD5). Desirable: one recorded origin
+  cannot silently hold two contents; reconcile explicitly.</li>
+<li><strong>Same content, different origin → different RIDs.</strong> The same bytes
+  registered from a different host — or the same host on a different day, or
+  a different path — produce a different tag URI and therefore a distinct
+  <code>File</code> row. Identity tracks the recorded <em>origin</em> <code>(host, date, path)</code>,
+  not the content hash; this is accepted, not a defect.</li>
+<li><strong>Re-registering the identical (tag URL, content) pair reuses the row</strong> —
+  no duplicate RID.</li>
+</ul>
+<p><strong>Hosting the bytes is optional; the checksum is not.</strong> A <code>File</code> row may
+hold a real URL + hosted bytes, or be a pure reference (URL + <code>MD5</code>, bytes
+not hosted). The reference form is <strong>complete-but-unverifiable</strong> provenance
+and is <strong>compliant</strong> — parallel to a checksummed workflow whose external
+commit was later deleted. The <code>MD5</code> makes it complete (you know exactly
+<em>what</em> was consumed); whether the URL still resolves is a best-effort health
+signal, not a compliance condition. The reference form exists deliberately
+so PII / large / licensed external data (e.g. an MRN-bearing CSV) can be
+recorded by reference + hash without hosting the bytes.</p>
+<h2 id="enforcement-verification">Enforcement &amp; verification</h2>
+<p>The contract enforces what DerivaML controls and detects the rest; it does
+not rely on a single hard gate. The pieces:</p>
+<h3 id="write-time-edge-guarantees">Write-time edge guarantees</h3>
+<p>Declaring an input (<code>datasets=</code> / <code>assets=</code> / <code>add_files(...)</code>) makes the
+checksummed record and the role-tagged edge <strong>automatic and correct</strong> —
+airtight <em>given the API is used</em>. This is the mechanism behind both the
+dataset-input invariant and the external-ingest rule.</p>
+<h3 id="the-no-input-commit-check">The no-input commit check</h3>
+<p>An artifact-producing execution that commits with <strong>no recorded inputs of
+any kind</strong> receives a loud, structured warning — <strong>not</strong> a refused commit. A
+hard block would mis-fire on legitimate input-less runs (a schema extension,
+a scalar-parameter-only run) and would push authors away from the framework
+and back toward the untracked interactive runs this contract exists to
+prevent.</p>
+<p>The warning also leaves a durable <strong>unknown-provenance mark</strong>, recorded as a
+real input edge (not a side-channel flag): the gap is recorded as
+<em>explicitly unknown</em>, not absent, so it is findable later. Silence and
+"explicitly unknown" are different; the contract requires the latter.</p>
+<p><strong>What this check does NOT catch (a deliberate limitation).</strong> The check
+fires on <strong>zero</strong> declared inputs — it catches the <em>symptom</em> (nothing
+declared) but cannot <em>recover</em> an undeclared dependency. Note this is <strong>not</strong>
+a "dataset consumed as a file" problem: under the asset framing above there
+is no such thing — an external file is an input <em>asset</em>, the dataset is the
+<em>output</em>, and the only failure mode is <em>failing to register the input file at
+all</em>. That failure presents as zero inputs and is caught (warn + sentinel),
+recorded as "unknown input." The residual, unavoidable limit is narrow: the
+check cannot distinguish a <em>legitimately</em> input-less run (a schema extension)
+from one that <em>forgot</em> to register its file — both warn, and a human
+reading the description distinguishes them. What no machine can do is
+reconstruct <em>which</em> file a forgetful run should have named. Declaring the
+file as a <code>LocalFile</code> in <code>assets=</code> (Input by context) is a one-liner, which
+keeps the "forgot" case rare by making declaration trivial.</p>
+<h3 id="the-two-unknown-provenance-sentinels">The two unknown-provenance sentinels</h3>
+<p>Both kinds of provenance gap are recorded <strong>as real edges to seeded sentinel
+rows</strong>, keeping provenance in the graph rather than in side-channel flags.
+Two sentinels, seeded at catalog initialization (alongside the
+platform-default <code>Asset_Role</code> terms), are duals:</p>
+<ul>
+<li><strong>Unknown-provenance <code>File</code></strong> — for an artifact-producing execution that
+  commits with <strong>no declared input</strong>. The framework links this <code>File</code> as an
+  <strong><code>Input</code></strong> via <code>File_Execution</code> (<code>Asset_Role="Input"</code>) — the same edge any
+  external-file input writes, pointed at the reserved row. Because the <code>File</code>
+  table mandates <code>MD5</code> NOT NULL and a unique <code>URL</code>, it is a well-formed row
+  with a reserved URL (e.g. <code>tag:deriva-ml,unknown-source</code>) and a fixed
+  marker MD5.</li>
+<li><strong>Unknown-provenance Execution</strong> — for an <strong>artifact with no producing
+  execution</strong> (data inserted outside any run). The artifact attributes to
+  this sentinel execution through the ordinary output edge
+  (<code>Dataset_Version.Execution = &lt;unknown-exec&gt;</code>, or an <code>Asset_Role="Output"</code>
+  link). A lineage walk from such an artifact terminates here and reports
+  "unknown origin" instead of dead-ending on a null producer.</li>
+</ul>
+<p>Each is a <strong>single shared sentinel</strong>, not a per-row instance. The edge
+records <em>that</em> the origin is unknown, uniformly and auditably; richer detail
+belongs in the row's description. Both make the gap visible in a lineage walk
+and reduce the audit to a plain edge query rather than status parsing.</p>
+<h3 id="honest-termination">Honest termination</h3>
+<p>DerivaML cannot force a human in an interactive session to drive a
+lifecycle. Honest termination is therefore guaranteed for the blessed path
+and <em>detected</em> (not auto-repaired) elsewhere:</p>
+<ol>
+<li><strong>The blessed path guarantees termination.</strong> <code>with
+   ml.create_execution(...) as exe:</code> drives <code>Created → Running</code> on
+   <code>__enter__</code> and <code>Running → {Stopped|Failed}</code> on <code>__exit__</code> (both clean
+   and exception paths). <code>__exit__</code> always fires, so the context manager
+   guarantees a terminal state. The contract names the context manager as
+   the required path for any run of record; docs and template scripts push
+   it. The <code>__del__</code> best-effort abort (fires only for non-terminal states
+   with a live in-process catalog session) is an in-process backstop.</li>
+<li><strong>Detection is read-only.</strong> The audit reports executions stranded in
+   non-terminal states as a health signal. It does not change state.</li>
+<li><strong>Resolution is human-invoked.</strong> A stranded row is resolved by an
+   operator deliberately calling <code>ml.gc_executions(...)</code> or an explicit
+   abort — never by a timer.</li>
+</ol>
+<p>An <strong>autonomous sweep is rejected by design.</strong> A background process flipping
+non-terminal → <code>Aborted</code> on a threshold (a) mutates production provenance on
+a heuristic that is sometimes wrong, (b) treats the symptom rather than the
+cause, and decisively (c) cannot distinguish "abandoned and did nothing"
+from "did the work but never closed the lifecycle" — auto-stamping the
+latter <code>Aborted</code> records a <em>different</em> falsehood. That judgment requires a
+human. The contract's job is to stop <em>creating</em> stranded rows (the blessed
+path does this); existing stranded rows are resolved by the one-time
+adoption backfill (see <em>Adoption and backfill</em>), which aborts them
+deliberately rather than on a timer.</p>
+<h3 id="audit">Audit</h3>
+<p>A read-only, catalog-wide scan surfaces all violations in one place. It
+tests the <strong>complete-provenance predicate</strong> clause by clause (each clause →
+one query):</p>
+<ul>
+<li>artifact-producers not in a terminal state (stranded non-terminal);</li>
+<li>artifact-producers with a degenerate URL or empty checksum on their
+  workflow;</li>
+<li>artifact-producers with <strong>zero</strong> declared inputs (no input edge at all, not
+  even the sentinel) — a violation;</li>
+<li>artifact-producers with an output that is not role-tagged;</li>
+<li><strong>artifacts with a null producer</strong> (no producing execution and not
+  attributed to the unknown-provenance execution sentinel) — a violation;</li>
+<li><code>Failed</code> rows missing a reason.</li>
+</ul>
+<p>The audit also <strong>reports</strong> (separately from violations) the <strong>known-degraded</strong>
+cases — these are <em>compliant</em>, but the report surfaces them so an operator can
+see where provenance is honest-but-thin:</p>
+<ul>
+<li>artifact-producers whose only input is the unknown-provenance <strong><code>File</code></strong>
+  sentinel (the run satisfies the input clause, but the input is explicitly
+  unknown);</li>
+<li>artifacts attributed to the unknown-provenance <strong>Execution</strong> sentinel
+  (a producer exists, but it is the "no real producer" marker).</li>
+</ul>
+<p>A sentinel attribution is <strong>compliant, not a violation</strong> — it satisfies the
+contract by recording the gap <em>explicitly</em> rather than leaving it null. The
+audit distinguishes <em>violations</em> (must fix) from <em>known-degraded</em> (visible,
+accepted) so the two are never conflated.</p>
+<p><strong>Authority and cadence (advisory, not gating — by design).</strong> The audit is
+<strong>advisory tooling with no blocking authority</strong>: it never fails a build,
+never blocks a commit, and never mutates state (Goal 4 — it cannot resolve
+the ambiguities it surfaces, only report them). It is intended to run as a
+<strong>per-catalog health report</strong>, on operator demand and optionally on a
+schedule, with results reviewed by the catalog's owner. It deliberately
+carries <strong>no SLA and no automatic remediation</strong>: a nonzero violation count
+is information for a human, not a trigger. This keeps it consistent with the
+no-autonomous-sweep decision — the audit <em>detects</em>; humans <em>decide and
+resolve</em>. Promoting any audit query to a hard gate (e.g. a release-time
+check that an artifact-producer's workflow is checksummed) is a deployment
+choice an operator may layer on top; the contract does not mandate it.</p>
+<h2 id="enforcement-summary">Enforcement summary</h2>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>When it fires</th>
+<th>Guarantee</th>
+<th>What it catches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Write-time edges</td>
+<td>input declared</td>
+<td>hard, <em>if the API is used</em></td>
+<td>dropped edges (none — automatic)</td>
+</tr>
+<tr>
+<td>No-input commit check</td>
+<td>commit</td>
+<td>warn + unknown-sentinel mark</td>
+<td>artifact-producer with <strong>zero</strong> inputs</td>
+</tr>
+<tr>
+<td>Audit</td>
+<td>on demand / scheduled read (advisory)</td>
+<td>detection only</td>
+<td>every predicate clause of complete provenance</td>
+</tr>
+<tr>
+<td>Convention &amp; review</td>
+<td>authoring</td>
+<td>soft</td>
+<td>declaring inputs at all (the file/dataset <em>was</em> an input)</td>
+</tr>
+</tbody>
+</table>
+<p>No single mechanism is sufficient; the guarantee is the stack. The
+zero-input check is hard (an artifact-producer that declares nothing is
+caught); what no machine can do is reconstruct <em>which</em> undeclared file a run
+should have named — that is recorded as explicitly unknown and resolved by a
+human. Declaring an input is a one-liner — a <code>LocalFile</code> (or RID) in
+<code>assets=</code> — which keeps the "forgot to declare" case rare by making the
+honest path the easy one.</p>
+<h2 id="reproducibility-what-the-graph-does-and-does-not-give-you">Reproducibility: what the graph does and does not give you</h2>
+<p>This contract is written for the researcher who has an ML result — say a
+prediction feature value on an image — and asks three things of it. Here is
+what the provenance graph delivers for each, and where it stops.</p>
+<p><strong>(1) "How was this result obtained?" — fully supported.</strong> From the feature
+value, follow its <code>Execution</code> FK to the producing execution, then to the
+workflow (code URL + checksum), the declared input datasets (version-pinned)
+and input assets/files (MD5), the configuring <code>Execution_Metadata</code>, and the
+other outputs. This is exactly the graph the contract guarantees, provided
+the writers used the blessed path. If any link is the unknown-provenance
+sentinel, the trace is honest about <em>where</em> it goes dark.</p>
+<p><strong>(2) "Reproduce it" — partially supported; the graph is necessary, not
+sufficient.</strong> The graph tells you <em>what</em> to feed a re-run, but identical
+output additionally requires things this contract does <strong>not</strong> mandate:</p>
+<ul>
+<li><strong>Pinned data, not dev versions.</strong> A dataset input pinned to a <em>released</em>
+  version is reproducible; a <em>dev</em> version (<code>Dataset_Version.Snapshot</code> null)
+  resolves to live state and can drift. Reproduction requires released,
+  snapshot-pinned inputs.</li>
+<li><strong>Retrievable inputs.</strong> A reference-only <code>File</code> input (MD5, no hosted
+  bytes) tells you the content hash but not where to fetch it.</li>
+<li><strong>Environment.</strong> Lockfile, container/image digest, Python version, random
+  seeds, env vars, hardware, external-service versions. These may be placed
+  in <code>Execution_Metadata</code>, but the contract defines <strong>no mandatory fields</strong>,
+  so their presence is not guaranteed.</li>
+</ul>
+<p>The honest statement: the graph gets you to "same code, same declared
+inputs, same recorded config" — not automatically to "same bits out."
+Bridging that is the v2 reproduction-metadata work.</p>
+<p><strong>(3) "Debug a systematic error across many runs" — supported at the graph
+level; ergonomics are a known gap.</strong> The edges support the queries you need:
+group feature rows by <code>Execution</code>; compare executions sharing a workflow
+checksum, an input dataset version, or an input-file MD5; walk forward from a
+suspect dataset version to everything downstream. What the contract does
+<strong>not</strong> yet provide is <em>packaged</em> impact queries — e.g. "every output of
+workflow checksum X with config param Y and input MD5 Z," "all descendants of
+dataset version D," "all successful outputs excluding failed/aborted
+partials." These are expressible over the graph but are left to tooling, not
+specified here. Two specifics a batch-debugger must know:</p>
+<ul>
+<li><strong>Failed/aborted partials are in the graph.</strong> A reader doing impact
+  analysis must filter to successful producers (terminal <code>Uploaded</code>/clean
+  <code>Stopped</code>) to exclude partial outputs recorded under <code>Failed</code>/<code>Aborted</code>
+  executions; the contract records them but does not auto-hide them.</li>
+<li><strong>Multiple feature values per target are normal</strong>, and which one a given
+  result <em>used</em> is a selector decision (<code>select_newest</code>, by-workflow, custom)
+  made by the consuming code — it is not encoded in the feature row. To trace
+  "the value this result used," you need the consuming execution's selector,
+  not just the target's feature rows.</li>
+</ul>
+<h3 id="recommended-execution-metadata">Recommended execution metadata</h3>
+<p><code>Execution_Metadata</code> is where environment capture lives. The contract does
+not <em>mandate</em> fields (that is the v2 work), but deriva-ml <strong>already captures
+a substantial set today</strong>, and a run on the blessed path gets them for free.
+This is what to rely on, what is conditional, and what is still missing.</p>
+<p><strong>Captured automatically by deriva-ml (every blessed-path run):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>What it records</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>configuration.json</code></td>
+<td>The resolved <code>ExecutionConfiguration</code> — declared datasets (version-pinned), assets, workflow, and the invoking <code>argv</code> (<code>sys.argv</code> captured at construction)</td>
+<td>always</td>
+</tr>
+<tr>
+<td><code>environment_snapshot_&lt;ts&gt;.txt</code></td>
+<td>Installed packages + versions (<code>importlib.metadata</code>); <strong>CPU architecture + processor</strong> (<code>platform.machine</code> / <code>platform.processor</code>), OS (<code>system</code>/<code>release</code>/<code>version</code>/<code>node</code>); Python interpreter config (<code>sys</code>, <code>sys.path</code>, <code>executable</code>, encodings); and <strong>all environment variables</strong> (<code>os.environ</code>)</td>
+<td>always</td>
+</tr>
+<tr>
+<td>GPU / accelerator</td>
+<td>GPU model(s), count, total VRAM, NVIDIA driver version, and (when torch is present) the CUDA / cuDNN versions torch was built against — folded into the environment snapshot</td>
+<td>best-effort (see <em>Implementation notes</em>); records "unavailable" when no probe succeeds</td>
+</tr>
+<tr>
+<td>Workflow URL + checksum + version</td>
+<td>The code identity: git commit URL, commit-hash checksum, and version string on the <code>Workflow</code> row</td>
+<td>always (for a committed workflow)</td>
+</tr>
+<tr>
+<td>Execution durations</td>
+<td><code>Execution_Duration</code>, <code>Download_Duration</code>, <code>Upload_Duration</code> on the <code>Execution</code> row</td>
+<td>always</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Captured conditionally:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>What it records</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>uv.lock</code></td>
+<td>The dependency lockfile — pinned versions of every package in the environment</td>
+<td>only when the workflow's git root contains a <code>uv.lock</code></td>
+</tr>
+<tr>
+<td><code>config.yaml</code>, <code>overrides.yaml</code>, <code>hydra.yaml</code></td>
+<td>The resolved Hydra config, command-line/sweep overrides, and Hydra runtime metadata</td>
+<td>only when running under hydra-zen</td>
+</tr>
+</tbody>
+</table>
+<p>The conditional set matters for reproduction: the <code>environment_snapshot</code>
+(always present) lists installed versions descriptively, but the <strong><code>uv.lock</code>
+is the re-installable pin</strong> — so a run <em>not</em> launched from a uv project has a
+weaker reproduction story (you can see what was installed, but not
+deterministically re-create it from a lockfile).</p>
+<p><strong>Recommended but NOT captured (the gap to close manually, pending v2):</strong></p>
+<ul>
+<li><strong>Container / image digest</strong> — if the run executed in a container, its
+  digest is the strongest environment pin and should be added to
+  <code>Execution_Metadata</code> by the caller.</li>
+<li><strong>External-service versions</strong> — any model API, feature service, or
+  external dependency the run called.</li>
+</ul>
+<p>(GPU / accelerator info was formerly on this list; it is now captured
+best-effort as part of the environment snapshot — see the table above and
+<em>Implementation notes</em>. It still degrades to "unavailable" when no probe
+succeeds, so a result that is GPU-sensitive on an un-probeable accelerator
+may still need a caller-supplied note.)</p>
+<p>These are the fields a researcher should add explicitly today (via
+<code>asset_file_path(MLAsset.execution_metadata, ...)</code>) when bit-for-bit
+reproduction matters, and the fields v2 would promote to mandatory.</p>
+<p><strong>Random seeds are captured via the Hydra config — not a separate field.</strong> A
+seed that affects a result (data split, weight init, sampler) is a <em>run
+parameter</em>, so it belongs in the Hydra configuration, where it is recorded as
+provenance automatically: it appears in <code>config.yaml</code> (the resolved value)
+and, if set on the command line or in a sweep, in <code>overrides.yaml</code>. The
+recommended practice is therefore to <strong>drive every seed through Hydra config
+rather than hard-coding it in the script</strong> — that way the seed is both
+controllable and captured, with no extra metadata work. (A run <em>not</em> launched
+under hydra-zen has no <code>config.yaml</code>, so for those runs the caller must record
+seeds explicitly, the same as any other config.)</p>
+<h2 id="conformance-and-versioning">Conformance and versioning</h2>
+<p>This is a normative spec that will evolve, so "compliant" must name <em>which
+contract version</em>.</p>
+<ul>
+<li><strong>Contract version.</strong> This document is <strong>Provenance Contract v1</strong>. Changes
+  that alter a normative rule bump the version; clarifications that do not
+  change conformance do not. The version is the unit other artifacts
+  reference (the ADR, the audit tool, release notes).</li>
+<li><strong>Conformance is whole-catalog.</strong> A catalog is conformant to vN when
+  <strong>every</strong> driven execution and <strong>every</strong> durable artifact satisfies the
+  contract — not just those created after some cutoff. There is no
+  "pre-contract" carve-out: adopting the contract includes a one-time
+  <strong>backfill</strong> (see <em>Adoption and backfill</em>) that brings existing data into
+  conformance by attributing orphan artifacts to the unknown-provenance
+  execution sentinel and aborting stranded non-terminal executions. After
+  backfill, the whole catalog is in scope.</li>
+<li><strong>What conformance asserts.</strong> "Catalog C is v1-conformant" means: every
+  <em>driven</em> execution satisfies the complete-provenance predicate (successful
+  artifact-producers) or honest termination (probes, failed, aborted); <strong>and</strong>
+  every durable artifact attributes to a producing execution (real or the
+  unknown-provenance sentinel). Much of a backfilled catalog will be
+  <em>honestly "unknown origin"</em> — which is compliant; conformance means
+  no <em>nulls</em> and no <em>stranded</em> rows, not that all provenance is fully traced.</li>
+<li><strong>Conformance is falsifiable.</strong> The audit is the test: run it catalog-wide;
+  zero violations ⟹ the catalog is conformant at the time of the scan.
+  (Because the audit is advisory, this is a <em>measured</em> claim, not an
+  <em>enforced</em> one — consistent with Goal 4.)</li>
+</ul>
+<h2 id="implementation-notes">Implementation notes</h2>
+<ul>
+<li>
+<p><strong>Local files as input assets — the implementation model.</strong> A local file
+  consumed by a run should behave, end to end, <strong>as much like a catalog
+  asset as possible</strong>, and must be declared by an <strong>explicit <code>LocalFile</code>
+  spec</strong> — never a bare path that the framework type-sniffs (see the safety
+  rationale in <em>External-resource ingest</em>). Four requirements drive the
+  design:</p>
+</li>
+<li>
+<p><strong>Specifiable in a hydra-config.</strong> A local file must be declarable as an
+     input in a <code>.yaml</code> experiment, so <code>LocalFile</code> is a config-serializable
+     hydra-zen structured config mirroring the existing <code>AssetSpecConfig</code>
+     (<code>asset/aux_classes.py</code>) — a <code>LocalFileConfig</code> sibling. (A <em>thin</em> config
+     object — see below — not a heavyweight new abstraction.)</p>
+</li>
+<li><strong>Looks like an asset.</strong> <code>LocalFile</code> belongs in <code>assets=</code> alongside
+     <code>AssetSpec</code>, sharing its vocabulary (<code>asset_role</code> defaulting to <code>Input</code>,
+     <code>cache</code>), so a reader of the config sees one uniform list of input
+     assets — some identified by RID, some by an explicit <code>LocalFile(path)</code>.</li>
+<li><strong>Application code sees it as an asset.</strong> Inside the execution, the
+     model function retrieves the file's on-disk path through the <strong>same
+     <code>asset_paths</code> surface</strong> it uses for any input asset — never a special
+     local-file API. Whether an input arrived from Hatrac or a <code>LocalFile</code> is
+     invisible at use-time. (<code>_download_input_assets</code> already populates
+     <code>asset_paths</code> for every input asset; a File-RID input lands there like
+     any other.)</li>
+<li><strong>The framework registers it; an already-registered file works by RID.</strong>
+     Two entry points to the same input:<ul>
+<li><strong>By <code>LocalFile(path)</code> (general case):</strong> the framework registers it
+   <strong>during input resolution</strong> — minting the <code>File</code> row via the existing
+   <code>FileSpec.create_filespecs(path, …)</code> (which computes <code>MD5</code>/length and
+   the <code>tag:</code> URI), then writing the <code>File_Execution</code> Input edge with the
+   role assigned <strong>by context</strong> (it is in <code>assets=</code>, so it is consumed),
+   using the same input-edge mechanism the asset download path uses. The
+   user does <strong>not</strong> register it by hand, computes nothing, and never
+   names a role.</li>
+<li><strong>By RID (already registered):</strong> an existing <code>File</code> row is named by its
+   RID (a bare string) and used directly — this is just
+   <code>AssetSpec(rid=&lt;file_rid&gt;)</code>, since <code>File</code> is an asset table whose RID
+   already resolves through the input path.</li>
+</ul>
+</li>
+</ul>
+<p><strong>A bare string in <code>assets=</code> resolves only as a RID.</strong> The resolver does
+  <strong>not</strong> inspect the string to decide RID-vs-path; a local file is a local
+  file <em>only</em> if it is a <code>LocalFile</code> instance. This is the safety boundary —
+  it removes the type-sniffing ambiguity and ensures a filesystem read
+  happens only for an explicitly-typed <code>LocalFile</code>, never for an arbitrary
+  (possibly injected) string.</p>
+<p><strong>Hydra-config piping.</strong> <code>LocalFile</code> must round-trip through a <code>.yaml</code>
+  experiment, because a researcher specifies the path <em>in the config</em>, not in
+  code. The mechanics are already proven by <code>AssetSpecConfig</code>: it is a
+  <code>@hydrated_dataclass(AssetSpec)</code> with plain scalar fields (<code>rid: str</code>,
+  <code>cache: bool</code>), and a path is just another scalar. So a <code>.yaml</code> carries:</p>
+<p><code>yaml
+  assets:
+    - rid: &lt;asset-rid&gt;            # AssetSpec — a catalog asset
+    - path: /data/labels.csv      # LocalFile — instantiated, then registered</code></p>
+<p>Two constraints the implementation must honor, both verified against the
+  existing code:</p>
+<ul>
+<li><strong>Keep <code>LocalFileConfig</code> to plain scalars — no <code>Literal</code> fields.</strong>
+    <code>AssetSpecConfig</code> deliberately drops <code>asset_role</code> partly because
+    omegaconf &lt; 2.4 cannot serialize <code>Literal</code> annotations. <code>LocalFileConfig</code>
+    carries <code>path: str</code> (+ optional <code>cache: bool</code>) and nothing <code>Literal</code>.</li>
+<li><strong><code>ExecutionConfiguration.validate_assets</code> is the routing + safety
+    chokepoint.</strong> That <code>@field_validator</code> (<code>execution_configuration.py:87</code>)
+    today coerces every entry — bare <code>str</code>, <code>dict</code>, <code>DictConfig</code> — to
+    <code>AssetSpec(rid=...)</code>. It must be extended to <strong>route on shape</strong>: an entry
+    with a <code>path</code> key (a <code>LocalFile</code>, or a <code>{path: ...}</code> dict/<code>DictConfig</code>
+    from hydra) resolves to <code>LocalFile</code>; an entry with a <code>rid</code> key, or a bare
+    string, resolves to <code>AssetSpec</code>. This same validator is <em>where the
+    "bare string = RID, never a path" safety rule is enforced</em> — a bare
+    string keeps hitting the <code>AssetSpec(rid=v)</code> branch it hits today and can
+    never become a path. (Without this routing the current validator would
+    mis-handle a <code>{path: ...}</code> entry — it would look for <code>.rid</code> and raise.)</li>
+</ul>
+<p><strong>What this reuses vs. what is new.</strong> Reused, unchanged: the <code>asset_paths</code>
+  path-getter (point 3), <code>FileSpec.create_filespecs</code> (checksum + tag-URI),
+  <code>AssetSpec</code>-by-RID resolution (point 4-RID). New, small:
+  - the <strong><code>LocalFile</code> spec + <code>LocalFileConfig</code></strong> (hydra-zen), a thin sibling
+    of <code>AssetSpec</code>/<code>AssetSpecConfig</code> that carries a <em>path</em> and resolves to a
+    <code>File</code> RID (by-RID inputs just use <code>AssetSpec</code>);
+  - <strong><code>validate_assets</code> shape-routing</strong> (<code>execution_configuration.py:87</code>) so
+    <code>path</code>-keyed entries become <code>LocalFile</code> and bare strings / <code>rid</code>-keyed
+    entries stay <code>AssetSpec</code> — the hydra seam and the safety chokepoint;
+  - a <strong>resolution hook</strong> that, for a <code>LocalFile</code>, mints the <code>File</code> row and
+    writes its <code>File_Execution</code> Input edge — the role assigned by context (in
+    <code>assets=</code> ⇒ Input), via the same input-edge write the asset download path
+    uses (<code>_update_asset_execution_table(..., asset_role="Input")</code>). <strong>No
+    <code>add_files</code> change and no role parameter</strong> — <code>add_files</code> stays
+    Output-by-context (it registers files the run <em>produced</em>); the input case
+    is the <code>assets=</code>/<code>LocalFile</code> path. The unknown-provenance <code>File</code> sentinel
+    reuses this same context-assigned Input edge.
+  - a <strong>download skip</strong> for <code>File</code>-table / <code>tag:</code>-URI inputs — a <code>File</code>
+    reference has no Hatrac bytes to fetch, so <code>download_asset</code> no-ops the
+    fetch and records the path/reference (the "not downloaded" exception).</p>
+<p>No user-side checksum work, no role flag, and no special use-time API: the
+  file is an asset everywhere it matters, and its role is derived from
+  context.</p>
+<ul>
+<li>
+<p><strong>Seed the two sentinels at catalog initialization.</strong> The platform-defaults
+  block of <code>create_ml_schema</code> (<code>schema/create_schema.py</code>, alongside the
+  <code>Asset_Role</code> terms) must seed both the unknown-provenance <strong><code>File</code></strong> row
+  (reserved <code>tag:</code> URL + marker MD5) and the unknown-provenance <strong>Execution</strong>
+  row. Both are bootstrap substrate, exempt from the producer obligation, and
+  are the link targets for the two no-provenance gaps. The no-input check and
+  the null-producer backfill depend on them existing.</p>
+</li>
+<li>
+<p><strong>Null-producer attribution.</strong> Writing an artifact with no real producer
+  (e.g. standalone <code>add_files</code>, direct inserts performed through deriva-ml
+  surfaces) should attribute it to the unknown-provenance Execution rather
+  than leave the producer null. New <code>Dataset_Version</code> rows already take an
+  <code>Execution</code>; the change is to default it to the sentinel when no real
+  execution is in scope, rather than permitting null.</p>
+</li>
+<li>
+<p><strong>GPU / accelerator capture (additive).</strong> Add a <code>get_gpu_info()</code> peer to
+  <code>get_platform_info()</code> in <code>execution/environment.py</code>, folded into
+  <code>get_execution_environment()</code> so it lands in the existing
+  <code>environment_snapshot_&lt;ts&gt;.txt</code> asset — no schema change, no new asset type.
+  It must be <strong>best-effort and dependency-free at the base layer</strong> (the env
+  snapshot runs for every execution, and the base library stays importable
+  without torch):</p>
+</li>
+<li><strong>Primary probe — <code>nvidia-smi</code> via subprocess</strong> (no added Python
+    dependency): <code>nvidia-smi --query-gpu=name,count,memory.total,driver_version
+    --format=csv</code>. Works whenever NVIDIA drivers are present.</li>
+<li><strong>Secondary probe — <code>torch.cuda</code>, guarded by
+    <code>importlib.util.find_spec("torch")</code></strong> (never imports torch into a non-ML
+    process, matching the existing lazy-import pattern in the torch/tf
+    adapters): device count/names plus the <strong>CUDA / cuDNN versions torch was
+    built against</strong> (which <code>nvidia-smi</code> does not report and which matter for
+    reproduction).</li>
+<li>
+<p><strong>Graceful fallback:</strong> record <code>{"available": false}</code> (or the probe error)
+    when nothing succeeds, so the snapshot is honest rather than silently
+    omitting GPU info. Swallow probe exceptions exactly as <code>get_platform_info</code>
+    already does — a failed GPU probe must never break the env snapshot.</p>
+</li>
+<li>
+<p><strong>Reproduction metadata (v2, out of scope for v1).</strong> v1 guarantees the
+  provenance <em>graph</em> and already <em>captures</em> a substantial environment set
+  (see <em>Recommended execution metadata</em>: <code>configuration.json</code>, the runtime
+  environment snapshot, workflow URL+checksum, and — conditionally —
+  <code>uv.lock</code>, Hydra configs, and best-effort GPU info). A v2 follow-on would
+  (a) <strong>mandate</strong> that set rather than leaving the conditional parts optional,
+  and (b) add the still-uncaptured fields — container/image digest and
+  external-service versions — turning "traceable" into "reproducible." (Random
+  seeds are out of this list: they are run parameters captured via the Hydra
+  config, not environment metadata — see <em>Recommended execution metadata</em>.)
+  Named here so the boundary is explicit; not specified in this document.</p>
+</li>
+<li>
+<p><strong>Packaged impact queries (tooling, not contract).</strong> The audit and the
+  researcher's batch-debugging both want canonical queries over the graph
+  ("all outputs of workflow X with input MD5 Z," "all descendants of dataset
+  version D," "successful outputs only"). These are expressible over the
+  edges this contract defines; building them as first-class tooling is a
+  separate deliverable.</p>
+</li>
+<li>
+<p><strong>Adoption and backfill (a one-time migration, part of adopting v1).</strong>
+  Bringing an existing catalog to conformance is a migration, not an optional
+  cleanup: the contract is whole-catalog (see <em>Conformance</em>), so adopting it
+  includes a one-time backfill. Two moves, both conformance-restoring and
+  neither fabricating provenance:</p>
+</li>
+<li><strong>Attribute orphan artifacts to the unknown-provenance Execution
+    sentinel.</strong> Every durable artifact with a null producer — on an
+    established catalog the large majority of dataset versions (e.g. ~95% of
+    <code>Dataset_Version</code> rows on the eye-ai catalog have a null <code>Execution</code>) —
+    is set to point at the sentinel execution. This records them as <em>honestly
+    "unknown origin"</em> (compliant, known-degraded), not as fabricated
+    provenance.</li>
+<li><strong>Abort stranded non-terminal executions.</strong> A <code>Created</code>/<code>Running</code>/
+    <code>Pending_Upload</code> row that has been abandoned cannot be honestly
+    "completed" — its only honest terminal state is <code>Aborted</code> (it did not
+    finish). The backfill transitions these via the <code>gc_executions</code> path,
+    with a reason noting the migration.</li>
+</ul>
+<p>The backfill should record its own provenance — when it ran and which rows
+  it touched (e.g. on the catalog provenance annotation) — so a
+  sentinel-attributed row is itself distinguishable as "backfilled on date X"
+  rather than "always unknown." After the backfill, a catalog-wide audit
+  should report zero violations.</p>
+<h2 id="illustrative-example">Illustrative example</h2>
+<p>A concrete case that exercises several clauses at once. On
+<code>www.eye-ai.org</code>, execution <code>6-05KM</code> built dataset <code>6-05M4</code> (a 470-subject
+USC-overlap cohort) from a CSV of 470 subject RIDs read off local disk. Two
+violations:</p>
+<ul>
+<li><strong>Undeclared input asset.</strong> The correct shape is
+  <code>File (the CSV) → Execution → Dataset (6-05M4)</code>: the CSV is an input
+  <em>asset</em> (declared as a <code>LocalFile</code> in <code>assets=</code>, where context makes it an
+  Input), and <code>6-05M4</code> is the output. The run declared neither, so no input
+  edge exists.
+  (A tempting mis-reading is that the run "consumed dataset <code>6-05M4</code>" because
+  the CSV's RIDs match its members — but the RIDs are file <em>contents</em>, not a
+  provenance edge; the dataset is the run's output, not its input.)</li>
+<li><strong>Honest-termination + workflow violations.</strong> <code>6-05KM</code> was abandoned at
+  <code>Created</code> (the lifecycle was never driven), from an interactive <code>&lt;stdin&gt;</code>
+  workflow with an empty checksum.</li>
+</ul>
+<p>Under this contract the correct remedy is to re-create the work via the
+blessed path — a committed, checksummed workflow that declares the CSV as a
+<code>LocalFile</code> input in <code>assets=</code> (Input by context) and produces <code>6-05M4</code> as
+output — not to hand-edit catalog edges. (The sibling run <code>6-09Z8</code>, which
+later wrote the 470 glaucoma labels for the same cohort, consumed the same
+CSV and is the same shape: its source file should likewise be registered as
+an input asset.)</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

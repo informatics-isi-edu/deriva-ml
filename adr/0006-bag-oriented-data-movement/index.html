@@ -1,0 +1,3324 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/adr/0006-bag-oriented-data-movement/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>ADR-0006: Bag-oriented data movement — bag is the unifying artifact - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-0006-bag-oriented-data-movement-bag-is-the-unifying-artifact" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-0006: Bag-oriented data movement — bag is the unifying artifact
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#three-bag-producing-use-cases-converge-on-one-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three bag-producing use cases converge on one pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#six-classes-one-profile-one-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Six classes, one profile, one policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-deriva-bag-profile-is-the-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The deriva-bag profile is the contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The deriva-bag profile is the contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#back-compat-for-bags-produced-before-profile-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back-compat for bags produced before profile registration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#asset-mode-and-the-load-side-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asset mode and the load-side reconciliation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#orphan-strategy-and-where-it-lives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Orphan strategy and where it lives
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-resolution-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor resolution semantics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-kind-handling-lives-in-the-generic-walker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table-kind handling lives in the generic walker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-domain-wrapper-datasetbagbuilder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deriva-ml domain wrapper: DatasetBagBuilder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bag-sqlalchemy-strategy-align-with-local_db" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bag SQLAlchemy strategy — align with local_db
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#producer-split-constructive-vs-walking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Producer split: constructive vs. walking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consumer-side-already-exists-upstream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consumer side already exists upstream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-domain-layer-is-unchanged-in-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml domain layer is unchanged in shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clone-is-rewritten-as-catalogbagbuilder-bagcatalogloader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clone is rewritten as CatalogBagBuilder + BagCatalogLoader
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#load_cifar10py-is-rewritten-as-bagbuilder-bagcatalogloader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load_cifar10.py is rewritten as BagBuilder + BagCatalogLoader
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Positive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Negative
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neutral-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral / open
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternatives considered
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#delivery-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delivery sequence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Delivery sequence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commit-stack-inside-the-deriva-py-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commit-stack inside the deriva-py PR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="adr-0006-bag-oriented-data-movement-bag-is-the-unifying-artifact">ADR-0006: Bag-oriented data movement — bag is the unifying artifact</h1>
+<p>Date: 2026-05-10
+Status: Accepted</p>
+<h2 id="context">Context</h2>
+<p>DerivaML moves catalog content across three boundaries today, each
+implemented by its own machinery:</p>
+<ol>
+<li><strong>Catalog → bag</strong> (dataset download). <code>Dataset.download_dataset_bag</code>
+   constructs an export spec via <code>CatalogGraph</code> and drives the
+   deriva-py export engine to write a BDBag. Anchored on the <code>Dataset</code>
+   table; FK walk shaped specifically by dataset element types,
+   features, and nested-dataset semantics.</li>
+<li><strong>Catalog → catalog</strong> (clone). <code>catalog/clone.py</code> implements a
+   bespoke three-stage pipeline: schema-without-FKs → async row copy
+   → FK application with orphan handling. ~1900 lines. Does not pass
+   through a bag — moves rows directly between ERMrest catalogs.</li>
+<li><strong>Files → catalog</strong> (model template / <code>load_cifar10.py</code>). Hand-rolled
+   image-upload loop that calls deriva-py's upload machinery directly,
+   bypassing both bags and clone. Schema setup is one path
+   (<code>setup_domain_model</code>); data load is another (loops calling
+   <code>add_dataset_members</code>, <code>asset_file_path</code>, etc.).</li>
+</ol>
+<p>The three paths share a problem domain — write rows that satisfy FK
+constraints, handle assets, preserve provenance — but no
+implementation. Each grew its own FK-traversal logic, its own asset
+handling, its own error semantics. <code>CatalogGraph</code> walks paths and
+filters by dataset membership; <code>clone._discover_reachable_tables</code>
+walks a flat reachable set with schema/table blocklists; <code>load_cifar10</code>
+ignores the question entirely because it has no source schema to walk.</p>
+<p>The redesign goal is to <strong>make the BDBag the unifying artifact</strong>.
+Every data-movement operation factors through a bag:</p>
+<ul>
+<li>"Catalog → bag" stays (it already does).</li>
+<li>"Catalog → catalog" becomes "catalog → bag → catalog."</li>
+<li>"Files → catalog" becomes "files → bag → catalog."</li>
+</ul>
+<p>A bag is on-disk, citable (via MINID), inspectable (via Bag
+SQLAlchemy),
+and round-trippable. Centralizing on it gives one set of FK
+semantics, one asset story, and one provenance trail.</p>
+<h2 id="decision">Decision</h2>
+<h3 id="three-bag-producing-use-cases-converge-on-one-pipeline">Three bag-producing use cases converge on one pipeline</h3>
+<p>Three distinct producer scenarios — all today implemented by
+separate, divergent code paths — converge under the redesign on
+a single bag-production pipeline plus a single bag-consumption
+pipeline. The bag in the middle is the canonical interchange
+artifact.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Use case</th>
+<th>Input</th>
+<th><code>DataSource</code></th>
+<th>Producer class</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Programmatic build (cifar, Kaggle, TF dataset)</td>
+<td>DataFrames / dict iterables in caller's memory</td>
+<td><code>DataFrameDataSource</code>, <code>IterableDataSource</code></td>
+<td><code>BagBuilder</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>End-of-execution upload</td>
+<td>Local SQLite from <code>local_db</code></td>
+<td><code>LocalDBDataSource</code></td>
+<td><code>BagBuilder</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Catalog slice / clone / dataset bag</td>
+<td>Live ERMrest catalog</td>
+<td>n/a (deriva-py export engine)</td>
+<td><code>CatalogBagBuilder</code></td>
+</tr>
+</tbody>
+</table>
+<p>All three produce a bag conforming to the deriva-bag profile.
+All three carry a <code>data/schema.json</code> describing every table in
+the bag plus every FK relationship between them — byte-identical
+format regardless of which producer wrote it (cases 1 and 2 use
+<code>schema_io.metadata_to_ermrest_json(metadata)</code>; case 3 routes
+the live ERMrest model through the same conversion path).</p>
+<p>All three are consumed identically:</p>
+<ul>
+<li><strong>Inspect</strong> — <code>BagDatabase.open(path)</code> returns SQLAlchemy
+  <code>MetaData</code> + row access + asset access.</li>
+<li><strong>Load into a catalog</strong> — <code>BagCatalogLoader(catalog, bag, policy).run()</code>
+  pushes the bag's contents to any ERMrest destination, using
+  one FK-ordered insert + Hatrac-dedupe upload path.</li>
+<li><strong>Cite</strong> — every bag has a MINID (the producer mints it as
+  part of finalization, regardless of use case).</li>
+</ul>
+<p>This unification is the load-bearing claim of the redesign. The
+end-of-execution upload (use case 2) becomes "build a bag from
+the local DB, then load it" — same two steps as catalog
+re-import (use case 3 → load) and same two steps as
+programmatic publication (use case 1 → load). Today these are
+three separate code paths (a hand-rolled upload loop, the export
+engine, and bespoke clone logic); after the redesign they share
+the bag pipeline.</p>
+<p>A consequence worth naming: the end-of-execution bag becomes a
+real durable artifact of every execution. Today's
+<code>commit_execution</code> hands data to the uploader and forgets it; the
+new path leaves the bag on disk, citable via MINID, inspectable
+via <code>BagDatabase</code>, and re-loadable if the catalog push fails
+mid-flight.</p>
+<h3 id="six-classes-one-profile-one-policy">Six classes, one profile, one policy</h3>
+<p>All bag machinery lives in <strong><code>deriva.bag</code></strong> (a new submodule of
+deriva-py, on the <code>deriva-ml</code> branch). Six classes, two shared
+types, and one profile JSON document:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Side</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BagDatabase</code></td>
+<td>consumer</td>
+<td>Open a bag → Bag SQLAlchemy layer (engine + metadata + ORM <code>Base</code>) + asset access.</td>
+</tr>
+<tr>
+<td><code>BagBuilder</code></td>
+<td>producer (constructive)</td>
+<td>Write a bag from in-memory data. No source catalog.</td>
+</tr>
+<tr>
+<td><code>CatalogBagBuilder</code></td>
+<td>producer (walking)</td>
+<td>Catalog → bag, via the deriva-py export engine.</td>
+</tr>
+<tr>
+<td><code>BagCatalogLoader</code></td>
+<td>round-trip</td>
+<td>Bag → catalog, walking the Bag SQLAlchemy layer.</td>
+</tr>
+<tr>
+<td><code>SchemaBuilder</code> + <code>SchemaORM</code></td>
+<td>shared primitive</td>
+<td>ERMrest <code>Model</code> → SQLAlchemy ORM. Used by <code>BagDatabase</code>, deriva-ml <code>local_db</code>, and <code>BagCatalogLoader</code>.</td>
+</tr>
+<tr>
+<td><code>DataLoader</code> + <code>DataSource</code> / <code>BagDataSource</code> / <code>CatalogDataSource</code></td>
+<td>shared primitive</td>
+<td>Generic "fill an ORM from a source."</td>
+</tr>
+</tbody>
+</table>
+<p>Shared types:</p>
+<ul>
+<li><strong><code>Anchor</code></strong> — discriminated union (<code>RIDAnchor</code>, <code>TableAnchor</code>,
+  <code>PathAnchor</code>) describing where <code>CatalogBagBuilder</code> starts walking.
+  "Anchor" rather than "seed" to avoid the random-number-seed
+  reading in ML contexts.</li>
+<li><strong><code>FKTraversalPolicy</code></strong> — config for the FK graph walk:
+  schema/table allow/block lists, depth bound, <code>vocab_export</code>,
+  <code>asset_mode</code>, <code>dangling_fk_strategy</code>. Walks are always bidirectional
+  and vocab tables are always inbound-only (hardcoded walker
+  rules; not policy fields). Shared between <code>CatalogBagBuilder</code>
+  (catalog → bag) and <code>BagCatalogLoader</code> (bag → catalog).</li>
+</ul>
+<p>Profile artifact:</p>
+<ul>
+<li><strong><code>deriva-bag-profile.json</code></strong> — the BagIt Profile JSON document
+  the producers declare and the consumers may validate. Hosted in
+  the deriva-py repo under <code>deriva/bag/profiles/</code>. Referenced by
+  identifier URL from each bag's <code>bag-info.txt</code>.</li>
+</ul>
+<h3 id="the-deriva-bag-profile-is-the-contract">The deriva-bag profile is the contract</h3>
+<p>Bags written by <code>BagBuilder</code> or <code>CatalogBagBuilder</code> follow a
+single layout — the <em>deriva-bag profile</em>. The profile is
+registered as a formal <strong>BagIt Profile</strong> (a JSON document
+validatable by <code>bdb.validate_bag_profile</code>), declared in
+<code>bag-info.txt</code> via the <code>BagIt-Profile-Identifier</code> field, and
+hosted as part of the <code>deriva.bag</code> submodule
+(<code>deriva/bag/profiles/deriva-bag-profile.json</code>). The profile
+constrains:</p>
+<ul>
+<li><code>data/schema.json</code> — ERMrest model description (subset of source
+  catalog, or projection of the SQLAlchemy <code>MetaData</code> supplied to
+  <code>BagBuilder</code>).</li>
+<li><code>data/&lt;schema&gt;/&lt;table&gt;.csv</code> — one CSV per table, header row +
+  rows in ERMrest CSV format.</li>
+<li><code>data/asset/&lt;asset_table&gt;/&lt;RID&gt;/&lt;filename&gt;</code> — asset bytes (when
+  embedded) or referenced via <code>fetch.txt</code>.</li>
+<li><code>metadata/</code> — optional provenance: the <code>Anchor</code> + <code>FKTraversalPolicy</code>
+  used by <code>CatalogBagBuilder</code>, build timestamps, source catalog
+  handle.</li>
+</ul>
+<p><code>BagDatabase</code> reads this profile. <code>BagCatalogLoader</code> consumes it.
+Both may call <code>bdb.validate_bag_profile</code> before reading to detect
+non-conforming bags early. The profile is what makes round-trip
+closed: <code>catalog → bag → catalog</code> produces an equivalent
+destination catalog (modulo orphan-policy outcomes).</p>
+<h4 id="back-compat-for-bags-produced-before-profile-registration">Back-compat for bags produced before profile registration</h4>
+<p>Dataset bags produced today (by the pre-redesign export path) do
+not declare a <code>BagIt-Profile-Identifier</code>. The migration treats an
+absent identifier as <strong>implicit conformance</strong>: <code>BagDatabase</code> and
+<code>BagCatalogLoader</code> validate only when the identifier is present,
+and otherwise assume the bag follows the profile's layout
+conventions. New bags produced by either builder always declare
+the identifier explicitly.</p>
+<h3 id="asset-mode-and-the-load-side-reconciliation">Asset mode and the load-side reconciliation</h3>
+<p><code>FKTraversalPolicy.asset_mode</code> has four values, all of which
+delegate the per-asset work to deriva-py's existing upload recipe
+(<code>DerivaUpload._uploadAsset</code>) rather than reimplementing it.
+That recipe already handles three things we'd otherwise rebuild:</p>
+<ul>
+<li><strong>Hatrac byte dedupe.</strong> Before transferring bytes, <code>put_loc</code>
+  issues a HEAD against the destination object. If MD5 (or SHA256)
+  matches, no bytes are uploaded. The catalog row is still
+  reconciled afterward.</li>
+<li><strong>Catalog row reconciliation.</strong> Even when bytes are already
+  in Hatrac, the asset row is compared column-by-column against
+  the bag's row and updated when the bag carries additional or
+  changed metadata.</li>
+<li><strong>Pre-allocated RID handling and transfer-state resumption.</strong>
+  Existing in <code>_createFileRecordWithRid</code> and the transfer-state
+  machinery — the loader inherits both.</li>
+</ul>
+<p>The three modes:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Asset rows</th>
+<th>Asset bytes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ROWS_ONLY</code></td>
+<td>inserted/reconciled with source URL</td>
+<td>not transferred</td>
+</tr>
+<tr>
+<td><code>UPLOAD_IF_MISSING</code> <em>(default)</em></td>
+<td>inserted/reconciled</td>
+<td>uploaded via Hatrac dedupe (no-op when destination already has matching MD5)</td>
+</tr>
+<tr>
+<td><code>UPLOAD_FORCE</code></td>
+<td>inserted/reconciled</td>
+<td>re-uploaded regardless (<code>force=True</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The "don't include this asset table at all" case belongs to
+<code>exclude_tables</code> (or <code>exclude_schemas</code>), not to <code>asset_mode</code>.
+Keeping scope and behavior in separate policy fields avoids the
+"I included X in traversal but set mode to SKIP — which wins?"
+ambiguity.</p>
+<p><code>UPLOAD_IF_MISSING</code> is the default because it's the right behavior
+for round-trip clone, re-import, partial-bag-update, and any "load
+this bag idempotently" scenario. Re-running the loader against the
+same destination should be a no-op for bytes that are already
+there, but should still pick up any metadata changes in the bag's
+rows. Hatrac's HEAD-and-compare gives us that automatically.</p>
+<p><code>UPLOAD_FORCE</code> is reserved for the rare case where the operator
+knows the source bytes are authoritative and wants to overwrite
+the destination's. It bypasses dedupe and re-uploads every asset.</p>
+<p>The bag-state × mode compatibility matrix, enforced at policy
+validation time before any rows are inserted:</p>
+<table>
+<thead>
+<tr>
+<th>Bag state</th>
+<th>Mode</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>materialized</td>
+<td><code>ROWS_ONLY</code></td>
+<td>rows reconciled with source URLs; bag bytes ignored</td>
+</tr>
+<tr>
+<td>materialized</td>
+<td><code>UPLOAD_IF_MISSING</code></td>
+<td>rows reconciled; bytes uploaded via dedupe</td>
+</tr>
+<tr>
+<td>materialized</td>
+<td><code>UPLOAD_FORCE</code></td>
+<td>rows reconciled; bytes re-uploaded</td>
+</tr>
+<tr>
+<td>holey</td>
+<td><code>ROWS_ONLY</code></td>
+<td>rows reconciled with source URLs; no bytes needed</td>
+</tr>
+<tr>
+<td>holey</td>
+<td><code>UPLOAD_IF_MISSING</code></td>
+<td><strong>rejected</strong> — no local bytes; user must materialize first or switch to <code>ROWS_ONLY</code></td>
+</tr>
+<tr>
+<td>holey</td>
+<td><code>UPLOAD_FORCE</code></td>
+<td><strong>rejected</strong> — same reason</td>
+</tr>
+</tbody>
+</table>
+<p>The two rejected combinations error early with a clear message
+pointing at <code>bdb.materialize(bag)</code> or <code>asset_mode=AssetMode.ROWS_ONLY</code>. The
+rejection is deliberate: silently materializing a multi-gigabyte
+bag at load time would hide the cost from the caller. Forcing the
+explicit step keeps the network and disk traffic visible.</p>
+<h3 id="orphan-strategy-and-where-it-lives">Orphan strategy and where it lives</h3>
+<p><code>FKTraversalPolicy</code> carries a <code>dangling_fk_strategy</code> field with three
+values: <code>FAIL</code> (default), <code>DELETE</code>, <code>NULLIFY</code>. Orphans arise when
+the bag carries a row whose FK reference points at a parent that
+is not in the bag — a consequence of <em>incoherent row-level
+policies</em> in source catalogs (a row is visible to the cloning user
+but its parent is not). Without orphan handling, the destination
+either rejects the row at FK-application time or is left with
+broken references.</p>
+<p>Detection and application split:</p>
+<ul>
+<li><strong>Detection happens at bag-read time</strong> in <code>BagDatabase</code>. The
+  SQLAlchemy ORM can compute dangling FK references cheaply with
+  no catalog round-trips. The list is exposed (e.g.,
+  <code>bag.orphans</code>) so callers can inspect a bag before deciding
+  which strategy to apply.</li>
+<li><strong>Application happens at load time</strong> in <code>BagCatalogLoader</code>,
+  which consumes the orphan list and acts according to
+  <code>dangling_fk_strategy</code>: refuse to start (<code>FAIL</code>), drop orphan rows
+  (<code>DELETE</code>), or null out the FK column (<code>NULLIFY</code>, only when the
+  column is nullable).</li>
+<li><strong><code>CatalogBagBuilder</code> is orphan-agnostic.</strong> It writes the walk's
+  output as-is. Orphans are a property of the bag's contents, not
+  the build process. A user who wants the <em>builder</em> to chase
+  parents and prevent orphans entirely should adjust the
+  <code>Anchor</code> + <code>FKTraversalPolicy</code> scope (e.g., extend the walk), not
+  reach for an orphan strategy.</li>
+</ul>
+<p>The default <code>FAIL</code> is deliberate: orphans usually indicate either
+a scope mismatch or a real data-integrity problem at the source.
+Users who know their catalog has policy incoherence opt in to
+<code>DELETE</code> or <code>NULLIFY</code> explicitly.</p>
+<h3 id="anchor-resolution-semantics">Anchor resolution semantics</h3>
+<p><code>Anchor</code> instances (<code>RIDAnchor</code>, <code>TableAnchor</code>, <code>PathAnchor</code>) are
+resolved by <code>CatalogBagBuilder</code> into a starting set of
+RIDs-per-table before the FK walk begins. Three edge cases get
+defined behavior:</p>
+<ul>
+<li><strong>Overlap is silently deduped.</strong> Anchors that name overlapping
+  rows are unioned; the FK walk's visited-set takes care of the
+  rest. No warning. Anchors describe intent; overlap doesn't
+  change the bag's contents.</li>
+<li><strong><code>RIDAnchor</code> with missing RIDs fails fast.</strong> Each <code>RIDAnchor</code>
+  table is validated against the source catalog with a single
+  <code>?RID=in(...)</code> query; absent RIDs raise an error naming the
+  missing ones before any walk work begins. Conservative default;
+  catches typos and stale configs cleanly.</li>
+<li><strong><code>TableAnchor</code> is silently empty-tolerant.</strong> A table with no
+  rows in scope is a legitimate "no rows from this table" outcome.</li>
+<li><strong><code>PathAnchor</code> warns but proceeds when empty.</strong> An empty
+  datapath result is ambiguous between "the filter is correct"
+  and "the filter is wrong" — log the empty result, let the build
+  continue.</li>
+</ul>
+<p>The defaults follow the same logic as <code>dangling_fk_strategy=DanglingFKStrategy.FAIL</code>:
+strict on enumeration mistakes (where user intent is precise),
+permissive on filter-based emptiness (where intent is fuzzier).</p>
+<h3 id="table-kind-handling-lives-in-the-generic-walker">Table-kind handling lives in the generic walker</h3>
+<p>The walker inside <code>CatalogBagBuilder</code> (and the corresponding
+inverse walk inside <code>BagCatalogLoader</code>) recognizes three
+structural table kinds and applies a hardcoded rule for each.
+The kinds are detected via methods that already exist on the
+deriva-py <code>Table</code> class — <code>is_vocabulary()</code>, <code>is_asset()</code>, and
+the <code>find_associations()</code> arity rules used by
+<code>BagDatabase.is_association_table</code>. None of the rules require
+deriva-ml-specific knowledge.</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Detection</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vocabulary</td>
+<td><code>Table.is_vocabulary()</code></td>
+<td>Follow FKs <em>into</em> the vocab table (pulling in referenced terms) but not <em>out of</em> it. Hardcoded; no policy field. Optionally run a separate full-export pass after the main walk when <code>vocab_export=VocabExport.FULL</code>.</td>
+</tr>
+<tr>
+<td>Asset</td>
+<td><code>Table.is_asset()</code></td>
+<td>Walked like any other table; the walker emits asset layout (<code>data/asset/&lt;table&gt;/&lt;RID&gt;/&lt;filename&gt;</code> + <code>fetch.txt</code>). Loader's <code>asset_mode</code> decides byte handling.</td>
+</tr>
+<tr>
+<td>Association</td>
+<td>arity rules</td>
+<td>Tag-along: included automatically when both endpoints are in the bag; doesn't count toward <code>max_depth</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>The vocab rule is what fixes the loop-back explosion: without
+it, a walk that reaches a vocab table (e.g., Species) would
+follow inbound FKs back to every other table that uses that
+vocab (every Subject, every Specimen, etc.), pulling in
+unrelated rows the user didn't ask for. The walker enters
+vocab tables (pulling the referenced terms) but does not exit
+them. This is hardcoded; the policy has no field controlling
+vocab-traversal direction because every real producer wants the
+same behavior.</p>
+<p>The full-vocabulary pass (<code>vocab_export=VocabExport.FULL</code>) is what today's
+<code>CatalogGraph._export_vocabulary</code> does for dataset bags —
+emitting every term, not just the ones referenced by member
+rows. Folding it into the generic walker means
+<code>DatasetBagBuilder</code> doesn't run a separate vocab-export step:
+it sets <code>vocab_export=VocabExport.FULL</code> on the policy and the engine
+handles both passes.</p>
+<p>Putting these rules in the walker is what keeps domain wrappers
+thin. Clone, slice-by-RID, and dataset-bag all need consistent
+vocab / asset / association handling; if the rules lived in
+<code>DatasetBagBuilder</code>, clone and slice would either replicate them
+or quietly diverge. Centralizing them in <code>CatalogBagBuilder</code>
+gives every producer case the same structural-table semantics
+for free.</p>
+<h3 id="deriva-ml-domain-wrapper-datasetbagbuilder">Deriva-ml domain wrapper: <code>DatasetBagBuilder</code></h3>
+<p><code>CatalogBagBuilder</code> in <code>deriva.bag</code> is deriva-ml-agnostic. The
+dataset-download path today (<code>CatalogGraph</code> in deriva-ml) carries
+four dataset-specific concerns that do not belong in the generic
+builder:</p>
+<ol>
+<li><strong>Association filtering by member element types</strong> — include
+   <code>Dataset_X</code> association tables only when the dataset has members
+   of element type <code>X</code>. Skips empty associations and prunes paths.</li>
+<li><strong>Vocabulary tables exported in full</strong> — vocabularies are
+   exported as standalone queries, not joined through the
+   element-type graph. Paths ending in vocabulary tables are
+   pruned from the main walk.</li>
+<li><strong>Feature tables per element type</strong> — for each member element
+   type, the dataset's feature tables must be included even though
+   the generic walk wouldn't reach them.</li>
+<li><strong>Nested datasets</strong> — a dataset's child datasets get their own
+   walks, recursively, up to a configurable <code>nesting_depth</code>.</li>
+</ol>
+<p>These four concerns become <code>DatasetBagBuilder</code>
+(<code>src/deriva_ml/dataset/bag_builder.py</code>), a thin wrapper that:</p>
+<ul>
+<li>Constructs the <code>Anchor</code> list from the dataset's row plus its
+  nested children.</li>
+<li>Constructs an <code>FKTraversalPolicy</code> with <code>exclude_tables</code>
+  covering concern 1 (associations without members) and
+  <code>vocab_export=VocabExport.FULL</code> for concern 2 (the bag wants the complete
+  vocabulary, not just terms referenced by member rows). Feature
+  tables (concern 3) are reached naturally by FK-following from
+  member element rows; no separate "force-include" mechanism is
+  needed.</li>
+<li>Hands the result to a generic <code>CatalogBagBuilder</code>. Vocabulary
+  handling — inbound-only traversal <em>into</em> vocab tables to avoid
+  loop-back, plus the optional full-vocabulary pass — is part of
+  the generic engine, not a <code>DatasetBagBuilder</code>-specific
+  post-processing step.</li>
+</ul>
+<p><code>Dataset.download_dataset_bag</code> is rewired to construct a
+<code>DatasetBagBuilder</code> internally and return a <code>DatasetMinid</code> from
+its output. The public signature does not change.</p>
+<p><code>FKTraversalPolicy</code> deliberately omits a <code>force_include</code> field:
+"always include table X" reduces either to <code>TableAnchor("X")</code>
+(every row) or to "let the walk reach X via FK-following" (rows
+reachable from another anchor). Either way, the generic policy
+does not need a third mechanism. Domain-specific row-shape
+concerns (which features matter for which element types, how
+vocabularies are exported) belong in the domain wrapper, not in
+the generic policy.</p>
+<h3 id="bag-sqlalchemy-strategy-align-with-local_db">Bag SQLAlchemy strategy — align with <code>local_db</code></h3>
+<p>The Bag SQLAlchemy layer (the per-bag SQLite database <code>BagDatabase</code>
+creates) must match the strategy already used by the <code>local_db</code>
+subsystem. Today they diverge in three places worth reconciling
+inside the deriva-py PR:</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Today's <code>BagDatabase</code></th>
+<th>Today's <code>local_db</code></th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SQLite pragmas</td>
+<td>default (no WAL, no busy_timeout, FK off)</td>
+<td>WAL + synchronous=NORMAL + foreign_keys=ON + busy_timeout=5000 (<code>create_wal_engine</code>)</td>
+<td>Use <code>create_wal_engine</code> everywhere.</td>
+</tr>
+<tr>
+<td>Read-only access</td>
+<td>not supported</td>
+<td>URI form <code>mode=ro&amp;uri=true</code></td>
+<td>Support read-only on the bag SQLite too (loader, MCP reader).</td>
+</tr>
+<tr>
+<td>Schema versioning</td>
+<td>none</td>
+<td><code>schema_meta</code> table + <code>SchemaVersionError</code></td>
+<td>Add to bag SQLite (<code>BAG_SCHEMA_VERSION</code> constant, bumped when the bag-SQLite layout changes).</td>
+</tr>
+</tbody>
+</table>
+<p>Three concrete actions in the deriva-py PR:</p>
+<ol>
+<li><strong>Move <code>sqlite_helpers.py</code> upstream.</strong> It's a generic SQLite
+   engine factory (WAL + pragmas + read-only URI + <code>schema_meta</code>)
+   used by both bag-SQLite and <code>local_db</code>. It lives in
+   <code>deriva.bag.sqlite_helpers</code> (or <code>deriva.bag.engine</code>) post-move.
+   The deriva-ml migration PR replaces <code>local_db/sqlite_helpers.py</code>
+   with a re-export.</li>
+<li><strong>Update <code>BagDatabase</code> to use <code>create_wal_engine</code>.</strong> One-line
+   refactor inside <code>BagDatabase.__init__</code> — replaces the bare
+   <code>create_engine(f"sqlite:///{...}")</code> call. Picks up WAL,
+   busy_timeout=5000, foreign_keys=ON, and the read-only URI mode
+   for free.</li>
+<li><strong>Add <code>ensure_schema_meta</code> to <code>BagDatabase.__init__</code>.</strong> A
+   <code>BAG_SCHEMA_VERSION = 1</code> constant in <code>deriva.bag</code> gets recorded
+   on first build. Future versions bump it; mismatched on-disk
+   state raises <code>SchemaVersionError</code> rather than failing with a
+   confusing column-missing error.</li>
+</ol>
+<p><strong>The on-disk layout is content-addressed by the BDBag checksum.</strong>
+Today's layout (<code>{database_dir}/{rid}_{checksum}/main.db</code>)
+assumes one bag = one anchoring RID. That assumption fails for
+multi-RID anchors (<code>RIDAnchor("Subject", ["S1", "S2", ...])</code>),
+table-wide anchors (<code>TableAnchor("Subject")</code>), <code>PathAnchor</code>, and
+catalog-wide clones — none of which has a single load-bearing
+RID. The new layout:</p>
+<pre><code>{cache_dir}/
+    index.sqlite                          # per host/catalog index
+    bags/
+        {checksum}/
+            bag/                          # bag directory
+            db/main.db                    # Bag SQLAlchemy main file
+            db/{schema}.db                # attached schemas
+</code></pre>
+<p>Identical-content bags (same closure built under different
+anchors) share one cache entry automatically.</p>
+<p>The <strong>cache index</strong> (<code>index.sqlite</code>, one per host/catalog) carries
+two tables:</p>
+<ul>
+<li><code>bags(checksum, profile_id, built_at, anchor_summary_json,
+  size_bytes)</code> — one row per cached bag.</li>
+<li><code>bag_anchor_rids(checksum, table, rid)</code> — reverse index from
+  anchor RIDs to bag checksums. Replaces today's <code>{rid}_*</code>
+  directory-glob affordance: callers ask
+  "<code>SELECT checksum FROM bag_anchor_rids WHERE table='Dataset'
+  AND rid=?</code>" instead of scanning filenames.</li>
+</ul>
+<p>The index itself uses <code>create_wal_engine</code> and <code>schema_meta</code> —
+same engine policy as the bags it indexes.</p>
+<p>The reverse index is what makes the "list cached versions of
+dataset X" workflow continue to work in a world where (a) a bag
+can be anchored by many RIDs and (b) the same bag can result
+from different anchor configurations. The on-disk filename is no
+longer load-bearing; the index is.</p>
+<p><code>BagCatalogLoader</code> opens the bag SQLite read-only (it only reads
+rows to push to the destination catalog). <code>BagBuilder</code> opens it
+read-write (it's writing rows). <code>DatasetBag</code> opens it read-only,
+which makes multi-worker PyTorch DataLoader readers safe.</p>
+<h3 id="producer-split-constructive-vs-walking">Producer split: constructive vs. walking</h3>
+<p><code>BagBuilder</code> and <code>CatalogBagBuilder</code> are deliberately separate.
+They share the <em>output contract</em> (the profile) and a substantial
+chunk of <em>schema-handling implementation</em> (<code>schema_io</code>), but
+each owns its own row-writing path:</p>
+<ul>
+<li><strong><code>CatalogBagBuilder</code> drives the deriva-py export engine.</strong> It
+  generates an export spec (query processors + bag settings) from
+  <code>Anchor</code> + <code>FKTraversalPolicy</code> and hands it to the existing export
+  engine. The engine writes the bag — paged streaming, async
+  fetching, MD5 manifest, S3 upload, MINID post-processors are all
+  preserved. <code>CatalogBagBuilder</code> does not reimplement them.</li>
+<li><strong><code>BagBuilder</code> writes bytes directly.</strong> No export engine, no
+  catalog. Takes either deriva-py <code>typed.SchemaDef</code>s or a
+  SQLAlchemy <code>MetaData</code> (or both); normalizes to <code>MetaData</code>
+  internally; <code>add_rows</code>
+  accepts a pandas DataFrame, a list of dicts, or any iterable of
+  dicts; rows flow through <code>DataLoader</code> with a CSV sink. Same
+  <code>DataLoader + DataSource</code> machinery the rest of the system
+  already uses, with a write-out sink instead of an into-SQLite
+  sink.</li>
+</ul>
+<p><strong>SQLAlchemy <code>MetaData</code> is the canonical <em>internal</em> schema
+vocabulary; producers accept multiple input forms.</strong> Internally,
+every consumer (<code>BagDatabase</code>, <code>BagCatalogLoader</code>, <code>local_db</code>)
+and the catalog walker all speak <code>MetaData</code>. Externally,
+<code>BagBuilder</code> accepts whichever schema vocabulary fits the
+caller's context:</p>
+<ul>
+<li><strong>deriva-py <code>typed.SchemaDef</code></strong> — for callers who are already
+  using <code>typed</code> to push schemas to a catalog. The same
+  <code>SchemaDef</code> object can be used for both the catalog push and
+  the bag construction; no second declaration.</li>
+<li><strong>SQLAlchemy <code>MetaData</code></strong> — for callers bridging from
+  non-deriva tooling or who already have a <code>MetaData</code> from
+  another source.</li>
+</ul>
+<p>Both are accepted; <code>BagBuilder</code> normalizes to <code>MetaData</code> at
+construction time.</p>
+<p>The other layers all converge on <code>MetaData</code> too:
+- <code>BagDatabase</code> returns a <code>MetaData</code> on bag read.
+- <code>local_db</code> already manipulates <code>MetaData</code> internally.
+- <code>CatalogBagBuilder</code> projects an ERMrest <code>Model</code> to a <code>MetaData</code>
+  slice (<code>ermrest_model_to_metadata</code>) before driving the export
+  engine — so even the live-catalog path internally speaks
+  <code>MetaData</code> for the schema half of its work.</p>
+<p>A new module <strong><code>deriva.bag.schema_io</code></strong> owns the conversions:
+- <code>typed_schema_def_to_metadata(schema_def, metadata)</code> — adds
+  typed defs into a <code>MetaData</code>. Used by <code>BagBuilder</code> to accept
+  <code>typed</code> input.
+- <code>metadata_to_typed_schema_defs(metadata) -&gt; list[SchemaDef]</code> —
+  inverse. Useful when <code>BagCatalogLoader</code> needs to create
+  missing tables in the destination catalog from the bag's
+  schema.
+- <code>metadata_to_ermrest_json(metadata) -&gt; dict</code> — used by
+  <code>BagBuilder</code> to write <code>schema.json</code>. Also used by
+  <code>CatalogBagBuilder</code> so that file's format is identical between
+  the two producers.
+- <code>ermrest_json_to_metadata(schema_dict) -&gt; MetaData</code> — used by
+  <code>BagDatabase</code> to read <code>schema.json</code>.
+- <code>ermrest_model_to_metadata(model) -&gt; MetaData</code> — used by
+  <code>CatalogBagBuilder</code> to derive the bag's <code>MetaData</code> from a live
+  catalog's <code>Model</code>.
+- The ERMrest ↔ SQLAlchemy type-mapping tables (one direction
+  each), single source of truth.</p>
+<p><code>MetaData</code> is the hub of the conversion graph: every other
+representation has a round-trip path through it.</p>
+<p>Code shared by both producers — <code>schema_io</code> (schema-side),
+archive-as-zip, <code>metadata/</code> provenance writer, profile path
+constants, asset layout conventions — lives in <code>deriva.bag.profile</code>
+(asset/archive bits) and <code>deriva.bag.schema_io</code> (schema bits).
+The shared surface is no longer the ~20-line "common profile
+constants" originally estimated; it's the entire schema
+vocabulary.</p>
+<p>Where the producers still diverge is the <strong>row-writing path</strong>:
+<code>CatalogBagBuilder</code> uses the deriva-py export engine for paged
+async ERMrest reads; <code>BagBuilder</code> uses <code>DataLoader + CSVSink</code>
+for local DataFrame/iterable inputs. Losing async/paged
+streaming on the catalog-walking side would be a regression we
+don't want, so the row-writing path stays bifurcated. The
+schema-writing path unifies.</p>
+<h3 id="consumer-side-already-exists-upstream">Consumer side already exists upstream</h3>
+<p><code>BagDatabase</code> already lives in deriva-py's <code>deriva-ml</code> branch as
+<code>deriva/core/bag_database.py</code>. The B3 migration moves it (and the
+primitives it shares with deriva-ml's <code>local_db</code>) into
+<code>deriva.bag.*</code> and deletes the parallel implementations in
+deriva-ml's <code>model/</code> directory.</p>
+<h3 id="deriva-ml-domain-layer-is-unchanged-in-shape">deriva-ml domain layer is unchanged in shape</h3>
+<p>After the migration:</p>
+<ul>
+<li><code>DatabaseModel(BagDatabase)</code> — adds <code>bag_rids</code>, <code>dataset_version</code>,
+  <code>rid_lookup</code>, <code>_get_dataset_execution</code>. ~80 lines, down from ~400.</li>
+<li><code>DerivaMLBagView</code> (renamed from <code>DerivaMLDatabase</code>) — domain
+  layer over <code>DatabaseModel</code>: vocabulary, features, element types,
+  factory for <code>DatasetBag</code>.</li>
+<li><code>DatasetBag</code> — per-dataset view over <code>DerivaMLBagView</code>.
+  Implements <code>DatasetLike</code>; unchanged interface for callers.</li>
+</ul>
+<h3 id="clone-is-rewritten-as-catalogbagbuilder-bagcatalogloader">Clone is rewritten as <code>CatalogBagBuilder + BagCatalogLoader</code></h3>
+<p>After migration, <code>catalog/clone.py</code> collapses from ~1900 lines to
+a thin wrapper: build an <code>FKTraversalPolicy</code> and a single
+<code>TableAnchor("*")</code> / equivalent full-catalog anchor, run
+<code>CatalogBagBuilder</code> to a temp bag, run <code>BagCatalogLoader</code> from
+that bag to the destination. The orphan strategies (FAIL, DELETE,
+NULLIFY) become a field on <code>FKTraversalPolicy</code> consumed by the
+loader's FK-application step.</p>
+<h3 id="load_cifar10py-is-rewritten-as-bagbuilder-bagcatalogloader"><code>load_cifar10.py</code> is rewritten as <code>BagBuilder + BagCatalogLoader</code></h3>
+<p>The hand-rolled image upload loop becomes:</p>
+<pre><code class="language-python">from deriva.core.typed import (
+    SchemaDef, TableDef, ColumnDef, KeyDef, ForeignKeyDef, BuiltinType,
+)
+
+# One schema definition; used both for the catalog push and the bag build.
+cifar_schema = SchemaDef(&quot;cifar&quot;, tables=[
+    TableDef(&quot;Label&quot;,
+        columns=[ColumnDef(&quot;Name&quot;, BuiltinType.text, nullok=False)],
+        keys=[KeyDef([&quot;Name&quot;], primary=True)],
+    ),
+    TableDef(&quot;Image&quot;,
+        columns=[
+            ColumnDef(&quot;RID&quot;, BuiltinType.ermrest_rid),
+            ColumnDef(&quot;Filename&quot;, BuiltinType.text, nullok=False),
+            ColumnDef(&quot;Label&quot;, BuiltinType.text, nullok=False),
+        ],
+        keys=[KeyDef([&quot;RID&quot;], primary=True)],
+        foreign_keys=[
+            ForeignKeyDef([&quot;Label&quot;], &quot;cifar&quot;, &quot;Label&quot;, [&quot;Name&quot;]),
+        ],
+    ),
+])
+
+# Push schema to the catalog using the same defs.
+model.create_schema_from_def(cifar_schema)
+
+images_df = pd.DataFrame({...})
+labels_df = pd.DataFrame({&quot;Name&quot;: [...]})
+
+with BagBuilder(schema_defs=[cifar_schema], output_dir=output_dir) as bb:
+    bb.add_rows(&quot;Label&quot;, labels_df)
+    bb.add_rows(&quot;Image&quot;, images_df)
+    for rid, path in image_files.items():
+        bb.add_asset(&quot;Image&quot;, rid, path)
+    bag = bb.finalize()
+
+BagCatalogLoader(catalog, bag, traversal).run()
+</code></pre>
+<p>The schema-setup half of <code>load_cifar10</code> stays (catalog-side
+<code>setup_domain_model</code>); the data-load half collapses to the snippet
+above.</p>
+<h2 id="consequences">Consequences</h2>
+<h3 id="positive">Positive</h3>
+<ul>
+<li><strong>One set of FK semantics.</strong> <code>FKTraversalPolicy</code> is the single policy
+  object; today's three independent FK-walks become one.</li>
+<li><strong>One asset story.</strong> <code>asset_mode</code>
+  (<code>ROWS_ONLY</code>/<code>UPLOAD_IF_MISSING</code>/<code>UPLOAD_FORCE</code>)
+  applies uniformly across <code>BagBuilder</code>, <code>CatalogBagBuilder</code>, and
+  <code>BagCatalogLoader</code>.</li>
+<li><strong>Round-trip is closed.</strong> <code>catalog → bag → catalog</code> is a defined
+  operation with a stable artifact in the middle — debuggable,
+  inspectable, citable.</li>
+<li><strong>Clone shrinks dramatically.</strong> ~1900 lines → a thin wrapper.</li>
+<li><strong><code>load_cifar10.py</code> shrinks.</strong> Hand-rolled upload loop replaced
+  by <code>BagBuilder</code> + <code>BagCatalogLoader</code>.</li>
+<li><strong>One implementation of Bag-SQLAlchemy-from-bag.</strong> Today's parallel
+  <code>BagDatabase</code> (upstream) + <code>SchemaBuilder</code> + <code>DataLoader</code> +
+  <code>BagDataSource</code> (deriva-ml) collapse into one tree under
+  <code>deriva.bag</code>.</li>
+<li><strong>Producer-side machinery is co-located with consumer-side</strong>.
+  The bag is the contract; the code that produces it and the code
+  that consumes it live next to each other.</li>
+<li><strong>One canonical internal schema vocabulary, multiple accepted
+  inputs.</strong> SQLAlchemy <code>MetaData</code> is the internal hub for
+  <code>BagDatabase</code> (output), <code>BagBuilder</code> (normalized input),
+  <code>BagCatalogLoader</code>, <code>local_db</code>, and <code>CatalogBagBuilder</code> (via
+  <code>ermrest_model_to_metadata</code>). <code>BagBuilder</code> accepts either
+  deriva-py <code>typed.SchemaDef</code> (so users already pushing schemas
+  to a catalog can use the same defs for bag construction —
+  <em>one declaration, two uses</em>) or a SQLAlchemy <code>MetaData</code> (for
+  callers bridging from other tooling). All conversions live in
+  one module (<code>schema_io</code>); the type-mapping tables have one
+  home.</li>
+</ul>
+<h3 id="negative">Negative</h3>
+<ul>
+<li><strong>One large deriva-py PR.</strong> B3 unifies five primitives (<code>BagDatabase</code>,
+  <code>SchemaBuilder</code>, <code>SchemaORM</code>, <code>DataLoader</code>, <code>DataSource</code> family)
+  plus the new producer classes in a single deriva-py PR. Larger
+  blast radius than a narrower migration would have.</li>
+<li><strong><code>local_db</code> is touched indirectly.</strong> Its <code>SchemaBuilder</code> import
+  moves from <code>deriva_ml.model</code> to <code>deriva.bag</code>. Behavior unchanged.</li>
+<li><strong>Mid-flight catalog operations.</strong> While the deriva-py PR is in
+  flight (before deriva-ml migrates), deriva-ml's <code>main</code> still
+  uses local <code>SchemaBuilder</code> etc. The migration PR in deriva-ml
+  pins the new deriva-py commit and switches imports atomically.</li>
+<li><strong>Some <code>CatalogGraph</code> complexity moves to <code>CatalogBagBuilder</code>.</strong>
+  Dataset-specific association filtering (filter associations by
+  member element types, prune paths ending in vocabularies, walk
+  nested datasets) does not belong in the generic
+  <code>CatalogBagBuilder</code>. It becomes a deriva-ml-domain wrapper
+  (<code>DatasetBagBuilder</code>) that
+  refines the generic anchor + traversal before handing them to the
+  upstream class.</li>
+</ul>
+<h3 id="neutral-open">Neutral / open</h3>
+<ul>
+<li><strong>MINID minting is unchanged.</strong> Today's <code>_create_dataset_minid</code> /
+  S3 post-processor flow is part of the export-engine spec
+  <code>CatalogBagBuilder</code> generates. Untouched.</li>
+<li><strong>Asset upload mode for <code>BagBuilder</code>-produced bags.</strong> The
+  builder writes complete or fetch-referenced bags directly; no
+  <code>asset_mode</code> enum needed at builder time. <code>asset_mode</code> only
+  matters when <em>moving</em> assets between catalogs (i.e., on the
+  loader side).</li>
+<li><strong><code>CatalogDataSource</code> has no live users in deriva-ml.</strong> It is
+  moving upstream nonetheless because it is the natural mirror of
+  <code>BagDataSource</code> and <code>BagCatalogLoader</code>'s reverse-direction
+  sibling.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<ul>
+<li><strong>Keep three independent code paths; ship producer-side
+  improvements piecemeal.</strong> Rejected: every new feature pays the
+  three-times tax. The current divergence between <code>CatalogGraph</code>
+  and <code>clone._discover_reachable_tables</code> is exactly the kind of
+  drift that compounds.</li>
+<li><strong>Make <code>BagBuilder</code> the universal bag-writing primitive;
+  <code>CatalogBagBuilder</code> feeds it row by row.</strong> Rejected: would
+  bypass the deriva-py export engine's paged streaming, async
+  queries, MD5 manifesting, S3 upload, and MINID post-processors.
+  Re-implementing those inside the producer is a regression.</li>
+<li><strong>Promote <code>BagDatabase</code> upstream but keep the producer side in
+  deriva-ml.</strong> Rejected: splits the bag contract across two repos.
+  The producer would import the profile from deriva-py while
+  living in deriva-ml — a coupling point that buys nothing.</li>
+<li><strong>Build the new module in deriva-ml first, lift to deriva-py
+  later.</strong> Rejected for this redesign: the consumer half
+  (<code>BagDatabase</code>) already lives upstream. Building the producer
+  half in a different repo would re-introduce the split that
+  motivates the redesign.</li>
+</ul>
+<h2 id="delivery-sequence">Delivery sequence</h2>
+<p>Delivery is two PRs, sequenced:</p>
+<ol>
+<li><strong>deriva-py PR against <code>deriva-ml</code> branch.</strong> New
+   <code>deriva/bag/</code> submodule with:</li>
+<li><code>sqlite_helpers.py</code> (or <code>engine.py</code>) — SQLite engine factory
+     with WAL + <code>synchronous=NORMAL</code> + <code>foreign_keys=ON</code> +
+     <code>busy_timeout=5000</code>, read-only URI support, and
+     <code>ensure_schema_meta</code> for forward-compat schema versioning.
+     Lifted from deriva-ml's <code>local_db/sqlite_helpers.py</code>.</li>
+<li><code>profile.py</code> — profile helpers (path constants, archive-as-zip,
+     <code>metadata/</code> writer, <code>BagIt-Profile-Identifier</code> constant,
+     validation wrapper around <code>bdb.validate_bag_profile</code>,
+     <code>BAG_SCHEMA_VERSION</code> constant).</li>
+<li><code>profiles/deriva-bag-profile.json</code> — the profile JSON document
+     (BagIt Profile spec). Hosted under the deriva-py repo; the
+     identifier URL points at the raw file on the <code>deriva-ml</code>
+     branch (e.g.,
+     <code>https://raw.githubusercontent.com/informatics-isi-edu/deriva-py/deriva-ml/deriva/bag/profiles/deriva-bag-profile.json</code>)
+     until it stabilizes and a versioned URL is minted.</li>
+<li><code>database.py</code> — <code>BagDatabase</code> (refactored from
+     <code>deriva/core/bag_database.py</code>; switched to <code>create_wal_engine</code>
+     and <code>ensure_schema_meta</code>).</li>
+<li><code>schema.py</code> — <code>SchemaBuilder</code> / <code>SchemaORM</code>.</li>
+<li><code>schema_io.py</code> — schema-interchange functions:
+     <code>typed_schema_def_to_metadata</code>,
+     <code>metadata_to_typed_schema_defs</code>,
+     <code>metadata_to_ermrest_json</code>, <code>ermrest_json_to_metadata</code>,
+     <code>ermrest_model_to_metadata</code>, and the ERMrest ↔ SQLAlchemy
+     type-mapping tables. Single source of truth for schema
+     interchange between deriva-py <code>typed</code> defs, ERMrest JSON,
+     SQLAlchemy <code>MetaData</code>, and ERMrest <code>Model</code>.</li>
+<li><code>loader.py</code> — <code>DataLoader</code> + <code>ForeignKeyOrderer</code> + <code>CSVSink</code>
+     (write-out sink used by <code>BagBuilder</code>; complements the
+     existing into-SQLite sink used by <code>BagDatabase</code> on read).</li>
+<li><code>sources.py</code> — <code>DataSource</code> + <code>BagDataSource</code> +
+     <code>CatalogDataSource</code> + <code>DataFrameDataSource</code> +
+     <code>IterableDataSource</code> + <code>LocalDBDataSource</code>. The last three
+     are inputs to <code>BagBuilder</code> for the three producer cases
+     (in-memory pandas, in-memory dict iterables, local SQLite
+     from <code>local_db</code>).</li>
+<li><code>builder.py</code> — <code>BagBuilder</code>.</li>
+<li><code>catalog_builder.py</code> — <code>CatalogBagBuilder</code>.</li>
+<li><code>catalog_loader.py</code> — <code>BagCatalogLoader</code>.</li>
+<li><code>anchors.py</code> — <code>Anchor</code> union.</li>
+<li><code>traversal.py</code> — <code>FKTraversalPolicy</code>.</li>
+<li><code>cache_index.py</code> — <code>BagCacheIndex</code> (SQLite-backed cache
+     index: <code>bags</code> and <code>bag_anchor_rids</code> tables, content-addressed
+     lookup, reverse-index queries by anchor RID). Replaces the
+     <code>{rid}_*</code> directory-glob affordance.</li>
+</ol>
+<p>Same PR deletes <code>deriva/core/bag_database.py</code>. Designed for
+   clean cherry-pick into the deriva-py <code>2.0</code> branch later.</p>
+<ol>
+<li><strong>deriva-ml migration PR.</strong> Pin deriva-py to the commit on
+   <code>deriva-ml</code> that contains the new module. Replace local
+   <code>model/schema_builder.py</code>, <code>model/data_loader.py</code>,
+   <code>model/data_sources.py</code>, <code>model/fk_orderer.py</code> with imports
+   from <code>deriva.bag</code>. Replace <code>local_db/sqlite_helpers.py</code> with a
+   re-export of <code>deriva.bag.sqlite_helpers</code> (or remove and update
+   <code>local_db</code> callers to import upstream directly). Rebuild
+   <code>DatabaseModel</code> as a <code>BagDatabase</code> subclass. Rename
+   <code>DerivaMLDatabase</code> → <code>DerivaMLBagView</code>. Update
+   <code>local_db/schema.py</code> imports. Replace <code>catalog/clone.py</code> body
+   with the <code>CatalogBagBuilder + BagCatalogLoader</code> wrapper.
+   Rewrite <code>load_cifar10.py</code> to use <code>BagBuilder +
+   BagCatalogLoader</code>. Add <code>DatasetBagBuilder</code> wrapper that layers
+   dataset-specific filtering on <code>CatalogBagBuilder</code>. Update
+   <code>BagCache</code>'s <code>CacheStatus</code> enum to use <code>cached_holey</code> instead
+   of <code>cached_incomplete</code> (matching the bag-terminology decisions
+   in CONTEXT.md); convert <code>CacheStatus(str, Enum)</code> to
+   <code>CacheStatus(StrEnum)</code> for consistency with the project's
+   established enum style. Rewrite <code>BagCache</code> to use the new
+   content-addressed cache index (<code>index.sqlite</code>) instead of the
+   <code>{rid}_*</code> directory glob. Include a one-shot migration helper
+   that scans any existing <code>{cache_dir}/{rid}_{checksum}/...</code>
+   directories, populates <code>index.sqlite</code>, and moves them into the
+   new <code>bags/{checksum}/</code> layout — cached bags do not need to be
+   re-downloaded.
+   Rewrite <code>Execution.commit_execution</code> to use the bag pipeline:
+   <code>BagBuilder(metadata=local_db_metadata,
+   source=LocalDBDataSource(local_db))</code> to build a bag from the
+   working SQLite, then <code>BagCatalogLoader(catalog, bag,
+   policy).run()</code> to push it. Replaces today's bespoke
+   <code>upload_directory()</code> + ad-hoc row-insert path with the same
+   two-step flow used by cifar load and catalog clone. The bag is
+   left on disk after the upload as a durable execution artifact
+   (citable, inspectable, re-loadable on failure).</li>
+</ol>
+<p>A subsequent ADR (0007) may slice the deriva-py PR into sub-PRs
+if it grows unreviewable; for now the assumption is one PR.</p>
+<h3 id="commit-stack-inside-the-deriva-py-pr">Commit-stack inside the deriva-py PR</h3>
+<p>The deriva-py PR is <strong>one PR with multiple logically coherent
+commits</strong> rather than one squash. Each commit leaves the tree in
+a working state, so individual commits can be cherry-picked into
+the <code>2.0</code> branch later. Proposed boundaries:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Commit</th>
+<th>Tree state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Add <code>deriva/bag/__init__.py</code>, <code>sqlite_helpers.py</code>, <code>profile.py</code>, <code>profiles/deriva-bag-profile.json</code></td>
+<td>Empty package + engine factory + profile artifact</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Move <code>deriva/core/bag_database.py</code> → <code>deriva/bag/database.py</code>; switch to <code>create_wal_engine</code> + <code>ensure_schema_meta</code></td>
+<td><code>BagDatabase</code> lives at new path with WAL; old path still works via re-export shim</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Add <code>deriva/bag/schema.py</code>, <code>schema_io.py</code>, <code>loader.py</code> (with <code>CSVSink</code>), <code>sources.py</code> (with <code>DataFrameDataSource</code>, <code>IterableDataSource</code>, <code>LocalDBDataSource</code>) — primitives lifted from deriva-ml plus the new schema-interchange, write-out sink, and producer-side data sources</td>
+<td>Primitives + schema-interchange + write-out sink + producer sources upstream; deriva-ml will switch imports in migration PR</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Add <code>deriva/bag/anchors.py</code>, <code>traversal.py</code></td>
+<td>Shared types ready</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Add <code>deriva/bag/cache_index.py</code> (<code>BagCacheIndex</code>)</td>
+<td>Content-addressed index ready</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Add <code>deriva/bag/builder.py</code> (<code>BagBuilder</code>)</td>
+<td>Constructive producer ready</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Add <code>deriva/bag/catalog_builder.py</code> (<code>CatalogBagBuilder</code>)</td>
+<td>Walking producer ready</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Add <code>deriva/bag/catalog_loader.py</code> (<code>BagCatalogLoader</code>)</td>
+<td>Loader ready</td>
+</tr>
+</tbody>
+</table>
+<p>The shim at <code>deriva/core/bag_database.py</code> (re-exporting from the
+new path) stays in place through the deriva-py PR and gets
+removed in a follow-up commit on the <code>deriva-ml</code> branch after
+the deriva-ml migration PR has landed. That removal is <strong>not</strong>
+part of this PR — keeps the deriva-py PR self-contained and
+non-breaking for any deriva-ml code that still imports the old
+path during migration.</p>
+<p>Move-only commits (commits 2 and 3) stay pure renames where
+possible: the diff is short, easy to audit, and obviously
+behavior-preserving. Behavior changes (WAL adoption, schema_meta
+addition) are isolated into the same commit as the move but
+called out in the commit message.</p>
+<h2 id="references">References</h2>
+<ul>
+<li>ADR-0001: Lineage walks data flow, not orchestration.</li>
+<li>ADR-0003: Dataset dev-versioning model.</li>
+<li>CONTEXT.md "Bag producer/consumer model" section.</li>
+<li><code>src/deriva_ml/dataset/catalog_graph.py</code> — the dataset-side
+  walker <code>CatalogBagBuilder</code> generalizes.</li>
+<li><code>src/deriva_ml/catalog/clone.py</code> — the catalog-side walker
+  <code>CatalogBagBuilder</code> + <code>BagCatalogLoader</code> replace.</li>
+<li><code>src/deriva_ml/model/*</code> — the consumer-side primitives moving
+  upstream.</li>
+<li><code>deriva-ml-model-template/src/scripts/load_cifar10.py</code> — the
+  constructive-producer case driving <code>BagBuilder</code>'s design.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

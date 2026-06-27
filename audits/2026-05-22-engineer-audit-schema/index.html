@@ -1,0 +1,2690 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/audits/2026-05-22-engineer-audit-schema/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Engineer Audit — schema/ Subsystem (v1.37.1, 2026-05-22) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#engineer-audit-schema-subsystem-v1371-2026-05-22" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Engineer Audit — schema/ Subsystem (v1.37.1, 2026-05-22)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#scope-and-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope and method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="engineer-audit-schema-subsystem-v1371-2026-05-22">Engineer Audit — schema/ Subsystem (v1.37.1, 2026-05-22)</h1>
+<h2 id="scope-and-method">Scope and method</h2>
+<p>Reviewed:</p>
+<ul>
+<li><code>src/deriva_ml/schema/__init__.py</code> (8 LoC)</li>
+<li><code>src/deriva_ml/schema/create_schema.py</code> (660 LoC)</li>
+<li><code>src/deriva_ml/schema/annotations.py</code> (629 LoC)</li>
+<li><code>src/deriva_ml/schema/policy.json</code> (81 LoC)</li>
+<li><code>tests/schema/test_acl_application.py</code>, <code>test_annotations.py</code>,
+  <code>test_cascade_behavior.py</code>, <code>test_policy.py</code>,
+  <code>test_seeded_vocab_terms.py</code>, <code>test_vocab_fk_convention.py</code></li>
+</ul>
+<p>External consumers (grep <code>from deriva_ml.schema</code> across <code>src/</code>):</p>
+<ul>
+<li><code>src/deriva_ml/demo_catalog.py</code> — uses <code>create_ml_catalog</code></li>
+<li><code>src/deriva_ml/core/base.py:1126</code> — uses <code>catalog_annotation</code></li>
+<li><code>src/deriva_ml/core/mixins/asset.py:30</code> — uses <code>asset_annotation</code></li>
+<li><code>src/deriva_ml/schema/create_schema.py:35</code> — uses
+  <code>asset_annotation</code>, <code>generate_annotation</code></li>
+</ul>
+<p>Recent context: PR #186 (<code>ecd140a3</code>) — fixed ACL-ordering bug in
+<code>create_ml_catalog</code> so <code>acl_config</code> runs <strong>after</strong>
+<code>create_ml_schema</code>. New <code>tests/schema/test_acl_application.py</code>
+guards that ordering.</p>
+<p>Severity:
+<strong>P0</strong> (release-blocker) / <strong>P1</strong> (must-fix before release) /
+<strong>P2</strong> (should-fix soon) / <strong>P3</strong> (nice-to-have).</p>
+<hr />
+<h2 id="executive-summary">Executive summary</h2>
+<p>The subsystem is in a <strong>shipworthy</strong> state for v1.37.1. The
+load-bearing entry points (<code>create_ml_catalog</code>,
+<code>create_ml_schema</code>, <code>asset_annotation</code>, <code>build_navbar_menu</code>,
+<code>initialize_ml_schema</code>) all carry recent test coverage, and PR</p>
+<h1 id="186-closed-the-most-consequential-bug-acl-ordering-the">186 closed the most consequential bug (ACL ordering). The</h1>
+<p>findings below are mostly correctness-near-misses and
+documentation drift — no P0 blockers.</p>
+<p>The single most important pattern uncovered: <strong><code>generate_annotation</code>
+hard-codes the literal string <code>"deriva-ml"</code> in seven places while
+also accepting a <code>schema</code> parameter</strong> (F-01). Callers who pass a
+non-default schema name get a half-rewritten annotation set that
+references both the supplied schema and the literal — Chaise will
+silently render broken FK pseudo-columns. This is a latent
+correctness bug for anyone who tries to use the documented
+<code>schema_name=</code> parameter on <code>create_ml_schema</code>.</p>
+<p>Themes:</p>
+<ol>
+<li><strong>Hard-coded schema names</strong> (F-01, F-02, F-03) — <code>schema_name</code>
+   parameter is partially honored.</li>
+<li><strong>Doc / signature drift</strong> (F-04, F-05, F-06, F-07) —
+   <code>asset_annotation</code> claims to return a dict; <code>generate_annotation</code>
+   has no docstring; <code>model</code> parameter is unused.</li>
+<li><strong>Non-deterministic emitted JSON</strong> (F-08) — <code>asset_metadata</code>
+   set iteration leaks into Chaise annotations.</li>
+<li><strong>Internal table-builder helpers are exposed via module
+   namespace but undocumented</strong> (F-09 — F-12).</li>
+<li><strong>No unit tests for <code>asset_annotation</code> / <code>generate_annotation</code></strong>
+   (F-13, F-14) — the only coverage is indirect through full
+   catalog integration tests.</li>
+<li><strong><code>use_hatrac</code> parameter accepted but ignored</strong> (F-15) — silent
+   <code>File</code> vs <code>Execution_Asset</code> divergence.</li>
+<li><strong>CASCADE warning is clear but doesn't surface the bag-pipeline
+   carve-out at the call site</strong> (F-16, F-17).</li>
+<li><strong>Schema-cache freshness contract is invisible from the
+   subsystem</strong> (F-18) — <code>create_ml_schema</code> rebuilds the catalog
+   model but the in-process <code>SchemaCache</code> (in <code>core/</code>) is never
+   touched. Acceptable, but worth a comment.</li>
+<li><strong>Hidden test gaps for the FK-naming convention used by
+   <code>asset_annotation</code></strong> (F-19) — annotation string-formula values
+   like <code>f"{asset_name}_Asset_Type_{asset_name}_fkey"</code> aren't
+   verified to match what <code>define_association</code> actually emits.</li>
+</ol>
+<p>Total findings: <strong>27</strong> (P0: 0, P1: 5, P2: 13, P3: 9).</p>
+<hr />
+<h2 id="findings">Findings</h2>
+<h3 id="f-01-generate_annotation-hard-codes-deriva-ml-despite-schema-parameter-p1-correctness">F-01 — <code>generate_annotation</code> hard-codes <code>"deriva-ml"</code> despite <code>schema</code> parameter (P1, correctness)</h3>
+<p><code>src/deriva_ml/schema/annotations.py:361,506,517,520,530,546,552</code></p>
+<pre><code class="language-python">def generate_annotation(model: Model, schema: str) -&gt; dict:
+    ...
+    dataset_annotation = {
+        deriva_tags.visible_columns: {
+            &quot;*&quot;: [
+                ...
+                {
+                    &quot;source&quot;: [
+                        {&quot;outbound&quot;: [&quot;deriva-ml&quot;, &quot;Dataset_Version_fkey&quot;]},  # ← literal
+                        ...
+</code></pre>
+<p>Seven occurrences inside <code>dataset_annotation</code> reference the literal
+<code>"deriva-ml"</code> instead of the <code>schema</code> parameter. The rest of the
+function (<code>workflow_annotation</code>, <code>execution_annotation</code>,
+<code>dataset_version_annotation</code>) correctly uses the parameter. A user
+who passes <code>schema_name="my_ml"</code> to <code>create_ml_schema</code> will get a
+<code>Dataset</code> table whose <code>visible_columns</code> annotation references
+<code>"deriva-ml"</code> FKs that don't exist in their schema — Chaise will
+silently render the column as missing.</p>
+<p><strong>Action</strong>: replace the seven literals with the <code>schema</code> parameter.</p>
+<h3 id="f-02-catalog_annotation-hard-codes-deriva-ml-in-chaise_configdefaulttable-p2-correctness">F-02 — <code>catalog_annotation</code> hard-codes <code>"deriva-ml"</code> in <code>chaise_config.defaultTable</code> (P2, correctness)</h3>
+<p><code>src/deriva_ml/schema/annotations.py:232</code></p>
+<pre><code class="language-python">&quot;defaultTable&quot;: {&quot;table&quot;: &quot;Dataset&quot;, &quot;schema&quot;: &quot;deriva-ml&quot;},
+</code></pre>
+<p>Same shape as F-01 but inside the Chaise top-level config. A
+non-default <code>schema_name</code> will mean the Chaise landing page
+points at a non-existent schema. Acceptable to defer if
+non-default <code>schema_name</code> is in practice unused, but the
+<code>schema_name</code> parameter is part of <code>create_ml_schema</code>'s
+documented signature, so the contract is broken.</p>
+<p><strong>Action</strong>: thread the schema name through <code>catalog_annotation</code>
+(or pull it from <code>model.ml_schema</code>).</p>
+<h3 id="f-03-create_ml_schema-honors-schema_name-partially-p2-correctness">F-03 — <code>create_ml_schema</code> honors <code>schema_name</code> partially (P2, correctness)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:313-410</code></p>
+<p>The function takes <code>schema_name: str = "deriva-ml"</code>. It correctly
+uses the parameter to look up / drop the schema (line 335) and to
+create vocabulary tables. But it calls <code>generate_annotation(model,
+schema_name)</code> which itself contains literal <code>"deriva-ml"</code> (F-01).
+And at line 410, <code>initialize_ml_schema(model, schema_name)</code> passes
+the name through correctly.</p>
+<p>So <code>create_ml_schema</code> partly honors <code>schema_name</code>. The contract
+needs either (a) the literals fixed (F-01, F-02), or (b) the
+parameter removed and the literal <code>"deriva-ml"</code> documented as
+the only supported value.</p>
+<p><strong>Action</strong>: pick a direction. The cheap path is fixing the
+literals.</p>
+<h3 id="f-04-asset_annotation-docstring-says-returns-a-dictionary-but-returns-none-p1-doc">F-04 — <code>asset_annotation</code> docstring says "Returns a dictionary" but returns <code>None</code> (P1, doc)</h3>
+<p><code>src/deriva_ml/schema/annotations.py:247-358</code></p>
+<pre><code class="language-python">def asset_annotation(asset_table: Table):
+    &quot;&quot;&quot;Generate annotations for an asset table.
+
+    Args:
+        asset_table: The Table object representing the asset table.
+
+    Returns:
+        A dictionary containing the annotations for the asset table.
+    &quot;&quot;&quot;
+</code></pre>
+<p>The function mutates <code>asset_table.annotations</code> in-place and calls
+<code>asset_table.schema.model.apply()</code>. It has <strong>no <code>return</code>
+statement</strong> — returns <code>None</code>. The "Returns" docstring section is
+wrong.</p>
+<p><strong>Action</strong>: rewrite the docstring to describe the mutation and
+the <code>apply()</code> side effect; drop the <code>Returns</code> block (or replace
+with <code>Returns: None</code>).</p>
+<h3 id="f-05-generate_annotation-has-no-docstring-at-all-p1-doc">F-05 — <code>generate_annotation</code> has no docstring at all (P1, doc)</h3>
+<p><code>src/deriva_ml/schema/annotations.py:361</code></p>
+<pre><code class="language-python">def generate_annotation(model: Model, schema: str) -&gt; dict:
+    workflow_annotation = {
+</code></pre>
+<p>The function is part of the module-level <code>__all__</code> (line 623), so
+it's a public API. Workspace convention (CLAUDE.md) requires a
+Google-style docstring with <code>Args/Returns/Raises/Example</code>.</p>
+<p><strong>Action</strong>: add a Google-style docstring; document the five keys
+of the returned dict (<code>workflow_annotation</code>, <code>dataset_annotation</code>,
+<code>execution_annotation</code>, <code>schema_annotation</code>,
+<code>dataset_version_annotation</code>).</p>
+<h3 id="f-06-generate_annotations-model-parameter-is-unused-p2-dead-code">F-06 — <code>generate_annotation</code>'s <code>model</code> parameter is unused (P2, dead code)</h3>
+<p><code>src/deriva_ml/schema/annotations.py:361</code></p>
+<pre><code class="language-python">def generate_annotation(model: Model, schema: str) -&gt; dict:
+</code></pre>
+<p><code>model</code> is declared but never referenced inside the function body.
+Either the function intended to introspect the model (e.g., to
+discover features) or the parameter is dead. The call site
+(<code>create_schema.py:340</code>) passes <code>generate_annotation(model,
+schema_name)</code>, so removing the parameter is a public-API change.</p>
+<p><strong>Action</strong>: either (a) remove the parameter and update the one
+call site, or (b) use the parameter (e.g., to drive
+<code>navbarMenu</code>-style discovery) and document it.</p>
+<h3 id="f-07-create_dataset_table-has-no-docstring-p1-doc">F-07 — <code>create_dataset_table</code> has no docstring (P1, doc)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:40-82</code></p>
+<p>The neighboring <code>create_execution_table</code>, <code>create_workflow_table</code>,
+<code>create_asset_table</code>, and <code>define_table_dataset_version</code> all have
+Google-style docstrings; <code>create_dataset_table</code> is the only
+sibling with none. Given the function creates four tables
+(Dataset, Dataset_Type, Dataset_Type association, Dataset_Version,
+Dataset_Dataset for nested, Dataset_Execution) the parameter
+documentation is non-trivial.</p>
+<p><strong>Action</strong>: add a Google-style docstring listing the side-effect
+graph (which tables get created, which FK edges get added).</p>
+<h3 id="f-08-asset_annotation-iterates-a-set-for-visible_columns-ordering-p1-correctness-non-determinism">F-08 — <code>asset_annotation</code> iterates a <code>set</code> for <code>visible_columns</code> ordering (P1, correctness — non-determinism)</h3>
+<p><code>src/deriva_ml/schema/annotations.py:259, 307, 321</code></p>
+<pre><code class="language-python">asset_metadata = {c.name for c in asset_table.columns} - DerivaAssetColumns
+...
+&quot;*&quot;: [
+    ...
+] + [fkey_column(c) for c in asset_metadata],   # ← set iteration
+&quot;detailed&quot;: [
+    ...
+] + [fkey_column(c) for c in asset_metadata],   # ← set iteration
+</code></pre>
+<p><code>asset_metadata</code> is a <strong>set</strong>, so its iteration order is
+implementation-defined. The resulting Chaise <code>visible_columns</code>
+order will jitter run-to-run on rebuilds and is not
+byte-reproducible across catalog instances created from the same
+source. This in turn breaks downstream diffs of catalog
+annotations.</p>
+<p>This is the same family of bug as the asset-manifest ordering bug
+documented in CLAUDE.md ("Metadata directory order must match
+<code>sorted(metadata_columns)</code> — both <code>asset_table_upload_spec()</code> and
+<code>_build_upload_staging()</code> sort alphabetically").</p>
+<p><strong>Action</strong>: replace both list comprehensions with <code>[fkey_column(c)
+for c in sorted(asset_metadata)]</code>.</p>
+<h3 id="f-09-internal-table-builder-helpers-create_dataset_table-etc-are-not-in-__all__-but-are-reachable-via-attribute-access-p2-api-surface">F-09 — Internal table-builder helpers (<code>create_dataset_table</code> etc.) are not in <code>__all__</code> but are reachable via attribute access (P2, API surface)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:655-659</code></p>
+<pre><code class="language-python">__all__ = [
+    &quot;create_ml_catalog&quot;,
+    &quot;create_ml_schema&quot;,
+    &quot;initialize_ml_schema&quot;,
+]
+</code></pre>
+<p><code>create_dataset_table</code>, <code>create_execution_table</code>,
+<code>create_workflow_table</code>, <code>create_asset_table</code>,
+<code>define_table_dataset_version</code> are all module-level and reachable
+as <code>deriva_ml.schema.create_schema.create_dataset_table</code>. They
+have no <code>_</code> prefix so the static analyzer treats them as public,
+but <code>__all__</code> excludes them. A wildcard import gets only the three
+listed — which is correct — but an explicit
+<code>from deriva_ml.schema.create_schema import create_dataset_table</code>
+works and is a hidden surface contract.</p>
+<p><strong>Action</strong>: prefix with <code>_</code> (recommended — they're build-time
+helpers), <strong>or</strong> add them to <code>__all__</code> and give them docstrings
+that reflect "internal but exposed".</p>
+<h3 id="f-10-asset_annotations-fk-name-string-formula-is-a-fragile-contract-p2-correctness">F-10 — <code>asset_annotation</code>'s FK-name string-formula is a fragile contract (P2, correctness)</h3>
+<p><code>src/deriva_ml/schema/annotations.py:276-289</code></p>
+<pre><code class="language-python">asset_type_source = {
+    &quot;source&quot;: [
+        {&quot;inbound&quot;: [schema, f&quot;{asset_name}_Asset_Type_{asset_name}_fkey&quot;]},
+        {&quot;outbound&quot;: [schema, f&quot;{asset_name}_Asset_Type_Asset_Type_fkey&quot;]},
+        &quot;RID&quot;,
+    ],
+    &quot;markdown_name&quot;: &quot;Asset Types&quot;,
+}
+</code></pre>
+<p>These FK-constraint names are constructed by <code>Table.define_association</code>
+inside deriva-py. The exact format (<code>&lt;assoc&gt;_&lt;column&gt;_fkey</code>) is a
+deriva-py convention, not a deriva-ml-controlled name. If deriva-py
+ever changes the synthesized constraint-name template, this
+annotation breaks silently — Chaise will render no asset-types
+column.</p>
+<p>There is no test that asserts these names actually match the FK
+constraints emitted by <code>define_association</code>.</p>
+<p><strong>Action</strong>: at minimum, add an integration assertion that the
+generated table has a FK constraint matching
+<code>f"{asset_name}_Asset_Type_{asset_name}_fkey"</code>. Better: pull the
+name from <code>asset_table.foreign_keys[…].name</code> rather than
+formatting a string.</p>
+<h3 id="f-11-create_asset_tableuse_hatrac-parameter-is-accepted-and-silently-ignored-p1-correctness">F-11 — <code>create_asset_table.use_hatrac</code> parameter is accepted and silently ignored (P1, correctness)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:222-249</code></p>
+<pre><code class="language-python">def create_asset_table(
+    schema: Schema,
+    asset_name: str,
+    execution_table: Table,
+    asset_type_table: Table,
+    asset_role_table: Table,
+    use_hatrac: bool = True,
+) -&gt; Table:
+    ...
+    asset_table = schema.create_table(
+        AssetTableDef(
+            schema_name=schema.name,
+            name=asset_name,
+            hatrac_template=&quot;/hatrac/metadata/{{MD5}}.{{Filename}}&quot;,
+        )
+    )
+</code></pre>
+<p>The <code>use_hatrac</code> parameter is documented in the docstring
+("Whether to use Hatrac for file storage") but the function body
+<strong>never references it</strong>. The <code>File</code> table is created at line 392
+with <code>use_hatrac=False</code>, but it gets the same <code>hatrac_template</code>
+as <code>Execution_Metadata</code> and <code>Execution_Asset</code>. So the <code>File</code> table
+is wired up identically to a Hatrac-backed asset.</p>
+<p>This is either (a) the parameter is dead and the <code>File</code> table's
+"not managed by Hatrac" semantic is implemented elsewhere, or
+(b) the parameter was supposed to switch off the <code>hatrac_template</code>
+and someone forgot to wire it up.</p>
+<p><strong>Action</strong>: investigate. If the <code>File</code> table actually doesn't go
+through Hatrac at runtime, the parameter is misleading and should
+either be removed or actually drive behavior. The seeded term
+<code>{"Name": "File", "Description": "A file that is not managed by
+Hatrac"}</code> (create_schema.py:476) reinforces that the semantic was
+intended.</p>
+<h3 id="f-12-define_table_dataset_version-and-similar-helpers-leak-schema-name-string-coupling-p2-design">F-12 — <code>define_table_dataset_version</code> and similar helpers leak schema-name string-coupling (P2, design)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:85-150</code></p>
+<p><code>define_table_dataset_version(sname, …)</code> takes the schema name as
+a string parameter and builds FK definitions that reference
+<code>sname</code> for <code>Dataset</code> and <code>Execution</code> tables. The function is
+called from <code>create_dataset_table</code> (line 72), which itself takes a
+<code>Schema</code> object. There's a layered API gap: the caller has the
+Schema, the inner function takes a string.</p>
+<p>This isn't load-bearing, but it makes the helper hard to reuse —
+you can't pass it a <code>Schema</code> directly.</p>
+<p><strong>Action</strong>: change the signature to <code>define_table_dataset_version(schema: Schema, …)</code> and use <code>schema.name</code> internally,
+mirroring <code>create_execution_table(schema, …)</code>.</p>
+<h3 id="f-13-no-unit-test-for-asset_annotation-p1-coverage">F-13 — No unit test for <code>asset_annotation</code> (P1, coverage)</h3>
+<p><code>tests/schema/</code> has no test file covering <code>asset_annotation</code>. The
+only coverage is indirect, via <code>test_acl_application.py</code> which
+exercises full catalog creation (and so runs <code>asset_annotation</code>
+as a side effect of <code>create_ml_schema</code>). A change that broke the
+annotation shape (e.g., dropped a key from <code>visible_columns</code>)
+would not be caught.</p>
+<p>The function is straightforward to test against a mock <code>Table</code>
+(no live catalog needed) — same pattern as
+<code>test_annotations.py::build_navbar_menu</code>.</p>
+<p><strong>Action</strong>: add <code>tests/schema/test_asset_annotation.py</code> with at
+least:
+- annotation dict shape (top-level keys);
+- presence of the <code>asset_type_source</code> inbound/outbound triple;
+- deterministic ordering (covers F-08);
+- file-preview annotation gets applied to the URL column.</p>
+<h3 id="f-14-no-unit-test-for-generate_annotation-p1-coverage">F-14 — No unit test for <code>generate_annotation</code> (P1, coverage)</h3>
+<p>Same shape as F-13. <code>generate_annotation</code> produces the dict that
+<code>create_ml_schema</code> passes to four <code>create_*_table</code> helpers; it
+has no test. Adding a test would catch the F-01 literal-vs-parameter
+bug as a regression.</p>
+<p><strong>Action</strong>: add <code>tests/schema/test_generate_annotation.py</code>
+checking the five-key shape and that <strong>no</strong> value contains the
+literal <code>"deriva-ml"</code> when called with <code>schema="not-deriva-ml"</code>.</p>
+<h3 id="f-15-policyjson-schema-is-not-documented-anywhere-in-the-subsystem-p2-doc">F-15 — <code>policy.json</code> schema is not documented anywhere in the subsystem (P2, doc)</h3>
+<p><code>src/deriva_ml/schema/policy.json</code> is bundled with the package and
+shelled out to <code>deriva.config.acl_config</code>. Its structure
+(<code>groups</code>, <code>acl_definitions</code>, <code>acl_bindings</code>, <code>catalog_acl</code>,
+<code>schema_acls</code>, <code>table_acls</code>) is partially documented in
+<code>tests/schema/test_policy.py</code> (which asserts the invariants) but
+there's no narrative in the module docstring, no README, no link
+from <code>create_ml_catalog</code>'s docstring to the file format. A future
+maintainer rewriting the file has no reference.</p>
+<p><strong>Action</strong>: add a brief <code>policy.json</code> schema explainer to
+<code>create_ml_catalog</code>'s docstring (or a sibling
+<code>schema/policy.md</code>) covering: the four group-resolution levels,
+the <code>read_only</code> / <code>self_serve</code> ACL definitions, the
+<code>row_owner_guard</code> binding, and the negative-lookahead pattern
+that targets non-public schemas.</p>
+<h3 id="f-16-cascade-warning-is-present-but-not-surfaced-to-callers-programmatically-p2-safety">F-16 — CASCADE warning is present but not surfaced to callers programmatically (P2, safety)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:336</code></p>
+<pre><code class="language-python">if model.schemas.get(schema_name):
+    logger.warning(f&quot;Dropping existing schema '{schema_name}' with CASCADE&quot;)
+    model.schemas[schema_name].drop(cascade=True)
+</code></pre>
+<p>The CASCADE drop fires after a <code>logger.warning(...)</code> only. A
+caller can't intercept this (no callback, no confirmation
+parameter, no exception that requires <code>force=True</code>). Compare to
+<code>refresh_schema</code> in <code>core/base.py:510-571</code>, which refuses to drop
+work without <code>force=True</code>.</p>
+<p>The CLAUDE.md note ("never call <code>create_ml_schema</code> on a catalog
+that already has data in <code>deriva-ml</code>") signals that the contract
+is "callers don't actually do this." But the safer pattern would
+be to require an explicit <code>force_drop=True</code>.</p>
+<p><strong>Action</strong>: add <code>force_drop: bool = False</code> and raise
+<code>DerivaMLConfigurationError</code> when the schema exists and
+<code>force_drop</code> is False. (The clone path already avoids this code
+path per the docstring at line 322.)</p>
+<h3 id="f-17-create_ml_schema-docstring-mentions-bag-pipeline-carve-out-but-doesnt-link-to-the-bag-loader-p3-doc">F-17 — <code>create_ml_schema</code> docstring mentions bag-pipeline carve-out but doesn't link to the bag loader (P3, doc)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:322-326</code></p>
+<p>The docstring says the bag-pipeline clone path "does not call
+this function — it loads catalog content via
+<code>BagCatalogLoader</code> instead." Useful, but no module path is given.
+A reader chasing the carve-out has to grep.</p>
+<p><strong>Action</strong>: add a fully-qualified reference, e.g.,
+<code>:class:\</code>deriva_ml.catalog.bag_catalog_loader.BagCatalogLoader``.</p>
+<h3 id="f-18-schema-cache-freshness-create_ml_schema-doesnt-touch-the-in-process-schemacache-p2-design-clarity">F-18 — Schema-cache freshness: <code>create_ml_schema</code> doesn't touch the in-process <code>SchemaCache</code> (P2, design clarity)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py</code> doesn't import or invoke
+the <code>core.schema_cache.SchemaCache</code>. In practice this is fine
+because <code>create_ml_schema</code> is called either before a <code>DerivaML</code>
+instance exists or via <code>create_ml_catalog</code> (which then constructs
+the instance). But for ad-hoc REPL workflows where a user does:</p>
+<pre><code class="language-python">ml = DerivaML(host, catalog_id)
+create_ml_schema(ml.catalog)   # destructive
+ml.find_datasets()             # stale schema-cache, may crash
+</code></pre>
+<p>…the schema-cache will be stale and there is no contract
+documenting it.</p>
+<p><strong>Action</strong>: at minimum, add a note to <code>create_ml_schema</code>'s
+docstring that callers with an existing <code>DerivaML</code> instance
+should call <code>ml.refresh_schema(force=True)</code> afterward. (No code
+change needed — the function lives below the cache layer.)</p>
+<h3 id="f-19-test_vocab_fk_conventionpy-proves-name-targeted-fks-but-doesnt-prove-asset_annotations-formula-matches-p2-coverage">F-19 — <code>test_vocab_fk_convention.py</code> proves Name-targeted FKs, but doesn't prove <code>asset_annotation</code>'s formula matches (P2, coverage)</h3>
+<p><code>tests/schema/test_vocab_fk_convention.py</code> walks the catalog and
+asserts that every FK targeting a vocab table references <code>Name</code>.
+Excellent invariant. But <code>asset_annotation</code> builds string
+references like <code>f"{asset_name}_Asset_Type_{asset_name}_fkey"</code>
+which is the <strong>synthesized constraint name</strong>, not the FK target.
+A test that crafts the same formula and looks it up against the
+live catalog's FK constraint names would close F-10.</p>
+<p><strong>Action</strong>: extend <code>test_vocab_fk_convention.py</code> (or add a
+sibling) to assert that every FK-string-formula in
+<code>asset_annotation</code>'s output resolves to a real constraint on the
+created table.</p>
+<h3 id="f-20-parallel-asset-table-creation-is-repeated-three-times-with-copy-paste-p2-dup">F-20 — Parallel asset-table creation is repeated three times with copy-paste (P2, dup)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:375-407</code></p>
+<pre><code class="language-python">create_asset_table(schema, MLTable.execution_metadata,
+    execution_table, asset_type_table, asset_role_table)
+create_asset_table(schema, MLTable.execution_asset,
+    execution_table, asset_type_table, asset_role_table)
+file_table = create_asset_table(schema, MLTable.file,
+    execution_table, asset_type_table, asset_role_table,
+    use_hatrac=False)
+</code></pre>
+<p>Three near-identical calls. The <code>File</code> table differs only by
+<code>use_hatrac=False</code> (which itself is broken per F-15) and the
+follow-up <code>Table.define_association(Dataset, File)</code> at lines
+401-407.</p>
+<p>Acceptable as-is (only three sites), but a <code>for asset_name in
+(MLTable.execution_metadata, MLTable.execution_asset, MLTable.file):</code>
+loop would be tidier.</p>
+<p><strong>Action</strong>: optional refactor. Low priority unless touched.</p>
+<h3 id="f-21-generate_annotation-has-parallel-workflow_annotation-dataset_annotation-execution_annotation-blocks-that-dont-share-structure-p3-dup">F-21 — <code>generate_annotation</code> has parallel <code>workflow_annotation</code> / <code>dataset_annotation</code> / <code>execution_annotation</code> blocks that don't share structure (P3, dup)</h3>
+<p><code>src/deriva_ml/schema/annotations.py:362-619</code></p>
+<p>Each of the four returned annotation dicts has its own
+hand-written <code>visible_columns: { "*": [...], "detailed": [...],
+"filter": { "and": [...] } }</code> block. The <code>RCB/RMB</code> pseudo-columns
+and the "Created By" / "Modified By" filter entries appear in
+multiple blocks. Extracting a <code>_audit_columns(schema, table)</code>
+helper would cut ~80 lines and ensure the four tables share the
+same audit-column display.</p>
+<p><strong>Action</strong>: optional refactor; would also make F-01 easier
+because the helper would naturally take the schema parameter.</p>
+<h3 id="f-22-_ensure_terms-helper-inside-initialize_ml_schema-is-good-could-be-promoted-p3-design">F-22 — <code>_ensure_terms</code> helper inside <code>initialize_ml_schema</code> is good; could be promoted (P3, design)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:449-455</code></p>
+<pre><code class="language-python">def _ensure_terms(table_name: str, terms: list[dict]) -&gt; None:
+    &quot;&quot;&quot;Insert terms that don't already exist in a vocabulary table.&quot;&quot;&quot;
+    table = pb.tables[table_name]
+    existing = {row[&quot;Name&quot;] for row in table.entities()}
+    missing = [t for t in terms if t[&quot;Name&quot;] not in existing]
+    if missing:
+        table.insert(missing, defaults={&quot;ID&quot;, &quot;URI&quot;})
+</code></pre>
+<p>Useful pattern; defined as a nested closure so it can't be reused.
+The CLAUDE.md mentions a <code>find_associations</code> / <code>add_term</code>
+elsewhere — promoting <code>_ensure_terms</code> to a module-level helper
+would let other vocab-seeding code reuse it.</p>
+<p><strong>Action</strong>: optional. If there's no second caller, leave it.</p>
+<h3 id="f-23-five-seeded-asset-types-have-descriptions-that-mix-metadata-structure-with-content-p3-content-drift">F-23 — Five seeded asset types have descriptions that mix metadata structure with content (P3, content drift)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:460-484</code></p>
+<p>Asset_Type seed descriptions:
+- <code>"Execution_Config"</code>: "Configuration File for execution metadata"
+- <code>"Execution_Metadata"</code>: "Information about the execution environment"</p>
+<p>vs.</p>
+<ul>
+<li><code>"Hydra_Config"</code>: "Hydra YAML configuration file (config.yaml,
+  overrides.yaml, hydra.yaml)" — names specific filenames</li>
+<li><code>"Metrics_File"</code>: "Training-metric log file (typically JSONL,
+  one record per evaluation point — epoch, step, or eval cycle)"</li>
+</ul>
+<p>The format is inconsistent: some descriptions are pure semantic
+("Information about the X"), others enumerate filename
+conventions, others document format ("typically JSONL"). Chaise
+will display these verbatim in the vocabulary picker. A
+consumer-facing description style guide would help.</p>
+<p><strong>Action</strong>: cosmetic; reconcile descriptions to one of (a)
+"What is this term for?" (semantic), or (b) "What concrete
+artifacts carry this term?" (operational). Currently mixed.</p>
+<h3 id="f-24-initialize_ml_schema-docstring-is-excellent-but-has-no-example-block-p3-doc">F-24 — <code>initialize_ml_schema</code> docstring is excellent but has no <code>Example:</code> block (P3, doc)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:413-444</code></p>
+<p>The function carries the strongest docstring in the subsystem
+(documents the platform-vs-domain principle, names anti-examples
+that the test suite then pins). It lacks an <code>Example:</code> block
+showing the typical invocation, which is a workspace convention.</p>
+<p><strong>Action</strong>: add an <code>Example:</code> block (probably <code># doctest: +SKIP</code>
+since it requires a live catalog).</p>
+<h3 id="f-25-create_ml_catalog-shells-out-to-a-sub-python-surface-the-cleanup-contract-p2-safety">F-25 — <code>create_ml_catalog</code> shells out to a sub-Python; surface the cleanup contract (P2, safety)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:618-641</code></p>
+<pre><code class="language-python">try:
+    subprocess.run(
+        [sys.executable, &quot;-m&quot;, &quot;deriva.config.acl_config&quot;, ...],
+        check=True, capture_output=True, text=True,
+    )
+except subprocess.CalledProcessError as e:
+    raise DerivaMLConfigurationError(
+        f&quot;Failed to apply ACL policy to catalog {catalog.catalog_id} ...&quot;
+    ) from e
+</code></pre>
+<p>If <code>acl_config</code> fails, the catalog <strong>already exists</strong> (it was
+created by <code>server.create_ermrest_catalog()</code> at line 590 and the
+schema was created at line 601). The exception is raised but the
+half-configured catalog leaks. Compare to the <code>catalog_alias</code>
+branch (line 644) — if alias creation fails, same problem.</p>
+<p>A <code>try/except/delete_ermrest_catalog(really=True)/raise</code>
+wrapper would prevent the leak.</p>
+<p><strong>Action</strong>: wrap the <code>acl_config</code> subprocess and the alias-creation
+call in a single try block that calls
+<code>catalog.delete_ermrest_catalog(really=True)</code> on failure before
+re-raising. The test fixtures already do this — the production
+helper should too.</p>
+<h3 id="f-26-policyjson-group-eye-ai-is-bundled-with-the-deriva-ml-package-p3-design">F-26 — <code>policy.json</code> group <code>eye-ai</code> is bundled with the deriva-ml package (P3, design)</h3>
+<p><code>src/deriva_ml/schema/policy.json:6,9-14</code></p>
+<pre><code class="language-json">&quot;eye-ai&quot;: [&quot;https://auth.globus.org/d38e6f4d-...&quot;],
+...
+&quot;project-writers&quot;:  [&quot;isrd-systems&quot;, &quot;eye-ai&quot;],
+&quot;project-curators&quot;: [&quot;isrd-systems&quot;, &quot;local-admin&quot;, &quot;eye-ai&quot;],
+&quot;project-users&quot;:    [&quot;isrd-systems&quot;, &quot;local-admin&quot;, &quot;eye-ai&quot;],
+</code></pre>
+<p>The bundled policy hard-codes an <code>eye-ai</code> group reference. Every
+deriva-ml catalog created via <code>create_ml_catalog</code> thus implicitly
+grants the eye-ai Globus group write/curate access on every
+non-public schema. This is reasonable for ISI but bleeds project
+identity into a platform-level default.</p>
+<p><strong>Action</strong>: either (a) document this in <code>policy.json</code>'s
+neighborhood, or (b) factor the project-specific groups out into
+a per-project policy file overlay.</p>
+<h3 id="f-27-workflowurl-column-is-typed-ermrest_uri-but-chaise-display-uses-raw-markdown-p3-cosmetic">F-27 — <code>Workflow.URL</code> column is typed <code>ermrest_uri</code> but Chaise display uses raw markdown (P3, cosmetic)</h3>
+<p><code>src/deriva_ml/schema/create_schema.py:289</code>
+<code>src/deriva_ml/schema/annotations.py:389-392</code></p>
+<p><code>Workflow.URL</code> is declared <code>BuiltinType.ermrest_uri</code> (a
+deriva-specific type that Chaise renders as a clickable link).
+The <code>detailed</code> view in <code>workflow_annotation</code> overrides this with
+a custom markdown template:</p>
+<pre><code class="language-python">{
+    &quot;display&quot;: {&quot;markdown_pattern&quot;: &quot;[{{{URL}}}]({{{URL}}})&quot;},
+    &quot;markdown_name&quot;: &quot;URL&quot;,
+},
+</code></pre>
+<p>This is redundant with the <code>ermrest_uri</code> type — Chaise will
+already render the column as a link. The custom template only
+exists for the "detailed" view; the "*" view doesn't have it.
+Inconsistent.</p>
+<p><strong>Action</strong>: either drop the custom <code>markdown_pattern</code> (let
+<code>ermrest_uri</code> do its job) or apply it to both views.</p>
+<hr />
+<h2 id="coverage-map">Coverage map</h2>
+<table>
+<thead>
+<tr>
+<th>Function / asset</th>
+<th>Public?</th>
+<th>Unit test</th>
+<th>Integration test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_ml_catalog</code></td>
+<td>yes (<code>__all__</code>)</td>
+<td>—</td>
+<td><code>test_acl_application.py</code>, <code>test_vocab_fk_convention.py</code>, <code>test_cascade_behavior.py</code></td>
+</tr>
+<tr>
+<td><code>create_ml_schema</code></td>
+<td>yes (<code>__all__</code>)</td>
+<td>—</td>
+<td><code>test_cascade_behavior.py</code></td>
+</tr>
+<tr>
+<td><code>initialize_ml_schema</code></td>
+<td>yes (<code>__all__</code>)</td>
+<td><code>test_seeded_vocab_terms.py</code> (source-introspection)</td>
+<td>indirect</td>
+</tr>
+<tr>
+<td><code>create_dataset_table</code></td>
+<td>exposed</td>
+<td>—</td>
+<td>indirect</td>
+</tr>
+<tr>
+<td><code>create_execution_table</code></td>
+<td>exposed</td>
+<td>—</td>
+<td>indirect</td>
+</tr>
+<tr>
+<td><code>create_workflow_table</code></td>
+<td>exposed</td>
+<td>—</td>
+<td>indirect</td>
+</tr>
+<tr>
+<td><code>create_asset_table</code></td>
+<td>exposed</td>
+<td>—</td>
+<td>indirect</td>
+</tr>
+<tr>
+<td><code>define_table_dataset_version</code></td>
+<td>exposed</td>
+<td>—</td>
+<td>indirect</td>
+</tr>
+<tr>
+<td><code>asset_annotation</code></td>
+<td>yes (<code>__all__</code>)</td>
+<td><strong>none</strong> (F-13)</td>
+<td>indirect</td>
+</tr>
+<tr>
+<td><code>catalog_annotation</code></td>
+<td>yes (<code>__all__</code>)</td>
+<td>—</td>
+<td><code>tests/core/test_catalog_annotations.py</code></td>
+</tr>
+<tr>
+<td><code>build_navbar_menu</code></td>
+<td>yes (<code>__all__</code>)</td>
+<td><code>test_annotations.py</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>generate_annotation</code></td>
+<td>yes (<code>__all__</code>)</td>
+<td><strong>none</strong> (F-14)</td>
+<td>indirect</td>
+</tr>
+<tr>
+<td><code>policy.json</code></td>
+<td>(resource)</td>
+<td><code>test_policy.py</code> (structural)</td>
+<td><code>test_acl_application.py</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="recommendation-for-v1371">Recommendation for v1.37.1</h2>
+<p><strong>Ship as-is.</strong> No P0. The five P1 items (F-01, F-04, F-05, F-07,
+F-08, F-11, F-13, F-14) are correctness-near-misses and doc
+issues; none change observable schema or break a working install.
+Recommend follow-up PRs:</p>
+<ol>
+<li><strong>F-01 + F-08 in one PR</strong> — they're the only two findings that
+   change emitted catalog state, and both fixes are small.</li>
+<li><strong>F-04 + F-05 + F-07 in a docs-only PR</strong> — pure docstring
+   patches.</li>
+<li><strong>F-11 + F-13 + F-14 in a coverage PR</strong> — investigate
+   <code>use_hatrac</code>, add unit tests for the two untested public
+   annotation functions.</li>
+<li><strong>F-25 in a safety PR</strong> — catalog-cleanup wrapper around the
+   <code>acl_config</code> shell-out.</li>
+</ol>
+<p>Defer P2/P3 to a non-release window.</p>
+<hr />
+<h2 id="totals">Totals</h2>
+<ul>
+<li><strong>Findings:</strong> 27 (P0: 0, P1: 7, P2: 13, P3: 7)</li>
+<li><strong>File:</strong> <code>/Users/carl/GitHub/DerivaML/deriva-ml/docs/audits/2026-05-22-engineer-audit-schema.md</code></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

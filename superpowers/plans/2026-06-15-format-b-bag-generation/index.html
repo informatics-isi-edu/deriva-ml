@@ -1,0 +1,2716 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-15-format-b-bag-generation/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Format-B Bag Generation (deriva-ml, Plan B2) Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#format-b-bag-generation-deriva-ml-plan-b2-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Format-B Bag Generation (deriva-ml, Plan B2) Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#scope-this-is-plan-b2-of-two-deriva-ml-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope: this is Plan B2 of two (deriva-ml side)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-helper-interface-locked-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared helper interface (locked here)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Shared helper interface (locked here)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-_compute_rid_sets-shared-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: _compute_rid_sets shared helper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-_compute_rid_sets-method-factor-estimate-onto-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: _compute_rid_sets method + factor estimate onto it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-build_bag-produces-a-format-b-bag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: build_bag produces a Format-B bag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-live-format-b-bag-round-trip-correctness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Live Format-B bag round-trip + correctness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-deriva-py-pin-advance-docs-lint-live-2-277g-re-measure-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: deriva-py pin advance, docs, lint, live 2-277G re-measure, PR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="format-b-bag-generation-deriva-ml-plan-b2-implementation-plan">Format-B Bag Generation (deriva-ml, Plan B2) Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Wire deriva-ml's bag generation to the client-side reachability engine so a dataset bag is built from per-table RID sets (Format B — one clean CSV per table) instead of deep-FK-join per-path CSVs, dropping bag-gen wall-clock from ~280s toward tens of seconds for eye-ai 2-277G.</p>
+<p><strong>Architecture:</strong> Factor the estimate's reachability assembly (build walk → <code>iter_reached_paths</code> → anchors → model → <code>from_model</code> fetch closure → <code>compute_reachability</code>) into a shared <code>DatasetBagBuilder._compute_rid_sets(dataset)</code> helper, reused by both <code>estimate_bag_size</code> and the bag-build path. <code>build_bag</code> calls <code>_compute_rid_sets</code>, passes the resulting <code>{(schema,table): [RID,...]}</code> map to its <code>_SnapshotAwareCatalogBagBuilder(rid_sets=...)</code> (deriva-py B1's new param), and the upstream engine emits one rid-set csv processor per non-vocab table. <code>_catalog_bag_builder</code> gains an opt-in <code>rid_sets=None</code> param for the spec-generation path; the estimate/annotation/aggregate_queries callers pass nothing and are unchanged.</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, deriva-ml (<code>src/deriva_ml/dataset/bag_builder.py</code>, <code>dataset.py</code>, <code>bag_download.py</code>), deriva-py (the merged B1 <code>CatalogBagBuilder(rid_sets=)</code> + <code>get_as_file(rid_set=)</code>), pytest. The deriva-py dependency is pinned to the <code>deriva-ml</code> branch, which now contains B1.</p>
+<hr />
+<h2 id="scope-this-is-plan-b2-of-two-deriva-ml-side">Scope: this is Plan B2 of two (deriva-ml side)</h2>
+<p>Stage B1 (deriva-py — RID-set fetch + <code>CatalogBagBuilder(rid_sets=)</code> emission) is <strong>merged</strong> (deriva-py PR #269 → <code>deriva-ml</code> branch). Stage A (the <code>compute_reachability</code> engine) is <strong>merged</strong> (deriva-ml PR #300). This plan is the consumer wiring: deriva-ml computes the RID sets and hands them to the merged upstream engine.</p>
+<p>Design: <code>docs/superpowers/specs/2026-06-14-stage-b-fast-portable-bag-design.md</code> (decisions D1–D4) + <code>2026-06-14-portable-bag-csv-contract.md</code> (the CSV contract). The reachability engine: <code>src/deriva_ml/dataset/_reachability.py::compute_reachability</code> (returns <code>(rids_by_table, asset_lengths_by_table, fetched_rows)</code>). Memory: <code>csv-ridset-chunk-append-proto.md</code>, <code>snapshot-held-model-staleness-hazard.md</code>.</p>
+<p><strong>The load-bearing reuse:</strong> <code>estimate_bag_size</code> already assembles the exact reachability inputs (<code>dataset.py</code> ~2722–2746), including the <code>datapath.from_model(snapshot.catalog, model)</code> fix for the [[snapshot-held-model-staleness-hazard]]. B2 factors that into one helper so estimate and bag-gen share it — and the bag path inherits the from_model fix for free (it would hit the same KeyError otherwise).</p>
+<p><strong>Key shape difference from the estimate:</strong> <code>compute_reachability</code> returns <code>rids_by_table</code> keyed by <strong>bare table name</strong> (<code>{table: set}</code>). The upstream <code>CatalogBagBuilder(rid_sets=...)</code> is keyed by <strong><code>(schema, table)</code> tuple</strong> (<code>{(schema,table): [RID]}</code>). The helper must return the tuple-keyed form (it has the schema from <code>reached</code>'s keys). See Task 1.</p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Responsibility</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/dataset/bag_builder.py</code></td>
+<td>New <code>_compute_rid_sets(dataset)</code> helper (factored reachability assembly, tuple-keyed). <code>_catalog_bag_builder</code> gains opt-in <code>rid_sets=None</code>. <code>build_bag</code> computes rid_sets + passes to <code>_SnapshotAwareCatalogBagBuilder(rid_sets=...)</code>.</td>
+<td><strong>Modify</strong> (~243 build_bag, ~449 _catalog_bag_builder, new helper)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/dataset.py</code></td>
+<td><code>estimate_bag_size</code> calls the shared <code>_compute_rid_sets</code> instead of inlining the assembly (DRY; keeps the from_model fix in one place).</td>
+<td><strong>Modify</strong> (~2722–2746)</td>
+</tr>
+<tr>
+<td><code>tests/dataset/test_format_b_bag.py</code></td>
+<td>Unit: <code>_compute_rid_sets</code> returns tuple-keyed RID sets matching <code>compute_reachability</code>; the spec carries rid-set processors. Live (DERIVA_HOST): a Format-B bag has one CSV per table, RID-distinct, with correct asset fetch.txt, and round-trips through the loader with counts matching the estimate.</td>
+<td><strong>Create</strong></td>
+</tr>
+<tr>
+<td><code>docs/reference/bag-export.md</code></td>
+<td>Update "Same engine, different consumer" + B4: dataset bags now use Format B (one rid-set csv processor per table) when built client-side.</td>
+<td><strong>Modify</strong></td>
+</tr>
+<tr>
+<td><code>docs/superpowers/specs/2026-06-14-stage-b-fast-portable-bag-design.md</code></td>
+<td>Mark B2 shipped; record the live bag-gen number.</td>
+<td><strong>Modify</strong></td>
+</tr>
+</tbody>
+</table>
+<p>No new module — the reachability engine and the upstream emission already exist; B2 is wiring + one shared helper.</p>
+<hr />
+<h2 id="shared-helper-interface-locked-here">Shared helper interface (locked here)</h2>
+<pre><code class="language-python"># src/deriva_ml/dataset/bag_builder.py  (method on DatasetBagBuilder)
+
+def _compute_rid_sets(self, dataset: DatasetLike) -&gt; dict[tuple[str, str], list[str]]:
+    &quot;&quot;&quot;Compute per-table reachable RID sets for a dataset, client-side.
+
+    Factored from estimate_bag_size's reachability assembly so the bag-build
+    path and the estimate share one implementation (and one copy of the
+    from_model snapshot-staleness fix). Returns a ``{(schema, table): [RID,...]}``
+    map suitable for ``CatalogBagBuilder(rid_sets=...)`` — tuple-keyed (the
+    upstream engine's key), unlike compute_reachability's bare-table-name
+    rids_by_table. Vocab tables are EXCLUDED (the upstream rid-set branch
+    skips vocab; including them would be harmless but wasteful).
+    &quot;&quot;&quot;
+</code></pre>
+<p>The helper builds <code>cb = self._catalog_bag_builder(dataset)</code>, <code>reached = cb.iter_reached_paths()</code>, <code>anchor_rids</code>, <code>model = cb._get_model()</code>, the <code>from_model</code> fetch closure, calls <code>compute_reachability</code>, then maps <code>rids_by_table</code> (bare name) back to <code>(schema, table)</code> keys using <code>reached</code>'s keys, dropping vocab tables. <code>self._ml_instance</code> is the snapshot catalog (the builder is constructed on the snapshot).</p>
+<hr />
+<h3 id="task-1-_compute_rid_sets-shared-helper">Task 1: <code>_compute_rid_sets</code> shared helper</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/bag_builder.py</code> (add <code>_compute_rid_sets</code> method)
+- Test: <code>tests/dataset/test_format_b_bag.py</code> (create)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>A unit test with a synthetic builder is awkward (the helper drives a real walk). Instead, test the <strong>key-mapping logic</strong> in isolation with a small pure helper, plus a live test in Task 4. First, the pure mapping: given <code>compute_reachability</code>'s bare-name <code>rids_by_table</code> and <code>reached</code>'s <code>(schema,table)</code> keys, produce the tuple-keyed map dropping vocab. Extract that mapping as a module-level pure function <code>_rid_sets_from_reachability</code> and test it:</p>
+<pre><code class="language-python"># tests/dataset/test_format_b_bag.py
+&quot;&quot;&quot;Tests for Format-B (rid-set) bag generation.&quot;&quot;&quot;
+
+from deriva_ml.dataset.bag_builder import _rid_sets_from_reachability
+
+
+def test_rid_sets_from_reachability_tuple_keys_and_drops_vocab():
+    # reached: (schema, table) -&gt; [fk_path, ...]  (paths irrelevant here)
+    reached = {
+        (&quot;eye-ai&quot;, &quot;Image&quot;): [()],
+        (&quot;eye-ai&quot;, &quot;Subject&quot;): [()],
+        (&quot;deriva-ml&quot;, &quot;Asset_Role&quot;): [()],  # vocab
+    }
+    rids_by_table = {
+        &quot;Image&quot;: {&quot;r1&quot;, &quot;r2&quot;},
+        &quot;Subject&quot;: {&quot;s1&quot;},
+        &quot;Asset_Role&quot;: {&quot;Input&quot;, &quot;Output&quot;},  # bare names; vocab
+    }
+    vocab_tables = {(&quot;deriva-ml&quot;, &quot;Asset_Role&quot;)}
+    result = _rid_sets_from_reachability(reached, rids_by_table, vocab_tables)
+    # Tuple-keyed, vocab dropped, RID lists sorted for determinism.
+    assert result == {
+        (&quot;eye-ai&quot;, &quot;Image&quot;): [&quot;r1&quot;, &quot;r2&quot;],
+        (&quot;eye-ai&quot;, &quot;Subject&quot;): [&quot;s1&quot;],
+    }
+
+
+def test_rid_sets_from_reachability_missing_table_is_empty_list():
+    &quot;&quot;&quot;A reached non-vocab table with no RID-set entry maps to [].&quot;&quot;&quot;
+    reached = {(&quot;S&quot;, &quot;T&quot;): [()]}
+    result = _rid_sets_from_reachability(reached, {}, set())
+    assert result == {(&quot;S&quot;, &quot;T&quot;): []}
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py -v</code>
+Expected: FAIL — <code>ImportError: cannot import name '_rid_sets_from_reachability'</code></p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<p>Add the pure mapping function at module level in <code>src/deriva_ml/dataset/bag_builder.py</code> (near the other module-level helpers, after the imports):</p>
+<pre><code class="language-python">def _rid_sets_from_reachability(
+    reached: dict[tuple[str, str], Any],
+    rids_by_table: dict[str, set[str]],
+    vocab_tables: set[tuple[str, str]],
+) -&gt; dict[tuple[str, str], list[str]]:
+    &quot;&quot;&quot;Map compute_reachability output to the upstream rid_sets shape.
+
+    ``compute_reachability`` returns ``rids_by_table`` keyed by bare table
+    name; ``CatalogBagBuilder(rid_sets=...)`` wants ``{(schema, table):
+    [RID,...]}``. This re-keys using ``reached``'s ``(schema, table)`` keys,
+    drops vocab tables (the upstream rid-set branch skips them — vocab keeps
+    its full/per-path query), and sorts each RID list for deterministic specs.
+
+    Args:
+        reached: ``{(schema, table): [fk_path, ...]}`` — the reached-paths map
+            (its keys enumerate the non-vocab tables to emit).
+        rids_by_table: ``{table_name: set(RID)}`` from compute_reachability.
+        vocab_tables: ``(schema, table)`` pairs that are vocabulary tables.
+
+    Returns:
+        ``{(schema, table): [RID, ...]}`` for every non-vocab reached table.
+    &quot;&quot;&quot;
+    result: dict[tuple[str, str], list[str]] = {}
+    for key in reached:
+        if key in vocab_tables:
+            continue
+        schema_name, table_name = key
+        result[key] = sorted(rids_by_table.get(table_name, set()))
+    return result
+</code></pre>
+<p>(<code>Any</code> is already imported in this module — verify; if not, add <code>from typing import Any</code>.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py -v</code>
+Expected: PASS (2 tests)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/dataset/bag_builder.py tests/dataset/test_format_b_bag.py &amp;&amp; git commit -m &quot;feat(bag): rid-sets-from-reachability key-mapping helper
+
+Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-_compute_rid_sets-method-factor-estimate-onto-it">Task 2: <code>_compute_rid_sets</code> method + factor estimate onto it</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/bag_builder.py</code> (add <code>_compute_rid_sets</code> method)
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code> (<code>estimate_bag_size</code> calls it)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>A wiring-shape guard: <code>estimate_bag_size</code>'s source should call <code>_compute_rid_sets</code>-shared logic rather than inlining <code>compute_reachability</code> + the from_model closure. We assert the shared method exists and that estimate no longer inlines its own <code>datapath.from_model</code> call (it delegates).</p>
+<pre><code class="language-python"># add to tests/dataset/test_format_b_bag.py
+def test_compute_rid_sets_method_exists():
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    assert hasattr(DatasetBagBuilder, &quot;_compute_rid_sets&quot;)
+
+
+def test_estimate_delegates_reachability_assembly():
+    &quot;&quot;&quot;estimate_bag_size should not inline its own from_model fetch closure
+    once the shared helper exists — it reuses _compute_rid_sets' assembly.&quot;&quot;&quot;
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    src = inspect.getsource(DatasetBagBuilder._compute_rid_sets)
+    # The from_model fix lives in the shared helper.
+    assert &quot;from_model&quot; in src
+    assert &quot;compute_reachability&quot; in src
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py::test_compute_rid_sets_method_exists -v</code>
+Expected: FAIL — <code>_compute_rid_sets</code> doesn't exist yet.</p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<p>READ <code>estimate_bag_size</code> in <code>dataset.py</code> (~2722–2790) to copy its exact reachability assembly. Add <code>_compute_rid_sets</code> to <code>DatasetBagBuilder</code> in <code>bag_builder.py</code>. It must return BOTH the rid_sets map AND the auxiliary data the estimate still needs (asset lengths, fetched rows for sampling) — OR be scoped to just rid_sets and have a sibling for the estimate's extra outputs. To keep the estimate working unchanged, make <code>_compute_rid_sets</code> return a richer result the estimate can use:</p>
+<pre><code class="language-python">    def _compute_rid_sets(
+        self, dataset: DatasetLike
+    ) -&gt; tuple[
+        dict[tuple[str, str], list[str]],
+        dict[str, set[str]],
+        dict[str, dict[str, int]],
+        dict[tuple[str, str], list[dict]],
+        dict[str, list[dict]],
+    ]:
+        &quot;&quot;&quot;Compute per-table reachable RID sets for a dataset, client-side.
+
+        Factored from estimate_bag_size's reachability assembly so the
+        bag-build path and the estimate share one implementation (and one
+        copy of the from_model snapshot-staleness fix — see
+        docs memory snapshot-held-model-staleness-hazard).
+
+        Returns:
+            A 5-tuple:
+            - ``rid_sets``: ``{(schema, table): [RID,...]}`` for non-vocab
+              reached tables — the shape ``CatalogBagBuilder(rid_sets=...)``
+              consumes (vocab excluded).
+            - ``rids_by_table``: bare-name ``{table: set(RID)}`` (estimate
+              row counts).
+            - ``asset_lengths_by_table``: ``{table: {RID: Length}}`` (estimate
+              asset bytes).
+            - ``fetched_rows``: ``{(schema, table): rows}`` (estimate CSV-byte
+              sampling).
+            - ``sample_rows_by_table``: ``{table: [row,...]}`` derived sample.
+        &quot;&quot;&quot;
+        from deriva_ml.dataset._reachability import (
+            compute_reachability,
+            sample_rows_from_fetched,
+        )
+
+        cb = self._catalog_bag_builder(dataset=dataset)
+        reached = cb.iter_reached_paths()
+        anchor_rids = [dataset.dataset_rid] + list(self._iter_descendant_rids(dataset))
+        model = cb._get_model()
+
+        # Build the path builder from the SAME model the walk used (not the
+        # held-model pathBuilder()) — the snapshot-staleness fix. See
+        # docs memory snapshot-held-model-staleness-hazard.
+        pb = datapath.from_model(self._ml_instance.catalog, model)
+
+        def _fetch(schema: str, table: str, columns: set[str]) -&gt; list[dict]:
+            tpb = pb.schemas[schema].tables[table]
+            try:
+                attrs = [getattr(tpb, c) for c in sorted(columns)]
+                return list(tpb.attributes(*attrs).fetch())
+            except Exception:  # noqa: BLE001
+                return list(tpb.entities().fetch())
+
+        rids_by_table, asset_lengths_by_table, fetched_rows = compute_reachability(
+            reached=reached, anchor_rids=anchor_rids, model=model, fetch=_fetch
+        )
+        sample_rows_by_table = sample_rows_from_fetched(
+            reached=reached, fetched_rows=fetched_rows
+        )
+
+        vocab_tables = {
+            key for key in reached
+            if model.schemas[key[0]].tables[key[1]].is_vocabulary()
+        }
+        rid_sets = _rid_sets_from_reachability(reached, rids_by_table, vocab_tables)
+
+        return (
+            rid_sets,
+            rids_by_table,
+            asset_lengths_by_table,
+            fetched_rows,
+            sample_rows_by_table,
+        )
+</code></pre>
+<p><strong><code>datapath</code> is NOT currently imported in <code>bag_builder.py</code></strong> (verified — it only appears in docstrings). Add the import using the SAME importlib form <code>dataset.py</code> uses to avoid shadowing by local <code>deriva.py</code> files. At the top of <code>bag_builder.py</code>, after the existing imports, add:</p>
+<pre><code class="language-python">import importlib
+
+# Import datapath via importlib to avoid shadowing by local 'deriva.py' files
+# (mirrors dataset.py's pattern).
+datapath = importlib.import_module(&quot;deriva.core.datapath&quot;)
+</code></pre>
+<p>(If <code>importlib</code> is already imported, reuse it. Check the existing imports first.)</p>
+<p>Now refactor <code>estimate_bag_size</code> in <code>dataset.py</code> to delegate. Replace its inlined assembly (the block from <code>version_snapshot_catalog = ...</code> through the <code>compute_reachability</code>/<code>sample_rows_from_fetched</code> calls) with:</p>
+<pre><code class="language-python">        version_snapshot_catalog = self._version_snapshot_catalog(version)
+        builder = DatasetBagBuilder(
+            ml_instance=version_snapshot_catalog,
+            exclude_tables=exclude_tables,
+        )
+        (
+            _rid_sets,
+            rids_by_table,
+            asset_lengths_by_table,
+            _fetched_rows,
+            sample_rows_by_table,
+        ) = builder._compute_rid_sets(self)
+
+        # asset_tables for assemble_estimate: any reached table flagged asset.
+        model = builder._catalog_bag_builder(dataset=self)._get_model()
+        ...
+</code></pre>
+<p>Wait — recomputing the model/reached for <code>asset_tables</code> would re-walk. Instead, have <code>estimate_bag_size</code> derive <code>asset_tables</code> from the data it already has. The current estimate computes <code>asset_tables</code> from <code>reached</code> + model. To avoid a second walk, <code>_compute_rid_sets</code> should ALSO return the asset-table set. ADD a sixth return element <code>asset_tables: set[str]</code> (bare names) computed inside <code>_compute_rid_sets</code>:</p>
+<pre><code class="language-python">        asset_tables = {
+            key[1] for key in reached
+            if model.schemas[key[0]].tables[key[1]].is_asset()
+        }
+</code></pre>
+<p>and return it as the final tuple element. Update the helper's return type/docstring to a 6-tuple and the estimate's unpacking accordingly. Then <code>estimate_bag_size</code>'s <code>assemble_estimate</code> call uses that <code>asset_tables</code> directly (it already takes <code>asset_tables</code> after RE-Task 7).</p>
+<p>The estimate's final assembly becomes:</p>
+<pre><code class="language-python">        (
+            _rid_sets,
+            rids_by_table,
+            asset_lengths_by_table,
+            _fetched_rows,
+            sample_rows_by_table,
+            asset_tables,
+        ) = builder._compute_rid_sets(self)
+
+        return assemble_estimate(
+            asset_tables=asset_tables,
+            rids_by_table=rids_by_table,
+            asset_lengths_by_table=asset_lengths_by_table,
+            sample_rows_by_table=sample_rows_by_table,
+            estimate_csv_bytes=self._estimate_csv_bytes,
+            human_readable_size=self._human_readable_size,
+        )
+</code></pre>
+<blockquote>
+<p><strong>Implementer note:</strong> READ the current <code>estimate_bag_size</code> body first — RE-Task 6/7 already wired it to <code>compute_reachability</code> + <code>assemble_estimate(asset_tables=...)</code>. You are MOVING that assembly into <code>_compute_rid_sets</code> and having the estimate call it. Preserve the exact behavior: the live estimate test (<code>tests/dataset/test_estimate_bag_size.py::test_reachability_matches_server_union</code>) must still pass. The 6-tuple is unwieldy but keeps one walk; that's the right tradeoff over re-walking.</p>
+</blockquote>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py tests/dataset/test_reachability.py tests/dataset/test_estimate_helpers.py -v
+</code></pre>
+<p>Expected: PASS (the new helper tests + the existing reachability/estimate-helper units).</p>
+<p>Run the live estimate exactness test (needs DERIVA_HOST) to confirm the refactor preserved estimate behavior:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_estimate_bag_size.py::test_reachability_matches_server_union -v
+</code></pre>
+<p>Expected: PASS (estimate counts still == server union — the assembly moved but didn't change).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/dataset/bag_builder.py src/deriva_ml/dataset/dataset.py tests/dataset/test_format_b_bag.py &amp;&amp; git commit -m &quot;refactor(bag): factor reachability assembly into _compute_rid_sets; estimate delegates
+
+Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-build_bag-produces-a-format-b-bag">Task 3: <code>build_bag</code> produces a Format-B bag</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/bag_builder.py</code> (<code>build_bag</code> ~243, <code>_catalog_bag_builder</code> ~449)
+- Test: <code>tests/dataset/test_format_b_bag.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>A wiring-shape guard that <code>build_bag</code> computes rid_sets and constructs its builder with them. We assert <code>build_bag</code>'s source references <code>_compute_rid_sets</code> and passes <code>rid_sets=</code> to the builder.</p>
+<pre><code class="language-python"># add to tests/dataset/test_format_b_bag.py
+def test_build_bag_uses_rid_sets():
+    &quot;&quot;&quot;build_bag computes rid_sets and passes them to the CatalogBagBuilder.&quot;&quot;&quot;
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    src = inspect.getsource(DatasetBagBuilder.build_bag)
+    assert &quot;_compute_rid_sets&quot; in src
+    assert &quot;rid_sets=&quot; in src
+
+
+def test_catalog_bag_builder_accepts_rid_sets():
+    &quot;&quot;&quot;_catalog_bag_builder forwards an opt-in rid_sets to CatalogBagBuilder.&quot;&quot;&quot;
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    sig = inspect.signature(DatasetBagBuilder._catalog_bag_builder)
+    assert &quot;rid_sets&quot; in sig.parameters
+    assert sig.parameters[&quot;rid_sets&quot;].default is None
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py::test_build_bag_uses_rid_sets tests/dataset/test_format_b_bag.py::test_catalog_bag_builder_accepts_rid_sets -v</code>
+Expected: FAIL — neither wiring exists yet.</p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<p>(a) Add opt-in <code>rid_sets</code> to <code>_catalog_bag_builder</code> (<code>bag_builder.py</code> ~449). Change the signature to <code>def _catalog_bag_builder(self, dataset: DatasetLike | None, rid_sets: dict[tuple[str, str], list[str]] | None = None) -&gt; CatalogBagBuilder:</code> and pass it to the constructor:</p>
+<pre><code class="language-python">        builder = CatalogBagBuilder(
+            catalog=self._ml_instance.catalog,
+            anchors=anchors,
+            output_dir=output_dir,
+            policy=policy,
+            rid_sets=rid_sets,
+        )
+</code></pre>
+<p>Document the new param in the method's docstring Args (opt-in; only the download path supplies it; None keeps per-path emission). The three existing callers (<code>generate_dataset_download_spec</code>, <code>generate_dataset_download_annotations</code>, <code>aggregate_queries</code>) call <code>_catalog_bag_builder(dataset=...)</code> without <code>rid_sets</code> → None → unchanged.</p>
+<blockquote>
+<p><strong>Watch:</strong> <code>_compute_rid_sets</code> itself calls <code>self._catalog_bag_builder(dataset=dataset)</code> (no rid_sets) to run the walk. That's correct — it needs the walk to COMPUTE rid_sets; it must NOT pass rid_sets there (would be circular). Only <code>build_bag</code> and the spec path pass rid_sets to a SEPARATE builder used for emission.</p>
+</blockquote>
+<p>(b) Wire <code>build_bag</code> (<code>bag_builder.py</code> ~243) to compute rid_sets and pass them to its <code>_SnapshotAwareCatalogBagBuilder</code>. READ the current <code>build_bag</code> — it constructs <code>_SnapshotAwareCatalogBagBuilder(catalog=, anchors=, output_dir=, policy=)</code> directly (~line 311). Before that construction, compute rid_sets:</p>
+<pre><code class="language-python">        rid_sets, *_ = self._compute_rid_sets(dataset)
+</code></pre>
+<p>and add <code>rid_sets=rid_sets</code> to the <code>_SnapshotAwareCatalogBagBuilder(...)</code> constructor call.</p>
+<blockquote>
+<p><strong>Confirmed (low risk):</strong> <code>_SnapshotAwareCatalogBagBuilder</code> (<code>bag_builder.py</code> ~71) overrides ONLY <code>_run_export</code> — it does NOT override <code>__init__</code>. So it inherits <code>CatalogBagBuilder.__init__</code> unchanged, which (post-B1) accepts <code>rid_sets</code>. The new <code>rid_sets=</code> kwarg flows straight through the inherited constructor — no subclass change needed. Just add <code>rid_sets=rid_sets</code> to the <code>_SnapshotAwareCatalogBagBuilder(...)</code> call in <code>build_bag</code>.</p>
+</blockquote>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py -v</code>
+Expected: PASS (the wiring-shape guards).</p>
+<p>Also confirm the spec-generation path is unbroken (it still passes no rid_sets):</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;from deriva_ml.dataset.bag_builder import DatasetBagBuilder; print('import OK')&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/dataset/bag_builder.py tests/dataset/test_format_b_bag.py &amp;&amp; git commit -m &quot;feat(bag): build_bag produces Format-B bags via rid_sets
+
+Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-live-format-b-bag-round-trip-correctness">Task 4: Live Format-B bag round-trip + correctness</h3>
+<p><strong>Files:</strong>
+- Modify: <code>tests/dataset/test_format_b_bag.py</code></p>
+<p>Prove on a live catalog (DERIVA_HOST) that a built bag is genuinely Format B: one CSV per table, RID-distinct, asset fetch.txt correct, and that loading it yields per-table row counts matching the estimate.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<pre><code class="language-python"># add to tests/dataset/test_format_b_bag.py
+import os
+from pathlib import Path
+
+import pytest
+
+
+@pytest.mark.skipif(
+    os.environ.get(&quot;DERIVA_HOST&quot;) in (None, &quot;&quot;),
+    reason=&quot;needs a live catalog&quot;,
+)
+def test_format_b_bag_one_csv_per_table_matches_estimate(catalog_with_datasets, tmp_path):
+    &quot;&quot;&quot;A built bag has one clean CSV per table; loading it reproduces the
+    estimate's per-table row counts.&quot;&quot;&quot;
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    ml, _desc = catalog_with_datasets
+    datasets = list(ml.find_datasets())
+    nested = next(
+        (d for d in datasets if d.list_dataset_children()),
+        datasets[0],
+    )
+    version = nested.current_version
+
+    # Estimate (the oracle for per-table counts).
+    est = nested.estimate_bag_size(version)
+    est_counts = {t: d[&quot;row_count&quot;] for t, d in est[&quot;tables&quot;].items() if d[&quot;row_count&quot;] &gt; 0}
+
+    # Build a Format-B bag.
+    snap = nested._version_snapshot_catalog(version)
+    builder = DatasetBagBuilder(ml_instance=snap)
+    zip_path = builder.build_bag(nested, output_dir=tmp_path)
+    assert zip_path.exists()
+
+    # Unzip and inspect data/ CSVs.
+    import zipfile
+
+    extract = tmp_path / &quot;extracted&quot;
+    with zipfile.ZipFile(zip_path) as zf:
+        zf.extractall(extract)
+
+    # Find every {table}.csv under data/ and assert ONE per table basename
+    # (Format B: no per-path fragmentation).
+    csvs = list(extract.rglob(&quot;data/**/*.csv&quot;))
+    from collections import Counter
+
+    by_basename = Counter(p.stem for p in csvs)
+    multi = {name: n for name, n in by_basename.items() if n &gt; 1}
+    assert not multi, f&quot;Format B violated — tables split across multiple CSVs: {multi}&quot;
+
+    # For each estimated table, the bag's CSV row count (minus header) matches.
+    import csv as csvmod
+
+    for table, est_count in est_counts.items():
+        matches = [p for p in csvs if p.stem == table]
+        if not matches:
+            continue  # vocab tables use the full query; skip count match here
+        with matches[0].open(encoding=&quot;utf-8&quot;) as fh:
+            rows = list(csvmod.DictReader(fh))
+        # RID-distinct.
+        rids = [r[&quot;RID&quot;] for r in rows if &quot;RID&quot; in r]
+        assert len(set(rids)) == len(rids), f&quot;{table}.csv has duplicate RIDs&quot;
+        assert len(rows) == est_count, f&quot;{table}: bag={len(rows)} estimate={est_count}&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails (or passes if wiring is correct)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_format_b_bag.py::test_format_b_bag_one_csv_per_table_matches_estimate -v --timeout=600</code>
+Expected: PASS if Tasks 1–3 wired correctly. If it FAILS:
+- "tables split across multiple CSVs" → rid_sets weren't passed / per-path emission still active. Re-check Task 3's <code>rid_sets=</code> threading into the actual builder <code>build()</code> uses.
+- a row-count mismatch → the rid_sets for that table don't match the estimate's reachable set; the bag and estimate share <code>_compute_rid_sets</code>, so a mismatch means the emission consumed a different map than computed — debug the key shape (tuple vs bare name).
+Do NOT weaken the test; fix the wiring.</p>
+<ul>
+<li>[ ] <strong>Step 3: (No new impl — validates Tasks 1–3)</strong></li>
+</ul>
+<p>If failing, the fix is in Task 3's threading (rid_sets must reach the builder whose <code>build()</code> runs). Trace <code>build_bag</code> → <code>_SnapshotAwareCatalogBagBuilder(rid_sets=...)</code> → <code>build()</code> → <code>_build_export_spec</code> (upstream) → rid-set processors.</p>
+<ul>
+<li>[ ] <strong>Step 4: Confirm pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_format_b_bag.py -v --timeout=600</code>
+Expected: PASS (all — units + live).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add tests/dataset/test_format_b_bag.py &amp;&amp; git commit -m &quot;test(bag): live Format-B bag one-CSV-per-table matches estimate counts
+
+Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-deriva-py-pin-advance-docs-lint-live-2-277g-re-measure-pr">Task 5: deriva-py pin advance, docs, lint, live 2-277G re-measure, PR</h3>
+<p><strong>Files:</strong>
+- Modify: <code>uv.lock</code> (advance the pinned deriva-py commit to include B1)
+- Modify: <code>docs/reference/bag-export.md</code>, the Stage-B spec</p>
+<ul>
+<li>[ ] <strong>Step 1: Advance the deriva-py pin to include B1</strong></li>
+</ul>
+<p>The pin is <code>@deriva-ml</code> (branch). B1 is merged there, but <code>uv.lock</code> may point at an older commit. Advance it:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv lock --upgrade-package deriva &amp;&amp; uv sync
+</code></pre>
+<p>Confirm the merged B1 is present:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;from deriva.core.ermrest_catalog import ErmrestCatalog; import inspect; assert 'rid_set' in inspect.signature(ErmrestCatalog.get_as_file).parameters; from deriva.bag.catalog_builder import CatalogBagBuilder; assert 'rid_sets' in inspect.signature(CatalogBagBuilder.__init__).parameters; print('B1 present')&quot;
+</code></pre>
+<p>Expected: "B1 present". If <code>rid_set</code>/<code>rid_sets</code> are absent, the lock didn't advance — re-run <code>uv lock --upgrade-package deriva</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update bag-export.md</strong></li>
+</ul>
+<p>In the "Same engine, different consumer" section and B4: note that a <strong>client-side-built</strong> dataset bag (via <code>build_bag</code>) now uses Format B — one rid-set csv processor per reached non-vocab table, producing one clean <code>data/{schema}/{table}.csv</code> per table (no per-path fragmentation, no loader union needed). Vocab tables keep their full query. Reference deriva-py's <code>CatalogBagBuilder(rid_sets=)</code> and deriva-ml's <code>_compute_rid_sets</code>. Keep the MINID/server-export arm's description accurate (it still uses the server export engine; only the client-side <code>build()</code> arm is Format B — confirm which arm the user-facing <code>download_dataset_bag</code> takes by default and document accordingly).</p>
+<ul>
+<li>[ ] <strong>Step 3: Update the Stage-B spec</strong></li>
+</ul>
+<p>In <code>docs/superpowers/specs/2026-06-14-stage-b-fast-portable-bag-design.md</code>, mark B2 shipped and record the live 2-277G bag-gen wall-clock from Step 5.</p>
+<ul>
+<li>[ ] <strong>Step 4: Lint + full unit sweep</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check --fix src/deriva_ml/dataset/bag_builder.py src/deriva_ml/dataset/dataset.py tests/dataset/test_format_b_bag.py &amp;&amp; uv run ruff format src/deriva_ml/dataset/bag_builder.py src/deriva_ml/dataset/dataset.py tests/dataset/test_format_b_bag.py
+cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py tests/dataset/test_reachability.py tests/dataset/test_estimate_helpers.py -q
+</code></pre>
+<p>Expected: clean + all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Live 2-277G bag-gen re-measure + PR</strong></li>
+</ul>
+<p>Run a timed <code>build_bag</code> (metadata-only, no asset materialization) against eye-ai 2-277G to capture the headline bag-gen number (needs a fresh www.eye-ai.org token). Target: tens of seconds vs the prior ~280s. Capture for the PR body.</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git push -u origin feature/format-b-bag-generation
+gh pr create --base main --title &quot;perf(bag): Format-B client-side bag generation (one clean CSV per table, ~Nx faster)&quot; --body &quot;Wires bag generation to the client-side reachability engine: build_bag computes per-table RID sets (compute_reachability) and hands them to deriva-py's CatalogBagBuilder(rid_sets=) (PR #269), which emits one rid-set csv processor per reached non-vocab table. Result: one clean data/{schema}/{table}.csv per table (no per-path fragmentation, no loader union), bag-gen &lt;N&gt;s vs ~280s on eye-ai 2-277G. Shares _compute_rid_sets with estimate_bag_size (and the from_model snapshot-staleness fix). Stage B2 of the fast-portable-bag effort; B1 = deriva-py #269, A = #300.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)&quot;
+</code></pre>
+<hr />
+<h2 id="self-review">Self-Review</h2>
+<p><strong>1. Spec coverage</strong> (against <code>2026-06-14-stage-b-fast-portable-bag-design.md</code> D1–D4):
+- D1 (<code>get_as_file</code> rid_set) — shipped in B1; B2 consumes it. ✓
+- D2 (Format B one-CSV-per-table) — Task 3 (build_bag passes rid_sets) + Task 4 (live one-CSV-per-table assertion). ✓
+- D3 (deriva-ml computes, passes rid_sets in) — Task 1 (mapping) + Task 2 (<code>_compute_rid_sets</code>) + Task 3 (build_bag wiring). The opt-in <code>_catalog_bag_builder(rid_sets=None)</code> keeps the other 3 callers unchanged. ✓
+- D4 (deriva-py first, then deriva-ml) — B1 merged; this is the deriva-ml PR (Task 5). ✓
+- The from_model snapshot-staleness fix carried into the shared helper — Task 2. ✓
+- Vocab exclusion (vocab keeps full query, not rid-set) — Task 1 (<code>_rid_sets_from_reachability</code> drops vocab) + matches B1's upstream <code>not is_vocabulary()</code> guard. ✓
+- Live bag-gen re-measure (the headline) — Task 5. ✓</p>
+<p><strong>2. Placeholder scan:</strong> No "TBD"/"handle edge cases". Every code step shows complete code. Task 4 Step 3 has no new impl (validates prior tasks) and says so. The 6-tuple return in Task 2 is fully specified (each element named + typed). ✓</p>
+<p><strong>3. Type consistency:</strong>
+- <code>_rid_sets_from_reachability(reached, rids_by_table, vocab_tables) -&gt; {(schema,table): [RID]}</code> — Task 1, consumed by Task 2's <code>_compute_rid_sets</code>. ✓
+- <code>_compute_rid_sets(dataset) -&gt; 6-tuple (rid_sets, rids_by_table, asset_lengths_by_table, fetched_rows, sample_rows_by_table, asset_tables)</code> — defined Task 2, unpacked by estimate (Task 2) and by <code>build_bag</code> (<code>rid_sets, *_</code>, Task 3). Consistent. ✓
+- <code>_catalog_bag_builder(dataset, rid_sets=None)</code> — Task 3; <code>_compute_rid_sets</code> calls it WITHOUT rid_sets (correct — avoids circularity, flagged). ✓
+- <code>assemble_estimate(asset_tables=...)</code> — matches the post-RE-Task-7 signature (Stage A). ✓
+- <code>build_bag</code> passes <code>rid_sets=</code> to <code>_SnapshotAwareCatalogBagBuilder</code>, which inherits/forwards to <code>CatalogBagBuilder(rid_sets=)</code> (B1). ✓</p>
+<p><strong>Risk flagged for the implementer:</strong> Task 2's 6-tuple is unwieldy but deliberate — it keeps ONE walk shared between the estimate and the rid_sets computation. The alternative (separate methods) re-walks. If the implementer finds the estimate's <code>asset_tables</code> derivation differs from what <code>_compute_rid_sets</code> returns, reconcile by reading the post-RE-Task-7 <code>estimate_bag_size</code> — do not change <code>assemble_estimate</code>'s contract. Task 3's <code>_SnapshotAwareCatalogBagBuilder.__init__</code> is the integration risk: verify it forwards <code>rid_sets</code> (inherits or explicitly passes to super) — a dropped <code>rid_sets</code> there silently reverts to per-path emission and Task 4's live test catches it.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

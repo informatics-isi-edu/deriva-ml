@@ -1,0 +1,3251 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/audits/2026-05-22-writer-audit/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Technical-writer audit (2026-05-22) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#technical-writer-audit-2026-05-22" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Technical-writer audit (2026-05-22)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#top-level-entry-point-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level entry-point review
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Top-level entry-point review">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#derivaml-class-srcderiva_mlcorebasepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaML class — src/deriva_ml/core/base.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derivamlconfig-srcderiva_mlcoreconfigpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLConfig — src/deriva_ml/core/config.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executionconfiguration-srcderiva_mlexecutionexecution_configurationpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionConfiguration — src/deriva_ml/execution/execution_configuration.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execution-srcderiva_mlexecutionexecutionpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution — src/deriva_ml/execution/execution.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assetspec-assetspecconfig-assetfilepath-srcderiva_mlassetaux_classespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssetSpec, AssetSpecConfig, AssetFilePath — src/deriva_ml/asset/aux_classes.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datasetspec-datasetspecconfig-srcderiva_mldatasetaux_classespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetSpec, DatasetSpecConfig — src/deriva_ml/dataset/aux_classes.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-srcderiva_mldatasetdatasetpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset — src/deriva_ml/dataset/dataset.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datasetbag-srcderiva_mldatasetdataset_bagpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetBag — src/deriva_ml/dataset/dataset_bag.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#featurerecord-srcderiva_mlfeaturepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FeatureRecord — src/deriva_ml/feature.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow-srcderiva_mlexecutionworkflowpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow — src/deriva_ml/execution/workflow.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#annotation-builders-srcderiva_mlmodelannotationspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Annotation builders — src/deriva_ml/model/annotations.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-by-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings by area
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Findings by area">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docstrings-src" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docstrings: src/
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docstrings: src/">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p0-derivamlconfigcompute_workdir-doctest-example-is-non-runnable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] DerivaMLConfig.compute_workdir doctest example is non-runnable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p0-datasetdownload_dataset_bag-docstring-contradicts-signature-on-fetch_concurrency-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] Dataset.download_dataset_bag docstring contradicts signature on fetch_concurrency default
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-executiondownload_dataset_bag-documents-return-fields-that-dont-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Execution.download_dataset_bag documents return fields that don't exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-executionasset_file_path-is-missing-a-usage-example-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] Execution.asset_file_path is missing a usage Example: block
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-derivamldownload_dir-example-uses-an-undefined-ml-and-is-not-skipped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] DerivaML.download_dir example uses an undefined ml and is not skipped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-derivaml_get_session_config-example-is-not-skipped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] DerivaML._get_session_config example is not skipped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-datasetspec-class-docstring-leads-with-a-typo-placeholder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] DatasetSpec class docstring leads with a typo / placeholder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasetspecversion-docstring-understates-the-accepted-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DatasetSpec.version docstring understates the accepted types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-derivaml__init__-has-no-example-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DerivaML.__init__ has no Example: block
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-several-annotation-builder-helpers-lack-example-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] Several annotation-builder helpers lack Example: blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasethistory-datasetminid-lack-example-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DatasetHistory, DatasetMinid lack Example: blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-datasetspecconfig-lacks-example-block-asymmetric-with-assetspecconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DatasetSpecConfig lacks Example: block (asymmetric with AssetSpecConfig)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-derivamlcache_table-derivaml_cache_features-use-sphinx-style-example-not-google-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] DerivaML.cache_table, DerivaML._cache_features use sphinx-style Example:: not Google Example:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-sortkey-assetspec-examples-have-no-expected-output-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] SortKey, AssetSpec examples have no expected-output lines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-inconsistent-example-vs-examples-heading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Inconsistent Example: vs Examples: heading
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-datasetdataset_types-example-is-opaque" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] Dataset.dataset_types example is opaque
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docsuser-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docs/user-guide/
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="docs/user-guide/">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p0-docsuser-guidedatasetsmd-calls-split_dataset-with-a-stale-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] docs/user-guide/datasets.md calls split_dataset with a stale signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p0-docsconfigurationoverviewmd-documents-a-check_auth-field-that-does-not-exist-on-derivamlconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] docs/configuration/overview.md documents a check_auth field that does not exist on DerivaMLConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p0-docsuser-guideexecutionsmd-documents-an-assetfilepathset_metadata-method-that-does-not-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] docs/user-guide/executions.md documents an AssetFilePath.set_metadata() method that does not exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p0-docsgetting-startedinstallquick-startproject-setupmd-are-html-redirects-not-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] docs/getting-started/{install,quick-start,project-setup}.md are HTML redirects, not docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p0-docsapi-referenceuploadmd-references-a-non-existent-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] docs/api-reference/upload.md references a non-existent module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p0-docsrelease-notesmd-is-3-releases-stale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] docs/release-notes.md is 3+ releases stale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-mkdocsyml-nav-omits-14-doc-pages-that-exist-on-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] mkdocs.yml nav omits 14 doc pages that exist on disk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-mkdocsyml-does-not-surface-derivamlconfig-assetspecassetspecconfig-datasetspecdatasetspecconfig-or-mlassetmlvocab-enums-in-api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] mkdocs.yml does not surface DerivaMLConfig, AssetSpec/AssetSpecConfig, DatasetSpec/DatasetSpecConfig, or MLAsset/MLVocab enums in API Reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsapi-referenceexceptionsmd-is-a-single-directive-no-overview-of-the-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/api-reference/exceptions.md is a single ::: directive — no overview of the hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsapi-referenceexecutionmd-uses-deriva_mlexecution-with-no-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/api-reference/execution.md uses ::: deriva_ml.execution with no overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsapi-referencederiva_ml_basemd-typo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/api-reference/deriva_ml_base.md typo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsapi-referencederiva_ml_basemd-mentions-execution-asset-table-that-no-longer-exists-by-that-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/api-reference/deriva_ml_base.md mentions Execution Asset table that no longer exists by that name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsconcepts-docsworkflows-docscli-referencemd-are-11-html-redirects-with-no-nav-presence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/concepts/, docs/workflows/, docs/cli-reference.md are 11 HTML redirects with no nav presence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsuser-guidedatasetsmd-references-mladd_termmlvocabdataset_type-without-showing-the-mlvocab-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/user-guide/datasets.md references ml.add_term(MLVocab.dataset_type, ...) without showing the MLVocab import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsuser-guideexecutionsmd-references-a-datasetspecversionnone-default-that-doesnt-match-the-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/user-guide/executions.md references a DatasetSpec(version=None) default that doesn't match the code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsconfigurationoverviewmd-shows-domain_schemasmy_domain-singular-string-and-elsewhere-shows-domain_schemasmy_domain-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/configuration/overview.md shows domain_schemas='my_domain' (singular string) and elsewhere shows domain_schemas={'my_domain'} (set)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsuser-guideexploringmd-claims-mlfind_executionsstatus-accepts-an-executionstatus-enum-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/user-guide/exploring.md claims ml.find_executions(status=...) accepts an ExecutionStatus enum directly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-docsuser-guidereproducibilitymd-references-an-asset_type-execution_config-for-uvlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P1] docs/user-guide/reproducibility.md references an asset_type "Execution_Config" for uv.lock
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsindexmd-when-to-use-deriva-ml-is-excellent-but-never-reached-from-nav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/index.md "When to use deriva-ml" is excellent but never reached from nav
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsuser-guideexploringmd-references-chapter-4-and-chapter-7-by-number-but-the-nav-uses-titles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/user-guide/exploring.md references Chapter 4 and Chapter 7 by number, but the nav uses titles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsuser-guideexecutionsmd-execution-status-lifecycle-mermaid-diagram-and-executionstatus-enum-are-not-cross-linked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/user-guide/executions.md "Execution status lifecycle" mermaid diagram and ExecutionStatus enum are not cross-linked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsconfigurationoverviewmd-datasetspecconfig-example-uses-field-timeout10-1800-list-instead-of-the-tuple-form-in-the-datasetspec-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/configuration/overview.md DatasetSpecConfig example uses field timeout=[10, 1800] (list) instead of the tuple form in the DatasetSpec model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsconcepts-docsworkflows-docscli-referencemd-redirects-dont-tell-mkdocs-they-should-be-excluded-from-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/concepts/, docs/workflows/, docs/cli-reference.md redirects don't tell mkdocs they should be excluded from build
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsuser-guidesharingmd-is-in-nav-but-not-in-scope-of-this-audit-flag-for-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/user-guide/sharing.md is in nav but not in scope of this audit — flag for review
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsarchitecturemd-is-large-current-and-not-in-nav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/architecture.md is large, current, and not in nav
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsuser-guidefeaturesmd-create_feature-signature-in-notes-doesnt-match-the-actual-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/user-guide/features.md create_feature signature in "Notes" doesn't match the actual signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsuser-guidedatasetsmd-mentions-datasetspec-import-without-showing-from-deriva_mldatasetaux_classes-import-datasetspec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/user-guide/datasets.md mentions DatasetSpec import without showing from deriva_ml.dataset.aux_classes import DatasetSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-docsuser-guidehydra-zenmd-line-53-imports-assetspecconfig-from-deriva_mlasset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] docs/user-guide/hydra-zen.md line 53 imports AssetSpecConfig from deriva_ml.asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-docsapi-referencelineagemd-cross-references-deriva_ml_basemd-for-lookup_lineage-but-mkdocstrings-inheritance-might-already-include-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] docs/api-reference/lineage.md cross-references deriva_ml_base.md for lookup_lineage but mkdocstrings inheritance might already include it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-docsindexmd-erd-image-alt-text-could-be-more-descriptive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] docs/index.md "ERD" image alt text could be more descriptive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-docsuser-guidedatasetsmd-mentions-minid-but-doesnt-link-to-a-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] docs/user-guide/datasets.md mentions MINID but doesn't link to a definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-docsrelease-notesmd-is-in-nav-root-not-under-a-release-group" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] docs/release-notes.md is in nav root, not under a "Release" group
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docsgetting-started-cross-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docs/getting-started/ + cross-references
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="docs/getting-started/ + cross-references">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p0-user-has-no-in-site-walkthrough-of-install-connect-first-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P0] User has no in-site walkthrough of "install → connect → first command"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-cutting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-cutting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cross-cutting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p2-core__init__py-docstring-at-line-16-example-uses-derivamlderivaexampleorg-my_catalog-string-for-catalog_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] core/__init__.py docstring at line 16 example uses DerivaML('deriva.example.org', 'my_catalog') — string for catalog_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-no-mention-of-modeconnectionmodeoffline-in-user-facing-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P2] No mention of mode=ConnectionMode.offline in user-facing docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p3-claudemd-mentions-cli-referencemd-exists-and-is-current-the-file-in-the-repo-is-a-redirect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [P3] CLAUDE.md mentions cli-reference.md exists and is current; the file in the repo is a redirect
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coverage-gaps-cross-cutting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage gaps (cross-cutting)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="technical-writer-audit-2026-05-22">Technical-writer audit (2026-05-22)</h1>
+<p>Pre-release documentation audit of deriva-ml v1.37.x. Scope, lenses, and severity tags as defined in the audit brief.</p>
+<h2 id="summary">Summary</h2>
+<ul>
+<li><strong>Public-API symbols audited:</strong> ~80 (DerivaML class methods, DerivaMLConfig, ExecutionConfiguration, Execution lifecycle methods, Dataset, DatasetBag, FeatureRecord and its selectors, AssetSpec/AssetSpecConfig, DatasetSpec/DatasetSpecConfig, Workflow, top-level exceptions, and all annotation-builder classes in <code>deriva_ml.model</code>).</li>
+<li><strong>Doc pages audited:</strong> 38 (<code>docs/index.md</code>, 3 getting-started stubs, 9 user-guide pages, 4 configuration pages, 14 api-reference pages, 7 concepts stubs, 3 workflows stubs, <code>docs/cli-reference.md</code>, <code>docs/architecture.md</code>, <code>docs/release-notes.md</code>, <code>docs/reference/</code>).</li>
+<li><strong>Findings:</strong> 56 total — <strong>9 P0</strong>, <strong>20 P1</strong>, <strong>20 P2</strong>, <strong>7 P3</strong>.</li>
+<li><strong>Top themes (in priority order):</strong></li>
+<li><strong>Reference rot</strong>: the api-reference tree has at least one entry pointing at a module that does not exist (<code>upload.md</code> → <code>deriva_ml.dataset.upload</code>), the docs nav buries entry points (<code>DerivaMLConfig</code>, <code>AssetSpec</code>, <code>AssetSpecConfig</code>, <code>FeatureRecord</code>, annotation builders) under <code>DerivaML</code> or omits them entirely.</li>
+<li><strong>Stale code examples</strong>: at least three high-traffic snippets in <code>docs/user-guide/datasets.md</code>, <code>docs/configuration/overview.md</code>, and <code>docs/user-guide/executions.md</code> call APIs with signatures that no longer exist (<code>split_dataset(ml, rid, test_size=...)</code> is missing the now-required <code>execution</code> arg; <code>DerivaMLConfig(check_auth=True)</code> cites a field that no longer exists; <code>AssetFilePath.set_metadata(key, value)</code> is documented but the class only exposes a <code>metadata</code> property + <code>set_asset_types</code>).</li>
+<li><strong>Getting-started is missing</strong>: <code>docs/getting-started/{install,quick-start,project-setup}.md</code> are HTML meta-refresh redirects to the template repo. A first-time reader landing on the site has zero in-site walkthrough — they get bounced out of the docs to a separate GitHub repo before they can copy a single line of working code.</li>
+<li><strong>Doc tree shape</strong>: 14 redirect-only pages (<code>concepts/</code>, <code>workflows/</code>, <code>cli-reference.md</code>, three <code>getting-started/</code>) live in the tree but are not in <code>mkdocs.yml</code>'s nav. They render as bare HTML if a Google result links to them. Decision needed — delete them, or restore real content.</li>
+<li><strong>Public-API symbols without runnable <code>Example:</code> blocks</strong>: most annotation builders (<code>TableDisplayOptions</code>, <code>ColumnDisplayOptions</code>, <code>PreFormat</code>, <code>Facet</code>, <code>FacetRange</code>, <code>InboundFK</code>/<code>OutboundFK</code>, <code>Aggregate</code>, <code>TemplateEngine</code>, <code>ArrayUxMode</code>, <code>FacetUxMode</code>), most exception classes, and <code>DatasetHistory</code> / <code>DatasetMinid</code> carry attribute-style docstrings without an <code>Example:</code> block, even though they are user-facing per CLAUDE.md.</li>
+<li><strong>Release notes are 3+ releases out of date</strong> (last entry <code>Version 1.34.0</code>; current release <code>v1.37.4</code>).</li>
+</ul>
+<h2 id="top-level-entry-point-review">Top-level entry-point review</h2>
+<h3 id="derivaml-class-srcderiva_mlcorebasepy"><code>DerivaML</code> class — <code>src/deriva_ml/core/base.py</code></h3>
+<ul>
+<li><strong>Class-level docstring</strong> (lines 97–135): strong. Documents the verb-naming convention (<code>find_*</code> vs <code>list_*</code>), lists attributes, and gives a runnable <code># doctest: +SKIP</code> example. The convention block is one of the best concept-in-docstring entries in the codebase. <strong>No findings.</strong></li>
+<li><strong><code>__init__</code></strong> (lines 237–290): full Google docstring with all kwargs, but <strong>no <code>Example:</code> block</strong> despite the class being the canonical user-facing entry point. P2.</li>
+<li><strong><code>from_context</code></strong> (lines 192–235): good prose; uses <code>Example::</code> (sphinx-rst directive) instead of Google <code>Example:</code> style. Inconsistent with the rest of the file. P3.</li>
+<li><strong><code>apply_catalog_annotations</code></strong> (lines 1078–1132): thorough; one of the best docstrings in the codebase. <strong>No findings.</strong></li>
+<li><strong><code>refresh_schema</code></strong>, <strong><code>pin_schema</code></strong>, <strong><code>unpin_schema</code></strong>, <strong><code>pin_status</code></strong>, <strong><code>diff_schema</code></strong>: excellent — every method documents its mode-branched behavior, its raises, and its caller obligations. <strong>No findings.</strong></li>
+<li><strong><code>chaise_url</code></strong> (lines 963–985): Example block uses heading <code>Examples:</code> (plural) — Google style is <code>Example:</code> (singular). Same for <code>cite</code> (lines 995–1043), <code>create_vocabulary</code> (lines 1134–1170), <code>create_table</code> (lines 1192–1300), <code>add_term</code> (mixin), <code>clear_cache</code>. The mkdocstrings handler accepts either, but the rest of the codebase uses singular <code>Example:</code>. Inconsistency. P3.</li>
+<li><strong><code>create_table</code></strong> docstring (lines 1192–1300): runs to ~108 lines of <code>Example:</code> markup. Useful, but mostly duplicates what's in <code>concepts/</code>-era docs. Could be split or shortened. P3.</li>
+<li><strong><code>mode</code></strong> property (lines 776–789): minimal <code>Example:</code> (<code>ml.mode is ConnectionMode.online</code>) — pure-Python example would need a constructed instance, so the example doesn't actually run as a doctest. Not marked <code># doctest: +SKIP</code>. P2.</li>
+<li><strong><code>download_dir</code></strong> (lines 797–813): no <code># doctest: +SKIP</code> on the catalog-dependent example (<code>cache_dir = ml.download_dir(cached=True)</code>) — example uses an undefined <code>ml</code>. If <code>--doctest-modules</code> runs against this it will fail. P1.</li>
+</ul>
+<h3 id="derivamlconfig-srcderiva_mlcoreconfigpy"><code>DerivaMLConfig</code> — <code>src/deriva_ml/core/config.py</code></h3>
+<ul>
+<li><strong>Class docstring</strong> (lines 71–114): comprehensive attribute table, runnable <code>Example:</code>. <strong>No findings.</strong></li>
+<li><strong><code>compute_workdir</code></strong> (lines 163–203): doctest example <code>&gt;&gt;&gt; DerivaMLConfig.compute_workdir('/shared/data', '52', 'ml.example.org')</code> is expected output uses literal <code>username</code> — but the method calls <code>getpass.getuser()</code> at runtime. The example doctest would FAIL for any non-<code>username</code> user. P0 — this WILL break <code>pytest --doctest-modules</code> on any developer machine. Either skip with <code># doctest: +SKIP</code> or convert to a no-output assertion.</li>
+</ul>
+<h3 id="executionconfiguration-srcderiva_mlexecutionexecution_configurationpy"><code>ExecutionConfiguration</code> — <code>src/deriva_ml/execution/execution_configuration.py</code></h3>
+<ul>
+<li><strong>Class docstring</strong> (lines 39–76): excellent — describes every attribute, including the mixed RID-string/AssetSpec coercion. <strong>No findings.</strong></li>
+<li><strong><code>validate_assets</code></strong> validator (lines 87–115): docstring describes the four input shapes correctly. <strong>No findings.</strong></li>
+<li><strong><code>load_configuration</code></strong> (lines 117–141): good. <strong>No findings.</strong></li>
+</ul>
+<h3 id="execution-srcderiva_mlexecutionexecutionpy"><code>Execution</code> — <code>src/deriva_ml/execution/execution.py</code></h3>
+<ul>
+<li><strong>Class docstring</strong> (lines 220–266): the example documents the "upload AFTER the context manager exits" rule clearly. <strong>No findings.</strong></li>
+<li><strong><code>__init__</code></strong> (lines 269–311): solid. <strong>No findings.</strong></li>
+<li><strong><code>download_dataset_bag</code></strong> (lines 1163–1188): the example is fine but the <strong>returned-value description</strong> ("DatasetBag with <code>path</code>, <code>rid</code>, <code>minid</code>") is wrong — <code>DatasetBag</code> exposes <code>path</code>, <code>dataset_rid</code>, <code>current_version</code> (no <code>rid</code>, no top-level <code>minid</code> field). P1.</li>
+<li><strong><code>update_status</code></strong> (lines 1189–1244): example <code>exe.update_status(ExecutionStatus.Running)</code> — but <code>update_status(status)</code> without an <code>error</code> is valid only on terminal-state attempts where error is ignored. Fine. <strong>No findings.</strong></li>
+<li><strong><code>execution_start</code>/<code>execution_stop</code></strong> (lines 1245–1344): mention "execution_stop()" inside the <code>execution_start()</code> example, which is a good cross-link. <strong>No findings.</strong></li>
+<li><strong><code>upload_execution_outputs</code></strong> (lines 1469–1505): solid. <strong>No findings.</strong></li>
+<li><strong><code>add_features</code></strong> (lines 1072–1160): excellent prose ("Provenance requirement" callout); example is runnable as <code># doctest: +SKIP</code>. <strong>No findings.</strong></li>
+<li><strong><code>asset_file_path</code></strong> (lines 1902–2014): missing <code>Example:</code> block entirely (every other public mutating method has one). P1.</li>
+<li><strong><code>metrics_file</code></strong> (lines 2016–2091): excellent. The <code>MLAsset.execution_metadata.value</code> pure-Python doctest actually runs — exemplary. <strong>No findings.</strong></li>
+<li><strong><code>abort</code></strong> (lines 2585–2616): solid. <strong>No findings.</strong></li>
+<li><strong><code>pending_summary</code></strong> / <strong><code>upload_outputs</code></strong> (lines 2618–2676): solid. <strong>No findings.</strong></li>
+</ul>
+<h3 id="assetspec-assetspecconfig-assetfilepath-srcderiva_mlassetaux_classespy"><code>AssetSpec</code>, <code>AssetSpecConfig</code>, <code>AssetFilePath</code> — <code>src/deriva_ml/asset/aux_classes.py</code></h3>
+<ul>
+<li><strong><code>AssetSpec</code></strong> (lines 153–176): the doctest examples are pure-Python and <em>will run</em> during collection — but <code>AssetSpec(rid="3JSE")</code> is not asserted (no expected output). <code>RID</code> validation lives in <code>core.definitions</code>; if the regex allows <code>"3JSE"</code> the test passes silently. P3 (cosmetic — preferred Google form: <code>&gt;&gt;&gt; AssetSpec(rid="3JSE").cache</code> <code>False</code>).</li>
+<li><strong><code>AssetSpecConfig</code></strong> (lines 187–202): example uses <code>from hydra_zen import store</code> — pure-Python but marked <code># doctest: +SKIP</code>. <strong>No findings.</strong></li>
+<li><strong><code>AssetFilePath</code></strong> (lines 28–150): no class-level <code>Example:</code> shows <code>set_asset_types()</code>; the constructor docstring is fine. The <code>metadata</code> getter/setter docstrings (lines 88–122) document the semantics well. <strong>No findings on existence</strong>, but see the <code>executions.md</code> issue below — user-guide docs claim a <code>set_metadata(key, value)</code> method exists; it does not. P0 (in docs/, not in src/).</li>
+</ul>
+<h3 id="datasetspec-datasetspecconfig-srcderiva_mldatasetaux_classespy"><code>DatasetSpec</code>, <code>DatasetSpecConfig</code> — <code>src/deriva_ml/dataset/aux_classes.py</code></h3>
+<ul>
+<li><strong><code>DatasetSpec</code></strong> (lines 304–394): docstring opens with <code>"Represent a dataset_table in an execution configuration dataset_table list"</code> — typo / placeholder leak from a refactor. P2.</li>
+<li><strong><code>DatasetSpec.version</code></strong> field type is <code>DatasetVersion | conlist(...) | tuple[...] | str</code> but the docstring just says "The version of the dataset. Should follow semantic versioning." — doesn't mention that lists/tuples/dicts/strings are all accepted via <code>version_field_validator</code>. P2.</li>
+<li><strong><code>DatasetVersion</code></strong> / <strong><code>VersionPart</code></strong> (lines 28–202): exemplary. Pure-Python doctests, clear rationale. <strong>No findings.</strong></li>
+<li><strong><code>DatasetHistory</code></strong> (lines 204–235): no <code>Example:</code> block, attribute-style only. P2.</li>
+<li><strong><code>DatasetMinid</code></strong> (lines 238–301): no <code>Example:</code> block, no description of when an instance is actually constructed (it's a parser for the MINID landing-page JSON). P2.</li>
+<li><strong><code>DatasetSpecConfig</code></strong> (lines 398–425): no <code>Example:</code> block. Compared to <code>AssetSpecConfig</code> (lines 187–202) — <code>AssetSpecConfig</code> has one, <code>DatasetSpecConfig</code> does not. P2.</li>
+</ul>
+<h3 id="dataset-srcderiva_mldatasetdatasetpy"><code>Dataset</code> — <code>src/deriva_ml/dataset/dataset.py</code></h3>
+<ul>
+<li><strong>Class docstring</strong> (lines 75–110): excellent. <strong>No findings.</strong></li>
+<li><strong><code>Dataset.__init__</code></strong> (lines 112–139): solid. <strong>No findings.</strong></li>
+<li><strong><code>dataset_types</code> property</strong> (lines 189–211): two-line <code>Example:</code> is opaque (<code>&gt;&gt;&gt; types = dataset.dataset_types</code> <code>&gt;&gt;&gt; print(types)</code>) — doesn't say what the output looks like. P3.</li>
+<li><strong><code>create_dataset</code></strong> static method (lines 213–292): excellent. <strong>No findings.</strong></li>
+<li><strong><code>release</code></strong>, <strong><code>is_dirty</code></strong>, <strong><code>release_diff</code></strong>, <strong><code>compare_versions</code></strong>, <strong><code>mark_dev</code></strong> — pin-quality writing on dev/released semantics. <strong>No findings.</strong></li>
+<li><strong><code>add_dataset_members</code></strong> (lines 1852+): inspected, well-documented. <strong>No findings.</strong></li>
+<li><strong><code>download_dataset_bag</code></strong> (lines 2320+): <strong>docstring says <code>fetch_concurrency</code> defaults to 8 but the signature is <code>fetch_concurrency: int = 1</code></strong>. Found at file lines 2327 and 2353. P0 — direct contradiction between signature and docstring.</li>
+</ul>
+<h3 id="datasetbag-srcderiva_mldatasetdataset_bagpy"><code>DatasetBag</code> — <code>src/deriva_ml/dataset/dataset_bag.py</code></h3>
+<ul>
+<li><strong>Class docstring</strong> (lines 65–112): excellent. <strong>No findings.</strong></li>
+<li><strong><code>as_torch_dataset</code></strong> / <strong><code>as_tf_dataset</code></strong> (lines 1130–1485): exhaustive — long but warranted given the framework adapter shape. <strong>No findings.</strong></li>
+<li><strong><code>restructure_assets</code></strong> (line 1485+): inspected. <strong>No findings.</strong></li>
+<li><strong><code>current_version</code></strong> property (lines 181–192): no <code>Example:</code>. P3.</li>
+</ul>
+<h3 id="featurerecord-srcderiva_mlfeaturepy"><code>FeatureRecord</code> — <code>src/deriva_ml/feature.py</code></h3>
+<ul>
+<li><strong>Module docstring</strong> (lines 1–33): excellent — names every selector helper. <strong>No findings.</strong></li>
+<li><strong>Class docstring</strong> (lines 49–95): explains attributes, provenance, multi-annotator selector pattern. <strong>No findings.</strong></li>
+<li><strong><code>select_newest</code></strong>, <strong><code>select_first</code></strong>, <strong><code>select_latest</code></strong> (lines 107–311): documented with runnable code in <code>Example:</code> blocks but the inline code is shown inside RST <code>::</code> literal blocks instead of doctest-style <code>&gt;&gt;&gt;</code>. Mkdocstrings rendering is fine; the missing <code>&gt;&gt;&gt;</code> means these are NOT picked up by <code>--doctest-modules</code>. Acceptable but inconsistent. P3.</li>
+<li><strong><code>select_by_execution</code></strong>, <strong><code>select_by_workflow</code></strong> (lines 131–269): excellent — "None return semantics" callout is exactly what a user needs. <strong>No findings.</strong></li>
+<li><strong><code>select_majority_vote</code></strong> (lines 313–373): solid. <strong>No findings.</strong></li>
+</ul>
+<h3 id="workflow-srcderiva_mlexecutionworkflowpy"><code>Workflow</code> — <code>src/deriva_ml/execution/workflow.py</code></h3>
+<ul>
+<li><strong>Class docstring</strong> (lines 41–105): good — covers catalog binding, write-back, deduplication. <strong>No findings.</strong></li>
+</ul>
+<h3 id="annotation-builders-srcderiva_mlmodelannotationspy">Annotation builders — <code>src/deriva_ml/model/annotations.py</code></h3>
+<p>Per CLAUDE.md, this is documented public API consumed by the <code>deriva-skills/use-annotation-builders</code> skill. Per-class assessment:</p>
+<ul>
+<li><strong><code>Display</code></strong> (lines 336–420): excellent. Multiple runnable examples. <strong>No findings.</strong></li>
+<li><strong><code>NameStyle</code></strong> (lines 302–333): one runnable example. <strong>No findings.</strong></li>
+<li><strong><code>SortKey</code></strong> (lines 428–448): example block <code>&gt;&gt;&gt; SortKey("Name")  # Ascending</code> has no expected output — doctest passes silently. P3.</li>
+<li><strong><code>InboundFK</code></strong>, <strong><code>OutboundFK</code></strong> (lines 456–559): good runnable examples. <strong>No findings.</strong></li>
+<li><strong><code>PseudoColumnDisplay</code></strong> (lines 562–599): no <code>Example:</code>. P2.</li>
+<li><strong><code>PseudoColumn</code></strong> (lines 606–730): exhaustive — multiple <code>Example:</code> blocks for outbound, inbound, multi-hop, display formatting, array aggregate. <strong>No findings.</strong></li>
+<li><strong><code>VisibleColumns</code></strong> (lines 741–862): excellent. <strong>No findings.</strong></li>
+<li><strong><code>VisibleForeignKeys</code></strong> (lines 874–911): minimal but adequate. <strong>No findings.</strong></li>
+<li><strong><code>TableDisplayOptions</code></strong> (lines 920–969): no <code>Example:</code>. P2.</li>
+<li><strong><code>TableDisplay</code></strong> (lines 973–1021): adequate. <strong>No findings.</strong></li>
+<li><strong><code>PreFormat</code></strong> (lines 1030–1051): no <code>Example:</code>. P2.</li>
+<li><strong><code>ColumnDisplayOptions</code></strong> (lines 1055–1085): no <code>Example:</code>. P2.</li>
+<li><strong><code>ColumnDisplay</code></strong> (lines 1087–1140): no <code>Example:</code> block. P2.</li>
+<li><strong><code>Facet</code></strong>, <strong><code>FacetList</code></strong>, <strong><code>FacetRange</code></strong> (lines 1142+): inspected; minimal docstrings without <code>Example:</code> blocks. P2.</li>
+<li><strong><code>TemplateEngine</code></strong>, <strong><code>Aggregate</code></strong>, <strong><code>ArrayUxMode</code></strong>, <strong><code>FacetUxMode</code></strong> enums (lines 139–280): inspected; member-style docstrings without examples of <em>use</em>. P2.</li>
+<li><strong><code>AnnotationBuilder</code></strong> base (lines 282–294): documents only the abstract contract. <strong>No findings.</strong></li>
+<li><strong><code>fk_constraint</code> helper</strong>: referenced in <code>VisibleColumns</code> examples but its own docstring not surfaced in this audit. P3.</li>
+</ul>
+<h2 id="findings-by-area">Findings by area</h2>
+<h3 id="docstrings-src">Docstrings: src/</h3>
+<h4 id="p0-derivamlconfigcompute_workdir-doctest-example-is-non-runnable">[P0] <code>DerivaMLConfig.compute_workdir</code> doctest example is non-runnable</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/core/config.py:186-191</code>
+<strong>Issue:</strong> The docstring shows a <code>&gt;&gt;&gt; DerivaMLConfig.compute_workdir('/shared/data', '52', 'ml.example.org')</code> example with literal expected output <code>PosixPath('/shared/data/username/deriva-ml/ml.example.org/52')</code>. The method internally calls <code>getpass.getuser()</code>, so the expected <code>username</code> portion will differ on every machine. Per CLAUDE.md, pure-Python examples run for real during pytest collection — this one will FAIL.
+<strong>Quote:</strong> <code>&gt;&gt;&gt; DerivaMLConfig.compute_workdir('/shared/data', '52', 'ml.example.org')</code> / <code>PosixPath('/shared/data/username/deriva-ml/ml.example.org/52')</code>
+<strong>Suggested fix:</strong> Either (a) mark both example lines <code># doctest: +SKIP</code>, or (b) convert to a no-output assertion like <code>&gt;&gt;&gt; str(DerivaMLConfig.compute_workdir('/x', '52', 'h.example.org')).endswith('/h.example.org/52')</code> <code>True</code>.</p>
+<h4 id="p0-datasetdownload_dataset_bag-docstring-contradicts-signature-on-fetch_concurrency-default">[P0] <code>Dataset.download_dataset_bag</code> docstring contradicts signature on <code>fetch_concurrency</code> default</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:2327</code> (signature) vs <code>dataset.py:2353</code> (docstring)
+<strong>Issue:</strong> Signature is <code>fetch_concurrency: int = 1</code> but the <code>Args:</code> block says <code>"Defaults to 8."</code> — direct contradiction.
+<strong>Quote (signature):</strong> <code>fetch_concurrency: int = 1</code>
+<strong>Quote (docstring):</strong> <code>"fetch_concurrency: Maximum number of concurrent file downloads during materialization. Defaults to 8."</code>
+<strong>Suggested fix:</strong> Decide which is correct and align the other. (The <code>DatasetSpec.fetch_concurrency</code> in <code>aux_classes.py</code> defaults to <code>8</code>, so the docstring intent appears to be 8 — the signature looks like a regression.)</p>
+<h4 id="p1-executiondownload_dataset_bag-documents-return-fields-that-dont-exist">[P1] <code>Execution.download_dataset_bag</code> documents return fields that don't exist</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1174-1178</code>
+<strong>Issue:</strong> Returns block lists <code>path</code>, <code>rid</code>, <code>minid</code> — but <code>DatasetBag</code> exposes <code>path</code>, <code>dataset_rid</code>, <code>current_version</code>, etc. There is no top-level <code>rid</code> attribute and no <code>minid</code> attribute on a <code>DatasetBag</code>.
+<strong>Quote:</strong> <code>"DatasetBag: Object containing: - path: Local filesystem path to downloaded dataset - rid: Dataset's Resource Identifier - minid: Dataset's Minimal Viable Identifier"</code>
+<strong>Suggested fix:</strong> Replace with <code>bag.path</code>, <code>bag.dataset_rid</code>, <code>bag.current_version</code> to match the actual public surface (and mirror the more-correct docstring on <code>Dataset.download_dataset_bag</code>).</p>
+<h4 id="p1-executionasset_file_path-is-missing-a-usage-example-block">[P1] <code>Execution.asset_file_path</code> is missing a usage <code>Example:</code> block</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/execution/execution.py:1902-1942</code>
+<strong>Issue:</strong> This is the canonical method for registering output files. The class-level docstring and every other major mutating method on <code>Execution</code> (<code>add_features</code>, <code>metrics_file</code>, <code>upload_execution_outputs</code>, <code>download_dataset_bag</code>, <code>download_asset</code>) has an <code>Example:</code> block. <code>asset_file_path</code> doesn't.
+<strong>Quote:</strong> Ends with <code>"Raises:" ... "DerivaMLValidationError: If asset_types contains invalid terms."</code> — no <code>Example:</code>.
+<strong>Suggested fix:</strong> Add a runnable <code># doctest: +SKIP</code> example covering at least (a) new-file mode (<code>path = exe.asset_file_path("Model", "model.pt"); path.write_bytes(...)</code>) and (b) the <code>metadata=AssetRecord(...)</code> form, since that's the recommended path.</p>
+<h4 id="p1-derivamldownload_dir-example-uses-an-undefined-ml-and-is-not-skipped">[P1] <code>DerivaML.download_dir</code> example uses an undefined <code>ml</code> and is not skipped</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/core/base.py:808-811</code>
+<strong>Issue:</strong> The <code>Example:</code> block reads <code>&gt;&gt;&gt; cache_dir = ml.download_dir(cached=True)</code> with no <code># doctest: +SKIP</code>. Per CLAUDE.md, catalog-dependent examples MUST carry <code>+SKIP</code>. The references to <code>ml</code> would fail under <code>--doctest-modules</code>.
+<strong>Quote:</strong> <code>&gt;&gt;&gt; cache_dir = ml.download_dir(cached=True)</code> / <code>&gt;&gt;&gt; work_dir = ml.download_dir(cached=False)</code>
+<strong>Suggested fix:</strong> Add <code># doctest: +SKIP</code> to both lines.</p>
+<h4 id="p1-derivaml_get_session_config-example-is-not-skipped">[P1] <code>DerivaML._get_session_config</code> example is not skipped</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/core/base.py:727-729</code>
+<strong>Issue:</strong> <code>&gt;&gt;&gt; config = DerivaML._get_session_config()</code> — this <em>should</em> run (it's a <code>@staticmethod</code> with no catalog requirement), but <code>&gt;&gt;&gt; print(config['retry_read']) # 8</code> has the expected output <code>8</code> written as a <em>comment</em> not as a doctest expected line. So either the doctest is wrong, or it's not actually being run. The intent is unclear from the source.
+<strong>Quote:</strong> <code>&gt;&gt;&gt; print(config['retry_read']) # 8</code>
+<strong>Suggested fix:</strong> Convert to standard doctest form: <code>&gt;&gt;&gt; config['retry_read']</code> <code>8</code>.</p>
+<h4 id="p1-datasetspec-class-docstring-leads-with-a-typo-placeholder">[P1] <code>DatasetSpec</code> class docstring leads with a typo / placeholder</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/aux_classes.py:304-317</code>
+<strong>Issue:</strong> Opens with <code>"Represent a dataset_table in an execution configuration dataset_table list"</code> — "dataset_table" looks like an unfinished refactor (the class is <code>DatasetSpec</code>, not <code>DatasetTable</code>).
+<strong>Quote:</strong> <code>"Represent a dataset_table in an execution configuration dataset_table list"</code>
+<strong>Suggested fix:</strong> Rewrite to <code>"Specification for a dataset input to an execution configuration."</code> to match the <code>AssetSpec</code> style.</p>
+<h4 id="p2-datasetspecversion-docstring-understates-the-accepted-types">[P2] <code>DatasetSpec.version</code> docstring understates the accepted types</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/aux_classes.py:317</code>
+<strong>Issue:</strong> Field type is <code>DatasetVersion | conlist(int, 3) | tuple[int,int,int] | str</code> and the <code>version_field_validator</code> accepts dicts, lists, tuples, strings, and <code>DatasetVersion</code>. The <code>Attributes:</code> block reduces this to <code>"version (DatasetVersion): The version of the dataset. Should follow semantic versioning."</code> — readers won't know they can pass <code>"1.2.3"</code>, <code>[1, 2, 3]</code>, or <code>(1, 2, 3)</code>.
+<strong>Quote:</strong> <code>"version (DatasetVersion): The version of the dataset. Should follow semantic versioning."</code>
+<strong>Suggested fix:</strong> Mention all accepted forms with one-liner examples per accepted type.</p>
+<h4 id="p2-derivaml__init__-has-no-example-block">[P2] <code>DerivaML.__init__</code> has no <code>Example:</code> block</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/core/base.py:237-290</code>
+<strong>Issue:</strong> Every kwarg is documented but there is no runnable <code>Example:</code> showing the constructor with common kwarg combos (<code>hostname</code> + <code>catalog_id</code>; <code>working_dir=</code>; <code>mode=ConnectionMode.offline</code>).
+<strong>Suggested fix:</strong> Add three small <code># doctest: +SKIP</code> example invocations.</p>
+<h4 id="p2-several-annotation-builder-helpers-lack-example-blocks">[P2] Several annotation-builder helpers lack <code>Example:</code> blocks</h4>
+<p><strong>Locations:</strong>
+- <code>PseudoColumnDisplay</code> — <code>src/deriva_ml/model/annotations.py:562-599</code>
+- <code>TableDisplayOptions</code> — <code>src/deriva_ml/model/annotations.py:920-969</code>
+- <code>PreFormat</code> — <code>src/deriva_ml/model/annotations.py:1030-1051</code>
+- <code>ColumnDisplayOptions</code> — <code>src/deriva_ml/model/annotations.py:1055-1085</code>
+- <code>ColumnDisplay</code> — <code>src/deriva_ml/model/annotations.py:1087-1140</code>
+- <code>Facet</code>, <code>FacetList</code>, <code>FacetRange</code> — <code>src/deriva_ml/model/annotations.py:1142+</code>
+- Enums <code>TemplateEngine</code>, <code>Aggregate</code>, <code>ArrayUxMode</code>, <code>FacetUxMode</code></p>
+<p><strong>Issue:</strong> Per CLAUDE.md <code>model/annotations.py</code> is consumed externally by the <code>deriva-skills/use-annotation-builders</code> skill. The skill's authors and end-users need to see runnable examples for each surface, not just an attribute table.
+<strong>Suggested fix:</strong> Each builder should carry at least one minimum-viable <code>&gt;&gt;&gt;</code> example showing how to instantiate it and pass it to a parent builder (e.g., <code>ColumnDisplay().detailed(ColumnDisplayOptions(pre_format=PreFormat(format="%.2f")))</code>).</p>
+<h4 id="p2-datasethistory-datasetminid-lack-example-blocks">[P2] <code>DatasetHistory</code>, <code>DatasetMinid</code> lack <code>Example:</code> blocks</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/aux_classes.py:204-301</code>
+<strong>Issue:</strong> Both are user-facing return types (<code>Dataset.dataset_history()</code> returns <code>list[DatasetHistory]</code>; <code>DatasetMinid</code> surfaces in MINID-creation flows). Neither has an <code>Example:</code> block; readers landing on these from the API reference get only an attribute table.
+<strong>Suggested fix:</strong> Add a <code># doctest: +SKIP</code> example for each showing the typical access pattern.</p>
+<h4 id="p2-datasetspecconfig-lacks-example-block-asymmetric-with-assetspecconfig">[P2] <code>DatasetSpecConfig</code> lacks <code>Example:</code> block (asymmetric with <code>AssetSpecConfig</code>)</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/aux_classes.py:398-425</code>
+<strong>Issue:</strong> <code>AssetSpecConfig</code> (lines 187–202) has a clear hydra-zen <code>store()</code> example. <code>DatasetSpecConfig</code> does not, even though it's the more common configuration in real projects.
+<strong>Suggested fix:</strong> Add an <code>Example:</code> block paralleling <code>AssetSpecConfig</code>'s.</p>
+<h4 id="p2-derivamlcache_table-derivaml_cache_features-use-sphinx-style-example-not-google-example">[P2] <code>DerivaML.cache_table</code>, <code>DerivaML._cache_features</code> use sphinx-style <code>Example::</code> not Google <code>Example:</code></h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/core/base.py:874-901</code>, <code>:903-961</code>
+<strong>Issue:</strong> <code>Example::</code> is the docutils/sphinx literal-block convention; the rest of the codebase consistently uses Google's <code>Example:</code> heading followed by <code>&gt;&gt;&gt;</code> lines. Mixed convention.
+<strong>Suggested fix:</strong> Convert to <code>Example:</code> + <code>&gt;&gt;&gt;</code> style consistently across the file.</p>
+<h4 id="p3-sortkey-assetspec-examples-have-no-expected-output-lines">[P3] <code>SortKey</code>, <code>AssetSpec</code> examples have no expected-output lines</h4>
+<p><strong>Locations:</strong> <code>src/deriva_ml/model/annotations.py:437-438</code>, <code>src/deriva_ml/asset/aux_classes.py:167-169</code>
+<strong>Issue:</strong> Examples like <code>&gt;&gt;&gt; SortKey("Name")  # Ascending</code> and <code>&gt;&gt;&gt; spec = AssetSpec(rid="3JSE")</code> lack expected-output assertions. They run but assert nothing.
+<strong>Suggested fix:</strong> Add an assertion line (<code>&gt;&gt;&gt; SortKey("Name").column</code> <code>'Name'</code>).</p>
+<h4 id="p3-inconsistent-example-vs-examples-heading">[P3] Inconsistent <code>Example:</code> vs <code>Examples:</code> heading</h4>
+<p><strong>Locations:</strong> <code>core/base.py:978-985, 1015-1028, 1156-1169, 1226-1299, 1385-1393, 1446-1449</code>, plus most mixin files.
+<strong>Issue:</strong> Google style is singular <code>Example:</code>. Some methods use <code>Examples:</code>. mkdocstrings handles both, but readers see two visual treatments.
+<strong>Suggested fix:</strong> Normalize to <code>Example:</code> across the codebase (search/replace).</p>
+<h4 id="p3-datasetdataset_types-example-is-opaque">[P3] <code>Dataset.dataset_types</code> example is opaque</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/dataset/dataset.py:203-205</code>
+<strong>Issue:</strong> <code>&gt;&gt;&gt; types = dataset.dataset_types</code> <code>&gt;&gt;&gt; print(types)</code> shows no expected output. Reader has no idea what's printed.
+<strong>Suggested fix:</strong> Add a representative expected output line like <code>['TrainingSet', 'Labeled']</code>.</p>
+<h3 id="docsuser-guide">docs/user-guide/</h3>
+<h4 id="p0-docsuser-guidedatasetsmd-calls-split_dataset-with-a-stale-signature">[P0] <code>docs/user-guide/datasets.md</code> calls <code>split_dataset</code> with a stale signature</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/datasets.md:289-330</code> (multiple examples)
+<strong>Issue:</strong> Every <code>split_dataset</code> example in the user guide uses the form <code>split_dataset(ml, source_dataset_rid, test_size=0.2, seed=42)</code>. The current signature in <code>src/deriva_ml/dataset/split.py:482</code> requires an <code>execution</code> parameter as the third positional argument: <code>split_dataset(ml, source_dataset_rid, execution, *, test_size=0.2, ...)</code>. Every copy-paste from this page raises <code>TypeError: split_dataset() missing 1 required positional argument: 'execution'</code>.
+<strong>Quote:</strong> <code>result = split_dataset(ml, source_dataset_rid, test_size=0.2, seed=42)</code>
+<strong>Suggested fix:</strong> Update all four examples (lines 290, 304, 322, 342, 361) to include an <code>execution=exe</code> arg, wrapped in an <code>ml.create_execution(...)</code> context manager. Note also that the <em>module docstring</em> at <code>src/deriva_ml/dataset/split.py:26-87</code> has the correct shape — the docs page just diverged from it.</p>
+<h4 id="p0-docsconfigurationoverviewmd-documents-a-check_auth-field-that-does-not-exist-on-derivamlconfig">[P0] <code>docs/configuration/overview.md</code> documents a <code>check_auth</code> field that does not exist on <code>DerivaMLConfig</code></h4>
+<p><strong>Location:</strong> <code>docs/configuration/overview.md:46-66</code>
+<strong>Issue:</strong> The example shows <code>check_auth=True</code> and the field table lists <code>check_auth | bool | True | Verify authentication on connect</code>. There is no <code>check_auth</code> field in <code>src/deriva_ml/core/config.py</code> (and a grep across <code>core/</code> finds no occurrences). Code copied from this snippet will fail Pydantic validation immediately.
+<strong>Quote:</strong> <code>check_auth=True, # Verify authentication</code>
+<strong>Suggested fix:</strong> Remove <code>check_auth=True</code> from the example and the corresponding row from the parameter table. If the intent was something else (mode? credential?), document the real field.</p>
+<h4 id="p0-docsuser-guideexecutionsmd-documents-an-assetfilepathset_metadata-method-that-does-not-exist">[P0] <code>docs/user-guide/executions.md</code> documents an <code>AssetFilePath.set_metadata()</code> method that does not exist</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/executions.md:108-143</code>
+<strong>Issue:</strong> The page contains two mentions of <code>.set_metadata()</code>: <code>"if you plan to update its metadata via .set_metadata() or .set_asset_types()"</code> and <code>path.set_metadata("Acquisition_Time", "14:30:00")  # update after registration</code>. The class (<code>src/deriva_ml/asset/aux_classes.py:28-150</code>) only exposes a <code>metadata</code> property (read/write) plus <code>set_asset_types()</code>. There is no <code>set_metadata()</code> method.
+<strong>Quote:</strong> <code>path.set_metadata("Acquisition_Time", "14:30:00")  # update after registration</code>
+<strong>Suggested fix:</strong> Replace with <code>path.metadata = {...}</code> (full-dict replacement via the property setter) — and document the underlying behavior (the setter accepts a dict or an <code>AssetRecord</code> and overwrites the entire metadata dict; there is no per-key incremental update).</p>
+<h4 id="p0-docsgetting-startedinstallquick-startproject-setupmd-are-html-redirects-not-docs">[P0] <code>docs/getting-started/{install,quick-start,project-setup}.md</code> are HTML redirects, not docs</h4>
+<p><strong>Location:</strong> all three files in <code>docs/getting-started/</code>
+<strong>Issue:</strong> Each is an HTML meta-refresh redirecting to <code>https://github.com/informatics-isi-edu/deriva-ml-model-template</code>. A first-time visitor to https://informatics-isi-edu.github.io/deriva-ml hitting "Quick start" gets bounced out of the docs site to a separate GitHub repo. The mkdocs nav doesn't surface getting-started at all (<code>mkdocs.yml</code> nav skips it entirely), so the existence of these files is invisible to most readers — but anyone with a stale bookmark or Google result hits these stubs.
+<strong>Quote:</strong> <code>&lt;meta http-equiv="refresh" content="0; url=https://github.com/informatics-isi-edu/deriva-ml-model-template"&gt;</code>
+<strong>Suggested fix:</strong> Either (a) delete the three files (they're not in nav and the redirect is silent), or (b) restore minimal getting-started content so the first-time reader has a path through the docs site itself. Option (b) is strongly preferred — the <code>docs/index.md</code> "Starting a new project" section already points to the template repo, so an in-site walkthrough adds value rather than duplicating.</p>
+<h4 id="p0-docsapi-referenceuploadmd-references-a-non-existent-module">[P0] <code>docs/api-reference/upload.md</code> references a non-existent module</h4>
+<p><strong>Location:</strong> <code>docs/api-reference/upload.md</code>
+<strong>Issue:</strong> Page body is <code>::: deriva_ml.dataset.upload</code> — but <code>src/deriva_ml/dataset/</code> contains no <code>upload.py</code>. The <code>mkdocstrings</code> directive will either render an empty page or fail the build.
+<strong>Quote:</strong> <code>::: deriva_ml.dataset.upload</code>
+<strong>Suggested fix:</strong> Either point to <code>deriva_ml.cli.upload</code> (the actual upload CLI module under <code>src/deriva_ml/cli/upload.py</code>), or delete the file and its nav entry (<code>mkdocs.yml:81</code>). Note: the nav entry's label is "Upload"; the CLI's job is different from "asset upload during executions," so check the intent before silently re-pointing.</p>
+<h4 id="p0-docsrelease-notesmd-is-3-releases-stale">[P0] <code>docs/release-notes.md</code> is 3+ releases stale</h4>
+<p><strong>Location:</strong> <code>docs/release-notes.md</code>
+<strong>Issue:</strong> Latest entry is <code>Version 1.34.0</code>. Current release per <code>git tag</code> is <code>v1.37.4</code>. Releases 1.35, 1.36, 1.37, and 1.37.1–1.37.4 are not documented. Recent merged PRs (#177, #178, #179, #180, #181, #184, #185) include user-visible changes — execution staging directory move, asset overwrite warning, find_association typed exceptions — none of which appear in release notes.
+<strong>Suggested fix:</strong> Backfill 1.35–1.37.4. This is a hard pre-release blocker — release notes are the standard signal for "should I upgrade?"</p>
+<h4 id="p1-mkdocsyml-nav-omits-14-doc-pages-that-exist-on-disk">[P1] <code>mkdocs.yml</code> nav omits 14 doc pages that exist on disk</h4>
+<p><strong>Location:</strong> <code>mkdocs.yml</code>
+<strong>Issue:</strong> The following exist as <code>.md</code> files but are not in the nav, so they're either dead pages (rendering as orphans if linked to) or undeclared content:
+- <code>docs/getting-started/install.md</code>, <code>quick-start.md</code>, <code>project-setup.md</code> (redirects)
+- <code>docs/concepts/*.md</code> (7 redirects)
+- <code>docs/workflows/*.md</code> (3 redirects)
+- <code>docs/cli-reference.md</code> (redirect)
+- <code>docs/architecture.md</code> (real content — but not in nav!)
+- <code>docs/reference/README.md</code>, <code>docs/reference/schema.md</code> (real content — schema is canonical per <code>reference/README.md</code>)</p>
+<p><strong>Suggested fix:</strong> Delete the redirect-only files; add <code>architecture.md</code> and <code>reference/schema.md</code> to the nav (the latter is described as the "Authoritative description of the deriva-ml schema" — first-class content). If the redirects are kept for legacy URL preservation, document the policy in a comment in <code>mkdocs.yml</code>.</p>
+<h4 id="p1-mkdocsyml-does-not-surface-derivamlconfig-assetspecassetspecconfig-datasetspecdatasetspecconfig-or-mlassetmlvocab-enums-in-api-reference">[P1] <code>mkdocs.yml</code> does not surface <code>DerivaMLConfig</code>, <code>AssetSpec/AssetSpecConfig</code>, <code>DatasetSpec/DatasetSpecConfig</code>, or <code>MLAsset/MLVocab</code> enums in API Reference</h4>
+<p><strong>Location:</strong> <code>mkdocs.yml:62-81</code>
+<strong>Issue:</strong> The <code>API Reference</code> section exposes <code>DerivaML</code> (<code>deriva_ml_base.md</code>), <code>DerivaModel</code>, <code>Dataset</code>, <code>DatasetBag</code>, <code>Dataset Splitting</code>, <code>Dataset Auxiliary Classes</code>, <code>Execution</code>, <code>ExecutionConfiguration</code>, <code>Workflow</code>, <code>Lineage</code>, <code>Feature</code>, <code>Definitions &amp; Types</code>, <code>Exceptions</code>, <code>Upload</code>. Missing: <code>DerivaMLConfig</code>, the <code>AssetSpec</code>/<code>AssetSpecConfig</code> pair as a discoverable page, and (most importantly) the annotation builders in <code>deriva_ml.model.annotations</code> are buried inside <code>deriva_model.md</code> (<code>::: deriva_ml.model</code>) rather than getting their own first-class API-reference page.
+<strong>Suggested fix:</strong> Add <code>api-reference/config.md</code> (<code>::: deriva_ml.core.config</code>), <code>api-reference/asset.md</code> (<code>::: deriva_ml.asset.aux_classes</code>), and <code>api-reference/annotations.md</code> (<code>::: deriva_ml.model.annotations</code>) — the last is particularly important because CLAUDE.md pins it as a public API consumed by the <code>deriva-skills</code> Claude Code skill.</p>
+<h4 id="p1-docsapi-referenceexceptionsmd-is-a-single-directive-no-overview-of-the-hierarchy">[P1] <code>docs/api-reference/exceptions.md</code> is a single <code>:::</code> directive — no overview of the hierarchy</h4>
+<p><strong>Location:</strong> <code>docs/api-reference/exceptions.md</code>
+<strong>Issue:</strong> Page body is just <code>::: deriva_ml.core.exceptions</code>. The exception hierarchy described in <code>CLAUDE.md</code> is a useful map (<code>DerivaMLException → DerivaMLConfigurationError → DerivaMLSchemaError, ...</code>), but readers landing on this page get an alphabetical class dump without that tree.
+<strong>Suggested fix:</strong> Add the hierarchy diagram from <code>CLAUDE.md</code> ("Exception Hierarchy" section) as introductory prose above the mkdocstrings directive.</p>
+<h4 id="p1-docsapi-referenceexecutionmd-uses-deriva_mlexecution-with-no-overview">[P1] <code>docs/api-reference/execution.md</code> uses <code>::: deriva_ml.execution</code> with no overview</h4>
+<p><strong>Location:</strong> <code>docs/api-reference/execution.md</code>
+<strong>Issue:</strong> Single-line body <code>::: deriva_ml.execution</code> will render the entire submodule (Execution, Workflow, ExecutionConfiguration, BaseConfig, lineage types, multirun_config, runner, lineage, ...) on one page — but the <code>execution_configuration.md</code>, <code>workflow.md</code>, <code>lineage.md</code> pages already point to specific submodules. Either this page duplicates them, or it's incoherent. The TOC will be enormous.
+<strong>Suggested fix:</strong> Either narrow this page to <code>::: deriva_ml.execution.execution</code> (just the <code>Execution</code> class) or restructure to make this page a true table-of-contents / overview that links to the per-class pages.</p>
+<h4 id="p1-docsapi-referencederiva_ml_basemd-typo">[P1] <code>docs/api-reference/deriva_ml_base.md</code> typo</h4>
+<p><strong>Location:</strong> <code>docs/api-reference/deriva_ml_base.md:4</code>
+<strong>Issue:</strong> Typo <code>"These methods assume tha tthe catalog"</code> — "tha tthe" with a space inside the word.
+<strong>Quote:</strong> <code>"These methods assume tha tthe catalog contains a 'deriva-ml' and a domain schema."</code>
+<strong>Suggested fix:</strong> Fix to <code>"These methods assume that the catalog ..."</code>.</p>
+<h4 id="p1-docsapi-referencederiva_ml_basemd-mentions-execution-asset-table-that-no-longer-exists-by-that-name">[P1] <code>docs/api-reference/deriva_ml_base.md</code> mentions Execution Asset table that no longer exists by that name</h4>
+<p><strong>Location:</strong> <code>docs/api-reference/deriva_ml_base.md:17-18</code>
+<strong>Issue:</strong> Lists <code>Execution Asset</code> and <code>Execution Metadata</code> as ML schema entities. Per <code>MLAsset</code> enum in <code>core/definitions.py</code>, the catalog tables are <code>Execution_Asset</code> and <code>Execution_Metadata</code> (underscore-separated). The prose form ("Execution Asset", "Execution Metadata" with space) is fine for English but might mislead readers searching the catalog. Minor.
+<strong>Suggested fix:</strong> Either use the canonical <code>Execution_Asset</code> form or add "(<code>Execution_Asset</code> in the catalog)" parenthetical for searchability.</p>
+<h4 id="p1-docsconcepts-docsworkflows-docscli-referencemd-are-11-html-redirects-with-no-nav-presence">[P1] <code>docs/concepts/</code>, <code>docs/workflows/</code>, <code>docs/cli-reference.md</code> are 11 HTML redirects with no nav presence</h4>
+<p><strong>Location:</strong> all files in <code>docs/concepts/</code>, <code>docs/workflows/</code>, plus <code>docs/cli-reference.md</code>
+<strong>Issue:</strong> Same shape as the getting-started redirects. Old URLs from prior versions of these docs are preserved as redirects, but neither the redirect targets nor the redirect itself is in the nav. If a search-engine result or external link points to e.g. <code>/concepts/datasets/</code>, the user lands on a bare HTML page with no navigation, no header, no styling — just a plain refresh tag.
+<strong>Quote (example):</strong> <code>&lt;meta http-equiv="refresh" content="0; url=../user-guide/datasets.md"&gt;</code>
+<strong>Suggested fix:</strong> Either (a) delete all 11 files (the redirects do bounce, but the experience is broken), or (b) use a proper mkdocs redirect plugin like <code>mkdocs-redirects</code> so the redirect happens server-side and the user lands on a real docs page.</p>
+<h4 id="p1-docsuser-guidedatasetsmd-references-mladd_termmlvocabdataset_type-without-showing-the-mlvocab-import">[P1] <code>docs/user-guide/datasets.md</code> references <code>ml.add_term(MLVocab.dataset_type, ...)</code> without showing the <code>MLVocab</code> import</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/datasets.md:52, 62-68</code>
+<strong>Issue:</strong> <code>ml.add_term(MLVocab.dataset_type, "TrainingSet", ...)</code> appears in a "Notes" callout AND in the next code block, but the <code>from deriva_ml import MLVocab</code> import only appears at line 61 (inside the second usage). A reader skimming the callout sees <code>MLVocab.dataset_type</code> with no idea where to import it from.
+<strong>Suggested fix:</strong> Add a one-line <code>from deriva_ml import MLVocab</code> to the first occurrence, or pull the import up to the chapter's overall setup snippet.</p>
+<h4 id="p1-docsuser-guideexecutionsmd-references-a-datasetspecversionnone-default-that-doesnt-match-the-code">[P1] <code>docs/user-guide/executions.md</code> references a <code>DatasetSpec(version=None)</code> default that doesn't match the code</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/executions.md:42-47</code>
+<strong>Issue:</strong> The table says <code>version | str | None | Specific version to use (default: current)</code>. The class signature in <code>src/deriva_ml/dataset/aux_classes.py:319-320</code> makes <code>version</code> <strong>required</strong> (no default) and accepts <code>DatasetVersion | conlist | tuple | str</code>. Constructing <code>DatasetSpec(rid="...")</code> without a version fails validation.
+<strong>Quote:</strong> <code>| version | str | None | Specific version to use (default: current) |</code>
+<strong>Suggested fix:</strong> Update the table to reflect that <code>version</code> is required and document the four accepted types.</p>
+<h4 id="p1-docsconfigurationoverviewmd-shows-domain_schemasmy_domain-singular-string-and-elsewhere-shows-domain_schemasmy_domain-set">[P1] <code>docs/configuration/overview.md</code> shows <code>domain_schemas='my_domain'</code> (singular string) and elsewhere shows <code>domain_schemas={'my_domain'}</code> (set)</h4>
+<p><strong>Location:</strong> <code>docs/configuration/overview.md:26-27, 50, 61</code>
+<strong>Issue:</strong> The example shows <code>domain_schemas='my_domain'</code> (a string), but the field type is <code>str | set[str] | None</code>. Both forms are legal — but mixing them across examples in the same page without explanation confuses readers.
+<strong>Suggested fix:</strong> Pick one form for the page, or add a single sentence: "<code>domain_schemas</code> accepts a single name (string) or a set of names. Use a set when working with catalogs that expose multiple domain schemas."</p>
+<h4 id="p1-docsuser-guideexploringmd-claims-mlfind_executionsstatus-accepts-an-executionstatus-enum-directly">[P1] <code>docs/user-guide/exploring.md</code> claims <code>ml.find_executions(status=...)</code> accepts an <code>ExecutionStatus</code> enum directly</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/exploring.md:122-128</code>
+<strong>Issue:</strong> <code>uploaded = list(ml.find_executions(status=ExecutionStatus.Uploaded))</code> — confirm this works. Cross-check with <code>core/mixins/execution.py</code>. If the actual filter signature takes a string, the example will fail.
+<strong>Suggested fix:</strong> Verify the signature; if the kwarg requires a string, either change the call or document the conversion (<code>status="Uploaded"</code> or <code>status=ExecutionStatus.Uploaded.value</code>).</p>
+<h4 id="p1-docsuser-guidereproducibilitymd-references-an-asset_type-execution_config-for-uvlock">[P1] <code>docs/user-guide/reproducibility.md</code> references an asset_type <code>"Execution_Config"</code> for <code>uv.lock</code></h4>
+<p><strong>Location:</strong> <code>docs/user-guide/reproducibility.md:18</code>
+<strong>Issue:</strong> Row in the table says <code>Execution_Config | uv.lock | Python dependency lockfile from the project root, recording exact package versions</code>. Confirm against <code>ExecMetadataType</code> enum members. If the enum uses a different name (e.g. <code>Lock_File</code>), the reader has no way to query the asset later.
+<strong>Suggested fix:</strong> Verify against <code>src/deriva_ml/core/definitions.py</code> <code>ExecMetadataType</code> and align.</p>
+<h4 id="p2-docsindexmd-when-to-use-deriva-ml-is-excellent-but-never-reached-from-nav">[P2] <code>docs/index.md</code> "When to use deriva-ml" is excellent but never reached from nav</h4>
+<p><strong>Location:</strong> <code>docs/index.md</code>
+<strong>Issue:</strong> The "Strong fit" / "Weaker fit" discussion is one of the best onboarding signals in the docs. But the nav opens directly to "Exploring a catalog" via the User Guide. New readers may never see this content.
+<strong>Suggested fix:</strong> Either add a prominent "Read this first" call-out at the top of <code>user-guide/exploring.md</code>, or restructure the nav so <code>index.md</code> is a clearly-labeled landing page distinct from chapter 1.</p>
+<h4 id="p2-docsuser-guideexploringmd-references-chapter-4-and-chapter-7-by-number-but-the-nav-uses-titles">[P2] <code>docs/user-guide/exploring.md</code> references <code>Chapter 4</code> and <code>Chapter 7</code> by number, but the nav uses titles</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/exploring.md:236-241</code>, similar in <code>datasets.md:543-550</code>, <code>features.md</code>
+<strong>Issue:</strong> Internal cross-references use ad-hoc chapter numbers ("Chapter 1", "Chapter 7"), but the nav titles them by topic ("Exploring a catalog", "Reproducibility"). Numbers get out of sync when chapters are added/removed.
+<strong>Suggested fix:</strong> Use the chapter titles directly: <code>[Exploring a catalog](exploring.md)</code>, <code>[Reproducibility](reproducibility.md)</code>. mkdocs-autorefs picks up titles automatically.</p>
+<h4 id="p2-docsuser-guideexecutionsmd-execution-status-lifecycle-mermaid-diagram-and-executionstatus-enum-are-not-cross-linked">[P2] <code>docs/user-guide/executions.md</code> "Execution status lifecycle" mermaid diagram and <code>ExecutionStatus</code> enum are not cross-linked</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/executions.md:270-288</code>
+<strong>Issue:</strong> The mermaid diagram shows the states; the table below documents them. Neither links to <code>execution.state_store.ExecutionStatus</code> in the API reference, so readers wanting the canonical enum can't navigate there.
+<strong>Suggested fix:</strong> Add an "API reference: <code>ExecutionStatus</code>" link to the section's "See also" footer, pointing to whichever api-reference page hosts the enum.</p>
+<h4 id="p2-docsconfigurationoverviewmd-datasetspecconfig-example-uses-field-timeout10-1800-list-instead-of-the-tuple-form-in-the-datasetspec-model">[P2] <code>docs/configuration/overview.md</code> <code>DatasetSpecConfig</code> example uses field <code>timeout=[10, 1800]</code> (list) instead of the <code>tuple</code> form in the <code>DatasetSpec</code> model</h4>
+<p><strong>Location:</strong> <code>docs/configuration/overview.md:91-93</code>
+<strong>Issue:</strong> <code>DatasetSpec.timeout</code> is typed <code>tuple[int, int] | None</code>. <code>DatasetSpecConfig.timeout</code> is <code>list[int] | None</code>. Reader might expect either form to work in both contexts.
+<strong>Suggested fix:</strong> Add a one-line note: "<code>DatasetSpec</code> (Python) accepts a tuple; <code>DatasetSpecConfig</code> (hydra-zen) uses a list because hydra serialization doesn't support tuples. Both produce the same effective config."</p>
+<h4 id="p2-docsconcepts-docsworkflows-docscli-referencemd-redirects-dont-tell-mkdocs-they-should-be-excluded-from-build">[P2] <code>docs/concepts/</code>, <code>docs/workflows/</code>, <code>docs/cli-reference.md</code> redirects don't tell mkdocs they should be excluded from build</h4>
+<p><strong>Location:</strong> <code>mkdocs.yml</code>
+<strong>Issue:</strong> mkdocs builds all <code>.md</code> files under <code>docs/</code> by default. The 14 redirect-only pages get compiled and shipped, just without nav. Build output is bloated.
+<strong>Suggested fix:</strong> Either delete the files or set <code>not_in_nav</code> / <code>exclude_from_search</code> configuration. mkdocs-material supports per-page <code>not_in_nav</code> in front matter.</p>
+<h4 id="p2-docsuser-guidesharingmd-is-in-nav-but-not-in-scope-of-this-audit-flag-for-review">[P2] <code>docs/user-guide/sharing.md</code> is in nav but not in scope of this audit — flag for review</h4>
+<p><strong>Location:</strong> <code>mkdocs.yml:48</code>, <code>docs/user-guide/sharing.md</code>
+<strong>Issue:</strong> Not reviewed in this pass due to time. Flag for a follow-up audit — it appears in nav as Chapter 6 (Sharing and collaboration) but I did not validate its code examples or cross-references against current API.
+<strong>Suggested fix:</strong> Run the same pass on <code>sharing.md</code> before release.</p>
+<h4 id="p2-docsarchitecturemd-is-large-current-and-not-in-nav">[P2] <code>docs/architecture.md</code> is large, current, and not in nav</h4>
+<p><strong>Location:</strong> <code>docs/architecture.md</code>, <code>mkdocs.yml</code>
+<strong>Issue:</strong> A 300+ line mermaid-rich architecture overview exists but is not surfaced in the nav. Readers who want a system-level view (especially those evaluating deriva-ml for adoption) will not find it.
+<strong>Suggested fix:</strong> Add to nav, possibly as "About → Architecture" or as a top-level "Architecture" link.</p>
+<h4 id="p2-docsuser-guidefeaturesmd-create_feature-signature-in-notes-doesnt-match-the-actual-signature">[P2] <code>docs/user-guide/features.md</code> <code>create_feature</code> signature in "Notes" doesn't match the actual signature</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/features.md:113-114</code>
+<strong>Issue:</strong> Notes block says <code>create_feature(target_table, feature_name, terms=None, assets=None, metadata=None, optional=None, comment="", update_navbar=True)</code>. Check this against <code>src/deriva_ml/core/mixins/feature.py:63</code> to confirm parameter order. The user-guide claims <code>terms</code>, <code>assets</code>, <code>metadata</code>, <code>optional</code> — confirm all four are accepted and in this order.</p>
+<h4 id="p2-docsuser-guidedatasetsmd-mentions-datasetspec-import-without-showing-from-deriva_mldatasetaux_classes-import-datasetspec">[P2] <code>docs/user-guide/datasets.md</code> mentions <code>DatasetSpec</code> import without showing <code>from deriva_ml.dataset.aux_classes import DatasetSpec</code></h4>
+<p><strong>Location:</strong> <code>docs/user-guide/datasets.md:438, 467-468, 485, 490</code>
+<strong>Issue:</strong> Several code blocks use <code>DatasetSpec(...)</code> without showing the import. Some blocks have the import; others don't. Inconsistent.
+<strong>Suggested fix:</strong> Add <code>from deriva_ml.dataset.aux_classes import DatasetSpec</code> (or, equivalently, <code>from deriva_ml.dataset import DatasetSpec</code>) to every snippet that uses it, or note that subsequent snippets reuse imports from earlier in the page.</p>
+<h4 id="p2-docsuser-guidehydra-zenmd-line-53-imports-assetspecconfig-from-deriva_mlasset">[P2] <code>docs/user-guide/hydra-zen.md</code> line 53 imports <code>AssetSpecConfig</code> from <code>deriva_ml.asset</code></h4>
+<p><strong>Location:</strong> <code>docs/user-guide/hydra-zen.md:53</code>
+<strong>Issue:</strong> Table cell says <code>from deriva_ml.asset import AssetSpecConfig</code>. Verified to work — <code>asset/__init__.py</code> re-exports it. But other docs (<code>docs/configuration/overview.md</code>, README content) might import from <code>deriva_ml.asset.aux_classes</code> directly. Pick one canonical import path and document it.
+<strong>Suggested fix:</strong> Pick <code>from deriva_ml.asset import AssetSpecConfig</code> (the shorter path) as canonical and update everywhere.</p>
+<h4 id="p3-docsapi-referencelineagemd-cross-references-deriva_ml_basemd-for-lookup_lineage-but-mkdocstrings-inheritance-might-already-include-it">[P3] <code>docs/api-reference/lineage.md</code> cross-references <code>deriva_ml_base.md</code> for <code>lookup_lineage</code> but mkdocstrings inheritance might already include it</h4>
+<p><strong>Location:</strong> <code>docs/api-reference/lineage.md:11-14</code>
+<strong>Issue:</strong> <code>"The method itself is documented on the DerivaML class: [DerivaML — lookup_lineage](deriva_ml_base.md)"</code> — the link target is the page, not the specific anchor. Readers click through to the entire 1600-line DerivaML page and have to ctrl-F.
+<strong>Suggested fix:</strong> Use the anchor: <code>(deriva_ml_base.md#deriva_ml.core.base.DerivaML.lookup_lineage)</code>.</p>
+<h4 id="p3-docsindexmd-erd-image-alt-text-could-be-more-descriptive">[P3] <code>docs/index.md</code> "ERD" image alt text could be more descriptive</h4>
+<p><strong>Location:</strong> <code>docs/index.md:27</code>
+<strong>Issue:</strong> <code>![ERD](assets/ERD.png)</code> — alt text is just "ERD", which is meaningless to screen readers.
+<strong>Suggested fix:</strong> Change to <code>![Entity-relationship diagram showing Dataset, Workflow, Execution, and Feature_Name tables in the deriva-ml schema](assets/ERD.png)</code>.</p>
+<h4 id="p3-docsuser-guidedatasetsmd-mentions-minid-but-doesnt-link-to-a-definition">[P3] <code>docs/user-guide/datasets.md</code> mentions <code>MINID</code> but doesn't link to a definition</h4>
+<p><strong>Location:</strong> <code>docs/user-guide/datasets.md:522</code>
+<strong>Issue:</strong> First mention of MINID is <code>"To create a MINID (a persistent, citable identifier) for a shared bag"</code> with a forward reference to Chapter 6. Good — but no link, just text.
+<strong>Suggested fix:</strong> <code>"To create a [MINID](sharing.md#minids) (a persistent, citable identifier) ..."</code>.</p>
+<h4 id="p3-docsrelease-notesmd-is-in-nav-root-not-under-a-release-group">[P3] <code>docs/release-notes.md</code> is in nav root, not under a "Release" group</h4>
+<p><strong>Location:</strong> <code>mkdocs.yml:82</code>
+<strong>Issue:</strong> Singleton top-level entry. Consider grouping with "About" / "Project info" if other singletons are added.</p>
+<h3 id="docsgetting-started-cross-references">docs/getting-started/ + cross-references</h3>
+<h4 id="p0-user-has-no-in-site-walkthrough-of-install-connect-first-command">[P0] User has no in-site walkthrough of "install → connect → first command"</h4>
+<p><strong>Location:</strong> <code>docs/getting-started/*.md</code>, <code>docs/index.md</code>, <code>docs/user-guide/exploring.md</code>
+<strong>Issue:</strong> Aggregate finding — covered by the per-page P0s above. Worth surfacing separately: the docs site has no <code>pip install deriva-ml</code> instruction visible in the nav. The reader is bounced to the template repo before they can install the library.
+<strong>Suggested fix:</strong> Add a real <code>getting-started/install.md</code> (in-site, in nav) with the <code>uv add deriva-ml</code> / <code>pip install deriva-ml</code> snippet, a one-line <code>deriva-auth</code> instruction, and a "next: Exploring a catalog" call to action.</p>
+<h3 id="cross-cutting">Cross-cutting</h3>
+<h4 id="p2-core__init__py-docstring-at-line-16-example-uses-derivamlderivaexampleorg-my_catalog-string-for-catalog_id">[P2] <code>core/__init__.py</code> docstring at line 16 example uses <code>DerivaML('deriva.example.org', 'my_catalog')</code> — string for catalog_id</h4>
+<p><strong>Location:</strong> <code>src/deriva_ml/core/__init__.py:16-18</code>
+<strong>Issue:</strong> Other examples use <code>catalog_id='42'</code> (numeric-looking string). Mixed conventions in examples — sometimes name, sometimes number, sometimes int. The <code>catalog_id: str | int</code> field type accepts both, but consistency aids skim-readability.
+<strong>Suggested fix:</strong> Pick one form for examples (numeric string <code>'42'</code> is most common across the codebase) and use it consistently.</p>
+<h4 id="p2-no-mention-of-modeconnectionmodeoffline-in-user-facing-docs">[P2] No mention of <code>mode=ConnectionMode.offline</code> in user-facing docs</h4>
+<p><strong>Location:</strong> Nowhere in <code>docs/user-guide/</code>.
+<strong>Issue:</strong> Offline mode is a documented feature on <code>DerivaML.__init__</code> (<code>base.py:285-289</code>) and gets a dedicated <code>Working offline</code> chapter (<code>offline.md</code>). But the offline-mode constructor pattern (<code>ml = DerivaML(..., mode=ConnectionMode.offline)</code>) is not in any user-guide page I audited.
+<strong>Suggested fix:</strong> Add a "How to work in offline mode" section to <code>offline.md</code> showing the constructor pattern, or cross-reference from <code>exploring.md</code>.</p>
+<h4 id="p3-claudemd-mentions-cli-referencemd-exists-and-is-current-the-file-in-the-repo-is-a-redirect">[P3] CLAUDE.md mentions <code>cli-reference.md</code> exists and is current; the file in the repo is a redirect</h4>
+<p><strong>Location:</strong> <code>docs/cli-reference.md</code>, brief
+<strong>Issue:</strong> The brief lists <code>docs/cli-reference.md</code> as in-scope and asks "current?" — it's a redirect stub. So either the brief is stale or the file was deleted recently.
+<strong>Suggested fix:</strong> Decide whether <code>cli-reference.md</code> should be revived (the <code>deriva-ml-run</code> / <code>deriva-ml-run-notebook</code> reference is currently buried inside <code>docs/user-guide/executions.md</code> lines 388–460). A dedicated CLI reference page accessible from nav would be more discoverable.</p>
+<h2 id="coverage-gaps-cross-cutting">Coverage gaps (cross-cutting)</h2>
+<p>These are areas where either docs exist without code, or code exists without docs.</p>
+<ol>
+<li><strong><code>DerivaML.from_context()</code></strong> (<code>base.py:192-235</code>) has a thorough docstring but is not mentioned in any user-guide page. It's the documented entry point for Claude-generated scripts — should appear in <code>exploring.md</code> or <code>hydra-zen.md</code> as the canonical pattern for "I'm working in a context the MCP server set up."</li>
+<li><strong><code>DerivaML.cache_table()</code> / <code>_cache_features()</code> / <code>workspace</code> property</strong> (<code>base.py:874-961</code>) — the "local caching" UX is documented in source but has no user-guide chapter. There's a <code>Workspace</code> concept buried in the source — should be documented as a discoverable feature.</li>
+<li><strong><code>DerivaML.pin_schema</code> / <code>unpin_schema</code> / <code>pin_status</code> / <code>diff_schema</code></strong> are thoroughly documented in source (<code>base.py:603-713</code>) but have no user-guide coverage. These are diagnostic / advanced-user surfaces and probably deserve a "Working with schema cache" section.</li>
+<li><strong><code>DerivaML.clear_cache</code> / <code>get_cache_size</code> / <code>list_execution_dirs</code> / <code>clean_execution_dirs</code> / <code>get_storage_summary</code></strong> (<code>base.py:1368-1622</code>) — local-disk management methods. No user-guide doc. These are useful day-to-day commands and worth a "Managing local storage" section.</li>
+<li><strong>Annotation builders</strong> have docstrings in <code>model/annotations.py</code> and a <code>concepts/annotations.md</code> redirect to <code>features.md</code> — but <code>features.md</code> doesn't actually cover annotation builders (it covers feature definitions). True annotation-builder docs only exist in the docstrings. The <code>deriva-skills</code> Claude Code skill is documented as the consumer per CLAUDE.md — but for human readers, there is no user-guide tour of <code>Display</code>, <code>VisibleColumns</code>, <code>TableDisplay</code>. Either (a) add a chapter (P1 for a thorough surface, P2 if the skill consumer is the primary audience), or (b) explicitly link to <code>deriva-skills</code> docs from the API-reference page.</li>
+<li><strong><code>AssetRecord</code></strong> is exported from <code>deriva_ml.asset.__init__</code> and referenced in docstrings (<code>Execution.asset_file_path</code> mentions <code>AssetRecord</code>) but is not in the api-reference nav at all and not in the main <code>deriva_ml.__init__</code> exports.</li>
+<li><strong><code>Workflow</code></strong> has an api-reference page (<code>api-reference/workflow.md</code>) but no user-guide chapter section. Workflow creation appears inline in <code>executions.md</code> (<code>ml.create_workflow(...)</code>) but the model itself (catalog write-back, deduplication, URL detection) isn't explained anywhere in the user guide.</li>
+<li><strong><code>MultirunSpec</code> and <code>multirun_config</code></strong> are exported from <code>deriva_ml.execution.__init__</code> but the <code>configuration/experiments.md</code> page covers experiments without making the <code>multirun_config</code> shape explicit. Reader sees it referenced via <code>deriva-ml-run --multirun</code> but the underlying spec is not introduced.</li>
+<li><strong><code>DerivaMLBagView</code></strong> is mentioned in <code>dataset_bag.py</code> docstrings as "use DerivaMLBagView for catalog-level operations" but there is no docs page for it. Its mention in <code>dataset_bag.py:87</code> is a dead-end for any reader.</li>
+<li><strong>The <code>core/exceptions.py</code> hierarchy</strong> — CLAUDE.md lays this out cleanly, and <code>exceptions.md</code> should reproduce it. The hierarchy is not in user-facing docs except as docstrings.</li>
+</ol>
+<h2 id="recommendations">Recommendations</h2>
+<p>In priority order for the v1.37.x release cycle:</p>
+<ol>
+<li><strong>Fix the four P0 broken-code-example issues</strong> (<code>split_dataset</code>, <code>check_auth</code>, <code>set_metadata</code>, <code>compute_workdir</code> doctest). These actively mislead readers; every one will produce a TypeError or AttributeError on the first paste. ETA: half a day across all four.</li>
+<li><strong>Fix the api-reference <code>upload.md</code> dead reference</strong> — either re-point to <code>deriva_ml.cli.upload</code> or delete. Even a 404 in a published docs site is a bad signal. ETA: 10 minutes.</li>
+<li><strong>Write release notes for 1.35–1.37.4.</strong> Use <code>git log v1.34.0..v1.37.4 --oneline</code> and the merged PRs as input. This is what release-day readers expect to see first. ETA: 1–2 hours.</li>
+<li><strong>Decide and act on the 14 redirect-only pages</strong> (<code>getting-started/</code>, <code>concepts/</code>, <code>workflows/</code>, <code>cli-reference.md</code>). Recommend: install <code>mkdocs-redirects</code> plugin, declare redirects there, delete the HTML-stub files. ETA: 1–2 hours including testing.</li>
+<li><strong>Add real getting-started content.</strong> At minimum a single <code>getting-started/install.md</code> with <code>pip install deriva-ml</code>, the <code>deriva-auth</code> step, and a <code>DerivaML(hostname=..., catalog_id=...)</code> first-call. Put it in the nav. The current "bounce to template repo" experience loses readers who just want to evaluate the library. ETA: half a day.</li>
+<li><strong>Restructure <code>mkdocs.yml</code> nav</strong> to add: <code>DerivaMLConfig</code> page, dedicated <code>Annotation Builders</code> page (<code>api-reference/annotations.md</code>), <code>architecture.md</code>, <code>reference/schema.md</code>. Fix the <code>Upload</code> entry. ETA: 1–2 hours.</li>
+<li><strong>Backfill the <code>Example:</code> blocks</strong> on the user-facing annotation builders (<code>TableDisplayOptions</code>, <code>PreFormat</code>, <code>ColumnDisplayOptions</code>, <code>ColumnDisplay</code>, the <code>Facet*</code> family, <code>PseudoColumnDisplay</code>) — these are pinned as public API by CLAUDE.md but lack the runnable examples that CLAUDE.md mandates for public APIs. ETA: 1 day.</li>
+</ol>
+<p>Lower priority (post-release cycle): the P2 / P3 normalization items (singular <code>Example:</code>, internal cross-link anchors, alt-text), the coverage-gap items (workspace docs, schema-pin docs, multirun docs). These are real but don't block release.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
