@@ -86,6 +86,141 @@ def test_lookup_lineage_two_execution_chain(test_ml):
     not os.environ.get("DERIVA_HOST"),
     reason="lookup_lineage live smoke test requires DERIVA_HOST",
 )
+def test_lookup_lineage_descends_into_member_asset_producers(test_ml, tmp_path):
+    """tk-018: lookup_lineage(dataset) reaches the source the dataset's MEMBER
+    assets were produced from, even when a different execution versioned the
+    dataset.
+
+    Shape built on the catalog:
+        exec_src  -> DS_SRC (source dataset)
+        exec_up   consumes DS_SRC, produces Image asset members (member producer)
+        DS_IM     version-produced by exec_ds, members = exec_up's Image assets
+
+    Assert: lookup_lineage(DS_IM) surfaces exec_up as a parent (reached via the
+    member assets), and exec_up's consumed DS_SRC appears under it.
+
+    The domain-schema ``Image`` asset table is used because it lives in the same
+    schema as the ``Dataset_Image`` element-type association table (already
+    registered at catalog creation), avoiding cross-schema lookup issues that
+    arise with ``Execution_Asset`` (ML-schema table vs domain-schema association).
+
+    Args:
+        test_ml: Clean DerivaML instance backed by a real catalog, provided by the
+            conftest session fixture.
+        tmp_path: Pytest-provided temporary directory for staging asset files.
+    """
+    # --- Vocabulary setup ---
+    test_ml.add_term(vc.dataset_type, "TK018Source", description="TK-018 source dataset type")
+    test_ml.add_term(vc.dataset_type, "TK018Image", description="TK-018 image-like dataset type")
+    test_ml.add_term(vc.workflow_type, "TK018 Lineage Test", description="TK-018 lineage smoke")
+
+    wf = test_ml.create_workflow(
+        name="TK018 member-asset lineage workflow",
+        workflow_type="TK018 Lineage Test",
+        description="TK-018 member-asset traversal smoke test",
+    )
+
+    # --- exec_src: produces DS_SRC ---
+    exec_src = test_ml.create_execution(
+        ExecutionConfiguration(workflow=wf, description="tk018 exec_src"),
+    )
+    with exec_src.execute():
+        ds_src = exec_src.create_dataset(
+            dataset_types="TK018Source",
+            description="tk018 source dataset",
+            version=DatasetVersion(1, 0, 0),
+        )
+    exec_src.commit_output_assets()
+    ds_src_rid = ds_src.dataset_rid
+
+    # --- Create a Subject row so Image assets can satisfy its FK ---
+    # Image in the test domain schema has a Subject FK; insert one directly.
+    domain_path = test_ml._domain_path()
+    subject_rows = list(domain_path.tables["Subject"].insert([{"Name": "tk018-subject"}]))
+    subject_rid = subject_rows[0]["RID"]
+
+    # --- exec_up: consumes DS_SRC, produces an Image asset (member producer) ---
+    exec_up = test_ml.create_execution(
+        ExecutionConfiguration(
+            workflow=wf,
+            description="tk018 exec_up (image asset producer)",
+            datasets=[DatasetSpec(rid=ds_src_rid, version=ds_src.current_version)],
+        ),
+    )
+    image_file = tmp_path / "tk018_image.txt"
+    image_file.write_text("tk018 image asset content")
+
+    with exec_up.execute():
+        exec_up.asset_file_path(
+            "Image",
+            image_file,
+            Subject=subject_rid,
+        )
+    exec_up.commit_output_assets()
+    exec_up_rid = exec_up.execution_rid
+
+    # Retrieve the Image RID created by exec_up (used as DS_IM member).
+    uploaded_assets = exec_up.uploaded_assets
+    image_entries = uploaded_assets.get(f"{test_ml.default_schema}/Image", [])
+    assert image_entries, (
+        f"exec_up did not produce any Image rows in {test_ml.default_schema}/Image; "
+        f"uploaded keys: {list(uploaded_assets.keys())}"
+    )
+    asset_rid = image_entries[0].asset_rid
+
+    # --- Ensure Image is registered as a dataset element type (idempotent) ---
+    # Dataset_Image is only created by create_demo_datasets (ensure_datasets);
+    # on a clean test_ml catalog it may not exist yet.
+    test_ml.add_dataset_element_type("Image")
+
+    # --- exec_ds: creates DS_IM (version-producer), adds the Image as member ---
+    # The essential invariant: DS_IM's Dataset_Version.Execution = exec_ds,
+    # while the Image's Image_Execution Output producer = exec_up.
+    exec_ds = test_ml.create_execution(
+        ExecutionConfiguration(workflow=wf, description="tk018 exec_ds (dataset assembler)"),
+    )
+    with exec_ds.execute():
+        ds_im = exec_ds.create_dataset(
+            dataset_types="TK018Image",
+            description="tk018 image-like dataset versioned by exec_ds",
+            version=DatasetVersion(1, 0, 0),
+        )
+        ds_im.add_dataset_members(
+            {"Image": [asset_rid]},
+            description="tk018: add exec_up's Image asset as member",
+        )
+    exec_ds.commit_output_assets()
+    ds_im_rid = ds_im.dataset_rid
+    exec_ds_rid = exec_ds.execution_rid
+
+    # Sanity: version-producer must be exec_ds, NOT exec_up.
+    assert exec_ds_rid != exec_up_rid, "exec_ds and exec_up must be distinct executions for tk-018 invariant"
+
+    # --- Walk lineage from DS_IM ---
+    result = test_ml.lookup_lineage(ds_im_rid)
+
+    assert isinstance(result, LineageResult)
+    assert result.root.type == "Dataset"
+    assert result.root.rid == ds_im_rid
+
+    # The member-producer (exec_up) is reachable as a parent somewhere in the
+    # tree (directly under the root version-producer node).
+    assert result.lineage is not None
+    parent_rids = {p.execution.rid for p in result.lineage.parents}
+    assert exec_up_rid in parent_rids, f"member-producer {exec_up_rid} not surfaced; parents were {parent_rids}"
+
+    # And from exec_up the walk reaches the source dataset DS_SRC it consumed.
+    up_node = next(p for p in result.lineage.parents if p.execution.rid == exec_up_rid)
+    consumed_src = {d.rid for d in up_node.consumed_datasets}
+    assert ds_src_rid in consumed_src, (
+        f"source dataset {ds_src_rid} not reached via member-producer; consumed were {consumed_src}"
+    )
+
+
+@pytest.mark.skipif(
+    not os.environ.get("DERIVA_HOST"),
+    reason="lookup_lineage live smoke test requires DERIVA_HOST",
+)
 def test_lookup_lineage_dataset_with_no_producer(test_ml):
     """A Dataset with no Dataset_Version row at all has no producer."""
     test_ml.add_term(vc.dataset_type, "LineageOrphan", description="Orphan smoke")
