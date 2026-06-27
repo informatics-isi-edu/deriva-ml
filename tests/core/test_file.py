@@ -144,8 +144,13 @@ class TestFile:
 
     def test_add_files_directory_datasets_record_path(self, file_table_setup):
         """Each directory dataset gets a Directory_Dataset row with its path
-        relative to the ingest root; the ingest root stores '.'. Description is
-        the bare caller string for every node (no path suffix)."""
+        relative to the ingest root; the ingest root stores '.'.
+
+        New contract (approved design decision, backward-compat waived):
+        - The ROOT dataset description defaults to the ingest-root directory's
+          basename (``ingest_root.name``), NOT the caller's description.
+        - Non-root / child datasets keep the caller's description.
+        """
         ml_instance = file_table_setup.ml_instance
         test_dir = file_table_setup.test_dir
         execution = file_table_setup.execution
@@ -154,8 +159,9 @@ class TestFile:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
             file_dataset = exe.add_files(filespecs, description="Ingest run")
 
-        # Description is the bare caller string everywhere now.
-        assert file_dataset.description == "Ingest run"
+        # Root description is the ingest-root directory's basename ("test_dir").
+        assert file_dataset.description == test_dir.name
+        # Child datasets keep the caller's description.
         for child in file_dataset.list_dataset_children():
             assert child.description == "Ingest run"
 
