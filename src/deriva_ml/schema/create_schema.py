@@ -1065,9 +1065,7 @@ def _ensure_sentinels(pb) -> None:
     # --- Execution sentinel (located by reserved Description; needs the
     #     Workflow FK above). Status=Aborted — it is not a real run. ---
     exe_table = pb.tables["Execution"]
-    exe_existing = [
-        r for r in exe_table.filter(exe_table.Description == SENTINEL_EXECUTION_DESCRIPTION).entities()
-    ]
+    exe_existing = [r for r in exe_table.filter(exe_table.Description == SENTINEL_EXECUTION_DESCRIPTION).entities()]
     if not exe_existing:
         exe_table.insert(
             [

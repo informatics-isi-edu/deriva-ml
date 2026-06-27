@@ -329,8 +329,8 @@ class TestFile:
         dd.update([{"RID": root_row["RID"], "Path": "."}])
 
         legacy_root = ml_instance.lookup_dataset(root.dataset_rid)
-        assert legacy_root.source_directory == "."          # legacy shape restored
-        assert legacy_root.is_source_root is True           # still found structurally
+        assert legacy_root.source_directory == "."  # legacy shape restored
+        assert legacy_root.is_source_root is True  # still found structurally
 
     def test_add_files_links_dataset_as_input(self, file_table_setup):
         """add_files records ONE Dataset_Execution input edge (the root source

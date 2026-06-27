@@ -482,9 +482,7 @@ class TestDirectoryDatasetSourceDirectory:
             (d / f"{rand_str()}.txt").write_text(rand_str(20))
         return test_dir
 
-    def test_dataset_bag_source_directory_and_is_directory(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_dataset_bag_source_directory_and_is_directory(self, catalog_manager: CatalogManager, tmp_path: Path):
         """DatasetBag.source_directory / .is_directory work offline from the materialized bag.
 
         Builds a directory dataset via add_files, downloads and materializes it
@@ -507,9 +505,7 @@ class TestDirectoryDatasetSourceDirectory:
         test_dir = self._make_test_tree(tmp_path)
 
         workflow = ml.create_workflow(name="Dir Bag Test", workflow_type="Dir Bag Test Workflow")
-        execution = ml.create_execution(
-            ExecutionConfiguration(workflow=workflow, description="Dir bag test run")
-        )
+        execution = ml.create_execution(ExecutionConfiguration(workflow=workflow, description="Dir bag test run"))
 
         with execution.execute() as exe:
             filespecs = FileSpec.create_filespecs(test_dir, "Dir Bag Ingest")

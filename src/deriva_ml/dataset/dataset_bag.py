@@ -252,10 +252,7 @@ class DatasetBag:
             ['d1', 'd2']
         """
         try:
-            rows = [
-                r for r in self.model.get_table_contents("Directory_Dataset")
-                if r["Dataset"] == self.dataset_rid
-            ]
+            rows = [r for r in self.model.get_table_contents("Directory_Dataset") if r["Dataset"] == self.dataset_rid]
         except KeyError:
             # Directory_Dataset table absent from this bag (e.g. a pre-feature bag)
             return None
