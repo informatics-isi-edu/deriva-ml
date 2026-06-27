@@ -226,6 +226,46 @@ def list_input_datasets(
     return [ml_instance.lookup_dataset(record["Dataset"]) for record in records if record.get("Dataset")]
 
 
+def list_input_datasets_with_versions(
+    *,
+    ml_instance: Any,
+    execution_rid: str,
+) -> list[tuple[Any, str | None]]:
+    """Input datasets of an execution paired with the consumed version.
+
+    Like :func:`list_input_datasets`, but also returns the
+    ``Dataset_Execution.Dataset_Version`` recorded on each input edge — the
+    version of the dataset that was actually consumed. Lineage uses this to walk
+    the consumed version rather than the dataset's current state. The existing
+    :func:`list_input_datasets` ``list[Dataset]`` contract is intentionally left
+    unchanged; lineage is the only caller that needs the consumed version.
+
+    Args:
+        ml_instance: The bound :class:`DerivaML` instance.
+        execution_rid: The anchor execution RID.
+
+    Returns:
+        List of ``(Dataset, consumed_version)`` tuples. ``consumed_version`` is
+        the version string from the input edge, or ``None`` when the edge has no
+        version pin. Empty when the execution has no input datasets.
+
+    Example:
+        >>> pairs = list_input_datasets_with_versions(  # doctest: +SKIP
+        ...     ml_instance=ml, execution_rid="2-EXAA"
+        ... )
+        >>> [(ds.dataset_rid, v) for ds, v in pairs]  # doctest: +SKIP
+        [('1-DSAA', '1.0.0')]
+    """
+    pb = ml_instance.pathBuilder()
+    dataset_exec = pb.schemas[ml_instance.ml_schema].Dataset_Execution
+    records = dataset_exec.filter(dataset_exec.Execution == execution_rid).entities().fetch()
+    return [
+        (ml_instance.lookup_dataset(record["Dataset"]), record.get("Dataset_Version"))
+        for record in records
+        if record.get("Dataset")
+    ]
+
+
 def list_assets(
     *,
     ml_instance: Any,
