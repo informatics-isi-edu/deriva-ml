@@ -306,20 +306,17 @@ class TestFile:
 
         pb = ml_instance.pathBuilder()
 
-        # (a) ZERO File_Execution Input rows were written by add_files.
-        # The unknown-provenance sentinel (written by provenance enforcement,
-        # not by add_files) is excluded from this count — its presence means
-        # add_files correctly fired create_dataset without a pre-existing input,
-        # not that add_files wrote per-file Input rows.
-        sentinel_rid = ml_instance.unknown_provenance_file_rid()
+        # (a) ZERO File_Execution Input rows were written by add_files — including
+        # no unknown-provenance sentinel. With _skip_input_check=True, provenance
+        # enforcement is suppressed during create_dataset; add_files declares the
+        # input itself via Dataset_Execution. No per-file edges, no sentinel.
         fe = pb.schemas[ml_instance.ml_schema].File_Execution
         fe_input_rows = [
-            r
-            for r in fe.filter(fe.Execution == exe.execution_rid).entities().fetch()
-            if r.get("Asset_Role") == "Input" and r.get("File") != sentinel_rid
+            r for r in fe.filter(fe.Execution == exe.execution_rid).entities().fetch() if r.get("Asset_Role") == "Input"
         ]
         assert fe_input_rows == [], (
-            f"add_files must NOT write per-file File_Execution Input rows; got {len(fe_input_rows)}"
+            f"add_files must write NO File_Execution Input rows (no per-file edges, "
+            f"no unknown-provenance sentinel); got {len(fe_input_rows)}"
         )
 
         # (b) EXACTLY ONE Dataset_Execution input edge: the root dataset.

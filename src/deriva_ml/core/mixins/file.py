@@ -331,6 +331,7 @@ class FileMixin:
             dataset_types=dataset_types,
             execution_rid=execution_rid,
             description=root_desc,
+            _skip_input_check=True,
         )
         # Record ONE input edge: the root source dataset is this execution's
         # input (consumed by reference). This replaces the per-file
@@ -365,6 +366,7 @@ class FileMixin:
                     dataset_types=dataset_types,
                     execution_rid=execution_rid,
                     description=description,
+                    _skip_input_check=True,
                 )
 
         # Record each directory dataset's source folder as a path relative to the
