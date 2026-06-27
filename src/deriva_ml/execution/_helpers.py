@@ -33,9 +33,8 @@ from deriva_ml.core.exceptions import DerivaMLException
 if TYPE_CHECKING:
     pass
 
-# Max Dataset_Version RIDs per .in_() filter, matching the shared 500 chunk
-# convention (cf. _MEMBER_PRODUCER_CHUNK in core/mixins/execution.py). Defined
-# locally to avoid a _helpers -> execution import cycle.
+# Max Dataset_Version RIDs per .in_() filter. Defined locally to avoid a
+# _helpers -> execution import cycle.
 _VERSION_RID_CHUNK = 500
 
 

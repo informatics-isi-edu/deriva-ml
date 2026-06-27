@@ -255,6 +255,141 @@ def test_lookup_lineage_dataset_with_no_producer(test_ml):
     not os.environ.get("DERIVA_HOST"),
     reason="lookup_lineage live smoke test requires DERIVA_HOST",
 )
+def test_member_producer_query_scales_to_many_members(test_ml, tmp_path):
+    """tk-023: the member-producer query must not 404 on a dataset with hundreds
+    of members. Builds a dataset whose 250 asset members are produced by one
+    upstream execution, then asserts lookup_lineage surfaces that producer.
+
+    The OLD client-side ``.in_()`` over >=200 member RIDs blew the Apache URL
+    limit (~8 KB) and 404'd. The rewritten server-side membership join carries
+    only the dataset RID in the URL, so it is safe at any member count. This
+    test is the live gate that proves the new join works on a real catalog.
+
+    Shape built on the catalog::
+
+        exec_src  → DS_SRC (source dataset)
+        exec_up   consumes DS_SRC; produces N_MEMBERS=250 Image assets
+        DS_BIG    versioned by exec_ds; members = all 250 exec_up Image assets
+
+    Assert: ``lookup_lineage(DS_BIG)`` does NOT raise (no 404) AND surfaces
+    ``exec_up`` as a parent in the lineage tree (reached via the member assets).
+
+    Args:
+        test_ml: Clean DerivaML instance backed by a real catalog, provided by
+            the conftest session fixture.
+        tmp_path: Pytest-provided temporary directory for staging asset files.
+    """
+    N_MEMBERS = 250  # > the ~hundreds threshold where the old URL blew up
+
+    # --- Vocabulary setup ---
+    test_ml.add_term(vc.dataset_type, "TK023Source", description="TK-023 source dataset type")
+    test_ml.add_term(vc.dataset_type, "TK023Big", description="TK-023 large member dataset type")
+    test_ml.add_term(vc.workflow_type, "TK023 Scale Test", description="TK-023 member-producer scale smoke")
+
+    wf = test_ml.create_workflow(
+        name="TK023 member-producer scale workflow",
+        workflow_type="TK023 Scale Test",
+        description="TK-023: member-producer query must not 404 at >=200 members",
+    )
+
+    # --- exec_src: produces DS_SRC (source dataset) ---
+    exec_src = test_ml.create_execution(
+        ExecutionConfiguration(workflow=wf, description="tk023 exec_src"),
+    )
+    with exec_src.execute():
+        ds_src = exec_src.create_dataset(
+            dataset_types="TK023Source",
+            description="tk023 source dataset",
+            version=DatasetVersion(1, 0, 0),
+        )
+    exec_src.commit_output_assets()
+    ds_src_rid = ds_src.dataset_rid
+
+    # --- Create a Subject row so Image assets can satisfy its FK ---
+    domain_path = test_ml._domain_path()
+    subject_rows = list(domain_path.tables["Subject"].insert([{"Name": "tk023-subject"}]))
+    subject_rid = subject_rows[0]["RID"]
+
+    # --- exec_up: consumes DS_SRC; produces N_MEMBERS Image assets ---
+    exec_up = test_ml.create_execution(
+        ExecutionConfiguration(
+            workflow=wf,
+            description=f"tk023 exec_up ({N_MEMBERS}-image asset producer)",
+            datasets=[DatasetSpec(rid=ds_src_rid, version=ds_src.current_version)],
+        ),
+    )
+
+    with exec_up.execute():
+        for i in range(N_MEMBERS):
+            asset_file = tmp_path / f"tk023_image_{i:04d}.txt"
+            asset_file.write_text(f"tk023 image asset {i}")
+            exec_up.asset_file_path(
+                "Image",
+                asset_file,
+                Subject=subject_rid,
+            )
+    exec_up.commit_output_assets()
+    exec_up_rid = exec_up.execution_rid
+
+    # Confirm exec_up produced the expected number of Image assets.
+    uploaded_assets = exec_up.uploaded_assets
+    image_entries = uploaded_assets.get(f"{test_ml.default_schema}/Image", [])
+    assert len(image_entries) == N_MEMBERS, (
+        f"exec_up produced {len(image_entries)} Image assets, expected {N_MEMBERS}; "
+        f"uploaded keys: {list(uploaded_assets.keys())}"
+    )
+    asset_rids = [entry.asset_rid for entry in image_entries]
+
+    # --- Ensure Image is registered as a dataset element type (idempotent) ---
+    test_ml.add_dataset_element_type("Image")
+
+    # --- exec_ds: creates DS_BIG (version-producer) and adds all N_MEMBERS members ---
+    # DS_BIG's Dataset_Version.Execution = exec_ds (version-producer);
+    # the Image assets' Image_Execution Output producer = exec_up (member-producer).
+    exec_ds = test_ml.create_execution(
+        ExecutionConfiguration(workflow=wf, description="tk023 exec_ds (dataset assembler)"),
+    )
+    with exec_ds.execute():
+        ds_big = exec_ds.create_dataset(
+            dataset_types="TK023Big",
+            description=f"tk023 large dataset with {N_MEMBERS} Image members",
+            version=DatasetVersion(1, 0, 0),
+        )
+        ds_big.add_dataset_members(
+            {"Image": asset_rids},
+            description=f"tk023: add all {N_MEMBERS} exec_up Image assets as members",
+        )
+    exec_ds.commit_output_assets()
+    ds_big_rid = ds_big.dataset_rid
+
+    # Sanity: version-producer must be exec_ds, NOT exec_up.
+    assert exec_ds.execution_rid != exec_up_rid, "exec_ds and exec_up must be distinct executions for tk-023 invariant"
+
+    # --- Walk lineage from DS_BIG ---
+    # This must NOT raise (the old .in_() code 404'd at this member count).
+    result = test_ml.lookup_lineage(ds_big_rid)
+
+    seen: set[str] = set()
+
+    def _collect(node):
+        if node is None:
+            return
+        seen.add(node.execution.rid)
+        for p in node.parents:
+            _collect(p)
+
+    _collect(result.lineage)
+
+    assert exec_up_rid in seen, (
+        f"member-producer {exec_up_rid} not surfaced for a {N_MEMBERS}-member dataset; saw {seen}"
+    )
+    assert result.cycle_detected is False
+
+
+@pytest.mark.skipif(
+    not os.environ.get("DERIVA_HOST"),
+    reason="lookup_lineage live smoke test requires DERIVA_HOST",
+)
 def test_lookup_lineage_reflects_consumed_version_not_latest(test_ml):
     """A dataset consumed at v1 must contribute v1's producers to lineage even
     after it is mutated to v2 by a different execution (tk-020 Gap 1).
