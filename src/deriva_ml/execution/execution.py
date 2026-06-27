@@ -1902,10 +1902,15 @@ class Execution:
     def list_input_datasets(self) -> list[Dataset]:
         """List all datasets that were inputs to this execution.
 
-        Excludes any dataset this execution itself *produced* — the
-        ``Dataset_Execution`` association table has no role column to
-        distinguish inputs from outputs, so we infer authorship from
-        each dataset's ``Dataset_Version.Execution`` link.
+        Returns every dataset linked to this execution via a
+        ``Dataset_Execution`` row. Under the authorship-canonical model,
+        ``Dataset_Execution`` is **input-only** — a dataset this execution
+        *produced* is recorded on ``Dataset_Version.Execution``, never here — so
+        every ``Dataset_Execution`` row is an input and no producer subtraction
+        is performed. (A single execution may legitimately be both the producer
+        of a dataset *and* an input-consumer of it: e.g. ``add_files`` records a
+        source dataset as both its output and its declared input. Such a dataset
+        is correctly returned here as an input.)
 
         Returns:
             List of Dataset objects that were used as inputs.

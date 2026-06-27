@@ -85,8 +85,9 @@ def test_E5_localfile_wrapper_is_the_only_path_entry_point():
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# E4 — live: a LocalFile input is registered as a File and linked as Input,
-# and is NOT downloaded (it is a reference, not a Hatrac asset).
+# E4 — live: a LocalFile input is registered as a File and its dataset is
+# recorded as the execution's input (one Dataset_Execution edge, not a per-file
+# File_Execution row), and is NOT downloaded (a reference, not a Hatrac asset).
 # ─────────────────────────────────────────────────────────────────────────
 
 
