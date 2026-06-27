@@ -1322,16 +1322,39 @@ class ExecutionMixin:
             f"Feature-value, or Execution RIDs."
         )
 
-    def _producer_of_dataset(self, dataset_rid: RID) -> RID | None:
-        """Return the Execution RID that produced the current version of ``dataset_rid``.
+    def _producer_of_dataset(self, dataset_rid: RID, version: Any | None = None) -> RID | None:
+        """Return the Execution RID that produced a version of ``dataset_rid``.
 
-        Returns None if the dataset has no Dataset_Version rows yet
-        or no version row carries an Execution link.
+        Args:
+            dataset_rid: Dataset whose producing execution to find.
+            version: When given, return the ``Execution`` recorded on that
+                specific version's ``Dataset_Version`` row (the execution that
+                produced the consumed version). When ``None`` (default), return
+                the producer of the **latest** version — the historical
+                behavior, unchanged for existing callers and the root path.
+
+        Returns:
+            The producing-execution RID, or ``None`` if the dataset has no
+            ``Dataset_Version`` rows, the requested ``version`` has no row, or
+            the matched row carries no ``Execution`` link.
+
+        Example:
+            >>> ml._producer_of_dataset("1-DSAA")  # doctest: +SKIP
+            '2-EXV2'
+            >>> ml._producer_of_dataset("1-DSAA", version="1.0.0")  # doctest: +SKIP
+            '2-EXV1'
         """
         pb = self.pathBuilder()
         version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
         rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
         if not rows:
+            return None
+
+        if version is not None:
+            want = str(version)
+            for row in rows:
+                if (row.get("Version") or "") == want:
+                    return row.get("Execution")
             return None
 
         # Pick the row with the highest semver-style Version. The catalog

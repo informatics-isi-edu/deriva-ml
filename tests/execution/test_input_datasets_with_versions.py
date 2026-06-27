@@ -55,3 +55,52 @@ def test_skips_rows_without_dataset():
     ml = _make_ml([{"Dataset": None, "Dataset_Version": "1.0.0", "Execution": "2-EXAA"}])
     result = list_input_datasets_with_versions(ml_instance=ml, execution_rid="2-EXAA")
     assert result == []
+
+
+from deriva_ml.core.mixins.execution import ExecutionMixin
+
+
+def _ml_with_versions(version_rows):
+    """Fake ExecutionMixin host whose Dataset_Version fetch returns version_rows."""
+    entities = MagicMock()
+    entities.fetch = lambda: version_rows
+    vp = MagicMock()
+    vp.filter.return_value = MagicMock(entities=lambda: entities)
+    tables = {"Dataset_Version": vp}
+    schema = MagicMock()
+    schema.tables = tables
+    pb = MagicMock()
+    pb.schemas = {"deriva-ml": schema}
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.pathBuilder = lambda: pb
+    ml.ml_schema = "deriva-ml"
+    return ml
+
+
+def test_producer_of_dataset_latest_when_version_none():
+    ml = _ml_with_versions(
+        [
+            {"Version": "1.0.0", "Execution": "2-EXV1", "Dataset": "1-DSAA"},
+            {"Version": "1.2.0", "Execution": "2-EXV2", "Dataset": "1-DSAA"},
+        ]
+    )
+    assert ml._producer_of_dataset("1-DSAA") == "2-EXV2"  # latest
+
+
+def test_producer_of_dataset_specific_version():
+    ml = _ml_with_versions(
+        [
+            {"Version": "1.0.0", "Execution": "2-EXV1", "Dataset": "1-DSAA"},
+            {"Version": "1.2.0", "Execution": "2-EXV2", "Dataset": "1-DSAA"},
+        ]
+    )
+    assert ml._producer_of_dataset("1-DSAA", version="1.0.0") == "2-EXV1"  # consumed
+
+
+def test_producer_of_dataset_missing_version_returns_none():
+    ml = _ml_with_versions(
+        [
+            {"Version": "1.0.0", "Execution": "2-EXV1", "Dataset": "1-DSAA"},
+        ]
+    )
+    assert ml._producer_of_dataset("1-DSAA", version="9.9.9") is None
