@@ -783,3 +783,15 @@ Append a dated entry to `/Users/carl/GitHub/DerivaML/tacit-knowledge.md` marking
 **Placeholder scan:** Task 3 Step 5/7 and Task 4/5 reference "the bag test file" / "the Dataset annotation builder" by discovery (grep/ls) rather than a hard-coded path, because those module names must be confirmed against the tree at execution time; each step gives the exact discovery command and the adaptation rule. Acceptable — these are discovery steps, not vague TODOs. Task 6 Step 3 has a deliberate refactor instruction (extract a shared `_directory_dataset_table_def` factory so Task 1's create-path and the migration cannot drift) rather than duplicated DDL — DRY.
 
 **Type consistency:** `path -> str | None` and `is_directory -> bool` consistent across Task 3 (live) and Task 3 (bag). `Directory_Dataset` columns `{Dataset, Path}` and FK `Directory_Dataset_Dataset_fkey` consistent across Tasks 1, 3, 4, 5, 6. `Path` value semantics (`"."` for root, `relative_to(ingest_root).as_posix()` otherwise) consistent across Task 2 (write) and Tasks 3/5 (read/display). The shared `_directory_dataset_table_def` factory (Task 6 Step 3) guarantees the create-path (Task 1) and migration-path (Task 6) produce identical tables.
+
+---
+
+## Amendment (2026-06-27): root Path stores its basename, not "."
+
+The original design stored the ingest root's `Directory_Dataset.Path` as `"."`.
+As of the 2026-06-27 root-path-name change, the root stores its directory
+basename (e.g. `cifar10_source`) so the catalog "Folder" column is
+self-describing. Root identification moved from `source_directory == "."` to the
+structural `Dataset.is_source_root` / `DatasetBag.is_source_root` accessor, which
+works on both old (`"."`) and new catalogs — no backfill required. See
+`docs/superpowers/specs/2026-06-27-directory-dataset-root-path-name-design.md`.

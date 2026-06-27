@@ -482,9 +482,7 @@ class TestDirectoryDatasetSourceDirectory:
             (d / f"{rand_str()}.txt").write_text(rand_str(20))
         return test_dir
 
-    def test_dataset_bag_source_directory_and_is_directory(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_dataset_bag_source_directory_and_is_directory(self, catalog_manager: CatalogManager, tmp_path: Path):
         """DatasetBag.source_directory / .is_directory work offline from the materialized bag.
 
         Builds a directory dataset via add_files, downloads and materializes it
@@ -507,16 +505,14 @@ class TestDirectoryDatasetSourceDirectory:
         test_dir = self._make_test_tree(tmp_path)
 
         workflow = ml.create_workflow(name="Dir Bag Test", workflow_type="Dir Bag Test Workflow")
-        execution = ml.create_execution(
-            ExecutionConfiguration(workflow=workflow, description="Dir bag test run")
-        )
+        execution = ml.create_execution(ExecutionConfiguration(workflow=workflow, description="Dir bag test run"))
 
         with execution.execute() as exe:
             filespecs = FileSpec.create_filespecs(test_dir, "Dir Bag Ingest")
             root_dataset = exe.add_files(filespecs, description="Dir Bag Ingest")
 
         # Live assertions — sanity-check before downloading the bag.
-        assert root_dataset.source_directory == ".", "live: root Dataset.source_directory must be '.'"
+        assert root_dataset.source_directory == "test_dir", "live: root Dataset.source_directory must be the basename"
         assert root_dataset.is_directory is True, "live: root Dataset.is_directory must be True"
 
         # Download the root directory dataset as a bag (metadata only; the File
@@ -527,10 +523,16 @@ class TestDirectoryDatasetSourceDirectory:
         )
 
         # Offline assertions on the root bag.
-        assert bag.source_directory == ".", (
-            f"bag root .source_directory should be '.', got {bag.source_directory!r}"
+        assert bag.source_directory == "test_dir", (
+            f"bag root .source_directory should be 'test_dir', got {bag.source_directory!r}"
         )
         assert bag.is_directory is True, "bag root .is_directory should be True"
+        # Structural root identification works offline on the bag.
+        assert root_dataset.is_source_root is True, "live root must be is_source_root"
+        assert bag.is_source_root is True, "bag root must be is_source_root"
+        assert not any(c.is_source_root for c in bag.list_dataset_children()), (
+            "bag directory children must not be source roots"
+        )
 
         # Child bags must report the relative subfolder names.
         child_dirs = {child.source_directory for child in bag.list_dataset_children()}

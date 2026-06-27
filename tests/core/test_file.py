@@ -144,7 +144,7 @@ class TestFile:
 
     def test_add_files_directory_datasets_record_path(self, file_table_setup):
         """Each directory dataset gets a Directory_Dataset row with its path
-        relative to the ingest root; the ingest root stores '.'.
+        relative to the ingest root; the ingest root stores its directory basename.
 
         New contract (approved design decision, backward-compat waived):
         - The ROOT dataset description defaults to the ingest-root directory's
@@ -170,7 +170,8 @@ class TestFile:
         rows = list(pb.schemas[ml_instance.ml_schema].tables["Directory_Dataset"].entities().fetch())
         path_by_dataset = {r["Dataset"]: r["Path"] for r in rows}
 
-        assert path_by_dataset[file_dataset.dataset_rid] == "."
+        # Root Directory_Dataset.Path is now the ingest-root basename, not ".".
+        assert path_by_dataset[file_dataset.dataset_rid] == "test_dir"
         child_paths = {path_by_dataset[c.dataset_rid] for c in file_dataset.list_dataset_children()}
         assert child_paths == {"d1", "d2"}
 
@@ -275,7 +276,7 @@ class TestFile:
             # Directory_Dataset row: source_directory is None and is_directory is False.
             plain = exe.create_dataset(dataset_types="Complete", description="not a dir")
 
-        assert root.source_directory == "."
+        assert root.source_directory == "test_dir"
         assert root.is_directory is True
         child_paths = {child.source_directory for child in root.list_dataset_children()}
         assert child_paths == {"d1", "d2"}
@@ -283,6 +284,53 @@ class TestFile:
 
         assert plain.source_directory is None
         assert plain.is_directory is False
+
+    def test_dataset_is_source_root_accessor(self, file_table_setup):
+        """is_source_root is True for the add_files tree root, False for its
+        directory children and for non-directory datasets. Identification is
+        structural (parent graph), not based on the Path string."""
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            root = exe.add_files(filespecs, description="Ingest run")
+            plain = exe.create_dataset(dataset_types="Complete", description="not a dir")
+
+        # The root is the source root.
+        assert root.is_source_root is True
+        # Directory children are NOT source roots (they have a directory parent).
+        assert all(not child.is_source_root for child in root.list_dataset_children())
+        # A non-directory dataset is never a source root.
+        assert plain.is_source_root is False
+
+        # Identity is structural, independent of the Path value: locate the root
+        # among all CIFAR-tree datasets via is_source_root and confirm it's `root`.
+        tree = [root] + list(root.list_dataset_children())
+        roots = [d for d in tree if d.is_source_root]
+        assert [d.dataset_rid for d in roots] == [root.dataset_rid]
+
+    def test_is_source_root_resolves_legacy_dot_path(self, file_table_setup):
+        """A pre-change catalog stores the root Path as '.'; is_source_root must
+        still identify it (identity is structural, not string-based)."""
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            root = exe.add_files(filespecs, description="Ingest run")
+
+        # Simulate a legacy catalog: rewrite the root's Path back to ".".
+        pb = ml_instance.pathBuilder()
+        dd = pb.schemas[ml_instance.ml_schema].tables["Directory_Dataset"]
+        rows = list(dd.entities().fetch())
+        root_row = next(r for r in rows if r["Dataset"] == root.dataset_rid)
+        dd.update([{"RID": root_row["RID"], "Path": "."}])
+
+        legacy_root = ml_instance.lookup_dataset(root.dataset_rid)
+        assert legacy_root.source_directory == "."  # legacy shape restored
+        assert legacy_root.is_source_root is True  # still found structurally
 
     def test_add_files_links_dataset_as_input(self, file_table_setup):
         """add_files records ONE Dataset_Execution input edge (the root source

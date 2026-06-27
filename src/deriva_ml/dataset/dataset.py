@@ -174,9 +174,12 @@ class Dataset:
         ingest root.
 
         Returns the path stored in ``Directory_Dataset`` for this dataset (the
-        ingest root stores ``"."``), or ``None`` if the dataset has no
-        ``Directory_Dataset`` row — i.e. it was not created from a directory
-        tree by :meth:`add_files`.
+        ingest root stores its directory basename), or ``None`` if the dataset
+        has no ``Directory_Dataset`` row — i.e. it was not created from a
+        directory tree by :meth:`add_files`.
+
+        See :attr:`is_source_root` to identify the tree root structurally
+        (independent of this string).
 
         Returns:
             str | None: The relative source folder this directory dataset
@@ -185,7 +188,7 @@ class Dataset:
         Example:
             >>> root = exe.add_files(specs, description="ingest")  # doctest: +SKIP
             >>> root.source_directory  # doctest: +SKIP
-            '.'
+            'cifar10_source'
             >>> [c.source_directory for c in root.list_dataset_children()]  # doctest: +SKIP
             ['d1', 'd2']
         """
@@ -214,6 +217,35 @@ class Dataset:
             True
         """
         return self.source_directory is not None
+
+    @property
+    def is_source_root(self) -> bool:
+        """Whether this dataset is the ROOT of an ``add_files`` directory tree.
+
+        ``True`` iff this dataset is a directory dataset (:attr:`is_directory`)
+        and none of its parent datasets is itself a directory dataset. This is
+        the structural, name-independent way to identify the tree root: it does
+        NOT depend on :attr:`source_directory` holding any particular string, so
+        it works on catalogs built before the root began recording its basename
+        (where the root's path is the legacy ``"."``) as well as new ones.
+
+        Datasets with no ``Directory_Dataset`` row (plain datasets, split-dataset
+        outputs) return ``False`` even when they are the parent of other
+        datasets — only directory datasets can be source roots.
+
+        Returns:
+            bool: True if this dataset is the root of an add_files tree.
+
+        Example:
+            >>> root = exe.add_files(specs, description="ingest")  # doctest: +SKIP
+            >>> root.is_source_root  # doctest: +SKIP
+            True
+            >>> any(c.is_source_root for c in root.list_dataset_children())  # doctest: +SKIP
+            False
+        """
+        if not self.is_directory:
+            return False
+        return not any(parent.is_directory for parent in self.list_dataset_parents())
 
     @description.setter
     def description(self, value: str) -> None:

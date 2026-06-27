@@ -66,7 +66,10 @@ def directory_dataset_table_def(schema_name: str) -> TableDef:
                 BuiltinType.text,
                 comment=(
                     "Source directory this dataset represents, relative to "
-                    "the ingest root. The ingest root stores '.'."
+                    "the ingest root. The ingest root stores its own directory "
+                    "basename (the same name as its Description); children store "
+                    "paths relative to it. Identify the tree root structurally "
+                    "via Dataset.is_source_root, not by matching this string."
                 ),
             ),
         ],
@@ -1062,9 +1065,7 @@ def _ensure_sentinels(pb) -> None:
     # --- Execution sentinel (located by reserved Description; needs the
     #     Workflow FK above). Status=Aborted — it is not a real run. ---
     exe_table = pb.tables["Execution"]
-    exe_existing = [
-        r for r in exe_table.filter(exe_table.Description == SENTINEL_EXECUTION_DESCRIPTION).entities()
-    ]
+    exe_existing = [r for r in exe_table.filter(exe_table.Description == SENTINEL_EXECUTION_DESCRIPTION).entities()]
     if not exe_existing:
         exe_table.insert(
             [

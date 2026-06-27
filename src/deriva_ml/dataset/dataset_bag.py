@@ -229,13 +229,16 @@ class DatasetBag:
         """Source folder this directory dataset represents, relative to the
         ingest root.
 
-        Returns the path stored in ``Directory_Dataset`` for this dataset (the
-        ingest root stores ``"."``), or ``None`` if the dataset has no
-        ``Directory_Dataset`` row — i.e. it was not created from a directory
-        tree by :meth:`~deriva_ml.execution.execution.Execution.add_files`.
+        Returns the path stored in ``Directory_Dataset`` for this dataset, or
+        ``None`` if the dataset has no ``Directory_Dataset`` row — i.e. it was
+        not created from a directory tree by
+        :meth:`~deriva_ml.execution.execution.Execution.add_files`.
 
         The bag is offline — this reads the bag's local SQLite mirror of the
         ``Directory_Dataset`` table; no catalog connection is used.
+
+        To determine whether this dataset is the root of an ``add_files`` tree
+        (regardless of the Path string), use :attr:`is_source_root`.
 
         Returns:
             str | None: The relative source folder this directory dataset
@@ -244,15 +247,12 @@ class DatasetBag:
         Example:
             >>> root_bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
             >>> root_bag.source_directory  # doctest: +SKIP
-            '.'
+            'cifar10_source'
             >>> [c.source_directory for c in root_bag.list_dataset_children()]  # doctest: +SKIP
             ['d1', 'd2']
         """
         try:
-            rows = [
-                r for r in self.model.get_table_contents("Directory_Dataset")
-                if r["Dataset"] == self.dataset_rid
-            ]
+            rows = [r for r in self.model.get_table_contents("Directory_Dataset") if r["Dataset"] == self.dataset_rid]
         except KeyError:
             # Directory_Dataset table absent from this bag (e.g. a pre-feature bag)
             return None
@@ -281,6 +281,31 @@ class DatasetBag:
             True
         """
         return self.source_directory is not None
+
+    @property
+    def is_source_root(self) -> bool:
+        """Whether this bag is the ROOT of an ``add_files`` directory tree.
+
+        ``True`` iff this dataset is a directory dataset (:attr:`is_directory`)
+        and none of its parent datasets is itself a directory dataset. Structural
+        and name-independent — it does NOT depend on :attr:`source_directory`
+        holding any particular string, so it resolves the root on both legacy
+        catalogs (root path ``"."``) and new ones (root path = basename).
+
+        The bag is offline — this reads the bag's local SQLite mirror; no catalog
+        connection is used.
+
+        Returns:
+            bool: True if this bag is the root of an add_files tree.
+
+        Example:
+            >>> root_bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
+            >>> root_bag.is_source_root  # doctest: +SKIP
+            True
+        """
+        if not self.is_directory:
+            return False
+        return not any(parent.is_directory for parent in self.list_dataset_parents())
 
     def materialize(self, *, fetch_concurrency: int = 8) -> Self:
         """Fetch any not-yet-downloaded files for this bag, in place.
