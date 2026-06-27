@@ -1194,6 +1194,13 @@ class ExecutionMixin:
         in_progress: set[RID] = set()
         flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
 
+        # For Dataset roots, member-assets may have been produced by an
+        # execution other than the one that assembled the dataset version.
+        # Seed those member-producers as extra parents of the root walk node.
+        root_member_producers: set[RID] | None = None
+        if root_descriptor.type == "Dataset":
+            root_member_producers = self._producers_of_dataset_members(rid) or None
+
         lineage_root_node = self._walk_node(
             execution_rid=producer_rid,
             depth_remaining=depth,
@@ -1201,6 +1208,7 @@ class ExecutionMixin:
             visited_global=visited_global,
             in_progress=in_progress,
             flags=flags,
+            extra_parent_rids=root_member_producers,
         )
 
         # The producing-execution summary on the root descriptor matches
@@ -1466,6 +1474,7 @@ class ExecutionMixin:
         visited_global: set[RID],
         in_progress: set[RID],
         flags: dict[str, bool],
+        extra_parent_rids: set[RID] | None = None,
     ) -> "LineageNode | None":
         """Expand one execution node and recurse on its data-flow parents.
 
@@ -1558,6 +1567,10 @@ class ExecutionMixin:
                 producer = self._producer_of_dataset(ds.dataset_rid)
                 if producer:
                     parent_rids.add(producer)
+                # Members of this consumed dataset may have been produced by a
+                # different execution than the one that assembled the dataset;
+                # those member-producers are data-flow parents too.
+                parent_rids |= self._producers_of_dataset_members(ds.dataset_rid)
 
             consumed_assets: list[AssetSummary] = []
             for asset in record.list_assets(asset_role="Input"):
@@ -1577,6 +1590,12 @@ class ExecutionMixin:
                     # If we can't resolve the producer of one asset,
                     # keep walking the rest of the inputs.
                     pass
+
+            # Root-seeded member-producers (and any other externally supplied
+            # parents) are merged in before recursion so they get full
+            # visited/cycle/depth handling.
+            if extra_parent_rids:
+                parent_rids |= extra_parent_rids
 
             # Recurse on parents.
             parents: list[LineageNode] = []
