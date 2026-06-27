@@ -405,5 +405,6 @@ __all__ = [
     "insert_nested_execution_link",
     "list_assets",
     "list_input_datasets",
+    "list_input_datasets_with_versions",
     "update_field_in_catalog",
 ]
