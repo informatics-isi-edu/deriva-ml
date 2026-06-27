@@ -144,6 +144,37 @@ def _root_description(ingest_root: Path, root_name: str | None, description: str
     return root_name or ingest_root.name or description or "root"
 
 
+def _root_path_name(ingest_root: Path, root_name: str | None) -> str:
+    """Folder name to store in ``Directory_Dataset.Path`` for the ingest root.
+
+    Shares precedence with :func:`_root_description` so the root dataset's
+    ``Path`` and ``Description`` name it identically. Unlike the description,
+    there is no caller-``description`` fallback — the root's *folder* is its
+    basename, not a prose blurb — but the empty-basename guard is the same.
+
+    Precedence (first truthy value wins):
+    1. ``root_name`` (explicit caller override)
+    2. ``ingest_root.name`` (basename, if non-empty)
+    3. ``"root"`` (sentinel — never returns an empty string)
+
+    Args:
+        ingest_root: The common-ancestor directory of all ingested files.
+        root_name: Caller-supplied name for the root dataset, or ``None``.
+
+    Returns:
+        str: A non-empty folder name for the root's ``Directory_Dataset.Path``.
+
+    Example:
+        >>> _root_path_name(Path("/tmp/abc/cifar10_source"), None)
+        'cifar10_source'
+        >>> _root_path_name(Path("/tmp/abc/cifar10_source"), "CIFAR-10 source")
+        'CIFAR-10 source'
+        >>> _root_path_name(Path("/"), None)
+        'root'
+    """
+    return root_name or ingest_root.name or "root"
+
+
 class FileMixin:
     """Mixin providing file management operations.
 
@@ -373,13 +404,15 @@ class FileMixin:
                 )
 
         # Record each directory dataset's source folder as a path relative to the
-        # ingest root (the root stores "."). Structured + queryable; consumers
+        # ingest root (the root stores its basename). Structured + queryable; consumers
         # never parse the Description.
         pb.schemas[self.ml_schema].tables["Directory_Dataset"].insert(
             [
                 {
                     "Dataset": ds.dataset_rid,
-                    "Path": "." if directory == ingest_root else directory.relative_to(ingest_root).as_posix(),
+                    "Path": _root_path_name(ingest_root, root_name)
+                    if directory == ingest_root
+                    else directory.relative_to(ingest_root).as_posix(),
                 }
                 for directory, ds in node_dataset.items()
             ]

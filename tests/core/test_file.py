@@ -144,7 +144,7 @@ class TestFile:
 
     def test_add_files_directory_datasets_record_path(self, file_table_setup):
         """Each directory dataset gets a Directory_Dataset row with its path
-        relative to the ingest root; the ingest root stores '.'.
+        relative to the ingest root; the ingest root stores its directory basename.
 
         New contract (approved design decision, backward-compat waived):
         - The ROOT dataset description defaults to the ingest-root directory's
@@ -170,7 +170,8 @@ class TestFile:
         rows = list(pb.schemas[ml_instance.ml_schema].tables["Directory_Dataset"].entities().fetch())
         path_by_dataset = {r["Dataset"]: r["Path"] for r in rows}
 
-        assert path_by_dataset[file_dataset.dataset_rid] == "."
+        # Root Directory_Dataset.Path is now the ingest-root basename, not ".".
+        assert path_by_dataset[file_dataset.dataset_rid] == "test_dir"
         child_paths = {path_by_dataset[c.dataset_rid] for c in file_dataset.list_dataset_children()}
         assert child_paths == {"d1", "d2"}
 
@@ -275,7 +276,7 @@ class TestFile:
             # Directory_Dataset row: source_directory is None and is_directory is False.
             plain = exe.create_dataset(dataset_types="Complete", description="not a dir")
 
-        assert root.source_directory == "."
+        assert root.source_directory == "test_dir"
         assert root.is_directory is True
         child_paths = {child.source_directory for child in root.list_dataset_children()}
         assert child_paths == {"d1", "d2"}
