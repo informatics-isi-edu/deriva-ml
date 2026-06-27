@@ -1902,10 +1902,15 @@ class Execution:
     def list_input_datasets(self) -> list[Dataset]:
         """List all datasets that were inputs to this execution.
 
-        Excludes any dataset this execution itself *produced* — the
-        ``Dataset_Execution`` association table has no role column to
-        distinguish inputs from outputs, so we infer authorship from
-        each dataset's ``Dataset_Version.Execution`` link.
+        Returns every dataset linked to this execution via a
+        ``Dataset_Execution`` row. Under the authorship-canonical model,
+        ``Dataset_Execution`` is **input-only** — a dataset this execution
+        *produced* is recorded on ``Dataset_Version.Execution``, never here — so
+        every ``Dataset_Execution`` row is an input and no producer subtraction
+        is performed. (A single execution may legitimately be both the producer
+        of a dataset *and* an input-consumer of it: e.g. ``add_files`` records a
+        source dataset as both its output and its declared input. Such a dataset
+        is correctly returned here as an input.)
 
         Returns:
             List of Dataset objects that were used as inputs.
@@ -2073,13 +2078,17 @@ class Execution:
         *,
         root_name: str | None = None,
     ) -> "Dataset":
-        """Register external file *references* and link them as execution inputs.
+        """Register external file *references* and record the source dataset as this execution's input.
 
         Inserts a ``File``-table row per file (a reference to externally-hosted
-        bytes — URL + MD5, not uploaded to Hatrac) and links each as an
-        **input** of this execution. Role is intrinsic, not a parameter: a
-        ``File`` reference names a file the run consumed, so it is always an
-        Input. Files the run *produced* are Hatrac-backed execution assets —
+        bytes — URL + MD5, not uploaded to Hatrac) and builds a nested
+        directory-structure dataset tree. The root source dataset is recorded
+        as this execution's input via a single ``Dataset_Execution`` row —
+        O(1) regardless of file count. Per-file ``File_Execution`` Input rows
+        are intentionally **not** written; find consumed files by traversing
+        the dataset.
+
+        Files the run *produced* are Hatrac-backed execution assets —
         use ``asset_file_path`` + ``commit_output_assets`` for those.
 
         ``files`` is consumed lazily in batches of ``chunk_size`` — a generator

@@ -340,6 +340,7 @@ class Dataset:
         dataset_types: str | list[str] | None = None,
         description: str = "",
         version: DatasetVersion | None = None,
+        _skip_input_check: bool = False,
     ) -> Self:
         """Creates a new dataset in the catalog.
 
@@ -352,6 +353,11 @@ class Dataset:
             dataset_types: One or more dataset type terms from Dataset_Type vocabulary.
             description: Description of the dataset's purpose and contents.
             version: Optional initial version number. Defaults to 0.1.0.
+            _skip_input_check: Internal — when True, skip the no-input enforcement
+                check inside ``_insert_dataset_versions``. The caller declares the
+                input edge itself immediately after creation (e.g. ``add_files``
+                writes a ``Dataset_Execution`` row). Defaults to False; existing
+                callers are unaffected.
 
         Returns:
             Dataset: The newly created dataset.
@@ -412,6 +418,7 @@ class Dataset:
             dataset_list=[DatasetSpec(rid=dataset_rid, version=version)],
             execution_rid=execution_rid,
             description="Initial dataset creation.",
+            _skip_input_check=_skip_input_check,
         )
         return dataset
 
@@ -2539,6 +2546,7 @@ class Dataset:
         dataset_list: list[DatasetSpec],
         description: str | None = "",
         execution_rid: RID | None = None,
+        _skip_input_check: bool = False,
     ) -> None:
         """Insert new version records for a list of datasets.
 
@@ -2557,6 +2565,11 @@ class Dataset:
             dataset_list: List of DatasetSpec objects containing RID and version info.
             description: Optional description of the version change.
             execution_rid: Optional execution RID to associate with the version.
+            _skip_input_check: Internal — when True, skip the no-input enforcement
+                check (``ensure_artifact_producer_has_input``). The caller declares
+                the input edge itself immediately after this call (e.g. ``add_files``
+                writes a ``Dataset_Execution`` row). Defaults to False; existing
+                callers are unaffected.
         """
         schema_path = ml_instance.pathBuilder().schemas[ml_instance.ml_schema]
 
@@ -2604,8 +2617,11 @@ class Dataset:
         # File sentinel as an explicit Input edge. Skipped for the sentinel
         # execution itself (exempt bootstrap substrate) and for producerless
         # authorship (execution_rid is None — handled by producerless attribution,
-        # not the no-input check).
-        if execution_rid is not None:
+        # not the no-input check). Also skipped when the caller has set
+        # ``_skip_input_check=True`` because it will declare the input edge itself
+        # immediately after this call (e.g. ``add_files`` writes a
+        # ``Dataset_Execution`` row — the source dataset IS the input).
+        if execution_rid is not None and not _skip_input_check:
             from deriva_ml.execution.provenance_enforcement import (
                 ensure_artifact_producer_has_input,
             )

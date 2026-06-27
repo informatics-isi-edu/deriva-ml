@@ -558,11 +558,15 @@ class ExecutionRecord(BaseModel):
     def list_input_datasets(self) -> list["Dataset"]:
         """List datasets that were input to this execution.
 
-        Filters out datasets that this execution *produced* (their
-        ``Dataset_Version.Execution`` row points back at this execution).
-        The catalog's ``Dataset_Execution`` table carries no role
-        column, so it can't natively distinguish inputs from outputs;
-        we use the version row's authorship as the source of truth.
+        Returns every dataset linked to this execution via a
+        ``Dataset_Execution`` row. Under the authorship-canonical model,
+        ``Dataset_Execution`` is **input-only** — a dataset this execution
+        *produced* lives on ``Dataset_Version.Execution``, never here — so every
+        ``Dataset_Execution`` row is an input and no producer subtraction is
+        performed. (One execution may be both producer and input-consumer of the
+        same dataset — e.g. ``add_files`` records a source dataset as both its
+        output and its declared input — and that dataset is correctly returned
+        here as an input.)
 
         Returns:
             List of Dataset objects that were used as inputs to this execution.

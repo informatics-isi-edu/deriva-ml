@@ -12,6 +12,7 @@ import os
 
 import pytest
 
+from deriva_ml import FileSpec
 from deriva_ml import MLVocab as vc
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
@@ -487,3 +488,79 @@ def test_lookup_lineage_reflects_consumed_version_not_latest(test_ml):
     assert exec_v1_rid in seen, f"consumed-version producer {exec_v1_rid} missing; saw {seen}"
     assert exec_v2_rid not in seen, f"latest-version producer {exec_v2_rid} leaked into lineage; saw {seen}"
     assert result.cycle_detected is False
+
+
+@pytest.mark.skipif(
+    not os.environ.get("DERIVA_HOST"),
+    reason="lookup_lineage live smoke test requires DERIVA_HOST",
+)
+def test_add_files_lineage_has_no_per_file_asset_bloat(test_ml, tmp_path):
+    """tk-024: lookup_lineage of an add_files-registered dataset shows the
+    registration execution with ZERO consumed_assets (no per-file File Inputs)
+    and the source dataset as its single consumed dataset; the self-loop
+    (dataset is both produced and consumed) does not flag a cycle.
+
+    Shape built on the catalog::
+
+        exe_reg  add_files(60 local files) → DS_SRC (root source dataset)
+        Dataset_Execution: DS_SRC is BOTH the output (Dataset_Version.Execution)
+            AND the input (Dataset_Execution row) of exe_reg.
+
+    Assert:
+        - ``lookup_lineage(DS_SRC).cycle_detected`` is ``False`` — the tk-022
+          self-parent guard handles the producer == expander case.
+        - The registration execution node has ``consumed_assets == []`` — no
+          per-file ``File_Execution`` Input rows were written.
+        - ``DS_SRC`` appears in the registration node's ``consumed_datasets`` —
+          the single ``Dataset_Execution`` input edge is present.
+
+    Args:
+        test_ml: Clean DerivaML instance backed by a real catalog, provided by
+            the conftest session fixture.
+        tmp_path: Pytest-provided temporary directory for staging local files.
+    """
+    N_FILES = 60  # enough that the OLD code would attach >=60 consumed_assets
+
+    # --- Vocabulary + workflow setup ---
+    test_ml.add_term(vc.dataset_type, "TK024Source", description="TK-024 source dataset type")
+    test_ml.add_term(vc.workflow_type, "TK024 AddFiles Test", description="TK-024 add_files lineage smoke")
+
+    wf = test_ml.create_workflow(
+        name="TK024 add_files lineage workflow",
+        workflow_type="TK024 AddFiles Test",
+        description="TK-024: add_files dataset has no per-file consumed_assets in lineage",
+    )
+
+    # --- Create N_FILES local files in tmp_path ---
+    files_dir = tmp_path / "tk024_source"
+    files_dir.mkdir()
+    for i in range(N_FILES):
+        (files_dir / f"tk024_file_{i:04d}.txt").write_text(f"tk024 source file {i}\n")
+
+    # --- exe_reg: run add_files over all N_FILES local files ---
+    exe_reg = test_ml.create_execution(
+        ExecutionConfiguration(workflow=wf, description="tk024 exe_reg (add_files registration)"),
+    )
+    specs = list(FileSpec.create_filespecs(files_dir, description="tk024 source file"))
+    assert len(specs) == N_FILES, f"Expected {N_FILES} FileSpecs, got {len(specs)}"
+
+    root_dataset = exe_reg.add_files(specs, dataset_types="TK024Source")
+
+    src_dataset_rid = root_dataset.dataset_rid
+    reg_exec_rid = exe_reg.execution_rid
+
+    # --- Walk lineage from DS_SRC ---
+    result = test_ml.lookup_lineage(src_dataset_rid)
+
+    assert result.cycle_detected is False
+    assert result.lineage is not None
+    # The registration execution is the producer of the source dataset.
+    assert result.root.producing_execution is not None
+    reg_node = result.lineage
+    assert reg_node.execution.rid == reg_exec_rid
+
+    # No per-file File Inputs on the registration execution.
+    assert reg_node.consumed_assets == [], f"expected zero consumed_assets, got {len(reg_node.consumed_assets)}"
+    # The source dataset is recorded as the one consumed dataset (the input edge).
+    consumed = {d.rid for d in reg_node.consumed_datasets}
+    assert src_dataset_rid in consumed, f"source dataset {src_dataset_rid} not in consumed_datasets {consumed}"
