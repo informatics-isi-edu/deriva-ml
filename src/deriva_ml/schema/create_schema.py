@@ -66,7 +66,10 @@ def directory_dataset_table_def(schema_name: str) -> TableDef:
                 BuiltinType.text,
                 comment=(
                     "Source directory this dataset represents, relative to "
-                    "the ingest root. The ingest root stores '.'."
+                    "the ingest root. The ingest root stores its own directory "
+                    "basename (the same name as its Description); children store "
+                    "paths relative to it. Identify the tree root structurally "
+                    "via Dataset.is_source_root, not by matching this string."
                 ),
             ),
         ],
