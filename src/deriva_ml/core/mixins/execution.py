@@ -1627,7 +1627,11 @@ class ExecutionMixin:
                     )
                 )
                 producer = self._producer_of_dataset(ds.dataset_rid, version=consumed_version)
-                if producer:
+                # Never the execution we are currently expanding: if it produced
+                # the consumed version of a dataset it also consumed, listing it
+                # as its own parent re-enters `in_progress` and flags a false
+                # cycle (same reason the member-producers below subtract it).
+                if producer and producer != execution_rid:
                     parent_rids.add(producer)
                 # Member-producers of the CONSUMED version. Never the execution
                 # we are currently expanding: an execution that both consumed

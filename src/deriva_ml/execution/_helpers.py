@@ -33,6 +33,11 @@ from deriva_ml.core.exceptions import DerivaMLException
 if TYPE_CHECKING:
     pass
 
+# Max Dataset_Version RIDs per .in_() filter, matching the shared 500 chunk
+# convention (cf. _MEMBER_PRODUCER_CHUNK in core/mixins/execution.py). Defined
+# locally to avoid a _helpers -> execution import cycle.
+_VERSION_RID_CHUNK = 500
+
 
 def check_writable_catalog(
     *,
@@ -243,8 +248,8 @@ def list_input_datasets_with_versions(
     ``Dataset_Execution.Dataset_Version`` is a **foreign key** to the
     ``Dataset_Version`` table — ERMrest returns the Dataset_Version row's RID
     (e.g. ``"4FP"``), not the version string (e.g. ``"1.0.0"``). This helper
-    resolves that RID to the version string by fetching the ``Dataset_Version``
-    table once and building a ``{RID: Version}`` map.
+    resolves that RID to the version string by fetching only the consumed-version
+    RIDs from ``Dataset_Version`` in chunks (bounded fetch).
 
     Args:
         ml_instance: The bound :class:`DerivaML` instance.
@@ -273,9 +278,19 @@ def list_input_datasets_with_versions(
         return []
 
     # Dataset_Execution.Dataset_Version is an FK — the value is the
-    # Dataset_Version row RID, not the version string. Resolve RID -> Version.
-    version_path = pb.schemas[ml_instance.ml_schema].tables["Dataset_Version"]
-    rid_to_version: dict[str, str | None] = {row["RID"]: row.get("Version") for row in version_path.entities().fetch()}
+    # Dataset_Version row RID, not the version string. Resolve only the RIDs
+    # actually referenced by these input edges (NOT the whole table — this
+    # helper runs once per walked execution, so a full-table scan would be
+    # O(walked-executions x total-versions)).
+    wanted_rids = {r["Dataset_Version"] for r in records if r.get("Dataset_Version")}
+    rid_to_version: dict[str, str | None] = {}
+    if wanted_rids:
+        version_path = pb.schemas[ml_instance.ml_schema].tables["Dataset_Version"]
+        wanted = list(wanted_rids)
+        for start in range(0, len(wanted), _VERSION_RID_CHUNK):
+            chunk = wanted[start : start + _VERSION_RID_CHUNK]
+            for row in version_path.filter(version_path.RID.in_(chunk)).entities().fetch():
+                rid_to_version[row["RID"]] = row.get("Version")
 
     result: list[tuple[Any, str | None]] = []
     for record in records:
