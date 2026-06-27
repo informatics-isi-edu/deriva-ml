@@ -47,10 +47,6 @@ if TYPE_CHECKING:
 
 __all__ = ["ExecutionMixin"]
 
-# Max member RIDs per <Asset>_Execution association filter, to stay under
-# ERMrest URL length limits (cf. the resolve_rids chunking).
-_MEMBER_PRODUCER_CHUNK = 500
-
 
 class ExecutionMixin:
     """Mixin providing execution management operations.
@@ -1418,87 +1414,112 @@ class ExecutionMixin:
     def _producers_of_dataset_members(self, dataset_rid: RID, version: Any | None = None) -> set[RID]:
         """Distinct executions that produced the member assets of a dataset.
 
-        Enumerates the dataset's member asset tables and, for each, collects
-        the distinct producing executions (the asset's ``<Asset>_Execution``
-        association with ``Asset_Role="Output"``). Deduplicated across all
-        members and tables, so a dataset of 2000 images that share one
-        producing execution yields a single RID. Nested-``Dataset`` members and
-        non-asset member kinds are skipped — dataset producers are handled by
-        :meth:`_producer_of_dataset`, reached through the normal dataset-input
-        path.
+        For each member ASSET table, collects the distinct producing executions
+        (the asset's ``<Asset>_Execution`` association with
+        ``Asset_Role="Output"``) via a server-side membership join — the request
+        URL carries only the dataset RID, never a client-side member-RID list,
+        so this is safe for datasets with thousands of members. Deduplicated
+        across all member tables. Nested-``Dataset`` and non-asset member kinds
+        are skipped — dataset producers are handled by :meth:`_producer_of_dataset`.
 
         The work is bounded by the number of member *asset tables* (typically
-        1-2), not the number of members: one chunked association query per
-        table (see :meth:`_distinct_member_output_producers`).
+        1-2), independent of member count.
 
         Args:
             dataset_rid: RID of the dataset whose member assets to inspect.
-            version: Optional dataset version to list members from. ``None``
-                uses the current version.
+            version: Optional dataset version. ``None`` uses the current version;
+                a version resolves the membership join against that version's
+                catalog snapshot (consumed-version faithfulness).
 
         Returns:
-            Set of distinct producing-execution RIDs. Empty when the dataset
-            has no member assets or none have a recorded ``Output`` producer.
+            Set of distinct producing-execution RIDs. Empty when the dataset has
+            no member assets or none have a recorded ``Output`` producer.
 
         Example:
             >>> producers = ml._producers_of_dataset_members("1-DSAA")  # doctest: +SKIP
             >>> sorted(producers)  # doctest: +SKIP
             ['2-EXUP']
         """
-        members = self.lookup_dataset(dataset_rid).list_dataset_members(version=version)
+        dataset = self.lookup_dataset(dataset_rid)
+        snapshot_pb = dataset._version_snapshot_catalog(version).pathBuilder()
         producers: set[RID] = set()
-        for member_type, rows in members.items():
-            if not rows:
+        for assoc_table in dataset._dataset_table.find_associations():
+            other_fkey = assoc_table.other_fkeys.pop()
+            member_table = other_fkey.pk_table  # the member asset table (e.g. Image)
+            membership_table = assoc_table.table  # the membership table (e.g. Dataset_Image)
+            if not self.model.is_asset(member_table):
+                # Nested-Dataset / non-asset member kinds are not asset-producer-shaped.
                 continue
-            table = self.model.name_to_table(member_type)
-            if not self.model.is_asset(table):
-                # Nested-Dataset members and non-asset member kinds are not
-                # asset-producer-shaped; skip them.
-                continue
-            member_rids = [r["RID"] for r in rows if r.get("RID")]
-            if not member_rids:
-                continue
-            producers |= self._distinct_member_output_producers(member_type, member_rids)
+            member_link_column = other_fkey.foreign_key_columns[0].name
+            target_column = other_fkey.referenced_columns[0].name
+            producers |= self._distinct_member_output_producers(
+                snapshot_pb,
+                membership_table,
+                member_table,
+                member_link_column,
+                target_column,
+                dataset.dataset_rid,
+            )
         return producers
 
-    def _distinct_member_output_producers(self, asset_table_name: str, member_rids: list[RID]) -> set[RID]:
-        """Distinct ``Output`` producing executions for a set of asset RIDs.
+    def _distinct_member_output_producers(
+        self,
+        snapshot_pb: Any,
+        membership_table: Any,
+        member_table: Any,
+        member_link_column: str,
+        target_column: str,
+        dataset_rid: RID,
+    ) -> set[RID]:
+        """Distinct ``Output`` producing executions of a dataset's members of one
+        asset table, via a server-side membership join.
 
-        Issues one chunked association query against the asset table's
-        ``<Asset>_Execution`` table (``Asset_Role="Output"``), filtering by the
-        given member RIDs in chunks of at most ``_MEMBER_PRODUCER_CHUNK`` to
-        stay under URL length limits, and returns the distinct ``Execution``
-        RIDs. Returns an empty set if the asset table has no execution
-        association.
+        Builds the path
+        ``<membership>(Dataset==dataset_rid) → <member> → <member>_Execution
+        (Asset_Role="Output")`` on ``snapshot_pb`` and projects distinct
+        ``Execution``. The request URL carries only the dataset RID — no
+        client-side member-RID list — so it is safe at any member count.
 
         Args:
-            asset_table_name: Name of the member asset table (e.g. ``"Image"``).
-            member_rids: RIDs of that table's members in this dataset.
+            snapshot_pb: Version-snapshot pathBuilder for the dataset.
+            membership_table: The ``Dataset_<member>`` membership table.
+            member_table: The member asset table (e.g. ``Image``).
+            member_link_column: FK column on the membership table referencing
+                the member.
+            target_column: The referenced column on the member table (often
+                ``"RID"``).
+            dataset_rid: RID of the dataset whose members to inspect.
 
         Returns:
-            Set of distinct producing-execution RIDs (``Output`` role).
+            Set of distinct producing-execution RIDs (``Output`` role). Empty if
+            the member asset table has no ``<member>_Execution`` association.
         """
-        asset_table = self.model.name_to_table(asset_table_name)
         try:
-            assoc_table, asset_fk, _exec_fk = self.model.find_association(asset_table, "Execution")
+            exec_assoc, member_exec_fk, _exec_fk = self.model.find_association(member_table, "Execution")
         except NoAssociationException:
             return set()
 
-        pb = self.pathBuilder()
-        assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
-        producers: set[RID] = set()
-        for start in range(0, len(member_rids), _MEMBER_PRODUCER_CHUNK):
-            chunk = member_rids[start : start + _MEMBER_PRODUCER_CHUNK]
-            rows = (
-                assoc_path.filter(assoc_path.columns[asset_fk].in_(chunk))
-                .filter(assoc_path.Asset_Role == "Output")
-                .entities()
-                .fetch()
+        membership_path = snapshot_pb.schemas[membership_table.schema.name].tables[membership_table.name]
+        member_path = snapshot_pb.schemas[member_table.schema.name].tables[member_table.name]
+        exec_path = snapshot_pb.schemas[exec_assoc.schema.name].tables[exec_assoc.name]
+
+        path = (
+            membership_path.filter(membership_path.Dataset == dataset_rid)
+            .link(
+                member_path,
+                on=(membership_path.columns[member_link_column] == member_path.columns[target_column]),
             )
-            for row in rows:
-                exec_rid = row.get("Execution")
-                if exec_rid:
-                    producers.add(exec_rid)
+            .link(
+                exec_path,
+                on=(member_path.columns[target_column] == exec_path.columns[member_exec_fk]),
+            )
+            .filter(exec_path.Asset_Role == "Output")
+        )
+        producers: set[RID] = set()
+        for row in path.attributes(exec_path.Execution).fetch():
+            exec_rid = row.get("Execution")
+            if exec_rid:
+                producers.add(exec_rid)
         return producers
 
     def _input_dataset_pairs(self, execution_rid: RID) -> list[tuple[Any, str | None]]:

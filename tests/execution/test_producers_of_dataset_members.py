@@ -1,187 +1,194 @@
 """Unit tests for ``ExecutionMixin._producers_of_dataset_members``.
 
-Mocks ``lookup_dataset``/``list_dataset_members`` and the per-table
-association fetch so the helper's enumerate-members → distinct-producers
-logic is exercised offline. The catalog-bound query path is covered by
-the live test in ``tests/execution/test_lookup_lineage_live.py``.
+Mocks ``lookup_dataset`` and the per-table association fetch so the helper's
+discover-associations → distinct-producers logic is exercised offline. The
+server-side join query path is covered by the live test in
+``tests/execution/test_lookup_lineage_live.py``.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from deriva_ml.core.mixins.execution import ExecutionMixin
 
 
-class _FakeMembersML(ExecutionMixin):
-    """ExecutionMixin host scripting just what _producers_of_dataset_members needs.
+class _FakeAssoc:
+    """Stand-in for a membership association table from find_associations()."""
 
-    Scripts:
-      * lookup_dataset(rid).list_dataset_members() -> members dict
-      * model.is_asset(table) -> whether a member-type table is an asset table
-      * the per-(asset_table, member_rids) Output-producer lookup
+    def __init__(self, membership_name, member_table_name, member_col="Image", target_col="RID"):
+        self.table = SimpleNamespace(name=membership_name, schema=SimpleNamespace(name="domain"))
+        member_tbl = SimpleNamespace(name=member_table_name, schema=SimpleNamespace(name="domain"))
+        ofk = SimpleNamespace(
+            pk_table=member_tbl,
+            foreign_key_columns=[SimpleNamespace(name=member_col)],
+            referenced_columns=[SimpleNamespace(name=target_col)],
+        )
+        # other_fkeys.pop() must return ofk
+        self.other_fkeys = [ofk]
+
+
+class _FakeMembersML(ExecutionMixin):
+    """Scripts what the rewritten _producers_of_dataset_members needs:
+    a dataset table whose find_associations() yields membership associations,
+    is_asset() per member table, and a seam (_distinct_member_output_producers)
+    that returns scripted producer sets per member table.
     """
 
-    def __init__(self) -> None:
-        # dataset_rid -> {member_type: [ {"RID": ...}, ... ]}
-        self._members: dict[str, dict[str, list[dict[str, Any]]]] = {}
-        # member_type name -> bool (is it an asset table?)
-        self._asset_types: set[str] = set()
-        # (asset_table, member_rid) -> producer execution RID or None
-        self._member_producers: dict[tuple[str, str], str | None] = {}
-        # asset tables that have NO <Asset>_Execution association at all
-        self._no_assoc_tables: set[str] = set()
+    def __init__(self):
+        # member_table_name -> set of producer RIDs (the seam result)
+        self._producers_by_table: dict[str, set[str]] = {}
+        # which member tables are asset tables
+        self._asset_tables: set[str] = set()
+        # membership associations the dataset table "has"
+        self._assocs: list[_FakeAssoc] = []
 
         self.model = MagicMock()
-        self.model.is_asset = lambda table: getattr(table, "name", table) in self._asset_types
-        self.model.name_to_table = lambda name: _T(name)
+        self.model.is_asset = lambda table: getattr(table, "name", table) in self._asset_tables
 
-    # scripting helpers -----------------------------------------------------
-    def set_members(self, dataset_rid: str, members: dict[str, list[dict[str, Any]]]) -> None:
-        self._members[dataset_rid] = members
+        # _dataset_table.find_associations() -> self._assocs
+        self._dataset_table = SimpleNamespace(find_associations=lambda: list(self._assocs))
 
-    def mark_asset_types(self, *names: str) -> None:
-        self._asset_types.update(names)
+    # scripting --------------------------------------------------------------
+    def add_member_table(
+        self,
+        membership_name,
+        member_table_name,
+        *,
+        is_asset=True,
+        producers=frozenset(),
+        member_col="Image",
+        target_col="RID",
+    ):
+        self._assocs.append(_FakeAssoc(membership_name, member_table_name, member_col, target_col))
+        if is_asset:
+            self._asset_tables.add(member_table_name)
+        self._producers_by_table[member_table_name] = set(producers)
 
-    def set_member_producer(self, asset_table: str, member_rid: str, producer: str | None) -> None:
-        self._member_producers[(asset_table, member_rid)] = producer
-
-    def mark_no_association(self, asset_table: str) -> None:
-        self._no_assoc_tables.add(asset_table)
-
-    # mocked primitives -----------------------------------------------------
-    def lookup_dataset(self, rid: str) -> Any:  # type: ignore[override]
-        ds = MagicMock()
-        ds.list_dataset_members = lambda version=None: self._members.get(rid, {})
+    # mocked primitives ------------------------------------------------------
+    def lookup_dataset(self, rid):  # type: ignore[override]
+        snap = MagicMock()
+        snap.pathBuilder = lambda: MagicMock()
+        ds = SimpleNamespace(
+            dataset_rid=rid,
+            _version_snapshot_catalog=lambda version: snap,
+            _dataset_table=self._dataset_table,
+        )
         return ds
 
-    def _distinct_member_output_producers(self, asset_table: str, member_rids: list[str]) -> set[str]:
-        """Test seam the real helper calls once per asset table.
-
-        The real implementation issues the chunked association query here;
-        the test scripts its result directly.
-        """
-        if asset_table in self._no_assoc_tables:
-            return set()
-        out: set[str] = set()
-        for rid in member_rids:
-            p = self._member_producers.get((asset_table, rid))
-            if p:
-                out.add(p)
-        return out
+    def _distinct_member_output_producers(
+        self,
+        snapshot_pb,
+        membership_table,
+        member_table,  # type: ignore[override]
+        member_link_column,
+        target_column,
+        dataset_rid,
+    ):
+        # Seam: return scripted producers for this member table.
+        return set(self._producers_by_table.get(getattr(member_table, "name", member_table), set()))
 
 
-class _T:
-    def __init__(self, name: str) -> None:
-        self.name = name
+# ---------------------------------------------------------------------------
+# Logic tests (via the seam)
+# ---------------------------------------------------------------------------
 
 
-def test_distinct_producers_dedup_across_many_members():
-    """2000 members sharing one producer -> a single producer RID."""
+def test_dedup_across_member_tables():
     ml = _FakeMembersML()
-    ml.mark_asset_types("Image")
-    members = {"Image": [{"RID": f"4-IMG{i}"} for i in range(2000)]}
-    ml.set_members("1-DSAA", members)
-    for i in range(2000):
-        ml.set_member_producer("Image", f"4-IMG{i}", "2-EXUP")
-
-    result = ml._producers_of_dataset_members("1-DSAA")
-
-    assert result == {"2-EXUP"}
-
-
-def test_no_members_returns_empty_set():
-    ml = _FakeMembersML()
-    ml.set_members("1-DSAA", {})
-    assert ml._producers_of_dataset_members("1-DSAA") == set()
-
-
-def test_members_with_no_output_producer_returns_empty_set():
-    ml = _FakeMembersML()
-    ml.mark_asset_types("Image")
-    ml.set_members("1-DSAA", {"Image": [{"RID": "4-IMG0"}]})
-    ml.set_member_producer("Image", "4-IMG0", None)
-    assert ml._producers_of_dataset_members("1-DSAA") == set()
+    ml.add_member_table("Dataset_Image", "Image", producers={"2-EXUP"})
+    assert ml._producers_of_dataset_members("1-DSAA") == {"2-EXUP"}
 
 
 def test_union_across_multiple_asset_tables():
     ml = _FakeMembersML()
-    ml.mark_asset_types("Image", "File")
-    ml.set_members(
-        "1-DSAA",
-        {"Image": [{"RID": "4-IMG0"}], "File": [{"RID": "4-FIL0"}]},
-    )
-    ml.set_member_producer("Image", "4-IMG0", "2-EXAA")
-    ml.set_member_producer("File", "4-FIL0", "2-EXAB")
+    ml.add_member_table("Dataset_Image", "Image", producers={"2-EXAA"})
+    ml.add_member_table("Dataset_File", "File", producers={"2-EXAB"}, member_col="File")
     assert ml._producers_of_dataset_members("1-DSAA") == {"2-EXAA", "2-EXAB"}
 
 
-def test_nested_dataset_and_non_asset_members_skipped():
+def test_non_asset_member_tables_skipped():
     ml = _FakeMembersML()
-    ml.mark_asset_types("Image")  # "Dataset" is intentionally NOT an asset type
-    ml.set_members(
-        "1-DSAA",
-        {
-            "Image": [{"RID": "4-IMG0"}],
-            "Dataset": [{"RID": "1-DSCH"}],  # nested dataset member -> skipped
-        },
-    )
-    ml.set_member_producer("Image", "4-IMG0", "2-EXAA")
-    # Even if a producer were scriptable for the nested dataset, it must be ignored.
+    ml.add_member_table("Dataset_Image", "Image", producers={"2-EXAA"})
+    ml.add_member_table("Dataset_Dataset", "Dataset", is_asset=False, producers={"2-EXNO"})
     assert ml._producers_of_dataset_members("1-DSAA") == {"2-EXAA"}
 
 
-def test_asset_table_without_execution_association_skipped():
+def test_no_producers_returns_empty():
     ml = _FakeMembersML()
-    ml.mark_asset_types("Image")
-    ml.mark_no_association("Image")
-    ml.set_members("1-DSAA", {"Image": [{"RID": "4-IMG0"}]})
-    ml.set_member_producer("Image", "4-IMG0", "2-EXAA")  # ignored: no assoc table
+    ml.add_member_table("Dataset_Image", "Image", producers=set())
     assert ml._producers_of_dataset_members("1-DSAA") == set()
 
 
-def test_distinct_member_output_producers_chunks_not_per_member():
-    """The real seam issues O(chunks) association fetches, never O(members)."""
-    from unittest.mock import MagicMock
-
+def test_no_member_tables_returns_empty():
     ml = _FakeMembersML()
-    # Real model.find_association + name_to_table: return stub table/assoc.
-    assoc_tbl = MagicMock()
-    assoc_tbl.schema.name = "deriva-ml"
-    assoc_tbl.name = "Image_Execution"
-    ml.model.find_association = lambda asset_table, target: (assoc_tbl, "Image", "Execution")
-    ml.model.name_to_table = lambda name: _T(name)
+    assert ml._producers_of_dataset_members("1-DSAA") == set()
 
-    # Mock pathBuilder so .filter(...).filter(...).entities().fetch() returns []
-    # and counts fetch() calls.
-    fetch_calls = {"n": 0}
 
-    def _fetch():
-        fetch_calls["n"] += 1
-        return []
+# ---------------------------------------------------------------------------
+# Join-shape test — regression guard for tk-023 URL-length bug class
+# ---------------------------------------------------------------------------
 
-    entities = MagicMock()
-    entities.fetch = _fetch
-    path = MagicMock()
-    path.entities.return_value = entities
-    path.filter.return_value = path  # chainable .filter(...).filter(...)
-    # column access: assoc_path.columns[asset_fk] and assoc_path.Asset_Role
-    path.columns = {"Image": MagicMock()}
-    path.columns["Image"].in_ = lambda values: MagicMock()
-    path.Asset_Role = MagicMock()
+
+def test_join_filters_by_dataset_not_member_rid_in():
+    """The real join filters membership by Dataset==rid and never builds an
+    .in_() over member RIDs (the tk-023 URL-length bug class)."""
+    calls = {"dataset_filter": False, "member_in_called": False, "asset_role_output": False}
+
+    # Column whose .in_() would be the BUG — flag it if ever called.
+    member_col = MagicMock()
+    member_col.in_ = lambda *a, **k: calls.__setitem__("member_in_called", True) or MagicMock()
+
+    def _make_table(name):
+        t = MagicMock()
+        t.columns = {"RID": member_col, "Image": MagicMock()}
+
+        # membership_path.Dataset == rid  -> record it
+        def _eq(other):
+            calls["dataset_filter"] = True
+            return MagicMock()
+
+        t.Dataset = MagicMock()
+        t.Dataset.__eq__ = lambda self_, other: _eq(other)
+        # Asset_Role == "Output"
+        t.Asset_Role = MagicMock()
+
+        def _asset_role_eq(self_, other):
+            calls["asset_role_output"] = other == "Output"
+            return MagicMock()
+
+        t.Asset_Role.__eq__ = _asset_role_eq
+        t.Execution = MagicMock()
+        # chainable path: filter/link return a path with attributes().fetch()
+        path = MagicMock()
+        path.filter.return_value = path
+        path.link.return_value = path
+        path.attributes.return_value.fetch.return_value = [{"Execution": "2-EXUP"}]
+        t.filter = path.filter
+        return t, path
+
+    membership_t, mpath = _make_table("Dataset_Image")
+    member_t, _ = _make_table("Image")
+    exec_t, _ = _make_table("Image_Execution")
 
     schema = MagicMock()
-    schema.tables = {"Image_Execution": path}
+    schema.name = "domain"
+    schema.tables = {"Dataset_Image": membership_t, "Image": member_t, "Image_Execution": exec_t}
     pb = MagicMock()
-    pb.schemas = {"deriva-ml": schema}
-    ml.pathBuilder = lambda: pb
+    pb.schemas = {"domain": schema}
 
-    member_rids = [f"4-IMG{i}" for i in range(2000)]
-    # Call the real ExecutionMixin implementation, bypassing _FakeMembersML's
-    # seam override, so the chunked-query behavior is actually exercised.
-    ExecutionMixin._distinct_member_output_producers(ml, "Image", member_rids)
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.model = MagicMock()
+    # find_association(member, "Execution") -> (exec_assoc_table, member_fk, exec_fk)
+    exec_assoc = SimpleNamespace(name="Image_Execution", schema=SimpleNamespace(name="domain"))
+    ml.model.find_association = lambda mt, target: (exec_assoc, "Image", "Execution")
 
-    # 2000 members / 500 chunk = 4 fetches. The point: it does NOT scale with
-    # the number of members (would be 2000 if implemented per-asset).
-    assert fetch_calls["n"] == 4, f"expected 4 chunked fetches, got {fetch_calls['n']}"
+    membership_table = SimpleNamespace(name="Dataset_Image", schema=SimpleNamespace(name="domain"))
+    member_table = SimpleNamespace(name="Image", schema=SimpleNamespace(name="domain"))
+
+    result = ml._distinct_member_output_producers(pb, membership_table, member_table, "Image", "RID", "1-DSAA")
+
+    assert result == {"2-EXUP"}
+    assert calls["dataset_filter"] is True, "must filter membership by Dataset==rid"
+    assert calls["member_in_called"] is False, "must NOT build an .in_() over member RIDs (tk-023)"
