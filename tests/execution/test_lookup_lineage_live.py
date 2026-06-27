@@ -13,7 +13,7 @@ import os
 import pytest
 
 from deriva_ml import MLVocab as vc
-from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
+from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.lineage import LineageResult
 
@@ -249,3 +249,106 @@ def test_lookup_lineage_dataset_with_no_producer(test_ml):
     assert result.root.producing_execution is None
     assert result.lineage is None
     assert result.walked_complete is True
+
+
+@pytest.mark.skipif(
+    not os.environ.get("DERIVA_HOST"),
+    reason="lookup_lineage live smoke test requires DERIVA_HOST",
+)
+def test_lookup_lineage_reflects_consumed_version_not_latest(test_ml):
+    """A dataset consumed at v1 must contribute v1's producers to lineage even
+    after it is mutated to v2 by a different execution (tk-020 Gap 1).
+
+    Shape built on the catalog:
+        exec_v1  produces D@1.0.0
+        exec_mid consumes D@1.0.0, produces DS_OUT
+        exec_v2  later releases D to v2 (2.0.0) via mark_dev + release
+
+    Assert: lookup_lineage(DS_OUT) surfaces exec_v1 (the consumed-version
+    producer of D, i.e. the execution stamped on ``Dataset_Version`` for
+    D@1.0.0), and does NOT surface exec_v2 (the later/latest producer
+    stamped on D@2.0.0).
+
+    Args:
+        test_ml: Clean DerivaML instance backed by a real catalog, provided by
+            the conftest session fixture.
+    """
+    # --- Vocabulary + workflow setup ---
+    test_ml.add_term(vc.dataset_type, "TK020Consumed", description="TK-020 consumed dataset type")
+    test_ml.add_term(vc.dataset_type, "TK020Output", description="TK-020 output dataset type")
+    test_ml.add_term(vc.workflow_type, "TK020 Lineage Test", description="TK-020 consumed-version smoke")
+
+    wf = test_ml.create_workflow(
+        name="TK020 consumed-version lineage workflow",
+        workflow_type="TK020 Lineage Test",
+        description="TK-020 consumed-version regression test",
+    )
+
+    # --- exec_v1: produces D@1.0.0 ---
+    # Dataset_Version.Execution = exec_v1 for version 1.0.0.
+    exec_v1 = test_ml.create_execution(
+        ExecutionConfiguration(workflow=wf, description="tk020 exec_v1 (D@1.0.0 producer)"),
+    )
+    d = exec_v1.create_dataset(
+        dataset_types="TK020Consumed",
+        description="tk020 dataset D, v1",
+        version=DatasetVersion(1, 0, 0),
+    )
+    d_rid = d.dataset_rid
+    exec_v1_rid = exec_v1.execution_rid
+    v1 = d.current_version  # DatasetVersion(1, 0, 0)
+
+    # --- exec_mid: consumes D@v1, produces DS_OUT ---
+    # The DatasetSpec pins the CONSUMED version so Dataset_Execution.Dataset_Version
+    # points at the 1.0.0 Dataset_Version row (exec_v1's row).
+    exec_mid = test_ml.create_execution(
+        ExecutionConfiguration(
+            workflow=wf,
+            description="tk020 exec_mid (consumer of D@v1, producer of DS_OUT)",
+            datasets=[DatasetSpec(rid=d_rid, version=v1)],
+        ),
+    )
+    ds_out = exec_mid.create_dataset(
+        dataset_types="TK020Output",
+        description="tk020 DS_OUT produced by exec_mid",
+        version=DatasetVersion(1, 0, 0),
+    )
+    ds_out_rid = ds_out.dataset_rid
+
+    # --- exec_v2: mutates D to v2 (2.0.0) ---
+    # mark_dev opens a dev period; release promotes it and stamps
+    # Dataset_Version.Execution = exec_v2 for the new version 2.0.0.
+    # exec_v2 is a distinct execution (different RID from exec_v1 / exec_mid).
+    exec_v2 = test_ml.create_execution(
+        ExecutionConfiguration(workflow=wf, description="tk020 exec_v2 (D mutator, v2 producer)"),
+    )
+    exec_v2_rid = exec_v2.execution_rid
+
+    d.mark_dev(description="tk020: exec_v2 opens dev period on D", execution=exec_v2)
+    d.release(
+        bump=VersionPart.major,
+        description="tk020: exec_v2 releases D@2.0.0",
+        execution=exec_v2,
+    )
+
+    # Sanity: D now has two released versions; the latest is produced by exec_v2.
+    assert exec_v1_rid != exec_v2_rid, "exec_v1 and exec_v2 must be distinct for tk-020 invariant"
+
+    # --- Walk lineage from DS_OUT ---
+    result = test_ml.lookup_lineage(ds_out_rid)
+
+    # Collect every execution RID anywhere in the lineage tree.
+    seen: set[str] = set()
+
+    def _collect(node):
+        if node is None:
+            return
+        seen.add(node.execution.rid)
+        for p in node.parents:
+            _collect(p)
+
+    _collect(result.lineage)
+
+    assert exec_v1_rid in seen, f"consumed-version producer {exec_v1_rid} missing; saw {seen}"
+    assert exec_v2_rid not in seen, f"latest-version producer {exec_v2_rid} leaked into lineage; saw {seen}"
+    assert result.cycle_detected is False

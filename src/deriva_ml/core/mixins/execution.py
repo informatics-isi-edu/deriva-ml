@@ -1322,16 +1322,39 @@ class ExecutionMixin:
             f"Feature-value, or Execution RIDs."
         )
 
-    def _producer_of_dataset(self, dataset_rid: RID) -> RID | None:
-        """Return the Execution RID that produced the current version of ``dataset_rid``.
+    def _producer_of_dataset(self, dataset_rid: RID, version: Any | None = None) -> RID | None:
+        """Return the Execution RID that produced a version of ``dataset_rid``.
 
-        Returns None if the dataset has no Dataset_Version rows yet
-        or no version row carries an Execution link.
+        Args:
+            dataset_rid: Dataset whose producing execution to find.
+            version: When given, return the ``Execution`` recorded on that
+                specific version's ``Dataset_Version`` row (the execution that
+                produced the consumed version). When ``None`` (default), return
+                the producer of the **latest** version — the historical
+                behavior, unchanged for existing callers and the root path.
+
+        Returns:
+            The producing-execution RID, or ``None`` if the dataset has no
+            ``Dataset_Version`` rows, the requested ``version`` has no row, or
+            the matched row carries no ``Execution`` link.
+
+        Example:
+            >>> ml._producer_of_dataset("1-DSAA")  # doctest: +SKIP
+            '2-EXV2'
+            >>> ml._producer_of_dataset("1-DSAA", version="1.0.0")  # doctest: +SKIP
+            '2-EXV1'
         """
         pb = self.pathBuilder()
         version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
         rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
         if not rows:
+            return None
+
+        if version is not None:
+            want = str(version)
+            for row in rows:
+                if (row.get("Version") or "") == want:
+                    return row.get("Execution")
             return None
 
         # Pick the row with the highest semver-style Version. The catalog
@@ -1478,6 +1501,29 @@ class ExecutionMixin:
                     producers.add(exec_rid)
         return producers
 
+    def _input_dataset_pairs(self, execution_rid: RID) -> list[tuple[Any, str | None]]:
+        """(Dataset, consumed_version) pairs for an execution's input edges.
+
+        Thin wrapper over
+        :func:`deriva_ml.execution._helpers.list_input_datasets_with_versions`
+        so the lineage walk has one overridable seam (tests stub this).
+
+        Args:
+            execution_rid: Execution whose input edges to read.
+
+        Returns:
+            List of ``(Dataset, consumed_version)`` tuples; ``consumed_version``
+            is ``None`` for edges with no version pin.
+
+        Example:
+            >>> pairs = ml._input_dataset_pairs("2-EXAA")  # doctest: +SKIP
+            >>> [(ds.dataset_rid, v) for ds, v in pairs]  # doctest: +SKIP
+            [('1-DSAA', '1.0.0')]
+        """
+        from deriva_ml.execution._helpers import list_input_datasets_with_versions
+
+        return list_input_datasets_with_versions(ml_instance=self, execution_rid=execution_rid)
+
     def _walk_node(
         self,
         *,
@@ -1561,29 +1607,35 @@ class ExecutionMixin:
                 status=record.status.value if record.status else "Unknown",
             )
 
-            # Consumed inputs.
+            # Consumed inputs. Walk the version that was ACTUALLY consumed
+            # (Dataset_Execution.Dataset_Version), not the dataset's current
+            # state, so lineage reflects the inputs as they were at consumption.
             consumed_datasets: list[DatasetSummary] = []
             parent_rids: set[RID] = set()
-            for ds in record.list_input_datasets():
-                ds_version = None
-                try:
-                    ds_version = str(ds.current_version)
-                except Exception:
-                    pass
+            for ds, consumed_version in self._input_dataset_pairs(execution_rid):
+                version_str = consumed_version
+                if version_str is None:
+                    try:
+                        version_str = str(ds.current_version)
+                    except Exception:
+                        version_str = None
                 consumed_datasets.append(
                     DatasetSummary(
                         rid=ds.dataset_rid,
                         description=ds.description or None,
-                        version=ds_version,
+                        version=version_str,
                     )
                 )
-                producer = self._producer_of_dataset(ds.dataset_rid)
+                producer = self._producer_of_dataset(ds.dataset_rid, version=consumed_version)
                 if producer:
                     parent_rids.add(producer)
-                # Members of this consumed dataset may have been produced by a
-                # different execution than the one that assembled the dataset;
-                # those member-producers are data-flow parents too.
-                parent_rids |= self._producers_of_dataset_members(ds.dataset_rid)
+                # Member-producers of the CONSUMED version. Never the execution
+                # we are currently expanding: an execution that both consumed
+                # this dataset and produced some of its members must not become
+                # its own parent (the mid-walk analogue of the root path's
+                # version-producer subtraction).
+                member_producers = self._producers_of_dataset_members(ds.dataset_rid, version=consumed_version)
+                parent_rids |= member_producers - {execution_rid}
 
             consumed_assets: list[AssetSummary] = []
             for asset in record.list_assets(asset_role="Input"):
