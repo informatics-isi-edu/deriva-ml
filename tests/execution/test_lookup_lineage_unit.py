@@ -70,10 +70,14 @@ class _StubDataset:
         dataset_rid: str,
         description: str = "",
         version: str = "0.1.0",
+        consumed_version: str | None = None,
     ) -> None:
         self.dataset_rid = dataset_rid
         self.description = description
         self._version = version
+        # The version recorded on the Dataset_Execution edge (what was consumed).
+        # None means "no pin" -> the walk falls back to current_version.
+        self.consumed_version = consumed_version
 
     @property
     def current_version(self) -> str:
@@ -121,10 +125,14 @@ class _FakeML(ExecutionMixin):
         self._executions: dict[str, _StubExecutionRecord] = {}
         # Map dataset_rid -> producing-execution RID (or None).
         self._dataset_producers: dict[str, str | None] = {}
+        # Map (dataset_rid, version) -> producing-execution RID.
+        self._versioned_dataset_producers: dict[tuple[str, str], str] = {}
         # Map asset_rid -> producing-execution RID (or None).
         self._asset_producers: dict[str, str | None] = {}
         # Map dataset_rid -> set of member-producing execution RIDs.
         self._dataset_member_producers: dict[str, set[str]] = {}
+        # Map (dataset_rid, version) -> set of member-producing execution RIDs.
+        self._versioned_member_producers: dict[tuple[str, str], set[str]] = {}
         # Tracks which RIDs the model considers "asset" tables.
         self._asset_table_names: set[str] = set()
         # Mock model.
@@ -205,13 +213,36 @@ class _FakeML(ExecutionMixin):
         """Script the member-asset producing executions of a dataset."""
         self._dataset_member_producers[dataset_rid] = set(producers)
 
-    def _producer_of_dataset(self, dataset_rid: str) -> str | None:  # type: ignore[override]
+    def set_versioned_producer(self, dataset_rid: str, version: str, producer: str) -> None:
+        """Script the producer of a SPECIFIC dataset version."""
+        self._versioned_dataset_producers[(dataset_rid, version)] = producer
+
+    def set_versioned_member_producers(self, dataset_rid: str, version: str, producers: set[str]) -> None:
+        """Script the member-asset producers for a SPECIFIC dataset version."""
+        self._versioned_member_producers[(dataset_rid, str(version))] = set(producers)
+
+    def _scripted_input_pairs(self, execution_rid: str):
+        """(Dataset, consumed_version) pairs for an execution, from the stub record."""
+        rec = self._executions.get(execution_rid)
+        if rec is None:
+            return []
+        return [(ds, ds.consumed_version) for ds in rec.list_input_datasets()]
+
+    def _input_dataset_pairs(self, execution_rid: str):  # type: ignore[override]
+        """Override the seam: return scripted pairs without hitting a catalog."""
+        return self._scripted_input_pairs(execution_rid)
+
+    def _producer_of_dataset(self, dataset_rid: str, version: Any = None) -> str | None:  # type: ignore[override]
+        if version is not None:
+            return self._versioned_dataset_producers.get((dataset_rid, str(version)))
         return self._dataset_producers.get(dataset_rid)
 
     def _producer_of_asset(self, asset_rid: str, asset_table: Any) -> str | None:  # type: ignore[override]
         return self._asset_producers.get(asset_rid)
 
     def _producers_of_dataset_members(self, dataset_rid: str, version: Any = None) -> set[str]:  # type: ignore[override]
+        if version is not None and (dataset_rid, str(version)) in self._versioned_member_producers:
+            return set(self._versioned_member_producers[(dataset_rid, str(version))])
         return set(self._dataset_member_producers.get(dataset_rid, set()))
 
 
@@ -592,3 +623,87 @@ def test_root_dataset_no_producers_at_all_returns_empty_walk():
     assert result.lineage is None
     assert result.root.producing_execution is None
     assert result.walked_complete is True
+
+
+# ---------------------------------------------------------------------------
+# Behavioral tests: consumed-version + self-parent guard (CV-fix Task 3).
+# ---------------------------------------------------------------------------
+
+
+def test_mid_walk_self_parent_guard_no_false_cycle():
+    """An execution that consumed D and also produced one of D's members must
+    not become its own parent (no false cycle)."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSAA", producer=None)
+    # EXSC consumes D-CON and also produced a member of D-CON.
+    ml.add_dataset("1-DCON", producer="2-EXOT")
+    ml.add_execution("2-EXSC", input_datasets=[_StubDataset("1-DCON")])
+    ml.add_dataset("1-DOUT", producer="2-EXSC")
+    ml.set_member_producers("1-DCON", {"2-EXSC"})  # self-produced member
+    ml.add_execution("2-EXOT", input_datasets=[])
+
+    result = ml.lookup_lineage("1-DOUT")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXSC"
+    # 2-EXSC must NOT appear among its own parents, and no false cycle.
+    assert all(p.execution.rid != "2-EXSC" for p in result.lineage.parents)
+    assert result.cycle_detected is False
+
+
+def test_mid_walk_uses_consumed_version_producer():
+    """When E consumed D@1.0.0 (produced by X) but D@2.0.0 (latest) is by Y,
+    walking through E surfaces X, not Y."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSRC", producer=None)
+    ml.add_execution("2-EXVX", input_datasets=[_StubDataset("1-DSRC")])  # produced D@1.0.0
+    ml.add_execution("2-EXVY", input_datasets=[])  # produced D@2.0.0
+    # D consumed at 1.0.0 by EXMID:
+    ml.add_dataset("1-DVER", producer="2-EXVY")  # latest producer = Y
+    ml.set_versioned_producer("1-DVER", "1.0.0", "2-EXVX")  # consumed-version producer = X
+    ml.add_execution("2-EXMD", input_datasets=[_StubDataset("1-DVER", consumed_version="1.0.0")])
+    ml.add_dataset("1-DEND", producer="2-EXMD")
+
+    result = ml.lookup_lineage("1-DEND")
+
+    parent_rids = {p.execution.rid for p in result.lineage.parents}
+    assert "2-EXVX" in parent_rids  # consumed-version producer
+    assert "2-EXVY" not in parent_rids  # latest-version producer must NOT appear
+
+
+def test_mid_walk_uses_consumed_version_member_producers():
+    """D@1.0.0 members by P1; D@2.0.0 adds members by P2. Walking E (consumed
+    1.0.0) surfaces P1, not P2."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSRC", producer=None)
+    ml.add_execution("2-EXP1", input_datasets=[_StubDataset("1-DSRC")])
+    ml.add_execution("2-EXP2", input_datasets=[])
+    ml.add_dataset("1-DVER", producer=None)
+    ml.set_versioned_member_producers("1-DVER", "1.0.0", {"2-EXP1"})
+    ml.set_versioned_member_producers("1-DVER", "2.0.0", {"2-EXP1", "2-EXP2"})
+    ml.add_execution("2-EXMD", input_datasets=[_StubDataset("1-DVER", consumed_version="1.0.0")])
+    ml.add_dataset("1-DEND", producer="2-EXMD")
+
+    result = ml.lookup_lineage("1-DEND")
+
+    parent_rids = {p.execution.rid for p in result.lineage.parents}
+    assert "2-EXP1" in parent_rids
+    assert "2-EXP2" not in parent_rids
+
+
+def test_mid_walk_consumed_dataset_summary_reports_consumed_version():
+    """consumed_datasets[].version reflects the consumed version, not current."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSRC", producer=None)
+    ml.add_dataset("1-DVER", producer=None)
+    ml.add_execution(
+        "2-EXMD",
+        input_datasets=[_StubDataset("1-DVER", version="9.9.9", consumed_version="1.0.0")],
+    )
+    ml.add_dataset("1-DEND", producer="2-EXMD")
+
+    result = ml.lookup_lineage("1-DEND")
+
+    consumed = result.lineage.consumed_datasets
+    assert len(consumed) == 1
+    assert consumed[0].version == "1.0.0"  # consumed, not current 9.9.9

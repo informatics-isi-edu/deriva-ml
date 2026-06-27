@@ -9,6 +9,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from deriva_ml.core.mixins.execution import ExecutionMixin
 from deriva_ml.execution._helpers import list_input_datasets_with_versions
 
 
@@ -55,9 +56,6 @@ def test_skips_rows_without_dataset():
     ml = _make_ml([{"Dataset": None, "Dataset_Version": "1.0.0", "Execution": "2-EXAA"}])
     result = list_input_datasets_with_versions(ml_instance=ml, execution_rid="2-EXAA")
     assert result == []
-
-
-from deriva_ml.core.mixins.execution import ExecutionMixin
 
 
 def _ml_with_versions(version_rows):
