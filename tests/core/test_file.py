@@ -285,6 +285,31 @@ class TestFile:
         assert plain.source_directory is None
         assert plain.is_directory is False
 
+    def test_dataset_is_source_root_accessor(self, file_table_setup):
+        """is_source_root is True for the add_files tree root, False for its
+        directory children and for non-directory datasets. Identification is
+        structural (parent graph), not based on the Path string."""
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            root = exe.add_files(filespecs, description="Ingest run")
+            plain = exe.create_dataset(dataset_types="Complete", description="not a dir")
+
+        # The root is the source root.
+        assert root.is_source_root is True
+        # Directory children are NOT source roots (they have a directory parent).
+        assert all(not child.is_source_root for child in root.list_dataset_children())
+        # A non-directory dataset is never a source root.
+        assert plain.is_source_root is False
+
+        # Identity is structural, independent of the Path value: locate the root
+        # among all CIFAR-tree datasets via is_source_root and confirm it's `root`.
+        tree = [root] + list(root.list_dataset_children())
+        roots = [d for d in tree if d.is_source_root]
+        assert [d.dataset_rid for d in roots] == [root.dataset_rid]
+
     def test_add_files_links_dataset_as_input(self, file_table_setup):
         """add_files records ONE Dataset_Execution input edge (the root source
         dataset), not per-file File_Execution Input rows. The execution is
