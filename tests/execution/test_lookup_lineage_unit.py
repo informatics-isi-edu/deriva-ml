@@ -523,3 +523,72 @@ def test_mid_walk_consumed_dataset_member_producers_become_parents():
     parent_rids = {p.execution.rid for p in result.lineage.parents}
     assert "2-EXDS" in parent_rids  # version producer
     assert "2-EXUP" in parent_rids  # member producer (the new edge)
+
+
+def test_root_dataset_surfaces_member_producer_when_both_exist():
+    """lookup_lineage(image_dataset): version-producer is root, member-producer
+    is a parent reaching the source — the tk-018 case."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSSR", producer=None)  # source dataset
+    ml.add_execution("2-EXUP", input_datasets=[_StubDataset("1-DSSR")])  # upload
+    ml.add_execution("2-EXDS", input_datasets=[])  # datasets-phase (version producer)
+    ml.add_dataset("1-DSIM", producer="2-EXDS")  # image dataset
+    ml.set_member_producers("1-DSIM", {"2-EXUP"})
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXDS"  # root = version producer
+    up = next((p for p in result.lineage.parents if p.execution.rid == "2-EXUP"), None)
+    assert up is not None, "member-producer must appear as a parent of the root"
+    assert {d.rid for d in up.consumed_datasets} == {"1-DSSR"}  # reaches the source
+    assert result.root.producing_execution is not None
+    assert result.root.producing_execution.rid == "2-EXDS"  # contract preserved
+
+
+def test_root_dataset_no_version_producer_walks_from_member_producers():
+    """A dataset with NO version producer but WITH member producers yields a
+    non-empty walk (previously this returned an empty LineageResult)."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSSR", producer=None)
+    ml.add_execution("2-EXUP", input_datasets=[_StubDataset("1-DSSR")])
+    ml.add_dataset("1-DSIM", producer=None)  # no version producer
+    ml.set_member_producers("1-DSIM", {"2-EXUP"})
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXUP"  # representative root
+    assert {d.rid for d in result.lineage.consumed_datasets} == {"1-DSSR"}
+    assert result.root.producing_execution is not None
+    assert result.root.producing_execution.rid == "2-EXUP"
+
+
+def test_root_dataset_member_producer_equals_version_producer_no_dup():
+    """If the version producer also produced the members, it is not listed as
+    its own parent."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSSR", producer=None)
+    ml.add_execution("2-EXVP", input_datasets=[_StubDataset("1-DSSR")])
+    ml.add_dataset("1-DSIM", producer="2-EXVP")
+    ml.set_member_producers("1-DSIM", {"2-EXVP"})  # same exec
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXVP"
+    # 2-EXVP must NOT appear as its own parent.
+    assert all(p.execution.rid != "2-EXVP" for p in result.lineage.parents)
+
+
+def test_root_dataset_no_producers_at_all_returns_empty_walk():
+    """Neither version nor member producers -> empty walk (unchanged)."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSIM", producer=None)
+    # no member producers scripted -> empty set
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    assert result.lineage is None
+    assert result.root.producing_execution is None
+    assert result.walked_complete is True

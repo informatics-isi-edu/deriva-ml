@@ -1185,21 +1185,34 @@ class ExecutionMixin:
         # 1. Classify the root RID with a single resolve_rid call.
         root_descriptor, producer_rid = self._classify_rid(rid)
 
+        # For a Dataset root, the members may have been produced by execution(s)
+        # other than the one that assembled/versioned the dataset. Those
+        # member-producers are data-flow parents and must be seeded into the
+        # walk so e.g. lookup_lineage(image_dataset) reaches the source the
+        # images were uploaded from. (See the lineage member-asset-traversal
+        # design spec; tk-018.)
+        extra_parent_rids: set[RID] = set()
+        if root_descriptor.type == "Dataset":
+            member_producers = self._producers_of_dataset_members(rid)
+            if producer_rid is not None:
+                # Subtract the version-producer so it is not listed as its own
+                # parent in the common case where it also produced some members.
+                extra_parent_rids = member_producers - {producer_rid}
+            elif member_producers:
+                # No version-producer, but the members have producers: walk from
+                # a deterministic representative; the rest become its parents.
+                ordered = sorted(member_producers)
+                producer_rid = ordered[0]
+                extra_parent_rids = set(ordered[1:])
+
         if producer_rid is None:
-            # No producer — return a valid result with an empty walk.
+            # No producer of any kind — return a valid result with an empty walk.
             return LineageResult(root=root_descriptor)
 
         # 2. Walk iteratively from the producing execution.
         visited_global: set[RID] = set()
         in_progress: set[RID] = set()
         flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
-
-        # For Dataset roots, member-assets may have been produced by an
-        # execution other than the one that assembled the dataset version.
-        # Seed those member-producers as extra parents of the root walk node.
-        root_member_producers: set[RID] | None = None
-        if root_descriptor.type == "Dataset":
-            root_member_producers = self._producers_of_dataset_members(rid) or None
 
         lineage_root_node = self._walk_node(
             execution_rid=producer_rid,
@@ -1208,7 +1221,7 @@ class ExecutionMixin:
             visited_global=visited_global,
             in_progress=in_progress,
             flags=flags,
-            extra_parent_rids=root_member_producers,
+            extra_parent_rids=extra_parent_rids or None,
         )
 
         # The producing-execution summary on the root descriptor matches
