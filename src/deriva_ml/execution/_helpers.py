@@ -240,6 +240,12 @@ def list_input_datasets_with_versions(
     :func:`list_input_datasets` ``list[Dataset]`` contract is intentionally left
     unchanged; lineage is the only caller that needs the consumed version.
 
+    ``Dataset_Execution.Dataset_Version`` is a **foreign key** to the
+    ``Dataset_Version`` table — ERMrest returns the Dataset_Version row's RID
+    (e.g. ``"4FP"``), not the version string (e.g. ``"1.0.0"``). This helper
+    resolves that RID to the version string by fetching the ``Dataset_Version``
+    table once and building a ``{RID: Version}`` map.
+
     Args:
         ml_instance: The bound :class:`DerivaML` instance.
         execution_rid: The anchor execution RID.
@@ -258,12 +264,25 @@ def list_input_datasets_with_versions(
     """
     pb = ml_instance.pathBuilder()
     dataset_exec = pb.schemas[ml_instance.ml_schema].Dataset_Execution
-    records = dataset_exec.filter(dataset_exec.Execution == execution_rid).entities().fetch()
-    return [
-        (ml_instance.lookup_dataset(record["Dataset"]), record.get("Dataset_Version"))
-        for record in records
+    records = [
+        record
+        for record in dataset_exec.filter(dataset_exec.Execution == execution_rid).entities().fetch()
         if record.get("Dataset")
     ]
+    if not records:
+        return []
+
+    # Dataset_Execution.Dataset_Version is an FK — the value is the
+    # Dataset_Version row RID, not the version string. Resolve RID -> Version.
+    version_path = pb.schemas[ml_instance.ml_schema].tables["Dataset_Version"]
+    rid_to_version: dict[str, str | None] = {row["RID"]: row.get("Version") for row in version_path.entities().fetch()}
+
+    result: list[tuple[Any, str | None]] = []
+    for record in records:
+        version_rid = record.get("Dataset_Version")
+        consumed_version = rid_to_version.get(version_rid) if version_rid else None
+        result.append((ml_instance.lookup_dataset(record["Dataset"]), consumed_version))
+    return result
 
 
 def list_assets(

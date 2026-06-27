@@ -13,16 +13,40 @@ from deriva_ml.core.mixins.execution import ExecutionMixin
 from deriva_ml.execution._helpers import list_input_datasets_with_versions
 
 
-def _make_ml(rows):
-    """Build a fake ml_instance whose Dataset_Execution fetch returns `rows`."""
-    entities = MagicMock()
-    entities.fetch = lambda: rows
+def _make_ml(de_rows, version_rows=None):
+    """Build a fake ml_instance whose Dataset_Execution and Dataset_Version fetches return realistic data.
+
+    Args:
+        de_rows: Rows to return from Dataset_Execution.filter(...).entities().fetch().
+            ``Dataset_Version`` values in each row must be RIDs (e.g. ``"VR1"``),
+            not version strings — faithfully modelling what ERMrest returns for an FK
+            column.
+        version_rows: Rows to return from Dataset_Version.entities().fetch().  Each
+            row must have ``"RID"`` and ``"Version"`` keys so the helper can build the
+            RID → version-string map.  Defaults to an empty list (no version rows).
+    """
+    if version_rows is None:
+        version_rows = []
+
+    # Dataset_Execution path — filter(...).entities() -> fetch() returns de_rows.
+    de_entities = MagicMock()
+    de_entities.fetch = lambda: de_rows
     de_path = MagicMock()
-    de_path.filter.return_value = MagicMock(entities=lambda: entities)
+    de_path.filter.return_value = MagicMock(entities=lambda: de_entities)
+
+    # Dataset_Version path — entities() -> fetch() returns version_rows.
+    dv_entities = MagicMock()
+    dv_entities.fetch = lambda: version_rows
+    dv_path = MagicMock()
+    dv_path.entities.return_value = dv_entities
+
     schema = MagicMock()
     schema.Dataset_Execution = de_path
+    schema.tables = {"Dataset_Version": dv_path}
+
     pb = MagicMock()
     pb.schemas = {"deriva-ml": schema}
+
     ml = MagicMock()
     ml.ml_schema = "deriva-ml"
     ml.pathBuilder.return_value = pb
@@ -32,11 +56,16 @@ def _make_ml(rows):
 
 
 def test_pairs_dataset_with_consumed_version():
+    """Consumed-version RIDs are resolved to version strings via the Dataset_Version map."""
     ml = _make_ml(
-        [
-            {"Dataset": "1-DSAA", "Dataset_Version": "1.0.0", "Execution": "2-EXAA"},
-            {"Dataset": "1-DSAB", "Dataset_Version": "2.3.0", "Execution": "2-EXAA"},
-        ]
+        de_rows=[
+            {"Dataset": "1-DSAA", "Dataset_Version": "VR1", "Execution": "2-EXAA"},
+            {"Dataset": "1-DSAB", "Dataset_Version": "VR2", "Execution": "2-EXAA"},
+        ],
+        version_rows=[
+            {"RID": "VR1", "Version": "1.0.0"},
+            {"RID": "VR2", "Version": "2.3.0"},
+        ],
     )
     result = list_input_datasets_with_versions(ml_instance=ml, execution_rid="2-EXAA")
     pairs = {(ds.dataset_rid, v) for ds, v in result}
@@ -44,7 +73,11 @@ def test_pairs_dataset_with_consumed_version():
 
 
 def test_version_none_when_edge_has_no_pin():
-    ml = _make_ml([{"Dataset": "1-DSAA", "Execution": "2-EXAA"}])  # no Dataset_Version key
+    """An edge with no Dataset_Version key yields consumed_version=None."""
+    ml = _make_ml(
+        de_rows=[{"Dataset": "1-DSAA", "Execution": "2-EXAA"}],  # no Dataset_Version key
+        version_rows=[],
+    )
     result = list_input_datasets_with_versions(ml_instance=ml, execution_rid="2-EXAA")
     assert len(result) == 1
     ds, version = result[0]
@@ -53,7 +86,11 @@ def test_version_none_when_edge_has_no_pin():
 
 
 def test_skips_rows_without_dataset():
-    ml = _make_ml([{"Dataset": None, "Dataset_Version": "1.0.0", "Execution": "2-EXAA"}])
+    """Rows where Dataset is None are filtered out."""
+    ml = _make_ml(
+        de_rows=[{"Dataset": None, "Dataset_Version": "VR1", "Execution": "2-EXAA"}],
+        version_rows=[{"RID": "VR1", "Version": "1.0.0"}],
+    )
     result = list_input_datasets_with_versions(ml_instance=ml, execution_rid="2-EXAA")
     assert result == []
 
