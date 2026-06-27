@@ -284,17 +284,17 @@ class TestFile:
         assert plain.source_directory is None
         assert plain.is_directory is False
 
-    def test_add_files_links_as_input(self, file_table_setup):
-        """add_files registers an external File reference and links it as an
-        INPUT — intrinsically, with no role parameter.
+    def test_add_files_links_dataset_as_input(self, file_table_setup):
+        """add_files records ONE Dataset_Execution input edge (the root source
+        dataset), not per-file File_Execution Input rows. The execution is
+        input-complete via the dataset edge; producer + membership intact.
 
-        The File table holds references to bytes the catalog does NOT host
-        (URL + MD5, no Hatrac upload). Registering such a reference means
-        "name an external file so I have a catalog handle to it" — which is
-        consuming/referencing it, never producing it. A produced file is a
-        Hatrac-backed execution asset via asset_file_path/commit, not a File
-        reference. So add_files is the input-reference mechanism: role is not
-        a variable, it is always Input.
+        Contract:
+        (a) ZERO File_Execution Input rows were written by add_files.
+        (b) EXACTLY ONE Dataset_Execution input edge points at the root dataset.
+        (c) The root dataset's current version is produced by this execution
+            (Dataset_Version.Execution — written by create_dataset).
+        (d) The root dataset transitively contains the registered files.
         """
         ml_instance = file_table_setup.ml_instance
         test_dir = file_table_setup.test_dir
@@ -302,14 +302,39 @@ class TestFile:
 
         with execution.execute() as exe:
             filespecs = list(FileSpec.create_filespecs(test_dir, "Referenced files"))
-            exe.add_files(filespecs)  # no role argument — Input by nature
+            root = exe.add_files(filespecs)
 
         pb = ml_instance.pathBuilder()
+
+        # (a) ZERO File_Execution Input rows were written by add_files.
+        # The unknown-provenance sentinel (written by provenance enforcement,
+        # not by add_files) is excluded from this count — its presence means
+        # add_files correctly fired create_dataset without a pre-existing input,
+        # not that add_files wrote per-file Input rows.
+        sentinel_rid = ml_instance.unknown_provenance_file_rid()
         fe = pb.schemas[ml_instance.ml_schema].File_Execution
-        rows = [r for r in fe.entities().fetch() if r["Execution"] == execution.execution_rid]
-        assert rows, "expected File_Execution rows for the execution"
-        roles = {r["Asset_Role"] for r in rows}
-        assert roles == {"Input"}, f"add_files must link File references as Input, got {roles}"
+        fe_input_rows = [
+            r
+            for r in fe.filter(fe.Execution == exe.execution_rid).entities().fetch()
+            if r.get("Asset_Role") == "Input" and r.get("File") != sentinel_rid
+        ]
+        assert fe_input_rows == [], (
+            f"add_files must NOT write per-file File_Execution Input rows; got {len(fe_input_rows)}"
+        )
+
+        # (b) EXACTLY ONE Dataset_Execution input edge: the root dataset.
+        de = pb.schemas[ml_instance.ml_schema].Dataset_Execution
+        de_rows = list(de.filter(de.Execution == exe.execution_rid).entities().fetch())
+        assert len(de_rows) == 1, f"expected exactly one Dataset_Execution input edge, got {len(de_rows)}"
+        assert de_rows[0]["Dataset"] == root.dataset_rid
+
+        # (c) Producer edge intact: the root dataset's current version is produced
+        #     by this execution (Dataset_Version.Execution).
+        assert ml_instance._producer_of_dataset(root.dataset_rid) == exe.execution_rid
+
+        # (d) Membership intact: the root dataset still transitively contains the files.
+        members = root.list_dataset_members(recurse=True)
+        assert members.get("File"), "root dataset should contain File members"
 
     def test_add_files_has_no_role_parameter(self, file_table_setup):
         """add_files must NOT expose a role parameter — role is not a user

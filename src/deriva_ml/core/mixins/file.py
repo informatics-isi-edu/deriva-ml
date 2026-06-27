@@ -183,16 +183,17 @@ class FileMixin:
         *,
         root_name: str | None = None,
     ) -> "Dataset":
-        """Register external file *references* and link them as execution inputs.
+        """Register external file *references* and record the source dataset as the execution's input.
 
         Inserts a ``File``-table row per file (URL + MD5 + length) — a
         *reference* to bytes the catalog does **not** host (no Hatrac upload).
-        Each file is linked to the execution as an **input**
-        (``File_Execution.Asset_Role="Input"``).
+        Builds a nested directory-structure dataset tree from the registered
+        files, and records the root source dataset as this execution's input
+        via a single ``Dataset_Execution`` row — O(1) regardless of file
+        count. Per-file ``File_Execution`` Input rows are intentionally **not**
+        written; find consumed files by traversing the dataset.
 
-        Role is intrinsic, not a choice: referencing an external file means
-        *naming* a file the run consumed/depended on, so it is always an
-        Input. A file the run *produced* is a Hatrac-backed execution asset —
+        A file the run *produced* is a Hatrac-backed execution asset —
         register those via ``asset_file_path`` + ``commit_output_assets``,
         never here. (Provenance contract: asset role is derived from context;
         a ``File`` reference is an input by its nature.)
@@ -267,14 +268,13 @@ class FileMixin:
         pb = self.pathBuilder()
         file_path = pb.schemas[self.ml_schema].tables["File"]
         atable_path = pb.schemas[self.ml_schema].tables[atable]
-        file_execution_path = pb.schemas[self.ml_schema].File_Execution
 
         # Stream ``files`` in batches of ``chunk_size``. Each batch is validated,
-        # inserted, tagged, and linked to the execution before the next batch is
-        # pulled — so a generator source is never fully materialized. The only
-        # state retained across batches is ``dir_rid_map`` (directory → File
-        # RIDs), used afterward to build the directory-structure datasets; it
-        # grows with the number of distinct directories, not the number of files.
+        # inserted, and tagged before the next batch is pulled — so a generator
+        # source is never fully materialized. The only state retained across
+        # batches is ``dir_rid_map`` (directory → File RIDs), used afterward to
+        # build the directory-structure datasets; it grows with the number of
+        # distinct directories, not the number of files.
         dir_rid_map = defaultdict(list)
         for batch in batched(files, chunk_size):
             # Validate this batch's file types against the defined vocabulary.
@@ -296,16 +296,6 @@ class FileMixin:
             ]
             if file_type_records:
                 atable_path.insert(file_type_records)
-
-            # Link each file to the execution as an INPUT. A File-table row is a
-            # reference to externally-hosted bytes — naming a file the run
-            # consumed — so its role is intrinsically Input (never a parameter).
-            file_execution_path.insert(
-                [
-                    {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Input"}
-                    for file_record in file_records
-                ]
-            )
 
             # Group this batch's RIDs by source directory for dataset building.
             # Canonicalize the directory so containment math is self-consistent
@@ -331,15 +321,51 @@ class FileMixin:
         # description. The folder each node represents is recorded structurally
         # in Directory_Dataset (below), not in the prose Description.
         root_desc = _root_description(ingest_root, root_name, description)
-        node_dataset: dict[Path, "Dataset"] = {
-            directory: Dataset.create_dataset(
-                self,  # type: ignore[arg-type]
-                dataset_types=dataset_types,
-                execution_rid=execution_rid,
-                description=root_desc if directory == ingest_root else description,
-            )
-            for directory in nodes
-        }
+
+        # Create the root dataset first and immediately record the Dataset_Execution
+        # input edge so that provenance enforcement (ensure_artifact_producer_has_input)
+        # sees a declared input before any child dataset version is authored — preventing
+        # the unknown-provenance sentinel from being written for this execution.
+        root_dataset = Dataset.create_dataset(
+            self,  # type: ignore[arg-type]
+            dataset_types=dataset_types,
+            execution_rid=execution_rid,
+            description=root_desc,
+        )
+        # Record ONE input edge: the root source dataset is this execution's
+        # input (consumed by reference). This replaces the per-file
+        # File_Execution Input rows — O(1) instead of O(N). The dataset is also
+        # this execution's OUTPUT (Dataset_Version.Execution, written by
+        # create_dataset above); the self-loop is lineage-safe (the lookup_lineage
+        # self-parent guard skips producer == the expanding execution).
+        # Dataset_Execution has no Asset_Role column — every row is an input edge.
+        try:
+            root_version_rid = self._version_rid(root_dataset.dataset_rid, root_dataset.current_version)
+        except Exception:
+            root_version_rid = None
+        de_assoc = pb.schemas[self.ml_schema].Dataset_Execution
+        de_assoc.insert(
+            [
+                {
+                    "Dataset": root_dataset.dataset_rid,
+                    "Execution": execution_rid,
+                    "Dataset_Version": root_version_rid,
+                }
+            ],
+            on_conflict_skip=True,
+        )
+
+        # Create child datasets (provenance enforcement now sees the Dataset_Execution
+        # input edge above; no sentinel will be written for child dataset authorship).
+        node_dataset: dict[Path, "Dataset"] = {ingest_root: root_dataset}
+        for directory in nodes:
+            if directory != ingest_root:
+                node_dataset[directory] = Dataset.create_dataset(
+                    self,  # type: ignore[arg-type]
+                    dataset_types=dataset_types,
+                    execution_rid=execution_rid,
+                    description=description,
+                )
 
         # Record each directory dataset's source folder as a path relative to the
         # ingest root (the root stores "."). Structured + queryable; consumers
@@ -369,8 +395,7 @@ class FileMixin:
             if members:
                 node_dataset[directory].add_dataset_members(members=members, execution_rid=execution_rid)
 
-        # The ingest root's dataset transitively contains every file.
-        return node_dataset[ingest_root]
+        return root_dataset
 
     def _bootstrap_versions(self) -> None:
         """Initialize dataset versions for datasets that don't have versions."""

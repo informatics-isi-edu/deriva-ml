@@ -2073,13 +2073,17 @@ class Execution:
         *,
         root_name: str | None = None,
     ) -> "Dataset":
-        """Register external file *references* and link them as execution inputs.
+        """Register external file *references* and record the source dataset as this execution's input.
 
         Inserts a ``File``-table row per file (a reference to externally-hosted
-        bytes — URL + MD5, not uploaded to Hatrac) and links each as an
-        **input** of this execution. Role is intrinsic, not a parameter: a
-        ``File`` reference names a file the run consumed, so it is always an
-        Input. Files the run *produced* are Hatrac-backed execution assets —
+        bytes — URL + MD5, not uploaded to Hatrac) and builds a nested
+        directory-structure dataset tree. The root source dataset is recorded
+        as this execution's input via a single ``Dataset_Execution`` row —
+        O(1) regardless of file count. Per-file ``File_Execution`` Input rows
+        are intentionally **not** written; find consumed files by traversing
+        the dataset.
+
+        Files the run *produced* are Hatrac-backed execution assets —
         use ``asset_file_path`` + ``commit_output_assets`` for those.
 
         ``files`` is consumed lazily in batches of ``chunk_size`` — a generator
