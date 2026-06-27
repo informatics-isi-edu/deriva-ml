@@ -1499,7 +1499,15 @@ class ExecutionMixin:
         except NoAssociationException:
             return set()
 
-        membership_path = snapshot_pb.schemas[membership_table.schema.name].tables[membership_table.name]
+        # The snapshot pathBuilder reflects the catalog schema at the time the
+        # dataset version was captured.  If the membership table (e.g.
+        # ``Dataset_Image``) was added *after* that snapshot, it won't appear
+        # in the snapshot's schema — which also means the snapshot contains no
+        # rows for it, so the correct answer is an empty producer set.
+        try:
+            membership_path = snapshot_pb.schemas[membership_table.schema.name].tables[membership_table.name]
+        except KeyError:
+            return set()
         member_path = snapshot_pb.schemas[member_table.schema.name].tables[member_table.name]
         exec_path = snapshot_pb.schemas[exec_assoc.schema.name].tables[exec_assoc.name]
 
