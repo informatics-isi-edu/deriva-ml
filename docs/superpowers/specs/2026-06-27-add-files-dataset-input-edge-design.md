@@ -114,6 +114,39 @@ lineage cap is needed because the N-asset bloat is eliminated at the source. The
 behavior change, per the design decision to change the default rather than gate
 it behind a flag).
 
+## Other writers of `File_Execution` are unaffected
+
+This change touches ONLY the by-reference `add_files` Input path. `File_Execution`
+remains a live, needed table — its other writers keep populating it:
+- `asset_upload.update_asset_execution_table` — the general per-asset writer for
+  **downloaded Input** files and **produced Output** files
+  (`asset_file_path` / `commit_output_assets`). Untouched.
+- `provenance_enforcement._link_file_sentinel_as_input` — links the
+  unknown-provenance sentinel as an Input when an execution has no inputs.
+  Untouched.
+- Readers (`list_assets(asset_role=…)`, `list_asset_executions`,
+  `find_executions_consuming` for non-add_files Files, the `File_Execution`
+  Chaise display annotation) are all unaffected. The table, its FKs, and its
+  annotation stay.
+
+So `File_Execution` is NOT becoming unused; only the high-volume, low-value
+by-reference-source case stops populating it (replaced by the one dataset-Input
+edge).
+
+### `LocalFile` execution inputs use this path too — intentional
+
+`add_files` also registers `LocalFile` execution inputs (`execution.py:716`,
+called from `Execution.execute` when an `ExecutionConfiguration` declares
+`LocalFile` assets). The change applies UNIFORMLY: a `LocalFile` input (typically
+one file) becomes a small File dataset whose single `Dataset_Execution` Input edge
+records consumption — the same shape as the bulk source-registration case, just
+at N=1. This is deliberate (one behavior for all `add_files` calls; everything it
+registers is a dataset input). The file remains reachable via its (tiny) dataset;
+`find_executions_consuming(<that File>)` goes through the dataset. The live/offline
+tests must confirm a `LocalFile`-input execution is still input-complete
+(`_execution_has_input` True) via the dataset edge — there is a `LocalFile`-input
+test (`tests/execution/test_local_file_input.py`) to update to the new contract.
+
 ## Behavior change & migration
 
 This changes a released API's behavior: after 1.53.0, `add_files`-registered
