@@ -248,8 +248,8 @@ def list_input_datasets_with_versions(
     ``Dataset_Execution.Dataset_Version`` is a **foreign key** to the
     ``Dataset_Version`` table — ERMrest returns the Dataset_Version row's RID
     (e.g. ``"4FP"``), not the version string (e.g. ``"1.0.0"``). This helper
-    resolves that RID to the version string by fetching the ``Dataset_Version``
-    table once and building a ``{RID: Version}`` map.
+    resolves that RID to the version string by fetching only the consumed-version
+    RIDs from ``Dataset_Version`` in chunks (bounded fetch).
 
     Args:
         ml_instance: The bound :class:`DerivaML` instance.

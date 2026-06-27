@@ -707,3 +707,53 @@ def test_mid_walk_consumed_dataset_summary_reports_consumed_version():
     consumed = result.lineage.consumed_datasets
     assert len(consumed) == 1
     assert consumed[0].version == "1.0.0"  # consumed, not current 9.9.9
+
+
+def test_self_parent_via_version_producer_no_false_cycle():
+    """An execution that consumed D AND produced D's consumed version must not
+    be its own parent (no false cycle). Guards execution.py:1631."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSRC", producer=None)
+    # EXSC consumes D-VER, and is ALSO the producer of D-VER's consumed version.
+    ml.add_dataset("1-DVER", producer="2-EXSC")
+    ml.set_versioned_producer("1-DVER", "1.0.0", "2-EXSC")  # consumed-version producer == consumer
+    ml.add_execution("2-EXSC", input_datasets=[_StubDataset("1-DVER", consumed_version="1.0.0")])
+    ml.add_dataset("1-DOUT", producer="2-EXSC")
+
+    result = ml.lookup_lineage("1-DOUT")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXSC"
+    # 2-EXSC must NOT be its own parent, and no false cycle.
+    assert all(p.execution.rid != "2-EXSC" for p in result.lineage.parents)
+    assert result.cycle_detected is False
+
+
+def test_multiple_consumed_datasets_different_versions():
+    """An execution consuming D1@1.0.0 (producer EXV1) and D2@2.0.0 (producer
+    EXV2) surfaces BOTH version-specific producers and BOTH summary versions."""
+    ml = _FakeML()
+    ml.add_dataset("1-DS01", producer=None)
+    ml.add_dataset("1-DS02", producer=None)
+    ml.add_execution("2-EXV1", input_datasets=[_StubDataset("1-DS01")])
+    ml.add_execution("2-EXV2", input_datasets=[_StubDataset("1-DS02")])
+    ml.add_dataset("1-DD01", producer=None)
+    ml.add_dataset("1-DD02", producer=None)
+    ml.set_versioned_producer("1-DD01", "1.0.0", "2-EXV1")
+    ml.set_versioned_producer("1-DD02", "2.0.0", "2-EXV2")
+    ml.add_execution(
+        "2-EXMD",
+        input_datasets=[
+            _StubDataset("1-DD01", consumed_version="1.0.0"),
+            _StubDataset("1-DD02", consumed_version="2.0.0"),
+        ],
+    )
+    ml.add_dataset("1-DEND", producer="2-EXMD")
+
+    result = ml.lookup_lineage("1-DEND")
+
+    parent_rids = {p.execution.rid for p in result.lineage.parents}
+    assert {"2-EXV1", "2-EXV2"} <= parent_rids
+    summary_versions = {s.rid: s.version for s in result.lineage.consumed_datasets}
+    assert summary_versions["1-DD01"] == "1.0.0"
+    assert summary_versions["1-DD02"] == "2.0.0"

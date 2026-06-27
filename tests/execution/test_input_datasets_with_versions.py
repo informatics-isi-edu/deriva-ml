@@ -234,3 +234,24 @@ def test_producer_of_dataset_missing_version_returns_none():
         ]
     )
     assert ml._producer_of_dataset("1-DSAA", version="9.9.9") is None
+
+
+def test_input_dataset_pairs_forwards_to_helper(monkeypatch):
+    """ExecutionMixin._input_dataset_pairs calls the module helper with
+    ml_instance=self and the given execution_rid (guards the real seam wiring
+    that otherwise only the live test exercises)."""
+    captured = {}
+
+    def _fake_helper(*, ml_instance, execution_rid):
+        captured["ml_instance"] = ml_instance
+        captured["execution_rid"] = execution_rid
+        return [("sentinel-ds", "1.0.0")]
+
+    monkeypatch.setattr("deriva_ml.execution._helpers.list_input_datasets_with_versions", _fake_helper)
+
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    result = ml._input_dataset_pairs("2-EXAA")
+
+    assert captured["ml_instance"] is ml
+    assert captured["execution_rid"] == "2-EXAA"
+    assert result == [("sentinel-ds", "1.0.0")]
