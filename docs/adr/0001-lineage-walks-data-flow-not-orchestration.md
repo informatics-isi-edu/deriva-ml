@@ -92,3 +92,9 @@ demand materializes; the field is additive.
 - If we later add forward traversal (`lookup_descendants`), it
   inherits the same decision: descendants are data-flow children
   (executions that consumed this artifact's outputs as inputs).
+- **Update (2026-06-26):** the data-flow walk descends into a dataset's
+  *member assets* — their `<AssetTable>_Execution` Output producers are
+  data-flow parents of the dataset, surfaced by `lookup_lineage`. This stays
+  within the data-flow doctrine (it is the same Output-edge rule applied to a
+  dataset's members) and adds no orchestration traversal. See
+  `docs/superpowers/specs/2026-06-26-lineage-member-asset-traversal-design.md`.

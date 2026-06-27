@@ -123,6 +123,8 @@ class _FakeML(ExecutionMixin):
         self._dataset_producers: dict[str, str | None] = {}
         # Map asset_rid -> producing-execution RID (or None).
         self._asset_producers: dict[str, str | None] = {}
+        # Map dataset_rid -> set of member-producing execution RIDs.
+        self._dataset_member_producers: dict[str, set[str]] = {}
         # Tracks which RIDs the model considers "asset" tables.
         self._asset_table_names: set[str] = set()
         # Mock model.
@@ -199,11 +201,18 @@ class _FakeML(ExecutionMixin):
             raise DerivaMLException(f"No such execution {rid}")
         return self._executions[rid]
 
+    def set_member_producers(self, dataset_rid: str, producers: set[str]) -> None:
+        """Script the member-asset producing executions of a dataset."""
+        self._dataset_member_producers[dataset_rid] = set(producers)
+
     def _producer_of_dataset(self, dataset_rid: str) -> str | None:  # type: ignore[override]
         return self._dataset_producers.get(dataset_rid)
 
     def _producer_of_asset(self, asset_rid: str, asset_table: Any) -> str | None:  # type: ignore[override]
         return self._asset_producers.get(asset_rid)
+
+    def _producers_of_dataset_members(self, dataset_rid: str, version: Any = None) -> set[str]:  # type: ignore[override]
+        return set(self._dataset_member_producers.get(dataset_rid, set()))
 
 
 # ---------------------------------------------------------------------------
@@ -463,3 +472,123 @@ def test_lineage_node_recursive_validation_works():
         parents=[leaf],
     )
     assert parent.parents[0].execution.rid == "2-EXLF"
+
+
+def test_walk_node_extra_parent_rids_attaches_as_parents():
+    """extra_parent_rids passed to the root walk become parents of the root node."""
+    ml = _FakeML()
+    # EXE-UP produced some members; it consumed DS-SRC (no producer).
+    ml.add_dataset("1-DSSR", producer=None)
+    ml.add_execution("2-EXUP", input_datasets=[_StubDataset("1-DSSR")])
+    # The dataset whose root walk we drive: produced by EXE-DS (version producer),
+    # but its members were produced by EXE-UP.
+    ml.add_dataset("1-DSIM", producer="2-EXDS")
+    ml.add_execution("2-EXDS", input_datasets=[])
+    ml.set_member_producers("1-DSIM", {"2-EXUP"})
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    # Root node is the version-producer EXE-DS.
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXDS"
+    # EXE-UP (the member-producer) appears as a parent of the root.
+    parent_rids = {p.execution.rid for p in result.lineage.parents}
+    assert "2-EXUP" in parent_rids
+    # And the walk continued into EXE-UP's consumed source dataset.
+    up_node = next(p for p in result.lineage.parents if p.execution.rid == "2-EXUP")
+    assert {d.rid for d in up_node.consumed_datasets} == {"1-DSSR"}
+
+
+def test_mid_walk_consumed_dataset_member_producers_become_parents():
+    """When an execution consumes a dataset whose members have a distinct
+    producer, that producer is walked as a parent."""
+    ml = _FakeML()
+    # Source dataset consumed by the upload exec.
+    ml.add_dataset("1-DSSR", producer=None)
+    ml.add_execution("2-EXUP", input_datasets=[_StubDataset("1-DSSR")])
+    # An intermediate image dataset: version-producer EXE-DS, members by EXE-UP.
+    ml.add_dataset("1-DSIM", producer="2-EXDS")
+    ml.set_member_producers("1-DSIM", {"2-EXUP"})
+    ml.add_execution("2-EXDS", input_datasets=[])
+    # A downstream execution that CONSUMES the image dataset as input.
+    ml.add_execution("2-EXTR", input_datasets=[_StubDataset("1-DSIM")])
+    ml.add_dataset("1-DSMO", producer="2-EXTR")
+
+    result = ml.lookup_lineage("1-DSMO")
+
+    # Root = EXE-TR; it consumed DS-IM. DS-IM's version producer EXE-DS AND its
+    # member producer EXE-UP both appear among EXE-TR's parents.
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXTR"
+    parent_rids = {p.execution.rid for p in result.lineage.parents}
+    assert "2-EXDS" in parent_rids  # version producer
+    assert "2-EXUP" in parent_rids  # member producer (the new edge)
+
+
+def test_root_dataset_surfaces_member_producer_when_both_exist():
+    """lookup_lineage(image_dataset): version-producer is root, member-producer
+    is a parent reaching the source — the tk-018 case."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSSR", producer=None)  # source dataset
+    ml.add_execution("2-EXUP", input_datasets=[_StubDataset("1-DSSR")])  # upload
+    ml.add_execution("2-EXDS", input_datasets=[])  # datasets-phase (version producer)
+    ml.add_dataset("1-DSIM", producer="2-EXDS")  # image dataset
+    ml.set_member_producers("1-DSIM", {"2-EXUP"})
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXDS"  # root = version producer
+    up = next((p for p in result.lineage.parents if p.execution.rid == "2-EXUP"), None)
+    assert up is not None, "member-producer must appear as a parent of the root"
+    assert {d.rid for d in up.consumed_datasets} == {"1-DSSR"}  # reaches the source
+    assert result.root.producing_execution is not None
+    assert result.root.producing_execution.rid == "2-EXDS"  # contract preserved
+
+
+def test_root_dataset_no_version_producer_walks_from_member_producers():
+    """A dataset with NO version producer but WITH member producers yields a
+    non-empty walk (previously this returned an empty LineageResult)."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSSR", producer=None)
+    ml.add_execution("2-EXUP", input_datasets=[_StubDataset("1-DSSR")])
+    ml.add_dataset("1-DSIM", producer=None)  # no version producer
+    ml.set_member_producers("1-DSIM", {"2-EXUP"})
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXUP"  # representative root
+    assert {d.rid for d in result.lineage.consumed_datasets} == {"1-DSSR"}
+    assert result.root.producing_execution is not None
+    assert result.root.producing_execution.rid == "2-EXUP"
+
+
+def test_root_dataset_member_producer_equals_version_producer_no_dup():
+    """If the version producer also produced the members, it is not listed as
+    its own parent."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSSR", producer=None)
+    ml.add_execution("2-EXVP", input_datasets=[_StubDataset("1-DSSR")])
+    ml.add_dataset("1-DSIM", producer="2-EXVP")
+    ml.set_member_producers("1-DSIM", {"2-EXVP"})  # same exec
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == "2-EXVP"
+    # 2-EXVP must NOT appear as its own parent.
+    assert all(p.execution.rid != "2-EXVP" for p in result.lineage.parents)
+
+
+def test_root_dataset_no_producers_at_all_returns_empty_walk():
+    """Neither version nor member producers -> empty walk (unchanged)."""
+    ml = _FakeML()
+    ml.add_dataset("1-DSIM", producer=None)
+    # no member producers scripted -> empty set
+
+    result = ml.lookup_lineage("1-DSIM")
+
+    assert result.lineage is None
+    assert result.root.producing_execution is None
+    assert result.walked_complete is True
