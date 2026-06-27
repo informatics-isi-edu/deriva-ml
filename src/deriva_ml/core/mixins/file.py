@@ -356,8 +356,11 @@ class FileMixin:
             on_conflict_skip=True,
         )
 
-        # Create child datasets (provenance enforcement now sees the Dataset_Execution
-        # input edge above; no sentinel will be written for child dataset authorship).
+        # Create child datasets. Each child passes _skip_input_check=True, so the
+        # provenance-enforcement guard is suppressed for their create_dataset calls
+        # and no sentinel is written. (The root's Dataset_Execution edge satisfies
+        # the overall input-completeness requirement; individual children never need
+        # their own edge or sentinel.)
         node_dataset: dict[Path, "Dataset"] = {ingest_root: root_dataset}
         for directory in nodes:
             if directory != ingest_root:

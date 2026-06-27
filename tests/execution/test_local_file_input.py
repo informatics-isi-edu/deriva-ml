@@ -92,14 +92,16 @@ def test_E5_localfile_wrapper_is_the_only_path_entry_point():
 
 @pytest.mark.integration
 def test_E4_localfile_input_registered_and_linked_as_input(test_ml, tmp_path):
-    """E4 — A LocalFile in assets= is registered as a File row and linked to
-    the execution as an Input (File_Execution Asset_Role="Input"), by context.
+    """E4 — A LocalFile in assets= is registered as a File dataset and recorded
+    as a Dataset_Execution input edge for the execution.
 
-    The file is referenced, not uploaded; its role comes from being declared
-    in assets=, never from a flag.
+    The file is referenced, not uploaded; provenance is recorded via a
+    Dataset_Execution row (one edge per dataset) rather than a per-file
+    File_Execution Input row.  The execution is input-complete via that edge.
     """
     from deriva_ml import MLVocab as vc
     from deriva_ml.asset.aux_classes import LocalFile
+    from deriva_ml.execution.provenance_enforcement import _execution_has_input
 
     ml = test_ml
     ml.add_term(vc.workflow_type, "LocalFile Test Workflow", description="local-file input test")
@@ -116,15 +118,25 @@ def test_E4_localfile_input_registered_and_linked_as_input(test_ml, tmp_path):
     )
 
     exe = ml.create_execution(config)
+    exec_rid = exe.execution_rid
 
-    # A File_Execution row with Asset_Role="Input" must exist for this run.
+    # The LocalFile input is registered via add_files, which records ONE
+    # Dataset_Execution input edge (the file's dataset) rather than a per-file
+    # File_Execution Input row.  The execution must be input-complete via that edge.
     pb = ml.pathBuilder()
+
+    # No per-file File_Execution Input row from the LocalFile registration.
     fe = pb.schemas[ml.ml_schema].File_Execution
-    rows = [r for r in fe.entities().fetch() if r["Execution"] == exe.execution_rid]
-    assert rows, "expected a File_Execution row for the LocalFile input"
-    assert {r["Asset_Role"] for r in rows} == {"Input"}, (
-        "a LocalFile declared in assets= must be linked as Input (role from context)"
-    )
+    fe_inputs = [r for r in fe.filter(fe.Execution == exec_rid).entities().fetch() if r.get("Asset_Role") == "Input"]
+    assert fe_inputs == [], "LocalFile input must not create a per-file File_Execution Input row"
+
+    # A Dataset_Execution input edge exists (the LocalFile's dataset).
+    de = pb.schemas[ml.ml_schema].Dataset_Execution
+    de_rows = list(de.filter(de.Execution == exec_rid).entities().fetch())
+    assert de_rows, "LocalFile input must be recorded as a Dataset_Execution input edge"
+
+    # The execution is input-complete (no unknown-provenance sentinel needed).
+    assert _execution_has_input(ml_instance=ml, execution_rid=exec_rid) is True
 
 
 # ─────────────────────────────────────────────────────────────────────────
