@@ -310,6 +310,28 @@ class TestFile:
         roots = [d for d in tree if d.is_source_root]
         assert [d.dataset_rid for d in roots] == [root.dataset_rid]
 
+    def test_is_source_root_resolves_legacy_dot_path(self, file_table_setup):
+        """A pre-change catalog stores the root Path as '.'; is_source_root must
+        still identify it (identity is structural, not string-based)."""
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            root = exe.add_files(filespecs, description="Ingest run")
+
+        # Simulate a legacy catalog: rewrite the root's Path back to ".".
+        pb = ml_instance.pathBuilder()
+        dd = pb.schemas[ml_instance.ml_schema].tables["Directory_Dataset"]
+        rows = list(dd.entities().fetch())
+        root_row = next(r for r in rows if r["Dataset"] == root.dataset_rid)
+        dd.update([{"RID": root_row["RID"], "Path": "."}])
+
+        legacy_root = ml_instance.lookup_dataset(root.dataset_rid)
+        assert legacy_root.source_directory == "."          # legacy shape restored
+        assert legacy_root.is_source_root is True           # still found structurally
+
     def test_add_files_links_dataset_as_input(self, file_table_setup):
         """add_files records ONE Dataset_Execution input edge (the root source
         dataset), not per-file File_Execution Input rows. The execution is
