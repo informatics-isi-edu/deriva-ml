@@ -1,0 +1,2292 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/release-notes/">
+      
+      
+        <link rel="prev" href="../api-reference/exceptions/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Release Notes - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Release Notes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Release Notes</h1>
+
+<p>Migration notes — corrections (2026-06-03)</p>
+<p><strong>Documentation backfill for previously under-documented public-API breakages.</strong> The
+changes below already shipped in earlier releases but were missing from (or only
+partially covered by) these notes. They are recorded here because they break
+external callers — notably domain subclasses of <code>DerivaML</code> such as <code>EyeAI</code> — and a
+consumer migrating across these versions needs them.</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Shipped in</th>
+<th>Migration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DatasetBag.denormalize_as_dataframe(...)</code> renamed to <strong><code>DatasetBag.get_denormalized_as_dataframe(...)</code></strong></td>
+<td>~v1.30.6 (the denormalize sugar-method refactor; old names removed)</td>
+<td>Rename the call. Arguments are unchanged: the positional <code>include_tables</code> list and the <code>include_tables=</code>, <code>row_per=</code>, <code>via=</code>, <code>selector=</code> keywords all carry over. The dict variant is likewise <code>get_denormalized_as_dict(...)</code>. There is no deprecation shim — the old name raises <code>AttributeError</code>.</td>
+</tr>
+<tr>
+<td>Public <code>DerivaML.domain_path</code> property removed; replaced by the <strong><code>_domain_path()</code> method</strong></td>
+<td>mixin refactor (path-builder accessors moved to <code>PathBuilderMixin</code>)</td>
+<td>Change <code>self.domain_path.&lt;Table&gt;...</code> to <code>self._domain_path().&lt;Table&gt;...</code> (note the parentheses — it is now a method). <code>_domain_path(schema=None)</code> returns the path builder for the domain schema (defaulting to <code>default_schema</code>); pass a schema name for a non-default one.</td>
+</tr>
+<tr>
+<td><code>check_auth</code> removed — <strong>also from the <code>DerivaML.__init__</code> constructor</strong>, not only from <code>DerivaMLConfig</code></td>
+<td>v1.37.x auth refactor (see the existing 1.37.0 note)</td>
+<td>The existing note says to drop <code>check_auth</code> from hydra-zen configs / <code>DerivaMLConfig</code>. It is <em>also</em> gone from the <code>DerivaML(...)</code> constructor signature: subclasses that accepted <code>check_auth</code> and forwarded it via <code>super().__init__(check_auth=...)</code> now raise <code>TypeError</code>. Remove the parameter and the forwarded keyword.</td>
+</tr>
+<tr>
+<td><code>DerivaML.__init__</code> gained a <strong><code>mode</code> parameter</strong> (<code>ConnectionMode</code>, default <code>online</code>)</td>
+<td>the mode-branched <code>__init__</code> change</td>
+<td>Non-breaking addition. <code>mode=ConnectionMode.online</code> (the default) preserves prior behavior; <code>mode=ConnectionMode.offline</code> (or the string <code>"online"</code>/<code>"offline"</code>) stages writes locally. Subclasses overriding <code>__init__</code> may forward <code>mode</code> through to <code>super().__init__(...)</code> to expose offline mode.</td>
+</tr>
+</tbody>
+</table>
+<p>Version 1.39.0</p>
+<p><strong>Breaking-API change shipped as a minor bump.</strong> The four ways to upload execution outputs (<code>Execution.upload_execution_outputs</code>, <code>Execution.upload_outputs</code>, <code>ExecutionSnapshot.upload_outputs</code>, <code>DerivaML.upload_pending</code>) collapse into one per-execution method and one batch method. Callers of the removed methods must migrate at upgrade — there are no deprecation shims. Major-version (<code>v2.0.0</code>) is deferred until the unified surface has more bake time. See ADR-0009 for the rationale and the two latent bugs fixed.</p>
+<p>Migration table:</p>
+<table>
+<thead>
+<tr>
+<th>Old</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exe.upload_execution_outputs(clean_folder=, progress_callback=)</code></td>
+<td><code>exe.commit_output_assets(clean_folder=, progress_callback=)</code> (returns UploadReport now, not dict)</td>
+</tr>
+<tr>
+<td><code>exe.upload_outputs(retry_failed=)</code></td>
+<td><code>exe.commit_output_assets()</code> (retry_failed was a no-op; removed)</td>
+</tr>
+<tr>
+<td><code>snap.upload_outputs(ml=, retry_failed=)</code></td>
+<td><code>ml.resume_execution(snap.rid).commit_output_assets()</code></td>
+</tr>
+<tr>
+<td><code>ml.upload_pending(execution_rids=, retry_failed=)</code></td>
+<td><code>ml.commit_pending_executions(execution_rids=, clean_folder=False)</code></td>
+</tr>
+<tr>
+<td><code>deriva-ml-upload --retry-failed</code></td>
+<td>(removed; flag was a no-op)</td>
+</tr>
+<tr>
+<td><code>deriva-ml-upload</code> (default: no folder cleanup)</td>
+<td><code>deriva-ml-upload --clean</code> (explicit opt-in to clean working folder)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bugs fixed by the unification:</strong>
+- CLI-uploaded executions now correctly transition to <code>Uploaded</code> status (were stuck <code>Stopped</code>).
+- <code>exe.upload_outputs()</code> callers now get asset descriptions written and Upload_Duration recorded (were silently skipped).</p>
+<p>Both bugs were present in v1.37.x but only reachable via the legacy methods that v1.39.0 removes.</p>
+<p><strong>Also in this release</strong> (post-v1.37.14, folded into v1.39):</p>
+<ul>
+<li><strong><code>feat(asset,dataset)</code>: write-through description setters</strong> (#221, closes #70). <code>Asset.description</code> and <code>Dataset.description</code> now use a <code>@property</code> / <code>@setter</code> pair that persists assignments to the catalog row, mirroring the symmetric pattern already in place on <code>Workflow</code> and <code>ExecutionRecord</code>. <code>update_field_in_catalog</code> in <code>execution/_helpers.py</code> gained an optional <code>schema_name</code> parameter so the same helper now serves both ML-schema (Workflow / Execution / Dataset) and domain-schema (Asset) callers.</li>
+<li><strong><code>fix(execution)</code>: Output_File directional tag + Execution_Execution exclusion</strong> (#220). <code>bag_commit._add_asset_rows_to_bag</code> now auto-adds the <code>Output_File</code> directional Asset_Type to every asset uploaded after an execution — restores the public-API contract that every execution-linked asset carries an Input or Output role. <code>find_asset_execution_tables</code> excludes <code>Execution_Execution</code> (which is an execution-to-execution association, not an asset). Adds a "How execution-asset roles work" section to <code>docs/user-guide/executions.md</code> and a 5-test <code>test_asset_role_contract.py</code> regression suite.</li>
+<li><strong><code>refactor(execution)</code>: public-API surface extracted to <code>asset_upload.py</code></strong> (#219, audit P1 Ex-god, third sweep). <code>upload_execution_outputs</code> and several sibling methods moved out of <code>execution.py</code> into the asset-upload module. Brings the <code>execution.py</code> running total to ~600 LOC removed across the three Ex-god sweeps.</li>
+<li><strong><code>docs(audits)</code>: 2026-05-22 audit status summary</strong> (#218). New <code>docs/audits/2026-05-22-audit-status.md</code> running ledger — tracks which P0/P1/P2/P3 items from the 9 audit reports have shipped vs. remain open.</li>
+<li><strong><code>refactor(execution)</code>: bag_commit_upload + update_asset_execution_table extracted</strong> (#217, audit P1 Ex-god, second sweep). Second pass on the execution god-class — moves <code>_bag_commit_upload</code> and <code>update_asset_execution_table</code> out of <code>Execution</code> into <code>asset_upload.py</code>.</li>
+</ul>
+<p>Version 1.37.14</p>
+<ul>
+<li><strong><code>chore(execution)</code>: P1 sweep (part 1) — 9 audit findings</strong> (#203). Correctness + coverage fixes across <code>execution/</code> subsystem; details in <code>docs/audits/2026-05-22-engineer-audit-execution.md</code>.</li>
+</ul>
+<p>Version 1.37.13</p>
+<ul>
+<li><strong><code>chore(model)</code>: P1 sweep — 10 audit findings</strong> (#202). Correctness + cleanup + coverage fixes across <code>model/</code> subsystem.</li>
+</ul>
+<p>Version 1.37.12</p>
+<ul>
+<li><strong><code>chore(asset)</code>: P1 sweep — 7 audit findings</strong> (#201). Correctness + cleanup + coverage fixes across <code>asset/</code> subsystem.</li>
+</ul>
+<p>Version 1.37.11</p>
+<ul>
+<li><strong><code>chore(catalog)</code>: P1 sweep — 6 audit findings</strong> (#200). Docs + correctness + coverage fixes across <code>catalog/</code> subsystem.</li>
+</ul>
+<p>Version 1.37.10</p>
+<ul>
+<li><strong><code>chore(dataset)</code>: P1 sweep — 2 correctness bugs + 1 cleanup</strong> (#199). Fixes a typo in <code>_version_snapshot_catalog</code> and rebuilds the <code>add_dataset_members</code> cycle check on a real graph walk; deletes two retired <code>DatasetBag</code> tombstones.</li>
+</ul>
+<p>Version 1.37.9</p>
+<ul>
+<li><strong><code>chore(schema)</code>: P1 sweep — 7 audit findings</strong> (#198). Threads the <code>schema</code> parameter through <code>generate_annotation</code>, sorts iteration, honours <code>use_hatrac</code>; backfills docstrings on 3 public functions; adds direct unit tests for <code>asset_annotation</code> and <code>generate_annotation</code>.</li>
+</ul>
+<p>Version 1.37.8</p>
+<ul>
+<li><strong><code>chore(feature)</code>: P1 sweep — 3 audit findings</strong> (#197). FK-classification coverage and docstring fixes.</li>
+</ul>
+<p>Version 1.37.7</p>
+<ul>
+<li><strong><code>chore(core)</code>: P1 sweep — 15 audit findings</strong> (#196). Sweep across <code>core/</code> covering exceptions, type hints, dead-code removal, and coverage.</li>
+</ul>
+<p>Version 1.37.6</p>
+<ul>
+<li><strong>fix-pack 2: eight documentation P0s</strong> (#195). Eight documentation-only P0s from the technical-writer audit — corrected examples, missing args, drifted references.</li>
+</ul>
+<p>Version 1.37.5</p>
+<ul>
+<li><strong>Six correctness P0 fixes from the 2026-05-22 pre-release audit</strong> (#193). (1) <code>Workflow._github_url</code> now treats any non-empty <code>git status --porcelain</code> output as dirty, not just staged-modified files — fixes silent provenance corruption for repos with unstaged, untracked, deleted, or renamed files. (2) <code>FileSpec.create_filespecs</code> now reports each file's actual length under a directory walk (was reporting the parent directory's stat size). (3) <code>DatasetBag.find_features(None)</code> no longer crashes with TypeError; now delegates to the deduped catalog walk. (4) <code>FeatureRecord.select_majority_vote(column=None)</code> auto-detect works on the single-term-feature happy path (was crashing with <code>TypeError: 'set' object is not subscriptable</code>). (5) <code>AssetSpecConfig</code> now mirrors <code>AssetSpec</code> field-for-field — the hydra-zen surface had been silently missing <code>asset_role</code>. (6) Adds integration coverage for <code>localize_assets</code> (350-LoC public function, previously had zero end-to-end tests).</li>
+<li>Adds nine pre-release audit reports under <code>docs/audits/</code> documenting the 382 findings across the four lenses (test coverage, code duplication, logic clarity, docstring completeness) and a follow-on technical-writer audit.</li>
+</ul>
+<p>Version 1.37.4</p>
+<ul>
+<li><strong>New: <code>validate_config_file</code> and <code>bootstrap_config</code> config APIs</strong> (#192). Reusable validation surface plus a bootstrap helper that resolves the workspace <code>.config.yaml</code> if it exists.</li>
+</ul>
+<p>Version 1.37.3</p>
+<ul>
+<li><strong><code>split_dataset</code> takes the caller's Execution</strong> (breaking, #191). The function no longer opens its own execution internally; callers must wrap the call in their own <code>ml.create_execution(...)</code> context and pass <code>exe</code> as the third positional argument. The CLI (<code>deriva-ml-split-dataset</code>) opens its execution on the caller's behalf and is unaffected. Rationale: deriva-ml never invents a workflow on the caller's behalf — the caller's workflow is the durable provenance record for the splitting decision. See <code>src/deriva_ml/dataset/split.py</code> module docstring for the canonical call shape.</li>
+<li><strong><code>fix(local_db)</code>: honest <code>estimated_row_count</code> when <code>row_per</code> is downstream of anchor</strong> (#190).</li>
+</ul>
+<p>Version 1.37.2</p>
+<ul>
+<li><strong><code>fix(local_db)</code>: stateless <code>PagedFetcher</code>; consolidate denormalize design doc</strong> (#189).</li>
+</ul>
+<p>Version 1.37.1</p>
+<ul>
+<li><strong><code>fix(local_db)</code>: hydrate <code>PagedFetcher</code> dedup state from engine on first access</strong> (#188).</li>
+<li><strong>Audit fix-pack: test-suite resync + cross-repo bug-fix workflow docs</strong> (#187). Resyncs 19 tests against the current deriva-py pin (drops removed <code>getCatalogSchema(refresh=True)</code> calls, replaces removed <code>BagDataSource(asset_localization=...)</code> kwarg, deletes stale <code>test_online_drift_warning</code>), migrates 3 denormalize tests to the new <code>row_per=</code> contract, and captures a new "Cross-repo bug fixes (deriva-py ↔ deriva-ml)" subsection in CLAUDE.md.</li>
+</ul>
+<p>Version 1.37.0</p>
+<ul>
+<li><strong><code>fix(schema)</code>: apply <code>acl_config</code> AFTER <code>create_ml_schema</code></strong> (#186). Production bug — every catalog created by deriva-ml since this ordering took shape had been silently missing <code>row_owner_guard</code> on its deriva-ml tables. Effect: non-curator users hit HTTP 403 the first time they PATCHed <code>Execution_Metadata</code> (asset uploads do this). Masked because tests run as catalog-owner with full ACLs.</li>
+<li><strong>Typed exceptions for <code>find_association</code> failure modes</strong> (breaking for <code>except DerivaMLException:</code> catchers, #180). New: <code>DerivaMLAssociationAmbiguous</code> and <code>DerivaMLAssociationNotFound</code> replace bare <code>DerivaMLException</code> raises in <code>Table.find_associations</code>. Existing <code>except DerivaMLException:</code> blocks still work; narrower handlers should switch to the new types.</li>
+<li><strong><code>fix(execution)</code>: warn before <code>download_asset</code> overwrites different bytes</strong> (#184/#181).</li>
+<li><strong><code>fix(execution)</code>: silence misleading dry-run exit warning</strong> (#183/#177).</li>
+<li><strong><code>fix(execution)</code>: move upload staging out of cache root</strong> (#182/#178). Staging now lives at <code>&lt;workspace&gt;/staging/&lt;execution_rid&gt;/</code>, not in the cache root — prevents stale staging files from leaking across runs.</li>
+<li><strong><code>fix(execution)</code>: RID-key the per-asset download path</strong> (#179).</li>
+<li><strong><code>fix(denormalize)</code>: feature-assoc tables are transparent</strong> (#176/#174). Denormalization now treats feature association tables (Execution_*) as transparent links rather than terminal sinks. Closes the "feature columns missing from denormalized output" class of bugs.</li>
+<li><strong><code>fix</code>: <code>SchemaCache</code> race when two processes write concurrently</strong> (#175/#173).</li>
+<li><strong><code>fix(execution)</code>: <code>list_execution_children</code>/<code>parents</code> propagate duration fields</strong> (#172).</li>
+<li><strong><code>fix(feature)</code>: <code>select_by_execution</code> returns <code>None</code> on no match, not raise</strong> (#171). Mirrors <code>select_by_workflow</code>'s no-match semantics; <code>feature_values</code> silently skips target rows whose record group has no match rather than aborting the whole query.</li>
+<li><strong><code>feat(dataset)</code>: adapters always surface element RID in return tuple</strong> (#169). Both <code>as_torch_dataset</code> and <code>as_tf_dataset</code> now yield <code>(image, target, rid)</code> rather than <code>(image, target)</code>. Lets training loops correlate per-batch predictions back to dataset rows.</li>
+<li><strong><code>fix(dataset)</code>: adapters resolve asset paths against canonical BDBag layout</strong> (#167). Plus a new "RID opacity rule" added to CLAUDE.md: a RID's only valid operation is equality comparison; never parse, slice, regex, or <code>startswith</code> on it, never compare across catalogs, never sort client-side by RID.</li>
+<li><strong><code>docs(reference)</code>: backfill <code>schema.md</code> to match <code>create_schema.py</code></strong> (#170). The reference is now described as canonical per <code>reference/README.md</code>.</li>
+<li><strong><code>fix(execution)</code>: drop unsupported <code>upload_timeout</code> / <code>upload_chunk_size</code> from <code>run_model</code></strong> (#168).</li>
+<li><strong><code>fix(execution)</code>: <code>__exit__</code> writes <code>Duration</code>; split into three phase columns</strong> (#166). Execution duration is now broken into <code>Download_Duration</code>, <code>Execution_Duration</code>, <code>Upload_Duration</code> so the three phases are independently observable in catalog rows.</li>
+<li><strong><code>refactor(auth)</code>: drop <code>check_auth</code> and the <code>get_authn_session</code> probe</strong>. The <code>check_auth</code> keyword no longer exists on <code>DerivaMLConfig</code>; remove it from any hydra-zen configs.</li>
+<li><strong>B1 + B2: simplify schema cache; fix <code>find_features</code> duplicates</strong>. <code>DerivaML._init_online</code> now delegates schema-freshness entirely to deriva-py's <code>ErmrestCatalog</code> (ETag revalidation + auto-invalidation on schema mutations through the same instance). <code>find_features()</code> no longer returns each feature multiple times when its association table has FKs to multiple tables.</li>
+<li><strong>T1: route all schema reads through deriva-py's <code>getCatalogSchema</code></strong>. Removes deriva-ml's local schema cache plumbing; the binding-layer cache is now the single source.</li>
+<li><strong><code>docs(api)</code>: document <code>find_*</code> / <code>list_*</code> method naming convention</strong> (#163). The convention is now load-bearing — <code>find_*</code> is schema-introspection/discovery with filtering; <code>list_*</code> is straightforward enumeration of "what's there" inside a known scope.</li>
+</ul>
+<p>Version 1.36.5</p>
+<ul>
+<li><strong><code>fix(execution)</code>: auto-tag input/output assets with <code>Input_File</code> / <code>Output_File</code></strong> (#165). Every asset linked to an execution is now tagged with <code>Asset_Role</code> automatically based on the direction of the link, restoring a regression in input-side tagging that had been silently broken since the previous lifecycle refactor.</li>
+<li><strong><code>fix(schema)</code>: remove domain-specific terms from default <code>Workflow_Type</code></strong> (E5, #164). The bootstrap vocabulary set no longer seeds opinionated domain-specific terms like <code>VGG19</code>, <code>RETFound</code>, <code>Multimodal</code>, or <code>Embedding</code> — those belong to downstream projects, not the framework.</li>
+</ul>
+<p>Version 1.36.4</p>
+<ul>
+<li>Docs: Phase 3 audit of <code>core/</code> subsystem and follow-on cleanup (#153, #154). 10 cleanup actions across <code>core/</code>.</li>
+</ul>
+<p>Version 1.36.3</p>
+<ul>
+<li><strong><code>refactor(schema)</code>: Phase 3 audit cleanup</strong> (#158). 11 commits / 13 actions; −11.6K LoC. Stripped legacy schema-generation paths now superseded by the bag pipeline. No user-facing API surface change.</li>
+</ul>
+<p>Version 1.36.2</p>
+<ul>
+<li><strong><code>refactor(catalog)</code>: Phase 3 audit cleanup</strong> (#156). 10 commits / 13 actions plus provenance wiring on the clone path.</li>
+</ul>
+<p>Version 1.36.1</p>
+<ul>
+<li><strong><code>refactor(core)</code>: Phase 3 audit cleanup</strong> (#154). 10 commits / 10 actions; tightens core module structure ahead of the next round of feature work.</li>
+</ul>
+<p>Version 1.36.0</p>
+<ul>
+<li><strong>Bag-pipeline migration complete</strong> (#111, #109, #110). The catalog clone path now routes entirely through deriva-py's bag pipeline (<code>CatalogBagBuilder</code>, <code>BagCatalogLoader</code>); the legacy upload path is retired. Net: −1479 LoC across deriva-ml.</li>
+<li><strong><code>feat(execution)</code>: bag-based <code>commit_execution</code> (per-execution path)</strong> (#103). Plus URL-dedup bag commit and the deletion of the legacy upload path (#104).</li>
+<li><strong><code>feat(clone-via-bag)</code>: terminal-tables for Execution/Workflow + policy-default merging</strong> (#101).</li>
+<li><strong><code>feat(catalog)</code>: nested-Dataset anchor expansion + vocab FULL default + schema-clone fixture</strong> (#100).</li>
+<li><strong><code>fix(dataset)</code>: <code>DatasetMinid</code> stops constructing <code>rid@None</code> when snapshot absent</strong> (#106).</li>
+<li><strong><code>refactor(execution)</code>: lean on upstream bag helpers, drop ~330 LoC</strong> (#107). Plus #108 Phase-1 cleanup (~1479 LoC removed across dataset-bag cutover and logger consolidation).</li>
+<li><strong>Phase 2 cleanup sprint (Steps 1–10)</strong> (#109) and <strong>Phase 2 polish (Steps 13–16)</strong> (#110): docstrings, naming, ADR-0007 (annotation-builders public API contract), apply-annotation guards.</li>
+</ul>
+<p>Version 1.35.0</p>
+<ul>
+<li><strong><code>feat(bag-migration)</code>: migrate deriva-ml onto <code>deriva.bag</code></strong> (#96). Foundation for the bag-pipeline arc completed in v1.36.0.</li>
+<li><strong>ADR-0006 + CONTEXT.md additions for bag-oriented data movement</strong> (#95).</li>
+<li><strong><code>refactor(dataset)</code>: rewire callers from <code>CatalogGraph</code> to <code>DatasetBagBuilder</code></strong> (#97).</li>
+<li><strong><code>test(catalog)</code>: live-catalog integration tests for <code>clone_via_bag</code> (xfail-marked)</strong> (#98).</li>
+<li><strong><code>fix(local_db)</code>: turn off SQLite FK enforcement during <code>_populate_from_catalog</code></strong> (#99).</li>
+<li><strong><code>fix(schema)</code>: regenerate <code>deriva-ml-reference.json</code> from fresh catalog dump</strong> (closes #83, #92).</li>
+</ul>
+<p>Version 1.34.0</p>
+<ul>
+<li><strong>Dataset dev versioning</strong> (breaking). Datasets now use a two-state versioning model: released versions (citable, snapshot-pinned) and dev versions (mutable, between-release labels of the form <code>&lt;release&gt;.post1.devN</code>). Every mutation lands on a dev version; <code>Dataset.release()</code> is the only path to a released version. See <code>docs/adr/0003-dataset-dev-versioning-model.md</code> and <code>docs/user-guide/migration.md</code> for the full migration story.</li>
+<li><strong><code>increment_dataset_version</code> renamed to <code>release</code></strong> (breaking). New signature: <code>Dataset.release(bump, description, execution=None)</code>. The old method is preserved as a private <code>_increment_dataset_version</code> for system-internal use only (e.g., catalog clone reinitialization).</li>
+<li><strong><code>add_dataset_members</code>, <code>delete_dataset_members</code>, <code>add_dataset_type</code>, <code>add_dataset_types</code>, <code>remove_dataset_type</code> now land on dev</strong> (breaking). Each call advances <code>.devN</code> rather than producing a released version. To mint a release after mutations, call <code>dataset.release(...)</code>.</li>
+<li><strong><code>DatasetVersion</code> rebased on PEP 440</strong> (breaking for some equality assertions). The wire format for released versions is unchanged (<code>"0.4.0"</code>); dev labels use PEP 440 post-release form (<code>"0.4.0.post1.dev1"</code>). String equality (<code>current_version == "1.0.0"</code>) no longer works — coerce explicitly: <code>str(current_version) == "1.0.0"</code>.</li>
+<li><strong>New: <code>Dataset.mark_dev</code>, <code>is_dirty</code>, <code>release_diff</code>, <code>compare_versions</code>.</strong> Mark drift explicitly, detect whether the catalog has drifted since the last release, and compare any two versions.</li>
+<li>Documentation: new ADRs (0003 dev-versioning model, 0004 PEP 440 vocabulary, 0005 delivery sequence) and a CONTEXT.md vocabulary file.</li>
+</ul>
+<p>Version 1.2.0</p>
+<ul>
+<li>Dataset versioning with semantic versioning. Note that the current dataset version does <em>NOT</em> have the current catalog values, but rather the values at the time the dataset was created. 
+To get the current values you must increment the dataset version number.  Please consult online documentation for more information on dataset and versioning.</li>
+<li>Streamlined create_execution.  Now all datasets are automatically downloaded and instance variable has databag classes. You no longer need to explictly create dataset_bdbag. </li>
+<li>Significant performance improvement on cached dataset access and initial download</li>
+<li>Automatic creation of MINID for every dataset download</li>
+<li>Added method to restore an existing execution from local disk.</li>
+</ul>
+<p>Version 1.1.4
+- Fixed error when creating DatasetBag on windows platform.</p>
+<p>Version 1.1.1</p>
+<ul>
+<li>Removed restriction on nested datasets so that now any level of nesting can be accomidated.</li>
+<li>Fixed bug in nested dataset download.</li>
+<li>Added additional methods to DatasetBag to make it easear to explore datasets.</li>
+<li>Added <code>datasets</code> instance variable to Execution object which has Dataset objects for all of the datasets listed in the configuration.</li>
+<li>Added option to DatasetBag init to provide a dataset RID or a path.  If the dataset has already been loaded, or the dataset is nested, this will return the assocated DatasetBag object.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../api-reference/exceptions/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Exceptions">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Exceptions
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

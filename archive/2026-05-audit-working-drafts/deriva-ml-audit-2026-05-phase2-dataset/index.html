@@ -1,0 +1,3952 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase2-dataset/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml audit 2026-05 — Phase 2: dataset/ - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-audit-2026-05-phase-2-dataset" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml audit 2026-05 — Phase 2: dataset/
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-1-dead-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 1 — Dead code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 1 — Dead code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-bagcachemigrate_legacy_cache-has-no-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 BagCache.migrate_legacy_cache has no callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-bagcacheindex-property-is-exposed-but-not-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 BagCache.index property is exposed but not used
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-bagcachecache_status-returns-versions_cached-that-nobody-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 BagCache.cache_status returns versions_cached that nobody reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-datasetprefetch-is-a-back-compat-alias-on-a-method-that-has-no-callers-needing-the-alias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 Dataset.prefetch is a back-compat alias on a method that has no callers needing the alias
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-_default_dir_name_from_target-does-an-import-inside-import-dance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 _default_dir_name_from_target does an import-inside-import dance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-datasetbaglist_dataset_members_visited-etc-are-marked-underscore-private-but-appear-in-the-public-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6 DatasetBag.list_dataset_members._visited etc. are marked underscore-private but appear in the public signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-datasetbagfetch_table_features-list_feature_values-are-retired-but-still-defined" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.7 DatasetBag.fetch_table_features / list_feature_values are retired but still defined
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-dataset_list_dataset_parents_current-_list_dataset_children_current-are-private-but-exist-for-one-caller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.8 Dataset._list_dataset_parents_current / _list_dataset_children_current are private but exist for one caller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-datasetbag__init__-argument-dataset_types-is-unused-as-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.9 DatasetBag.__init__ argument dataset_types is unused-as-input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#110-stale-cataloggraph-references-in-test-docstrings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.10 Stale CatalogGraph references in test docstrings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-2-deriva-py-derivabag-interface-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 2 — Deriva-py / deriva.bag interface usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 2 — Deriva-py / deriva.bag interface usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-dataset_create_dataset_bag_client-re-implements-catalogbagbuilder_run_export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Dataset._create_dataset_bag_client re-implements CatalogBagBuilder._run_export
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-dataset_download_dataset_minid-and-_bag_is_fully_materialized-parallel-bag_cachepy_is_fully_materialized" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Dataset._download_dataset_minid and _bag_is_fully_materialized parallel bag_cache.py:_is_fully_materialized
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-_create_dataset_bag_client-builds-the-remote-file-manifest-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 _create_dataset_bag_client builds the remote-file manifest by hand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-bag_builderpy_catalog_bag_builder-stashes-a-temporarydirectory-on-the-instance-to-satisfy-a-constructor-requirement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 bag_builder.py:_catalog_bag_builder stashes a TemporaryDirectory on the instance to satisfy a constructor requirement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-datasetestimate_bag_size_extract_path-parses-a-uri-back-into-a-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Dataset.estimate_bag_size._extract_path parses a URI back into a path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-estimate_bag_size-uses-asyncermrestcatalog-directly-instead-of-the-bag-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 estimate_bag_size uses AsyncErmrestCatalog directly instead of the bag pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-bag_builderpy_dataset_visible_fkeys-could-use-purefalse-max_arity3-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 bag_builder.py:_dataset_visible_fkeys could use pure=False, max_arity=3 consistency
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-4-inconsistencies-duplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 4 — Inconsistencies / duplication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 4 — Inconsistencies / duplication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-two-cache-layouts-coexist-the-legacy-one-is-still-being-written" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Two cache layouts coexist; the legacy one is still being written
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-datasetlist_dataset_members-and-datasetbaglist_dataset_members-reimplement-the-element-type-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Dataset.list_dataset_members and DatasetBag.list_dataset_members reimplement the element-type loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-datasetlist_dataset_members-vs-datasetbag_dataset_table_view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Dataset.list_dataset_members vs. DatasetBag._dataset_table_view
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-label-resolution-two-paths-in-dataset_bagpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Label resolution: two paths in dataset_bag.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-snapshot-resolution-duplicated-three-ways" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Snapshot resolution duplicated three ways
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-datasetpy-and-dataset_bagpy-reimplement-list_dataset_children-list_dataset_parents-similarly-but-not-identically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 dataset.py and dataset_bag.py reimplement list_dataset_children / list_dataset_parents similarly but not identically
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-bag_cachepycachestatus-carries-an-aliased-member-that-doesnt-behave-like-an-alias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 bag_cache.py:CacheStatus carries an aliased member that doesn't behave like an alias
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-5-simplification-opportunities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 5 — Simplification opportunities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 5 — Simplification opportunities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-delete-_create_dataset_bag_client-subsumes-21-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Delete _create_dataset_bag_client (subsumes §2.1, §2.3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-unify-the-cache-layout-41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Unify the cache layout (§4.1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-fold-_load_feature_values_cache-into-_resolve_targets-44" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Fold _load_feature_values_cache into _resolve_targets (§4.4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-build-a-single-_association_map-helper-42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Build a single _association_map helper (§4.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-replace-_bag_is_fully_materialized-with-the-working-bagcache_is_fully_materialized-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Replace _bag_is_fully_materialized with the working BagCache._is_fully_materialized (§2.2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-delete-_list_dataset__current-duplicates-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 Delete _list_dataset_*_current duplicates (§1.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-move-uploadpy-to-executionupload_layoutpy-or-similar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 Move upload.py to execution/upload_layout.py (or similar)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#58-inline-datasetprefetch-away-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.8 Inline Dataset.prefetch away (§1.4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#59-use-dppath-instead-of-substring-marker-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.9 Use dp.path instead of substring marker (§2.5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-6-maintainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 6 — Maintainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 6 — Maintainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-datasetpy-carries-three-responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 dataset.py carries three responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-dataset_bagpy-carries-three-responsibilities-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 dataset_bag.py carries three responsibilities too
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-docstring-quality-is-good-with-a-few-drifted-comments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Docstring quality is good, with a few drifted comments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-naming-bag_path-bag_dir-cached_bag_path-cache_dir-cache_suffix-cache_dir_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Naming: bag_path, bag_dir, cached_bag_path, cache_dir, cache_suffix, cache_dir_name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-datasetdataset_types-re-fetches-on-every-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Dataset.dataset_types re-fetches on every access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-__all__-is-missing-on-every-non-__init__-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 __all__ is missing on every non-__init__ module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#67-_visited-parameter-is-private-but-public" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.7 _visited parameter is "private" but public
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#68-datasetcreate_dataset-is-a-staticmethod-that-uses-cls-in-its-docstring-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.8 Dataset.create_dataset is a staticmethod that uses cls in its docstring example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#69-splitpy_logger-initialization-at-line-1172" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.9 split.py:_logger initialization at line 1172
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-actions-1n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions (1–N)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#follow-up-scope-phase-3-candidates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Follow-up scope (Phase 3 candidates)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Follow-up scope (Phase 3 candidates)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#3a-datasetpy-structural-split-action-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.A dataset.py structural split (action 10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3b-dataset_bagpy-structural-split-action-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.B dataset_bag.py structural split (action 10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3c-dataset-datasetbag-interface-harmonization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.C Dataset / DatasetBag interface harmonization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3d-datasetestimate_bag_size-performance-vs-bag-pipeline-alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.D Dataset.estimate_bag_size performance vs. bag-pipeline alignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3e-bagcacheindex-semantics-for-multi-anchor-bags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.E BagCacheIndex semantics for multi-anchor bags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-2-audit-closing-inventory-2026-05-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 audit — closing inventory (2026-05-15)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2 audit — closing inventory (2026-05-15)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ranked-actions-110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions (1–10)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-follow-up-candidates-3a3e" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 follow-up candidates (§3.A–§3.E)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loc-reduction-achieved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoC reduction achieved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#items-intentionally-not-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Items intentionally NOT done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#closing-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closing posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-audit-2026-05-phase-2-dataset">deriva-ml audit 2026-05 — Phase 2: dataset/</h1>
+<p>Reviewed <code>/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/dataset/</code>
+(~6 800 LoC across 13 Python files) at the tip of
+<code>fix/catalog-manager-state-guards</code> (HEAD <code>4442f82</code>). External-API
+checks were run against <code>/Users/carl/GitHub/deriva-py/deriva/bag/</code>
+(the ADR-0006 producer/consumer module). The Phase 1 cleanup sprint
+has landed: <code>CatalogGraph</code> is gone, <code>DatasetBagBuilder</code> now drives
+<code>CatalogBagBuilder</code> for real, <code>bag_cache.py</code> is a <code>BagCacheIndex</code>
+wrapper, <code>icecream</code> imports are gone, <code>LoggerMixin</code> is gone, the
+<code>model/</code> shim layer is gone. What's left is mostly the part the
+Phase 1 audit didn't reach into: the two god modules (<code>dataset.py</code>
+3 579, <code>dataset_bag.py</code> 2 385) and the legacy cache/download path
+inside <code>dataset.py</code> that didn't move when <code>bag_cache.py</code> did.</p>
+<h2 id="executive-summary">Executive summary</h2>
+<p>Overall posture: <strong>the load-bearing migration is done; the surface
+that consumed the old machinery is still on the old shape.</strong>
+<code>DatasetBagBuilder</code> correctly drives <code>CatalogBagBuilder</code> per the
+cutover doc. But <code>Dataset.download_dataset_bag</code> and its three
+helpers (<code>_get_dataset_minid</code>, <code>_download_dataset_minid</code>,
+<code>_create_dataset_bag_client</code>) still implement the legacy
+<code>{rid}_{checksum}/Dataset_{rid}</code> cache layout, write
+<code>validated_check.txt</code> markers, and re-implement the export-engine's
+query-processor loop in pure Python — <em>while</em> the bag pipeline can
+now answer all three concerns. <code>BagCache</code> already speaks the new
+content-addressed index but only <code>Dataset.bag_info</code> reads it; nothing
+writes through it.</p>
+<p>Top themes ranked by impact:</p>
+<ol>
+<li>
+<p><strong>Two cache layouts coexist.</strong> <code>bag_cache.py:143</code> reads via
+   <code>BagCacheIndex</code>. <code>dataset.py:2874, 2898, 3365</code> writes via the
+   legacy <code>{rid}_{spec_hash[:16]}_{snapshot}/</code> directory layout
+   and the <code>validated_check.txt</code> marker. The two are stitched by
+   <code>BagCache.cache_status</code> (<code>bag_cache.py:145-186</code>) which falls
+   back to the legacy glob — a wallpaper-over-the-crack that the
+   bag-cutover doc explicitly called for finishing. Until the
+   write-side flips, every download writes a directory the index
+   doesn't know about.</p>
+</li>
+<li>
+<p><strong><code>Dataset._create_dataset_bag_client</code> re-implements the export
+   engine.</strong> <code>dataset.py:3024-3255</code> walks the spec returned by
+   <code>DatasetBagBuilder.generate_dataset_download_spec</code>, branches on
+   <code>processor=</code> strings (<code>env</code>, <code>json</code>, <code>csv</code>, <code>fetch</code>), and writes
+   CSVs + a remote-file manifest by hand. The bag pipeline's
+   <code>CatalogBagBuilder.build()</code> (<code>deriva-py/deriva/bag/catalog_builder.py:167</code>)
+   does exactly this work and writes a profile-conformant bag. The
+   client-export path predates ADR-0006 and was kept "for paged
+   query support and snapshot-catalog timeout handling"; both are
+   now in <code>CatalogBagBuilder._run_export</code> (<code>catalog_builder.py:1160</code>).
+   This is the biggest single LoC win available in <code>dataset/</code>.</p>
+</li>
+<li>
+<p><strong><code>Dataset</code> and <code>DatasetBag</code> reimplement the same operations
+   differently.</strong> <code>list_dataset_members</code>, <code>list_dataset_children</code>,
+   <code>list_dataset_parents</code>, <code>list_executions</code>, <code>get_denormalized_*</code>,
+   <code>find_features</code>, <code>feature_values</code>, <code>lookup_feature</code>,
+   <code>list_dataset_element_types</code> — every one of these has a live-
+   catalog body in <code>dataset.py</code> and a SQLite body in <code>dataset_bag.py</code>.
+   The element-type loop alone is reimplemented three times (<code>dataset.py:1535</code>,
+   <code>dataset_bag.py:501</code>, <code>_dataset_table_view</code> at <code>dataset_bag.py:359</code>).
+   Half the divergences are necessary (live vs. SQLite); the other
+   half are accidental and the tests pin both shapes.</p>
+</li>
+<li>
+<p><strong><code>upload.py</code> is in the wrong package.</strong> Nothing in
+   <code>dataset/</code> imports it; every consumer
+   (<code>execution/execution.py</code>, <code>execution/bag_commit.py</code>,
+   <code>execution/upload_engine.py</code>, <code>asset/null_sentinel_processor.py</code>,
+   <code>schema/annotations.py</code>, <code>core/base.py</code>,
+   <code>core/mixins/path_builder.py</code>) is outside <code>dataset/</code>. It is a
+   642-line upload-staging-layout module that lives here for
+   historical reasons.</p>
+</li>
+<li>
+<p><strong><code>BagCache</code> carries a one-shot migrator with no caller.</strong>
+   <code>bag_cache.py:285-384</code> exposes <code>migrate_legacy_cache</code> to
+   walk <code>{cache_dir}/{rid}_*</code> directories and record them in
+   <code>BagCacheIndex</code>. No production code path invokes it. Its sole
+   reason to exist is to let users with pre-migration caches keep
+   them — but the legacy-write path in <code>Dataset</code> is <em>also</em> still
+   alive (theme 1), so users keep producing legacy directories
+   without ever migrating them.</p>
+</li>
+</ol>
+<p>Worst-offending modules within <code>dataset/</code>:</p>
+<ol>
+<li>
+<p><strong><code>dataset.py</code></strong> (3 579 LoC). <code>_create_dataset_bag_client</code>
+   (231 LoC), <code>_get_dataset_minid</code> (197 LoC), and
+   <code>_download_dataset_minid</code> (94 LoC) are the dead-weight. The
+   <code>Dataset</code> class itself has 58 public/private methods and
+   carries three concerns: catalog-side dataset CRUD, version
+   management, and bag-download orchestration.</p>
+</li>
+<li>
+<p><strong><code>dataset_bag.py</code></strong> (2 385 LoC). Internal asset-restructuring
+   helpers (<code>_get_asset_dataset_mapping</code>,
+   <code>_load_feature_values_cache</code>, <code>_resolve_grouping_value</code>,
+   <code>_detect_asset_table</code>, <code>_validate_dataset_types</code>,
+   <code>_build_dataset_type_path_map</code>) are private to
+   <code>restructure_assets</code> but parallel internally what
+   <code>target_resolution._resolve_targets</code> solves for
+   <code>as_torch_dataset</code> / <code>as_tf_dataset</code>. Two label-resolution
+   paths through the same bag.</p>
+</li>
+<li>
+<p><strong><code>bag_cache.py</code></strong> (387 LoC). Healthy direction; the legacy
+   fallback branches and the migrator are dead-on-arrival until
+   the write-side cutover (theme 1).</p>
+</li>
+</ol>
+<hr />
+<h2 id="subsystem-inventory">Subsystem inventory</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">LoC</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__.py</code></td>
+<td style="text-align: right;">35</td>
+<td>Public-package surface. Clean.</td>
+</tr>
+<tr>
+<td><code>aux_classes.py</code></td>
+<td style="text-align: right;">417</td>
+<td><code>DatasetVersion</code>, <code>DatasetHistory</code>, <code>DatasetMinid</code>, <code>DatasetSpec</code>, <code>DatasetSpecConfig</code>. Pydantic. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>bag_builder.py</code></td>
+<td style="text-align: right;">730</td>
+<td><code>DatasetBagBuilder</code>. The wrapper that drives <code>deriva.bag.catalog_builder.CatalogBagBuilder</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>bag_cache.py</code></td>
+<td style="text-align: right;">387</td>
+<td><code>BagCache</code> + <code>CacheStatus</code> + <code>migrate_legacy_cache</code>. Half-cutover (see Lens 4.1).</td>
+</tr>
+<tr>
+<td><code>bag_feature_cache.py</code></td>
+<td style="text-align: right;">180</td>
+<td><code>BagFeatureCache</code> (per-feature SQLite denorm cache). Single consumer: <code>DatasetBag.feature_values</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>dataset.py</code></td>
+<td style="text-align: right;">3 579</td>
+<td>God module. Three responsibilities (CRUD, versions, bag download) in one class.</td>
+</tr>
+<tr>
+<td><code>dataset_bag.py</code></td>
+<td style="text-align: right;">2 385</td>
+<td>God module. <code>DatasetBag</code> + <code>restructure_assets</code> helpers. Half overlap with <code>dataset.py</code>.</td>
+</tr>
+<tr>
+<td><code>split.py</code></td>
+<td style="text-align: right;">1 276</td>
+<td><code>split_dataset</code> + CLI. Independent. Carries its own logging-config code (<code>split.py:75, 1172-1177</code>) — Phase-1 §4.5 contagion.</td>
+</tr>
+<tr>
+<td><code>target_resolution.py</code></td>
+<td style="text-align: right;">137</td>
+<td><code>_resolve_targets</code> for adapters/restructure. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>tf_adapter.py</code></td>
+<td style="text-align: right;">204</td>
+<td><code>build_tf_dataset</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>torch_adapter.py</code></td>
+<td style="text-align: right;">179</td>
+<td><code>build_torch_dataset</code>. <strong>Healthy.</strong></td>
+</tr>
+<tr>
+<td><code>upload.py</code></td>
+<td style="text-align: right;">642</td>
+<td>Upload-staging directory layout + spec builder. <strong>Mis-placed</strong> (zero in-package consumers).</td>
+</tr>
+<tr>
+<td><code>validation.py</code></td>
+<td style="text-align: right;">225</td>
+<td>Pydantic models for spec-validation reports. <strong>Healthy.</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Cross-module dependencies worth naming:</p>
+<ul>
+<li><code>bag_builder.py</code> consumes only <code>deriva.bag.*</code> + <code>core/</code>. It does
+  <em>not</em> depend on <code>Dataset</code> — <code>DatasetLike</code> is the protocol it
+  takes. Clean.</li>
+<li><code>dataset.py</code> imports <code>DatasetBag</code> from <code>dataset_bag.py</code> (return
+  type of <code>download_dataset_bag</code>) <em>and</em> <code>DatasetBagBuilder</code> from
+  <code>bag_builder.py</code> (for the spec, aggregate-queries, and drift
+  paths). Single highest-fanout module.</li>
+<li><code>dataset_bag.py</code> consumes <code>target_resolution</code>, <code>bag_feature_cache</code>,
+  <code>tf_adapter</code>, <code>torch_adapter</code> via lazy imports. Healthy structure;
+  the body is just too large.</li>
+<li><code>bag_cache.py</code> is only imported by <code>dataset.py:2678</code> (one call
+  site — <code>bag_info</code>). Despite the module's role, the live download
+  path doesn't touch it.</li>
+</ul>
+<hr />
+<h2 id="lens-1-dead-code">Lens 1 — Dead code</h2>
+<h3 id="11-bagcachemigrate_legacy_cache-has-no-callers">1.1 <code>BagCache.migrate_legacy_cache</code> has no callers</h3>
+<p><code>bag_cache.py:285-384</code> — 100-line migrator for pre-deriva.bag
+caches. <code>grep -r "migrate_legacy_cache" src/ tests/</code> returns zero
+hits; it isn't exposed on <code>DerivaML</code>, no CLI ships it, no test
+exercises it. The function itself is correct but the use case it
+exists for is unreachable from the current API surface.</p>
+<p><strong>Two options:</strong></p>
+<p>(a) Expose it as a one-shot CLI (<code>deriva-ml-migrate-cache</code>) and
+document it in the migration guide.</p>
+<p>(b) Delete it. Legacy caches will be re-downloaded on next access
+and the deterministic-cache key (<code>{rid}_{spec_hash[:16]}_{snapshot}</code>)
+matches the same content, so users pay one re-download per dataset
+and never need the migrator.</p>
+<p><strong>Recommended:</strong> (b), because the <em>write-side</em> legacy layout
+hasn't been retired either (see §4.1) — adding a one-time migrator
+on top of a still-writing legacy path produces dirty caches
+indefinitely.</p>
+<p><strong>Risk: low. LoC: −100.</strong> <strong>Severity: medium</strong> (the function is the
+only piece of <code>bag_cache.py</code> that signals "migration in progress";
+deleting it forces the issue).</p>
+<h3 id="12-bagcacheindex-property-is-exposed-but-not-used">1.2 <code>BagCache.index</code> property is exposed but not used</h3>
+<p><code>bag_cache.py:115-123</code> exposes the underlying <code>BagCacheIndex</code> as a
+public property for "callers that need richer index queries." Grep
+across <code>src/</code> and <code>tests/</code> shows zero callers. The docstring
+suggests <code>find_bags_for_rid</code>, <code>list_bags</code>, <code>total_size_bytes</code> as
+intended use cases — none are invoked.</p>
+<p><strong>Fix:</strong> delete the property until a caller needs it.
+<strong>Risk: low. LoC: −15.</strong> <strong>Severity: low.</strong></p>
+<h3 id="13-bagcachecache_status-returns-versions_cached-that-nobody-reads">1.3 <code>BagCache.cache_status</code> returns <code>versions_cached</code> that nobody reads</h3>
+<p><code>bag_cache.py:153-172</code> builds and returns a <code>versions_cached</code>
+list ("supplied for back-compat with the pre-migration API").
+<code>grep -rn '\["versions_cached"\]' src/ tests/</code> shows zero
+consumers. <code>Dataset.bag_info</code> (the single caller) returns
+<code>cache.cache_status(...)</code> merged with size info but no caller of
+<code>bag_info</code> reads the list either.</p>
+<p><strong>Fix:</strong> drop <code>versions_cached</code> from the return dict. Or move it
+to a separate <code>BagCache.list_versions(rid)</code> method that nobody is
+currently asked to call.
+<strong>Risk: low. LoC: −5.</strong> <strong>Severity: low.</strong></p>
+<h3 id="14-datasetprefetch-is-a-back-compat-alias-on-a-method-that-has-no-callers-needing-the-alias">1.4 <code>Dataset.prefetch</code> is a back-compat alias on a method that has no callers needing the alias</h3>
+<p><code>dataset.py:2725-2727</code> — <code>prefetch(*args, **kwargs)</code> is a single-
+line wrapper around <code>cache(*args, **kwargs)</code> documented as
+"Deprecated: Use cache() instead." <code>grep -rn '\.prefetch(' src/</code>
+returns one hit (the alias itself). <code>grep -rn '\.prefetch(' tests/</code>
+returns zero hits. No external project under the workspace uses
+it either.</p>
+<p><strong>Fix:</strong> delete the alias. <strong>Risk: low.</strong> <strong>LoC: −5.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="15-_default_dir_name_from_target-does-an-import-inside-import-dance">1.5 <code>_default_dir_name_from_target</code> does an import-inside-import dance</h3>
+<p><code>dataset_bag.py:67-114</code> imports <code>DerivaMLException</code> at module load
+<em>and</em> re-imports it inside the function body (line 92). The
+function-body import is dead. Same pattern at <code>dataset_bag.py:2096</code>
+inside <code>restructure_assets</code>.</p>
+<p><strong>Fix:</strong> remove the redundant import. <strong>Risk: zero. LoC: −2.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="16-datasetbaglist_dataset_members_visited-etc-are-marked-underscore-private-but-appear-in-the-public-signature">1.6 <code>DatasetBag.list_dataset_members._visited</code> etc. are marked underscore-private but appear in the public signature</h3>
+<p><code>dataset_bag.py:445-543</code>, <code>829-888</code>, <code>890-941</code> — the recursion-
+guard parameter <code>_visited: set[RID] | None = None</code> is part of every
+external signature, including in <code>Dataset</code> itself (<code>dataset.py:1493,
+2111, 2177</code>). Pydantic <code>validate_call</code> won't catch user values
+because the same default is used; static type checkers see it as a
+public kwarg. The leading <code>_</code> is a fig leaf.</p>
+<p><strong>Fix:</strong> either prefix with the standard "private" call wrappers
+(<code>_list_dataset_members_internal(visited=...)</code>) or document
+<code>_visited</code> as an internal sentinel callers must not pass.
+<strong>LoC: ±0</strong> for documentation; <strong>+~20 / −~20</strong> for splitting.
+<strong>Severity: low.</strong></p>
+<h3 id="17-datasetbagfetch_table_features-list_feature_values-are-retired-but-still-defined">1.7 <code>DatasetBag.fetch_table_features</code> / <code>list_feature_values</code> are retired but still defined</h3>
+<p><code>dataset_bag.py:772-811</code> defines two methods that exist only to
+raise <code>DerivaMLException("retired")</code>. Each carries an 18-line
+docstring explaining what to use instead. Their presence makes the
+public surface noisier than a <code>__getattr__</code> would.</p>
+<p><strong>Fix:</strong> delete both methods and let attribute access raise
+<code>AttributeError</code>. Or replace with a <code>__getattr__</code> that maps the
+two stale names to a single <code>DerivaMLException</code>.
+<strong>Risk: low</strong> (the deprecation messages are still relevant; users
+hitting them get a clear pointer either way). <strong>LoC: −45.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="18-dataset_list_dataset_parents_current-_list_dataset_children_current-are-private-but-exist-for-one-caller">1.8 <code>Dataset._list_dataset_parents_current</code> / <code>_list_dataset_children_current</code> are private but exist for one caller</h3>
+<p><code>dataset.py:2232-2257</code> — two near-duplicate methods that exist
+because <code>_build_dataset_graph_1</code> (<code>dataset.py:859</code>) needs a
+version-agnostic walk. Each is ~12 lines, both duplicate the
+relevant branch of <code>list_dataset_parents</code> / <code>list_dataset_children</code>
+with <code>version=None</code>.</p>
+<p><strong>Fix:</strong> replace with <code>list_dataset_parents(version=None)</code> /
+<code>list_dataset_children(version=None)</code> calls. The version=None
+case already exists in the public methods. <strong>LoC: −25.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="19-datasetbag__init__-argument-dataset_types-is-unused-as-input">1.9 <code>DatasetBag.__init__</code> argument <code>dataset_types</code> is unused-as-input</h3>
+<p><code>dataset_bag.py:170-217</code> — the constructor accepts
+<code>dataset_types: str | list[str] | None</code> and stores it. No caller
+in <code>src/</code> or <code>tests/</code> ever passes this argument (verified by
+<code>grep -rn 'DatasetBag(' src/ tests/</code>). Every call path goes
+through <code>DerivaMLBagView.lookup_dataset(rid)</code> which doesn't
+forward the kwarg.</p>
+<p><strong>Fix:</strong> drop the parameter and the normalisation block at
+<code>dataset_bag.py:208-214</code>. Promote <code>dataset_types</code> to a computed
+property that reads from the SQLite <code>Dataset_Dataset_Type</code> table
+on demand (matching the live <code>Dataset.dataset_types</code> property at
+<code>dataset.py:230</code>).
+<strong>Risk: medium</strong> (one tests asserts <code>bag.dataset_types == [...]</code>;
+spot-check first). <strong>LoC: −15 + +10.</strong> <strong>Severity: medium</strong> — the
+two classes have parallel <code>dataset_types</code> surfaces that disagree
+on storage (list field on bag, live query on dataset).</p>
+<h3 id="110-stale-cataloggraph-references-in-test-docstrings">1.10 Stale <code>CatalogGraph</code> references in test docstrings</h3>
+<p>The class is deleted but three test files still mention it:</p>
+<ul>
+<li><code>tests/dataset/test_bag_builder.py:17-22</code> — docstring describes
+  "the bag-content equivalence harness that gated the cutover from
+  <code>CatalogGraph</code>."</li>
+<li><code>tests/dataset/test_bag_builder.py:42</code> — <code>TestSpecSmoke</code> class
+  doc says "Not equivalence tests — those live in
+  <code>TestBagEquivalence</code>." <code>TestBagEquivalence</code> was deleted with
+  <code>CatalogGraph</code>.</li>
+<li><code>tests/dataset/test_composite_fk_denormalize.py:257</code> — code
+  comment "This tests the FK path traversal in CatalogGraph."</li>
+<li><code>tests/dataset/test_estimate_bag_size.py:60</code> — "CatalogGraph._aggregate_queries".</li>
+</ul>
+<p><strong>Fix:</strong> scrub the stale references. <strong>LoC: −5 doc-only.</strong>
+<strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-2-deriva-py-derivabag-interface-usage">Lens 2 — Deriva-py / deriva.bag interface usage</h2>
+<h3 id="21-dataset_create_dataset_bag_client-re-implements-catalogbagbuilder_run_export">2.1 <code>Dataset._create_dataset_bag_client</code> re-implements <code>CatalogBagBuilder._run_export</code></h3>
+<p><code>dataset.py:3024-3255</code> is the biggest single hand-rolled
+mirror-of-deriva-py left in <code>dataset/</code>. It:</p>
+<ol>
+<li>Takes the spec dict from <code>DatasetBagBuilder.generate_dataset_download_spec</code>.</li>
+<li>Walks <code>spec["catalog"]["query_processors"]</code>.</li>
+<li>Switches on <code>processor in {"env", "json", "csv", "fetch"}</code>.</li>
+<li>For <code>csv</code>: calls <code>catalog.get_as_file(... paged=True ...)</code>.</li>
+<li>For <code>fetch</code>: builds a remote-file manifest from JSON.</li>
+<li>Calls <code>bdb.make_bag(remote_file_manifest=...)</code>.</li>
+</ol>
+<p>The deriva-py equivalent is already what <code>CatalogBagBuilder.build()</code>
+(<code>deriva-py/deriva/bag/catalog_builder.py:167-185</code>) drives via
+<code>_run_export</code> (<code>catalog_builder.py:1160-1196</code>). The deriva-py path:</p>
+<ul>
+<li>Reads the same <code>query_processors</code> list (it built it).</li>
+<li>Uses the canonical <code>DerivaExport</code> driver inside deriva-py
+  (<code>deriva/transfer/download/deriva_export.py</code>).</li>
+<li>Handles the same paged-query, env-template, and remote-file-
+  manifest concerns the dataset.py code does.</li>
+<li>Writes a profile-conformant bag with the <code>BagIt-Profile-Identifier</code>
+  declared.</li>
+</ul>
+<p>The historical motivation for the deriva-ml copy was "the
+deriva-py export driver doesn't tolerate snapshot-catalog
+timeouts" — <code>dataset.py:3151-3163</code> even has the "tolerate
+individual query failures" branch. After ADR-0006 that
+tolerance is <code>FKTraversalPolicy.exclude_tables</code> (callers can
+pre-prune) and <code>CatalogBagBuilder.build</code>'s own retry loop.</p>
+<p><strong>Recommended action:</strong> delete <code>_create_dataset_bag_client</code>. Make
+<code>_create_dataset_minid(use_minid=False, ...)</code> call
+<code>CatalogBagBuilder(...).build()</code> and archive the result to the
+same <code>client_export</code> directory shape. Confirmed:
+<code>CatalogBagBuilder.build</code> returns the bag directory path
+(<code>catalog_builder.py:170</code>); the existing tier-3 wiring in
+<code>_get_dataset_minid</code> already expects a <code>file://</code> URL that can be
+constructed from that path.</p>
+<p><strong>Risk: medium-high</strong> (live-catalog smoke needed; the
+<code>DatasetMinid.RID = "{rid}@{snap}"</code> invariant + the
+<code>spec_hash</code>/<code>snapshot</code> cache key need to round-trip cleanly).
+<strong>LoC: −230.</strong> <strong>Severity: high.</strong></p>
+<h3 id="22-dataset_download_dataset_minid-and-_bag_is_fully_materialized-parallel-bag_cachepy_is_fully_materialized">2.2 <code>Dataset._download_dataset_minid</code> and <code>_bag_is_fully_materialized</code> parallel <code>bag_cache.py:_is_fully_materialized</code></h3>
+<p><code>dataset.py:3475-3503</code> is a 28-line method that:</p>
+<ol>
+<li>Calls <code>bdb.validate_bag_structure</code>.</li>
+<li>Reads <code>fetch.txt</code>.</li>
+<li>Returns True iff every line's third field references an
+   existing file.</li>
+</ol>
+<p><code>bag_cache.py:230-262</code> (<code>BagCache._is_fully_materialized</code>) does
+<em>exactly</em> this. Two implementations of the same predicate, one
+on <code>Dataset</code> (with <code>self._logger.debug</code> — but actually broken at
+line 3491: it references <code>self._logger</code> from inside a <code>@staticmethod</code>,
+so it would <code>NameError</code> on a validation failure today) and one
+on <code>BagCache</code> (working).</p>
+<p><strong>The static method is broken.</strong> <code>dataset.py:3475</code> declares
+<code>@staticmethod</code>; <code>dataset.py:3491</code> calls <code>self._logger.debug(...)</code>.
+The only reason this isn't a live bug is that the <code>try</code>/<code>except</code>
+swallows the <code>bdb.validate_bag_structure</code> exception path almost
+always when the bag is valid. Trip the validation, and you
+crash with <code>NameError</code> instead of returning <code>False</code>.</p>
+<p><strong>Fix:</strong> delete <code>Dataset._bag_is_fully_materialized</code> and call
+<code>BagCache._is_fully_materialized</code> (or expose it as a module-level
+helper in <code>bag_cache.py</code>). Two callsites
+(<code>dataset.py:3489, 3550</code>) update to use the public helper.
+<strong>Risk: low. LoC: −30 (delete + fix the crash).</strong> <strong>Severity: medium</strong>
+— there's a latent bug in the staticmethod's error path.</p>
+<h3 id="23-_create_dataset_bag_client-builds-the-remote-file-manifest-by-hand">2.3 <code>_create_dataset_bag_client</code> builds the remote-file manifest by hand</h3>
+<p><code>dataset.py:3231-3243</code> writes the JSON-stream remote-file manifest
+line-by-line:</p>
+<pre><code class="language-python">entry = {&quot;url&quot;: url, &quot;length&quot;: int(length) if length else 0, &quot;filename&quot;: filename}
+if md5: entry[&quot;md5&quot;] = md5
+f.write(json.dumps(entry) + &quot;\n&quot;)
+</code></pre>
+<p>The repo's own CLAUDE.md ("BDBag Remote File Manifest") documents
+the format and points at <code>deriva_download.py</code> in deriva-py as
+the canonical implementation. The same routine is now also
+exposed via <code>deriva.bag.profile</code> helpers (verified at
+<code>deriva-py/deriva/bag/profile.py</code>).</p>
+<p><strong>Fix:</strong> subsumed by §2.1 — once the client export uses
+<code>CatalogBagBuilder.build</code>, the manifest writer is gone with the
+rest of <code>_create_dataset_bag_client</code>.</p>
+<h3 id="24-bag_builderpy_catalog_bag_builder-stashes-a-temporarydirectory-on-the-instance-to-satisfy-a-constructor-requirement">2.4 <code>bag_builder.py:_catalog_bag_builder</code> stashes a <code>TemporaryDirectory</code> on the instance to satisfy a constructor requirement</h3>
+<p><code>bag_builder.py:319-332</code>:</p>
+<pre><code class="language-python">tmp = TemporaryDirectory()
+output_dir = Path(tmp.name)
+builder = CatalogBagBuilder(catalog=..., anchors=..., output_dir=output_dir, policy=...)
+builder._datasetbag_output_tmp = tmp  # type: ignore[attr-defined]
+</code></pre>
+<p>The comment at 315-318 explains: "<code>CatalogBagBuilder</code> requires an
+<code>output_dir</code> even when nothing will be written; <code>aggregate_queries</code>
+and the annotation path don't run <code>build</code>." Two of the three
+public methods on <code>DatasetBagBuilder</code> <em>never</em> call <code>build</code>, so
+the constructor's required <code>output_dir</code> is dead weight for those
+paths.</p>
+<p><strong>This is a deriva-py-side defect</strong>, not a deriva-ml one — the
+audit of deriva-py would file it as "CatalogBagBuilder.output_dir
+should be optional (or lazy) when only read-only methods are
+called." Until deriva-py changes, the <code>_datasetbag_output_tmp</code>
+attribute-poke is the right workaround. <strong>No deriva-ml fix.</strong>
+<strong>Severity: low.</strong> Flag as a deriva-py follow-up.</p>
+<h3 id="25-datasetestimate_bag_size_extract_path-parses-a-uri-back-into-a-path">2.5 <code>Dataset.estimate_bag_size._extract_path</code> parses a URI back into a path</h3>
+<p><code>dataset.py:2507-2517</code>:</p>
+<pre><code class="language-python">def _extract_path(uri: str) -&gt; str:
+    for marker in (&quot;/aggregate/&quot;, &quot;/entity/&quot;, &quot;/attribute/&quot;):
+        idx = uri.find(marker)
+        if idx &gt;= 0:
+            return uri[idx:]
+    raise ValueError(f&quot;Cannot extract catalog path from URI: {uri}&quot;)
+</code></pre>
+<p>This is the same anti-pattern Phase 1 §2.5 flagged on
+<code>CatalogGraph.source_path</code> (which is now deleted). <code>estimate_bag_size</code>
+needs the path-only string because <code>AsyncErmrestCatalog.get_async</code>
+takes a path, not a full URI. The datapath's <code>.uri</code> attribute is the
+canonical way to get the full URI; deriva-py exposes <code>.path</code> on the
+same object (<code>deriva-py/deriva/core/datapath.py:DataPath</code>) — using
+it avoids the substring-marker scan.</p>
+<p><strong>Fix:</strong> replace the search-for-marker logic with
+<code>dp.path</code> (or <code>dp.uri.split('?', 1)[0].rsplit('/ermrest/catalog/' + cat_id, 1)[1]</code>
+if <code>.path</code> doesn't yet exist on the public API — confirmed it does:
+<code>deriva-py/deriva/core/datapath.py</code> exposes <code>_path</code> privately,
+should be promoted). <strong>Risk: low.</strong> <strong>LoC: −10.</strong> <strong>Severity: low.</strong></p>
+<h3 id="26-estimate_bag_size-uses-asyncermrestcatalog-directly-instead-of-the-bag-pipeline">2.6 <code>estimate_bag_size</code> uses <code>AsyncErmrestCatalog</code> directly instead of the bag pipeline</h3>
+<p><code>dataset.py:2486-2568</code> constructs an <code>AsyncErmrestCatalog</code> /
+<code>AsyncErmrestSnapshot</code>, builds datapaths through
+<code>DatasetBagBuilder.aggregate_queries</code>, then evaluates each
+datapath against the async catalog by extracting path strings
+and calling <code>catalog.get_async(query_path)</code>.</p>
+<p>The work this is doing — "evaluate every datapath the bag walk
+discovered, with custom filters / aggregations, against a live
+snapshot catalog" — is exactly what
+<code>CatalogBagBuilder.iter_table_datapaths</code> returns
+(<code>catalog_builder.py:210</code>). The datapaths it returns are already
+bound to the live catalog. The async dance is an optimisation
+that doesn't have a sibling on the bag pipeline today, but the
+cost in code size (~80 LoC of async glue + the URI parser from
+§2.5) is high for the gain.</p>
+<p><strong>Recommendation:</strong> flag as Phase 3. Either lift the async-query
+optimisation upstream to <code>CatalogBagBuilder</code> (and let
+deriva-ml just call <code>iter_table_datapaths</code> and iterate), or
+document <code>estimate_bag_size</code> as the one place we deliberately
+bypass the bag-builder for parallelism.
+<strong>LoC: net ±0 today; potentially −80 if upstream changes.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="27-bag_builderpy_dataset_visible_fkeys-could-use-purefalse-max_arity3-consistency">2.7 <code>bag_builder.py:_dataset_visible_fkeys</code> could use <code>pure=False, max_arity=3</code> consistency</h3>
+<p><code>bag_builder.py:535</code> calls <code>dataset_table.find_associations(max_arity=3, pure=False)</code>.
+The other <code>find_associations()</code> callsites in <code>dataset.py:1535, 1959, 2056</code>
+call with default args. The two argument shapes return different
+sets of associations (<code>pure=False</code> includes those with annotation
+columns), so the bag annotation enumerates a superset of what
+<code>add_dataset_members</code> validates against. Phase 1 §2.7 noted the
+same divergence on the <code>is_association</code> side; the
+<code>find_associations</code> callsites have the same drift.</p>
+<p><strong>Recommendation:</strong> decide the canonical args for the
+"dataset's element-type association enumeration" and use it in
+all four callsites. <strong>LoC: ±0 (single-line change × 4).</strong>
+<strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-4-inconsistencies-duplication">Lens 4 — Inconsistencies / duplication</h2>
+<h3 id="41-two-cache-layouts-coexist-the-legacy-one-is-still-being-written">4.1 Two cache layouts coexist; the legacy one is still being written</h3>
+<p><strong>The hazard:</strong> <code>dataset.py</code> is the only <code>dataset/</code> module that
+<em>writes</em> a cached bag. It writes to the pre-ADR-0006 layout
+(<code>dataset.py:2874, 2898, 3365, 3387, 3454</code>):</p>
+<pre><code class="language-python">bag_dir = self._ml_instance.cache_dir / f&quot;{minid.dataset_rid}_{minid.checksum}&quot;
+</code></pre>
+<p>and uses <code>validated_check.txt</code> markers (<code>dataset.py:3545-3578</code>)
+for materialization status.</p>
+<p><code>bag_cache.py</code> reads via <code>BagCacheIndex</code>
+(<code>deriva-py/deriva/bag/cache_index.py:102</code>) — the index expects
+bag content under <code>{cache_dir}/bags/{checksum}/</code> and records
+<code>(checksum, anchor table, anchor RID)</code> triples in
+<code>index.sqlite</code>. The reader at <code>bag_cache.py:143-186</code> has a
+fallback branch that globs for the legacy <code>{rid}_*</code> directories
+because — per the cutover doc — the writer cutover was
+deferred.</p>
+<p><strong>Effect today:</strong></p>
+<ul>
+<li>Every <code>download_dataset_bag</code> call writes to the legacy layout.</li>
+<li><code>BagCache.cache_status</code> finds those via the legacy glob, not via
+  the index. The index stays empty for downloaded datasets.</li>
+<li><code>BagCacheIndex.find_bags_for_rid</code> (the canonical "is this
+  cached?" API) returns no results for downloaded bags.</li>
+<li><code>migrate_legacy_cache</code> (§1.1) exists to backfill the index from
+  the legacy dirs, but it's never called.</li>
+</ul>
+<p><strong>Recommendation:</strong> make <code>download_dataset_bag</code> write through the
+index. Three changes:</p>
+<ol>
+<li>Replace the <code>{rid}_{checksum}</code> directory construction in
+   <code>_download_dataset_minid</code> and <code>_get_dataset_minid</code> with
+   <code>BagCache.index.bag_dir_for(checksum)</code> (already returns
+   <code>bags/{checksum}/</code>).</li>
+<li>Replace the <code>validated_check.txt</code> marker with the materialised
+   status that <code>BagCacheIndex</code> already records.</li>
+<li>Once #1 and #2 land, delete the <code>cache_status</code> legacy-fallback
+   branch at <code>bag_cache.py:174-186</code> and the migrator.</li>
+</ol>
+<p><strong>Risk: high</strong> (most-touched in <code>dataset/</code>; the cache layout
+change ripples into every test in <code>test_dataset_caching.py</code> and
+<code>test_deterministic_cache.py</code>). <strong>LoC: ~−150 (delete fallback +
+migrator + validated_check + the legacy directory branch in
+<code>_download_dataset_minid</code>).</strong> <strong>Severity: high.</strong></p>
+<h3 id="42-datasetlist_dataset_members-and-datasetbaglist_dataset_members-reimplement-the-element-type-loop">4.2 <code>Dataset.list_dataset_members</code> and <code>DatasetBag.list_dataset_members</code> reimplement the element-type loop</h3>
+<p><code>dataset.py:1532-1577</code> (catalog-side, via datapath):</p>
+<pre><code class="language-python">for assoc_table in self._dataset_table.find_associations():
+    other_fkey = assoc_table.other_fkeys.pop()
+    target_table = other_fkey.pk_table
+    member_table = assoc_table.table
+    if not self._ml_instance.model.is_domain_schema(...) and not (
+        target_table == self._dataset_table or target_table.name == &quot;File&quot;
+    ):
+        continue
+    ...
+</code></pre>
+<p><code>dataset_bag.py:498-543</code> (bag-side, via SQLAlchemy):</p>
+<pre><code class="language-python">for element_table in self.model.list_dataset_element_types():
+    element_class = self.model.get_orm_class_for_table(element_table)
+    assoc_class, dataset_rel, element_rel = self.model.get_association_class(...)
+    element_table = inspect(element_class).mapped_table
+    if not self.model.is_domain_schema(element_table.schema) and element_table.name not in [&quot;Dataset&quot;, &quot;File&quot;]:
+        continue
+    ...
+</code></pre>
+<p>The filter shape is identical (domain-schema OR Dataset/File);
+the body differs because one's a datapath fetch and the other's
+a SQLAlchemy join. The two are correct but easy to drift —
+the live version dropped the magic "File" name as a string
+once (in <code>dataset.py:1542</code> <code>target_table.name == "File"</code>) but
+the bag version still hardcodes the list (<code>["Dataset", "File"]</code>).
+Sibling concerns:</p>
+<ul>
+<li><code>add_dataset_members</code> (<code>dataset.py:1955-2009</code>) builds the same
+  <code>association_map = {target_table.name: assoc_table.name}</code> again
+  (<code>dataset.py:1959-1960</code>).</li>
+<li><code>delete_dataset_members</code> (<code>dataset.py:2055-2057</code>) again.</li>
+</ul>
+<p>That's four implementations of "which assoc table covers which
+target table for the Dataset anchor."</p>
+<p><strong>Fix:</strong> lift to a single helper on <code>DerivaModel</code> or
+<code>Dataset._build_association_map(self) -&gt; dict[str, str]</code> and call
+it from the four sites. <strong>Risk: low</strong> (mechanical). <strong>LoC: −40.</strong>
+<strong>Severity: medium</strong> — every drift between these four maps is a
+silent membership bug.</p>
+<h3 id="43-datasetlist_dataset_members-vs-datasetbag_dataset_table_view">4.3 <code>Dataset.list_dataset_members</code> vs. <code>DatasetBag._dataset_table_view</code></h3>
+<p><code>DatasetBag._dataset_table_view</code> (<code>dataset_bag.py:359-404</code>)
+computes "all rows in a table that belong to this dataset by
+walking every FK path" and UNIONs the per-path queries.
+<code>Dataset.list_dataset_members</code> (<code>dataset.py:1489-1578</code>) computes
+"all rows in element tables directly associated with this dataset
+via the association table." Different definitions — the bag's
+view is broader (transitive FK reachability) and the live
+catalog's view is narrower (direct membership only).</p>
+<p>This divergence is <strong>intentional</strong> for <code>list_dataset_members</code> —
+the contract is "direct members" — but <code>DatasetBag</code> then <em>also</em>
+exposes <code>list_dataset_members</code> (<code>dataset_bag.py:445-543</code>) which
+<em>matches</em> the live-catalog narrow definition, while
+<code>_dataset_table_view</code> is used internally by <code>_get_reachable_assets</code>
+to do the broader walk for <code>restructure_assets</code>. So inside
+<code>DatasetBag</code> we have two different "which rows belong here"
+definitions — and only one is documented at the call site.</p>
+<p><strong>Recommendation:</strong> name them. Promote <code>_get_reachable_assets</code>
+to a public <code>list_reachable(...)</code> method with a clear docstring
+distinguishing it from <code>list_dataset_members</code>. The internal
+helpers stay; only the naming and a docstring change.
+<strong>Risk: low. LoC: ±0.</strong> <strong>Severity: low</strong> — but the two-meaning
+collision will trip a user every release if not labeled.</p>
+<h3 id="44-label-resolution-two-paths-in-dataset_bagpy">4.4 Label resolution: two paths in <code>dataset_bag.py</code></h3>
+<p><code>dataset_bag.py:1267-1441</code> (<code>_load_feature_values_cache</code>)
+implements label / feature-value resolution for
+<code>restructure_assets</code>. It supports column targets, feature-name
+targets, dotted <code>Feature.column</code> syntax, vocab enforcement,
+selector callables — 175 LoC.</p>
+<p><code>target_resolution.py:_resolve_targets</code> does the same logical job
+(walks <code>bag.feature_values(target_name)</code>, groups by RID,
+applies missing-policy) in 137 LoC and is used by
+<code>as_torch_dataset</code> / <code>as_tf_dataset</code>. <code>restructure_assets</code> calls
+<code>_resolve_targets</code> <em>for the feature path</em> (<code>dataset_bag.py:2184-2189</code>)
+<em>and</em> <code>_load_feature_values_cache</code> <em>for vocabulary enforcement</em>
+(<code>dataset_bag.py:2211-2212</code>).</p>
+<p>The duplication is a transition artifact. <code>_resolve_targets</code> is
+the post-spec implementation; <code>_load_feature_values_cache</code>
+predates it and persists because (a) <code>restructure_assets</code>'s
+column-vs-feature classification was harder to fold in, and (b)
+the cache-style return type differs from what <code>_resolve_targets</code>
+emits.</p>
+<p><strong>Recommendation:</strong> extend <code>_resolve_targets</code> with an
+<code>enforce_vocabulary</code> mode and a <code>value_selector</code> parameter,
+then delete <code>_load_feature_values_cache</code>. The classification
+between "column" and "feature" stays in
+<code>restructure_assets</code>; only the value-extraction loop merges.
+<strong>Risk: medium</strong> (multiple callers, behavior is subtle). <strong>LoC: −125.</strong>
+<strong>Severity: medium</strong> — biggest unforced duplicate in <code>dataset_bag.py</code>.</p>
+<h3 id="45-snapshot-resolution-duplicated-three-ways">4.5 Snapshot resolution duplicated three ways</h3>
+<p>The same "given a dataset_rid and a version, get the catalog
+snapshot" computation appears at:</p>
+<ul>
+<li><code>dataset.py:2781-2801</code> (<code>_version_snapshot_catalog</code>) — returns
+  a catalog bound to the snapshot.</li>
+<li><code>dataset.py:2803-2833</code> (<code>_version_snapshot_catalog_id</code>) — returns
+  the <code>"{cat_id}@{snap}"</code> string.</li>
+<li><code>dataset.py:3318-3326</code> — inlined again in <code>_get_dataset_minid</code>
+  for the version-record lookup.</li>
+</ul>
+<p><code>_version_snapshot_catalog_id</code> walks <code>dataset_history</code> to find
+the version row; <code>_get_dataset_minid</code> walks <code>dataset_history</code>
+again to find the same row. Two history fetches per download.</p>
+<p><strong>Fix:</strong> rewrite <code>_get_dataset_minid</code> to call
+<code>_version_snapshot_catalog_id</code> instead of re-implementing the
+walk. <strong>LoC: −20.</strong> <strong>Severity: low.</strong></p>
+<h3 id="46-datasetpy-and-dataset_bagpy-reimplement-list_dataset_children-list_dataset_parents-similarly-but-not-identically">4.6 <code>dataset.py</code> and <code>dataset_bag.py</code> reimplement <code>list_dataset_children</code> / <code>list_dataset_parents</code> similarly but not identically</h3>
+<p>Compare <code>dataset.py:2173-2230</code> (catalog) and <code>dataset_bag.py:829-941</code>
+(bag). The recursion guard (<code>_visited</code>) is identical but stored
+on the parameter; the cycle-breaking logic is identical; the
+ordering policy (depth-first via <code>copy()</code> of the working list)
+is identical. Only the data-fetch differs.</p>
+<p>This is the "live versus bag" version of the same class of split
+called out in Phase 1's "two protocols, one operation" pattern.
+<strong>Phase-3 scope:</strong> investigate whether the two could share a
+common base that takes a <code>_fetch_neighbors(rid) -&gt; list[RID]</code>
+callable. Not actionable in a quick-cleanup PR.</p>
+<h3 id="47-bag_cachepycachestatus-carries-an-aliased-member-that-doesnt-behave-like-an-alias">4.7 <code>bag_cache.py:CacheStatus</code> carries an aliased member that doesn't behave like an alias</h3>
+<p><code>bag_cache.py:47-76</code>:</p>
+<pre><code class="language-python">class CacheStatus(StrEnum):
+    not_cached = &quot;not_cached&quot;
+    cached_metadata_only = &quot;cached_metadata_only&quot;
+    cached_materialized = &quot;cached_materialized&quot;
+    cached_holey = &quot;cached_holey&quot;
+    cached_incomplete = &quot;cached_holey&quot;   # alias
+</code></pre>
+<p><code>CacheStatus.cached_incomplete</code> is the same enum member as
+<code>CacheStatus.cached_holey</code> (StrEnum aliasing rules), so
+<code>==</code> works, but <code>repr(CacheStatus.cached_incomplete)</code> shows
+<code>&lt;CacheStatus.cached_holey: 'cached_holey'&gt;</code>. The "alias" docstring
+implies a backward-compatibility helper; the actual behavior is
+identical to deleting <code>cached_incomplete</code> and trusting users to
+have migrated.</p>
+<p>Phase 1 §4.3 already flagged this; the change in <code>bag_cache.py:76</code>
+is the actual one to make. <strong>LoC: −2 (delete the alias line).
+Severity: low.</strong></p>
+<hr />
+<h2 id="lens-5-simplification-opportunities">Lens 5 — Simplification opportunities</h2>
+<h3 id="51-delete-_create_dataset_bag_client-subsumes-21-23">5.1 Delete <code>_create_dataset_bag_client</code> (subsumes §2.1, §2.3)</h3>
+<p>Net: <strong>−230 LoC</strong>, biggest single LoC win in <code>dataset/</code>. Replace
+the body of <code>_create_dataset_minid(use_minid=False, ...)</code> with a
+<code>CatalogBagBuilder(catalog=..., anchors=anchors_for(...), output_dir=...).build()</code>
+call. Map the result to a <code>file://</code> URL.</p>
+<p>The path-builder construction (<code>DerivaServer(... session_config)</code>
+from <code>dataset.py:3056-3061</code>) for snapshot-catalog timeouts is
+already inside <code>CatalogBagBuilder.__init__</code> (it accepts a
+prebuilt <code>catalog</code> handle — pass the snapshot one in).</p>
+<p>Two pieces of work to verify:</p>
+<ul>
+<li><code>bag_builder.py</code>'s <code>_minid_post_processors</code> (lines 340-364)
+  is the post-processor injection point for client export. With
+  <code>_create_dataset_bag_client</code> gone, the post-processor list
+  becomes unconditionally part of the spec; <code>use_minid=False</code>
+  means "don't add the cloud-upload processor" — the spec
+  body stays the same.</li>
+<li>The deterministic cache key (<code>{rid}_{spec_hash[:16]}_{snapshot}</code>)
+  becomes the <code>BagCacheIndex</code> lookup key after §4.1 lands.</li>
+</ul>
+<p><strong>Severity: high</strong> (action 1 below).</p>
+<h3 id="52-unify-the-cache-layout-41">5.2 Unify the cache layout (§4.1)</h3>
+<p>Net: ~<strong>−150 LoC</strong> of fallbacks + migrator + validated_check.
+This is the most invasive of the recommendations; it requires
+a test-suite pass to confirm the cache-status semantics are
+unchanged. Order of operations: do §5.1 first (the legacy writer
+goes), then §5.2 (the legacy reader fallback can go).</p>
+<h3 id="53-fold-_load_feature_values_cache-into-_resolve_targets-44">5.3 Fold <code>_load_feature_values_cache</code> into <code>_resolve_targets</code> (§4.4)</h3>
+<p>Net: <strong>−125 LoC</strong>. The function it replaces is private and has
+two callers; refactor confined to <code>dataset_bag.py</code> +
+<code>target_resolution.py</code>.</p>
+<h3 id="54-build-a-single-_association_map-helper-42">5.4 Build a single <code>_association_map</code> helper (§4.2)</h3>
+<p>Net: <strong>−40 LoC</strong>, low risk.</p>
+<h3 id="55-replace-_bag_is_fully_materialized-with-the-working-bagcache_is_fully_materialized-22">5.5 Replace <code>_bag_is_fully_materialized</code> with the working <code>BagCache._is_fully_materialized</code> (§2.2)</h3>
+<p>Net: <strong>−30 LoC</strong> and fixes the <code>self._logger</code>-in-staticmethod
+crash.</p>
+<h3 id="56-delete-_list_dataset__current-duplicates-18">5.6 Delete <code>_list_dataset_*_current</code> duplicates (§1.8)</h3>
+<p>Net: <strong>−25 LoC</strong>.</p>
+<h3 id="57-move-uploadpy-to-executionupload_layoutpy-or-similar">5.7 Move <code>upload.py</code> to <code>execution/upload_layout.py</code> (or similar)</h3>
+<p>Mechanical move — every consumer is in <code>execution/</code>,
+<code>asset/</code>, <code>schema/</code>, <code>core/</code>. No <code>dataset/</code> module imports it.
+The current location is a Phase-1-era organizational accident.</p>
+<p><strong>Risk: low</strong> (mechanical rename + import update). <strong>LoC: ±0.</strong>
+<strong>Severity: medium</strong> — the package directory is misleading. New
+maintainers reading <code>dataset/</code> will not expect to find the
+upload-staging spec there.</p>
+<h3 id="58-inline-datasetprefetch-away-14">5.8 Inline <code>Dataset.prefetch</code> away (§1.4)</h3>
+<p>Trivial.</p>
+<h3 id="59-use-dppath-instead-of-substring-marker-25">5.9 Use <code>dp.path</code> instead of substring marker (§2.5)</h3>
+<p>Trivial. Pending deriva-py promotion of <code>_path</code> → <code>path</code>.</p>
+<hr />
+<h2 id="lens-6-maintainability">Lens 6 — Maintainability</h2>
+<h3 id="61-datasetpy-carries-three-responsibilities">6.1 <code>dataset.py</code> carries three responsibilities</h3>
+<p><code>Dataset</code> class has 58 methods (counting helpers). They cluster
+into:</p>
+<ul>
+<li><strong>Dataset CRUD</strong> (lines 213-541, 1864-2257):
+  <code>create_dataset</code>, <code>dataset_types</code>,
+  <code>add_dataset_type</code>/<code>remove_dataset_type</code>/<code>add_dataset_types</code>,
+  <code>list_members</code>, <code>list_dataset_members</code>/<code>*_children</code>/<code>*_parents</code>,
+  <code>add_dataset_members</code>/<code>delete_dataset_members</code>, <code>list_executions</code>.</li>
+<li><strong>Version management</strong> (lines 675-1488):
+  <code>dataset_history</code>, <code>current_version</code>, <code>release</code>,
+  <code>is_dirty</code>, <code>release_diff</code>, <code>compare_versions</code>, <code>mark_dev</code>,
+  <code>_create_or_advance_dev_row</code>, <code>_build_dataset_graph*</code>,
+  <code>_increment_dataset_version</code>, <code>_release_diff_bounds</code>,
+  <code>_resolve_version_to_rmt</code>, <code>_iter_drift_counts</code>,
+  <code>_insert_dataset_versions</code>.</li>
+<li><strong>Bag download orchestration</strong> (lines 2355-3579):
+  <code>download_dataset_bag</code>, <code>estimate_bag_size</code>, <code>bag_info</code>,
+  <code>cache</code>, <code>prefetch</code>, <code>_create_dataset_minid</code>,
+  <code>_create_dataset_bag_client</code>, <code>_get_dataset_minid</code>,
+  <code>_download_dataset_minid</code>, <code>_materialize_dataset_bag</code>,
+  <code>_fetch_minid_metadata</code>, <code>_version_snapshot_catalog*</code>,
+  <code>_bag_is_fully_materialized</code>, <code>_estimate_csv_bytes</code>,
+  <code>_human_readable_size</code>.</li>
+</ul>
+<p>The bag-download cluster is ~1 200 LoC. With §5.1 it shrinks
+significantly. Phase 3 scope: consider splitting <code>dataset.py</code>
+into <code>dataset_core.py</code> (CRUD+versions) + <code>dataset_download.py</code>
+(bag-download orchestration). The current <code>dataset_bag.py</code> is a
+different concern (read-side bag access), not the place for the
+download orchestration code.</p>
+<p><strong>Severity: medium</strong> (size; mixed concerns).</p>
+<h3 id="62-dataset_bagpy-carries-three-responsibilities-too">6.2 <code>dataset_bag.py</code> carries three responsibilities too</h3>
+<ul>
+<li><strong>Bag access</strong> (lines 117-1051): <code>DatasetBag</code> SQLAlchemy-backed
+  catalog mirror.</li>
+<li><strong>Asset reachability</strong> (lines 1160-1481):
+  <code>_build_dataset_type_path_map</code>, <code>_get_asset_dataset_mapping</code>,
+  <code>_get_reachable_assets</code>, <code>_load_feature_values_cache</code>,
+  <code>_resolve_grouping_value</code>, <code>_detect_asset_table</code>,
+  <code>_validate_dataset_types</code>. ~320 LoC.</li>
+<li><strong>Restructure / framework adapters</strong> (lines 1483-2381):
+  <code>_validate_dataset_types</code>, <code>as_torch_dataset</code>, <code>as_tf_dataset</code>,
+  <code>restructure_assets</code>. ~900 LoC, half of which is one method's
+  docstring.</li>
+</ul>
+<p>The asset-reachability cluster's only consumer is
+<code>restructure_assets</code>. Phase 3 scope: extract to
+<code>restructure.py</code> adjacent to <code>target_resolution.py</code>.</p>
+<p><strong>Severity: medium.</strong></p>
+<h3 id="63-docstring-quality-is-good-with-a-few-drifted-comments">6.3 Docstring quality is <strong>good</strong>, with a few drifted comments</h3>
+<p>Sampled the public methods on <code>Dataset</code> and <code>DatasetBag</code> — the
+Google-format <code>Args</code> / <code>Returns</code> / <code>Raises</code> / <code>Example</code> skeleton is
+filled in correctly almost everywhere. Three exceptions:</p>
+<ul>
+<li><code>dataset.py:1939-1944</code> — <code>check_dataset_cycle</code> docstring is the
+  template-default placeholder (<code>Args:</code> and <code>Returns:</code> are empty
+  bullet headers with no content). Same pattern as Phase 1 §6.3
+  flagged in <code>model/catalog.py</code>.</li>
+<li><code>dataset.py:1499</code> — <code>list_dataset_members</code> says "returns a
+  dictionary mapping member types to lists of member records"
+  without specifying that the keys are <em>element table names</em>. The
+  bag version of the same docstring (<code>dataset_bag.py:445-486</code>) is
+  precise.</li>
+<li><code>dataset_bag.py:264-269</code> — the <code>path</code> property's
+  <code>Example::</code> block contains code that calls
+  <code>ml.download_dataset_bag(spec)</code> — but <code>ml</code> has no
+  <code>download_dataset_bag</code> method (it's on <code>Dataset</code>, accessed via
+  <code>dataset.download_dataset_bag(...)</code>). Subtle but wrong.</li>
+</ul>
+<p><strong>LoC: ±0 (docs).</strong> <strong>Severity: low.</strong></p>
+<h3 id="64-naming-bag_path-bag_dir-cached_bag_path-cache_dir-cache_suffix-cache_dir_name">6.4 Naming: <code>bag_path</code>, <code>bag_dir</code>, <code>cached_bag_path</code>, <code>cache_dir</code>, <code>cache_suffix</code>, <code>cache_dir_name</code></h3>
+<p>In a single 100-line block (<code>dataset.py:3318-3455</code>) we have:</p>
+<ul>
+<li><code>cache_dir</code> (instance prop on the catalog),</li>
+<li><code>cache_dir_name</code> (the legacy directory's name string),</li>
+<li><code>cached_dir</code> (the path Object for the legacy directory),</li>
+<li><code>cached_bag_path</code> (the bag-dir inside the cache dir),</li>
+<li><code>cache_suffix</code> (the <code>spec_hash[:16]_snapshot</code> suffix string),</li>
+<li><code>bag_dir</code> (the same as <code>cached_dir</code> but constructed differently
+  three lines later in <code>_download_dataset_minid</code>),</li>
+<li><code>bag_path</code> (returned from <code>_materialize_dataset_bag</code>).</li>
+</ul>
+<p>Eight names, four concepts. Phase 1 §6.5 already noted the
+problem at the inter-module level; intra-<code>dataset.py</code> it's worse.</p>
+<p><strong>Severity: low</strong> (cosmetic but a documented friction point).</p>
+<h3 id="65-datasetdataset_types-re-fetches-on-every-access">6.5 <code>Dataset.dataset_types</code> re-fetches on every access</h3>
+<p><code>dataset.py:230-253</code> — the property runs a fresh catalog
+fetch every time. The docstring is explicit about this ("ensures
+consistency when multiple Dataset instances reference the same
+dataset"), but a single notebook loop that calls
+<code>dataset.dataset_types</code> four times pays four round-trips.</p>
+<p>Not a bug — the contract is correct — but inconsistent with the
+analogous <code>DatasetBag.dataset_types</code> which is a frozen attribute
+(<code>dataset_bag.py:210-214</code>). The "live versus immutable snapshot"
+boundary is right, but no caller of <code>dataset.dataset_types</code> has
+chosen "live read"-semantics on purpose.</p>
+<p><strong>Recommendation:</strong> add an internal cache invalidated by
+<code>add_dataset_type</code>/<code>remove_dataset_type</code>. <strong>LoC: +20.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="66-__all__-is-missing-on-every-non-__init__-module">6.6 <code>__all__</code> is missing on every non-<code>__init__</code> module</h3>
+<p>Spot-checked <code>dataset.py</code>, <code>dataset_bag.py</code>, <code>bag_builder.py</code>,
+<code>bag_cache.py</code>, <code>aux_classes.py</code>, <code>validation.py</code>. None define
+<code>__all__</code>. <code>dataset/__init__.py</code> does, but it re-exports a curated
+subset. Anyone reaching into a module path directly gets every
+import and every helper.</p>
+<p><code>bag_builder.py:730</code> is the exception (<code>__all__ = ["DatasetBagBuilder"]</code>).
+<code>bag_cache.py:387</code> does too.</p>
+<p><strong>Recommendation:</strong> add <code>__all__</code> to <code>dataset.py</code>, <code>dataset_bag.py</code>,
+<code>aux_classes.py</code>, and <code>validation.py</code>. <strong>LoC: +20.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="67-_visited-parameter-is-private-but-public">6.7 <code>_visited</code> parameter is "private" but public</h3>
+<p>See §1.6. A maintainability gripe more than a bug.</p>
+<h3 id="68-datasetcreate_dataset-is-a-staticmethod-that-uses-cls-in-its-docstring-example">6.8 <code>Dataset.create_dataset</code> is a staticmethod that uses <code>cls</code> in its docstring example</h3>
+<p><code>dataset.py:255-333</code> — declared <code>@staticmethod</code> (line 255 is
+inside the class). The docstring at lines 270-280 shows
+<code>dataset = Dataset.create_dataset(...)</code> — fine — but the type
+annotation returns <code>Dataset</code> (the class), not <code>Self</code>. Since it's
+a staticmethod, <code>Self</code> wouldn't help, but the method is morally
+a class constructor and should be <code>@classmethod</code> returning <code>Self</code>.</p>
+<p><strong>Severity: low.</strong> Phase-3 polish.</p>
+<h3 id="69-splitpy_logger-initialization-at-line-1172">6.9 <code>split.py:_logger</code> initialization at line 1172</h3>
+<p>The CLI entry point initializes logging by hand instead of using
+<code>configure_logging</code>:</p>
+<pre><code class="language-python">handler = logging.StreamHandler(sys.stderr)
+handler.setLevel(logging.INFO)
+handler.setFormatter(logging.Formatter(&quot;%(asctime)s - %(levelname)s - %(message)s&quot;))
+</code></pre>
+<p>Phase 1 §4.5 was about adopting <code>get_logger</code>; this CLI never
+adopted <code>configure_logging</code>. <strong>LoC: −10.</strong> <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="ranked-actions-1n">Ranked actions (1–N)</h2>
+<p>Ranked by <code>(impact × confidence) / cost</code>. Items 1–3 are the high-
+value cleanups; 4–7 are mechanical wins; 8–10 are Phase-3 scope.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Risk</th>
+<th style="text-align: right;">LoC</th>
+<th>Files</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>§2.1 + §5.1</strong> Delete <code>Dataset._create_dataset_bag_client</code>; route <code>_create_dataset_minid(use_minid=False)</code> through <code>CatalogBagBuilder.build()</code></td>
+<td>medium-high</td>
+<td style="text-align: right;">−230</td>
+<td><code>dataset.py</code></td>
+<td>Biggest single LoC win; eliminates a hand-rolled mirror of <code>_run_export</code>. Required precursor to §2 (cache layout cutover).</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>§4.1 + §5.2</strong> Cache-layout cutover: write through <code>BagCacheIndex</code>, delete <code>validated_check.txt</code> markers, drop the legacy-glob fallback in <code>BagCache.cache_status</code></td>
+<td>high</td>
+<td style="text-align: right;">−150</td>
+<td><code>dataset.py</code>, <code>bag_cache.py</code></td>
+<td>Half-cutover today. After action 1, this is the last legacy write path in <code>dataset/</code>.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>§4.4 + §5.3</strong> Fold <code>_load_feature_values_cache</code> into <code>_resolve_targets</code> with <code>enforce_vocabulary</code> + <code>value_selector</code></td>
+<td>medium</td>
+<td style="text-align: right;">−125</td>
+<td><code>dataset_bag.py</code>, <code>target_resolution.py</code></td>
+<td>Removes the largest unforced duplicate in <code>dataset_bag.py</code>.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>§2.2 + §5.5</strong> Delete <code>Dataset._bag_is_fully_materialized</code> (fixes the staticmethod <code>self._logger</code> bug); call <code>BagCache._is_fully_materialized</code> instead</td>
+<td>low</td>
+<td style="text-align: right;">−30</td>
+<td><code>dataset.py</code>, <code>bag_cache.py</code></td>
+<td>Latent crash on validation-failure path; net code reduction.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>§5.7</strong> Move <code>upload.py</code> out of <code>dataset/</code> (e.g., <code>execution/upload_layout.py</code>)</td>
+<td>low</td>
+<td style="text-align: right;">±0</td>
+<td><code>upload.py</code> + ~8 import sites</td>
+<td>Mechanical; the directory currently lies about its contents.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>§4.2 + §5.4</strong> Lift <code>association_map</code> construction to a single helper called from <code>list_dataset_members</code>, <code>add_dataset_members</code>, <code>delete_dataset_members</code>, and <code>DatasetBag.list_dataset_members</code></td>
+<td>low</td>
+<td style="text-align: right;">−40</td>
+<td><code>dataset.py</code>, <code>dataset_bag.py</code></td>
+<td>Four parallel implementations of "what assoc table covers what element type" today.</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>§1.1 + §1.2 + §1.3 + §1.4 + §1.5 + §1.7 + §1.8 + §1.9 + §1.10 + §4.5 + §4.7 + §5.6 + §5.8 + §5.9 + §6.3 + §6.6 + §6.9</strong> Pure dead-code / duplicate-helper / stale-doc sweep</td>
+<td>low</td>
+<td style="text-align: right;">~−250</td>
+<td>~10 files</td>
+<td>Mechanical cleanup; each item small but they accumulate.</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>§2.5 + §2.6</strong> Replace URI substring parser with <code>dp.path</code> and consider lifting the async-query loop to <code>CatalogBagBuilder.iter_table_datapaths</code></td>
+<td>low-medium</td>
+<td style="text-align: right;">−10 to −90</td>
+<td><code>dataset.py</code>, deriva-py</td>
+<td>Half is a deriva-py promotion; the rest is a Phase-3 question.</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>§4.6</strong> Phase 3 — share <code>list_dataset_children</code> / <code>list_dataset_parents</code> body between <code>Dataset</code> and <code>DatasetBag</code> via a <code>_fetch_neighbors</code> callable</td>
+<td>medium</td>
+<td style="text-align: right;">−60</td>
+<td><code>dataset.py</code>, <code>dataset_bag.py</code></td>
+<td>Real cleanup needs the "live versus bag" base class question answered.</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>§6.1 + §6.2</strong> Phase 3 — split <code>dataset.py</code> into CRUD/versions/download and <code>dataset_bag.py</code> into access/restructure</td>
+<td>medium-high</td>
+<td style="text-align: right;">±0 net (LoC moves)</td>
+<td>several</td>
+<td>Out of audit scope per the brief; flagged as motivation.</td>
+</tr>
+</tbody>
+</table>
+<p>Items 1 + 2 ship together (the cache cutover doesn't make sense
+without the writer flip). Items 4–7 are good for a single cleanup
+PR. Item 3 wants its own PR with restructure-test focus. Items
+8–10 are Phase-3.</p>
+<hr />
+<h2 id="follow-up-scope-phase-3-candidates">Follow-up scope (Phase 3 candidates)</h2>
+<h3 id="3a-datasetpy-structural-split-action-10">3.A <code>dataset.py</code> structural split (action 10)</h3>
+<p>The bag-download orchestration cluster
+(<code>download_dataset_bag</code> → <code>_get_dataset_minid</code> →
+<code>_create_dataset_minid</code> → <code>_create_dataset_bag_client</code> /
+<code>_download_dataset_minid</code> / <code>_materialize_dataset_bag</code>) is a
+self-contained subsystem with one external entry point
+(<code>download_dataset_bag</code>) and one external dependency
+(<code>DatasetBagBuilder</code>). After action 1 it's ~600 LoC instead of
+1 200 — small enough to live next to <code>bag_builder.py</code> as
+<code>bag_pipeline.py</code> or <code>download.py</code>.</p>
+<h3 id="3b-dataset_bagpy-structural-split-action-10">3.B <code>dataset_bag.py</code> structural split (action 10)</h3>
+<p>The restructure / asset-reachability cluster
+(<code>_build_dataset_type_path_map</code>, <code>_get_asset_dataset_mapping</code>,
+<code>_get_reachable_assets</code>, <code>_load_feature_values_cache</code>,
+<code>_resolve_grouping_value</code>, <code>_detect_asset_table</code>,
+<code>_validate_dataset_types</code>, <code>restructure_assets</code> itself) is
+~1 050 LoC. Currently it's pinned to <code>DatasetBag</code> because it
+calls <code>self.list_dataset_members</code>, <code>self._catalog</code>,
+<code>self.engine</code> — but those are all available on a
+<code>DatasetLike</code> (the protocol the bag implements). Lift to
+<code>restructure.py</code> taking a <code>DatasetLike</code>.</p>
+<h3 id="3c-dataset-datasetbag-interface-harmonization">3.C <code>Dataset</code> / <code>DatasetBag</code> interface harmonization</h3>
+<p>The two classes claim to implement <code>DatasetLike</code>, but the
+member-walking, parent-walking, and child-walking methods have
+diverged enough that the protocol is more aspirational than
+load-bearing. Phase 1 §4.7 flagged a similar terminology drift
+between <code>_DEFAULT_SKIP_TABLES</code> and <code>terminal_tables</code>; the same
+applies here. A real harmonization probably means making the
+protocol enforce method-signature parity (kwargs, return shapes)
+in a CI check, not just docstring agreement.</p>
+<h3 id="3d-datasetestimate_bag_size-performance-vs-bag-pipeline-alignment">3.D <code>Dataset.estimate_bag_size</code> performance vs. bag-pipeline alignment</h3>
+<p>The async-query loop in <code>estimate_bag_size</code> (action 8) is the only
+piece of <code>dataset/</code> that bypasses <code>CatalogBagBuilder</code> for
+performance. Decision point: lift the optimisation upstream to
+<code>CatalogBagBuilder</code> (giving every consumer free parallelism), or
+formalise <code>estimate_bag_size</code> as an opt-out path. The current
+"opportunistic copy-paste" is the worst of both worlds.</p>
+<p><strong>Update (Phase 3 follow-up):</strong> decision recorded in
+<a href="../adr/0008-estimate-bag-size-bypasses-bag-pipeline.md">ADR-0008</a>:
+the bypass is <strong>formalised as a deliberate opt-out</strong>, not lifted
+upstream. The estimator continues to share the <em>walker</em> via
+<code>DatasetBagBuilder.aggregate_queries</code> and bypasses
+<code>CatalogBagBuilder</code> only for <em>execution</em> (the async parallel
+queries). The docstring on <code>Dataset.estimate_bag_size</code> now points
+at the ADR. The "lift upstream" alternative remains open as future
+work; ADR-0008 documents what it would entail and why we haven't
+done it yet.</p>
+<h3 id="3e-bagcacheindex-semantics-for-multi-anchor-bags">3.E <code>BagCacheIndex</code> semantics for multi-anchor bags</h3>
+<p>The cutover doc (D1) noted that pre-cutover MINIDs may become
+unresolvable. After action 2, every cached bag is keyed by
+checksum and resolvable by any anchor RID. Users who run
+<code>download_dataset_bag(rid=A)</code> then <code>download_dataset_bag(rid=B)</code>
+on overlapping content will be storing one bag, not two. Test
+the round-trip story explicitly before merging the cutover.</p>
+<p><strong>Update (Phase 3 follow-up):</strong> the round-trip test exists at
+<code>tests/dataset/test_multi_anchor_bag_cache.py</code>. The audit's
+"one bag, not two" hypothesis was originally <strong>half-true</strong> — storage
+<em>was</em> shared (one row in <code>bags</code>), but <code>BagCacheIndex.record()</code>
+replaced anchors on every call, so <code>cache_status("A")</code> returned
+<code>not_cached</code> after <code>download_dataset_bag(rid=B)</code> landed on the same
+checksum.</p>
+<p><strong>Resolution:</strong> Fixed upstream in
+<a href="https://github.com/informatics-isi-edu/deriva-py/pull/254">deriva-py#254</a>.
+<code>BagCacheIndex.record()</code> now <strong>accumulates</strong> anchors via
+<code>INSERT OR IGNORE</code>. The test file no longer carries an
+<code>xfail</code> — it pins the new accumulation behaviour positively.
+Issue <a href="https://github.com/informatics-isi-edu/deriva-ml/issues/142">#142</a>
+closed.</p>
+<hr />
+<h2 id="phase-2-audit-closing-inventory-2026-05-15">Phase 2 audit — closing inventory (2026-05-15)</h2>
+<p>Cross-checked every ranked action and Phase-3 candidate against the
+live source. <strong>All ten ranked actions and all five §3.A–§3.E
+follow-up candidates have shipped or been intentionally deferred
+with documentation.</strong> This audit is closed.</p>
+<h3 id="ranked-actions-110">Ranked actions (1–10)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Status</th>
+<th>Where it landed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Delete <code>_create_dataset_bag_client</code>; route through <code>CatalogBagBuilder.build()</code></td>
+<td>✅ shipped</td>
+<td>PR #111 (commit <code>6658137a</code>). One historical reference remains in a comment in <code>bag_download.py:374</code>.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Cache-layout cutover: write through <code>BagCacheIndex</code>, delete <code>validated_check.txt</code>, drop legacy-glob fallback</td>
+<td>✅ shipped</td>
+<td>PR #111. <code>validated_check.txt</code>, the legacy <code>{rid}_{spec_hash}_{snapshot}/</code> layout, and the glob fallback are all gone.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Fold <code>_load_feature_values_cache</code> into <code>_resolve_targets</code></td>
+<td>✅ shipped via different decomposition</td>
+<td>The duplicate path collapsed into <code>BagFeatureCache</code> (<code>dataset/bag_feature_cache.py</code>), a per-feature SQLite denorm cache. <code>_resolve_targets</code> (in <code>target_resolution.py</code>) is the single label-resolution path. The audit's specific proposed merge didn't happen — a cleaner factoring did.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Delete <code>Dataset._bag_is_fully_materialized</code>; call <code>BagCache._is_fully_materialized</code></td>
+<td>✅ shipped</td>
+<td>Symbol is gone from <code>dataset.py</code>. <code>BagCache._is_fully_materialized</code> is the single source.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Move <code>upload.py</code> out of <code>dataset/</code></td>
+<td>✅ shipped</td>
+<td>Now at <code>src/deriva_ml/core/upload_layout.py</code> (commit <code>33717b14</code>).</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Single <code>_association_map</code> helper</td>
+<td>⚠️ shipped via different decomposition; worth a deeper check</td>
+<td><code>DerivaModel.get_association_class</code> is the bag's single source. <code>Dataset._get_dataset_type_association_table</code> is a <em>different</em> lookup (dataset-type → table, not element-type → assoc) and legitimately stands alone. The audit's complaint about "four parallel implementations" doesn't survive; whether the remaining factoring is right is a Phase 3+ question.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Pure dead-code sweep (§1.1–§1.10, §4.5, §4.7, §5.6, §5.8, §5.9, §6.3, §6.6, §6.9)</td>
+<td>✅ mostly shipped</td>
+<td>Spot-checked the major ones: <code>migrate_legacy_cache</code>, <code>LoggerMixin</code>, <code>DerivaMLNoExecutionContext</code>, <code>AssetRID</code>, <code>Dataset.prefetch</code>, <code>_list_dataset_*_current</code>, the <code>icecream</code> debug fallback — all gone. §1.7 (<code>fetch_table_features</code>, <code>list_feature_values</code>) is intentionally retained as a <strong>raising stub</strong> with a migration message rather than fully deleted; this is a deliberate UX choice.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>URI substring parser → <code>dp.path</code>; lift async loop to <code>CatalogBagBuilder</code></td>
+<td>✅ deferred deliberately</td>
+<td>Recorded as <a href="../adr/0008-estimate-bag-size-bypasses-bag-pipeline.md">ADR-0008</a>: the <code>_extract_path</code> URI trick remains in <code>Dataset.estimate_bag_size</code> as the deliberate opt-out from <code>CatalogBagBuilder</code>. The upstream-lift alternative remains open future work.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Phase 3 — share <code>list_dataset_children</code> / <code>list_dataset_parents</code> body between <code>Dataset</code> and <code>DatasetBag</code></td>
+<td>partially</td>
+<td>The Phase 3 §3.A extraction (<code>bag_download.py</code>) and §3.B extraction (<code>restructure.py</code>) reduced surface but did not unify the live-vs-bag walkers. The protocol-parity work from §3.C (<code>test_dataset_like_signature_parity.py</code>) now enforces signature parity, which is most of the audit's actual ask.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Phase 3 — split <code>dataset.py</code> and <code>dataset_bag.py</code></td>
+<td>✅ shipped</td>
+<td>PRs #139 (denormalize planner extracted to <code>model/denormalize_planner.py</code>), #140 (<code>bag_download.py</code>), and #141 (<code>restructure.py</code>). <code>dataset.py</code> dropped from 3 579 → 2 804 LoC; <code>dataset_bag.py</code> from 2 385 → 1 494 LoC.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="phase-3-follow-up-candidates-3a3e">Phase 3 follow-up candidates (§3.A–§3.E)</h3>
+<table>
+<thead>
+<tr>
+<th>§</th>
+<th>Topic</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3.A</td>
+<td><code>dataset.py</code> structural split</td>
+<td>✅ PR #140 — <code>bag_download.py</code> extracted (688 LoC).</td>
+</tr>
+<tr>
+<td>3.B</td>
+<td><code>dataset_bag.py</code> structural split</td>
+<td>✅ PR #141 — <code>restructure.py</code> extracted (751 LoC).</td>
+</tr>
+<tr>
+<td>3.C</td>
+<td><code>DatasetLike</code> interface harmonization</td>
+<td>✅ PR #144 — protocol tightened; 38-test CI parity check (<code>tests/test_dataset_like_signature_parity.py</code>).</td>
+</tr>
+<tr>
+<td>3.D</td>
+<td><code>estimate_bag_size</code> opt-out vs. lift upstream</td>
+<td>✅ PR #145 — <a href="../adr/0008-estimate-bag-size-bypasses-bag-pipeline.md">ADR-0008</a> records the opt-out decision. Docstring on <code>Dataset.estimate_bag_size</code> points at the ADR.</td>
+</tr>
+<tr>
+<td>3.E</td>
+<td><code>BagCacheIndex</code> multi-anchor semantics</td>
+<td>✅ PR #143 (test) + deriva-py PR #254 (fix) + deriva-ml PR #146 (lockstep). Anchor accumulation now works; issue <a href="https://github.com/informatics-isi-edu/deriva-ml/issues/142">#142</a> closed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="loc-reduction-achieved">LoC reduction achieved</h3>
+<p>Combining shipped PRs across both phases:</p>
+<ul>
+<li><code>upload_engine.py</code> (883) + <code>upload_job.py</code> (137) + three test files
+  (1 207) — total <strong>−2 227 LoC</strong> retired via PR #111's bag-pipeline
+  consolidation.</li>
+<li><code>_create_dataset_bag_client</code> — <strong>−231 LoC</strong> (PR #111).</li>
+<li><code>_load_feature_values_cache</code> and friends — <strong>−~125 LoC</strong> (via the
+  <code>BagFeatureCache</code> decomposition).</li>
+<li>Phase 3 structural splits — moved code, did not net-reduce, but
+  <code>dataset.py</code> is <strong>−775 LoC</strong> and <code>dataset_bag.py</code> is <strong>−891 LoC</strong>
+  vs. the audit baseline.</li>
+</ul>
+<h3 id="items-intentionally-not-done">Items intentionally NOT done</h3>
+<p>These appeared in the audit but were consciously deferred or
+declined:</p>
+<ol>
+<li><strong>Lift <code>estimate_bag_size</code>'s async-query loop into
+   <code>CatalogBagBuilder</code></strong> (audit §2.6, action 8 second half). ADR-0008
+   explains why: cross-repo coordination cost, different query
+   shapes, no current performance crisis. Tracked as a future-work
+   item in the ADR.</li>
+<li><strong>Fully delete the <code>fetch_table_features</code> / <code>list_feature_values</code>
+   raising stubs</strong> (audit §1.7). Kept as user-guidance stubs that
+   raise with a migration message instead of returning <code>None</code>. UX
+   beats minimalism here.</li>
+<li><strong>Unify <code>_assoc_map</code> across <code>Dataset</code> and <code>DatasetBag</code></strong> (audit
+   §4.2 / action 6) — the bag uses <code>DerivaModel.get_association_class</code>,
+   <code>Dataset</code> uses a domain-specific lookup. The audit's "four
+   parallel implementations" claim didn't survive contact with the
+   current code; what's left isn't accidental duplication.</li>
+</ol>
+<h3 id="closing-posture">Closing posture</h3>
+<p>Phase 2 audit is closed. The dataset subsystem is in the shape the
+audit recommended:</p>
+<ul>
+<li><strong>One</strong> cache-write path (<code>bag_download</code> → <code>BagCacheIndex</code>); <strong>one</strong>
+  bag-producer (<code>CatalogBagBuilder</code>); <strong>one</strong> upload path
+  (<code>bag_commit</code>).</li>
+<li>The "god modules" (<code>dataset.py</code>, <code>dataset_bag.py</code>) are
+  substantially split into named submodules.</li>
+<li>The <code>DatasetLike</code> protocol is now load-bearing, enforced in CI.</li>
+<li>Two architectural decisions that didn't follow the audit's
+  default recommendation are documented as ADRs: ADR-0007
+  (annotations as a public API for <code>deriva-skills</code>) and ADR-0008
+  (<code>estimate_bag_size</code> opt-out).</li>
+</ul>
+<p>Any new structural concerns in <code>dataset/</code> should start with a
+fresh audit, not a continuation of this one.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

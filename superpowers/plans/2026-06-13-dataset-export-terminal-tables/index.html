@@ -1,0 +1,2549 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-13-dataset-export-terminal-tables/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Dataset-Export Terminal Tables Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dataset-export-terminal-tables-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dataset-Export Terminal Tables Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context-for-the-implementer-read-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context for the implementer (read first)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Context for the implementer (read first)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#file-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File map
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-shared-constant-in-coreconstantspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Shared constant in core/constants.py
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-apply-terminal-tables-in-build_policy-the-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Apply terminal tables in build_policy (the fix)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-de-duplicate-clone_via_bag-onto-the-shared-constant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: De-duplicate clone_via_bag onto the shared constant
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-walk-scope-regression-test-the-explosion-arm-is-severed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Walk-scope regression test (the explosion arm is severed)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-lint-full-bagclone-suite-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Lint, full bag/clone suite, PR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-review
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="dataset-export-terminal-tables-implementation-plan">Dataset-Export Terminal Tables Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Stop the dataset-bag export from walking the catalog's entire provenance DAG (an 18-minute hang on large nested datasets) by making <code>DatasetBagBuilder.build_policy</code> mark <code>Execution</code>/<code>Workflow</code> as terminal tables — the same protection <code>clone_via_bag</code> already has.</p>
+<p><strong>Architecture:</strong> Extract <code>{Execution, Workflow}</code> into a shared constant in <code>core/constants.py</code> so the two bag-producing paths can't diverge, then consume it in both <code>build_policy</code> and <code>clone_via_bag</code>. The walker enters terminal tables (keeping the provenance link) but does not follow their FKs outward, severing the explosion.</p>
+<p><strong>Tech Stack:</strong> Python 3.12+, deriva-py <code>FKTraversalPolicy</code>, pytest.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-06-13-dataset-export-terminal-tables-design.md</code>
+<strong>Branch:</strong> <code>fix/dataset-export-terminal-tables</code> (already created off <code>main</code>; spec commit is on it).</p>
+<hr />
+<h2 id="context-for-the-implementer-read-first">Context for the implementer (read first)</h2>
+<ul>
+<li><strong>CWD discipline:</strong> chain <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; &lt;cmd&gt;</code> in ONE Bash call every time. Tests: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest ...</code>.</li>
+<li><strong>The bug (verified):</strong> <code>bag_builder.build_policy</code> returns an <code>FKTraversalPolicy</code> with <strong>no <code>terminal_tables</code></strong>, so the <code>CatalogBagBuilder</code> walk enters <code>Execution</code> (a hub with 21 inbound FKs) and fans out across the whole catalog provenance graph. <code>clone_via_bag</code> already sets <code>terminal_tables={("deriva-ml","Execution"),("deriva-ml","Workflow")}</code>; <code>build_policy</code> must do the same.</li>
+<li><strong>Existing shared-constant pattern:</strong> <code>INTENTIONAL_FK_CYCLES</code> lives in <code>src/deriva_ml/core/constants.py</code> and is imported by BOTH <code>bag_builder.py:64</code> and <code>clone_via_bag.py:76</code>. The new terminal-tables constant follows this exact pattern (same file, same dual-import).</li>
+<li><strong><code>ML_SCHEMA = "deriva-ml"</code></strong> is defined at <code>core/constants.py:44</code> — use it to build the constant rather than hard-coding the string.</li>
+<li><strong>Current sites:</strong></li>
+<li><code>core/constants.py</code> — <code>INTENTIONAL_FK_CYCLES</code> at line 75, <code>__all__</code> starts line 80.</li>
+<li><code>bag_builder.py</code> — <code>build_policy</code> at line 756, its <code>return FKTraversalPolicy(...)</code> at line 804 (no <code>terminal_tables</code> arg today).</li>
+<li><code>clone_via_bag.py</code> — <code>default_terminal_tables</code> literal at line 360, used at lines 367 and 410.</li>
+<li><strong>Tests:</strong> <code>tests/dataset/test_bag_builder.py</code> (<code>TestAnchorsAndPolicy</code>-style class, uses the live <code>catalog_with_datasets</code> fixture; <code>test_build_policy_default</code> at line 147 is the sibling to extend). <code>tests/catalog/test_clone_via_bag.py</code> already asserts terminal_tables merge (lines 304-305) — those must still pass after the constant extraction.</li>
+</ul>
+<h3 id="file-map">File map</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Action</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/core/constants.py</code></td>
+<td>modify</td>
+<td>define <code>PROVENANCE_TERMINAL_TABLES</code> + add to <code>__all__</code></td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/bag_builder.py</code></td>
+<td>modify</td>
+<td>import it; pass <code>terminal_tables=</code> in <code>build_policy</code></td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/catalog/clone_via_bag.py</code></td>
+<td>modify</td>
+<td>replace local <code>default_terminal_tables</code> literal with the import</td>
+</tr>
+<tr>
+<td><code>tests/dataset/test_bag_builder.py</code></td>
+<td>modify</td>
+<td>assert <code>build_policy</code> sets the terminal tables + walk excludes Execution_Asset</td>
+</tr>
+<tr>
+<td><code>tests/core/test_constants.py</code> (or existing)</td>
+<td>modify/create</td>
+<td>pin the constant's value + dual-import no-divergence</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="task-1-shared-constant-in-coreconstantspy">Task 1: Shared constant in <code>core/constants.py</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/constants.py</code> (after <code>INTENTIONAL_FK_CYCLES</code>, ~line 77; <code>__all__</code> ~line 80)
+- Test: <code>tests/core/test_constants.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Check whether <code>tests/core/test_constants.py</code> exists. If it does, append; if not, create it with this content:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Tests for shared FK-traversal constants.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+
+def test_provenance_terminal_tables_value():
+    from deriva_ml.core.constants import ML_SCHEMA, PROVENANCE_TERMINAL_TABLES
+
+    assert PROVENANCE_TERMINAL_TABLES == frozenset(
+        {(ML_SCHEMA, &quot;Execution&quot;), (ML_SCHEMA, &quot;Workflow&quot;)}
+    )
+
+
+def test_provenance_terminal_tables_exported():
+    import deriva_ml.core.constants as c
+
+    assert &quot;PROVENANCE_TERMINAL_TABLES&quot; in c.__all__
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify it fails</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_constants.py::test_provenance_terminal_tables_value -v 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: FAIL — <code>ImportError: cannot import name 'PROVENANCE_TERMINAL_TABLES'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add the constant</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/constants.py</code>, immediately after the
+<code>INTENTIONAL_FK_CYCLES</code> definition (the closing <code>})</code> near line 77),
+add:</p>
+<pre><code class="language-python"># Provenance tables the dataset-bag walk ENTERS but does not traverse
+# outward. ``Execution`` and ``Workflow`` describe *how* rows came to
+# be, not *what they are*; one Execution aggregates state across every
+# Subject/Image/Dataset its run touched and has many inbound FKs (every
+# ``*_Execution`` association, plus self-loops via ``Execution_Execution``
+# and back-edges to feature tables like ``Annotation``). Following those
+# inbound FKs makes the walk fan out across the entire catalog provenance
+# graph — an 18-minute hang on large nested datasets (eye-ai 2-277G).
+# Marking them terminal keeps the provenance *link* in the bag while
+# severing the fan-out. Shared by ``DatasetBagBuilder.build_policy`` and
+# ``clone_via_bag`` so the two bag-producing paths cannot diverge.
+PROVENANCE_TERMINAL_TABLES: frozenset[tuple[str, str]] = frozenset(
+    {
+        (ML_SCHEMA, &quot;Execution&quot;),
+        (ML_SCHEMA, &quot;Workflow&quot;),
+    }
+)
+</code></pre>
+<p>Then add <code>"PROVENANCE_TERMINAL_TABLES",</code> to the <code>__all__</code> list (next to
+<code>"INTENTIONAL_FK_CYCLES",</code>).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run to verify it passes</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_constants.py -v 2&gt;&amp;1 | tail -6
+</code></pre>
+<p>Expected: both tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+git add src/deriva_ml/core/constants.py tests/core/test_constants.py &amp;&amp; \
+git commit -m &quot;feat(constants): shared PROVENANCE_TERMINAL_TABLES {Execution, Workflow}&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-apply-terminal-tables-in-build_policy-the-fix">Task 2: Apply terminal tables in <code>build_policy</code> (the fix)</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/bag_builder.py</code> (import line ~64; <code>build_policy</code> return ~804)
+- Test: <code>tests/dataset/test_bag_builder.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>In <code>tests/dataset/test_bag_builder.py</code>, add this test to the class that
+holds <code>test_build_policy_default</code> (the one using the
+<code>catalog_with_datasets</code> fixture — around line 147):</p>
+<pre><code class="language-python">    def test_build_policy_marks_execution_workflow_terminal(
+        self, catalog_with_datasets
+    ) -&gt; None:
+        &quot;&quot;&quot;Execution and Workflow are terminal so the walk doesn't fan
+        out across the catalog provenance graph (the 2-277G 18-min hang).&quot;&quot;&quot;
+        ml, _ = catalog_with_datasets
+        datasets = list(ml.find_datasets())
+        if not datasets:
+            pytest.skip(&quot;Need at least one dataset.&quot;)
+        dataset = ml.lookup_dataset(datasets[0].dataset_rid)
+        builder = DatasetBagBuilder(ml_instance=ml)
+        policy = builder.build_policy(dataset)
+        assert (&quot;deriva-ml&quot;, &quot;Execution&quot;) in policy.terminal_tables
+        assert (&quot;deriva-ml&quot;, &quot;Workflow&quot;) in policy.terminal_tables
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify it fails</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest \
+  &quot;tests/dataset/test_bag_builder.py::TestAnchorsAndPolicy::test_build_policy_marks_execution_workflow_terminal&quot; -v 2&gt;&amp;1 | tail -8
+</code></pre>
+<p>(If the class name differs, run the whole file and find the new test.)
+Expected: FAIL — <code>terminal_tables</code> is empty (assertion error), because
+<code>build_policy</code> doesn't set it yet. Requires the local catalog stack
+(<code>catalog_with_datasets</code> is a live fixture).</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the fix</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/bag_builder.py</code>:</p>
+<p>(a) Extend the existing constants import at line 64:</p>
+<pre><code class="language-python">from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES, PROVENANCE_TERMINAL_TABLES, RID
+</code></pre>
+<p>(b) In <code>build_policy</code>, change the <code>return FKTraversalPolicy(...)</code> (line
+804) to pass <code>terminal_tables</code>:</p>
+<pre><code class="language-python">        return FKTraversalPolicy(
+            exclude_tables=exclude_tables,
+            vocab_export=vocab_export,
+            # Provenance tables are entered but not traversed outward —
+            # otherwise the walk fans out across the whole catalog
+            # provenance graph (see core/constants.py
+            # :PROVENANCE_TERMINAL_TABLES). Same protection clone_via_bag
+            # applies.
+            terminal_tables=set(PROVENANCE_TERMINAL_TABLES),
+            # Silence WARNING-level &quot;Breaking cycle in FK
+            # dependencies&quot; log spam for the known
+            # Dataset ↔ Dataset_Version cycle. See
+            # core/constants.py:INTENTIONAL_FK_CYCLES.
+            intentional_cycles=set(INTENTIONAL_FK_CYCLES),
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run to verify it passes</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest \
+  tests/dataset/test_bag_builder.py -v --timeout=600 2&gt;&amp;1 | tail -12
+</code></pre>
+<p>Expected: all pass, including the new test. (Requires localhost catalog.)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+git add src/deriva_ml/dataset/bag_builder.py tests/dataset/test_bag_builder.py &amp;&amp; \
+git commit -m &quot;fix(dataset): mark Execution/Workflow terminal in bag-export walk
+
+The export walk entered Execution (a provenance hub with 21 inbound
+FKs) and fanned out across the whole catalog provenance graph — an
+18-minute hang on large nested datasets (eye-ai 2-277G/5-WEBG). Mark
+the provenance tables terminal so the walk keeps the provenance link
+but stops following outward. Mirrors clone_via_bag.&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-de-duplicate-clone_via_bag-onto-the-shared-constant">Task 3: De-duplicate <code>clone_via_bag</code> onto the shared constant</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/catalog/clone_via_bag.py</code> (import ~76; literal ~360, uses ~367/410)
+- Test: <code>tests/catalog/test_clone_via_bag.py</code> (existing assertions must still pass)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the no-divergence test</strong></li>
+</ul>
+<p>Append to <code>tests/core/test_constants.py</code>:</p>
+<pre><code class="language-python">def test_clone_and_bag_builder_share_terminal_tables():
+    &quot;&quot;&quot;clone_via_bag and bag_builder must use the SAME terminal set —
+    a divergence is what let the dataset-export path miss this guard.&quot;&quot;&quot;
+    from deriva_ml.catalog import clone_via_bag as cvb
+    from deriva_ml.core.constants import PROVENANCE_TERMINAL_TABLES
+
+    # clone_via_bag builds its default terminal set from the constant.
+    assert cvb._DEFAULT_TERMINAL_TABLES == set(PROVENANCE_TERMINAL_TABLES)
+</code></pre>
+<p>(Note: this references <code>clone_via_bag._DEFAULT_TERMINAL_TABLES</code>, a
+module-level name introduced in Step 3 below.)</p>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify it fails</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_constants.py::test_clone_and_bag_builder_share_terminal_tables -v 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: FAIL — <code>module 'deriva_ml.catalog.clone_via_bag' has no attribute '_DEFAULT_TERMINAL_TABLES'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Replace the local literal with the shared constant</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/catalog/clone_via_bag.py</code>:</p>
+<p>(a) Extend the constants import at line 76:</p>
+<pre><code class="language-python">from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES, PROVENANCE_TERMINAL_TABLES
+</code></pre>
+<p>(b) Read the current <code>default_terminal_tables</code> block (line 360). It is
+a local variable inside a function. Replace the inline literal:</p>
+<pre><code class="language-python">    default_terminal_tables: set[tuple[str, str]] = {
+        (&quot;deriva-ml&quot;, &quot;Execution&quot;),
+        (&quot;deriva-ml&quot;, &quot;Workflow&quot;),
+    }
+</code></pre>
+<p>with a reference to a module-level name built from the constant. Add
+this near the top of the module (after imports, module scope):</p>
+<pre><code class="language-python"># Module-level alias so tests can assert clone_via_bag and bag_builder
+# share one terminal set (core/constants.py:PROVENANCE_TERMINAL_TABLES).
+_DEFAULT_TERMINAL_TABLES: set[tuple[str, str]] = set(PROVENANCE_TERMINAL_TABLES)
+</code></pre>
+<p>and replace the in-function literal with:</p>
+<pre><code class="language-python">    default_terminal_tables = set(_DEFAULT_TERMINAL_TABLES)
+</code></pre>
+<p>(keep the existing comment block above it). The two downstream uses at
+lines 367 and 410 (<code>terminal_tables=default_terminal_tables</code> /
+<code>merge_kwargs["terminal_tables"] = default_terminal_tables</code>) are
+unchanged — they still reference the local <code>default_terminal_tables</code>.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run to verify it passes (incl. existing clone tests)</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest \
+  tests/core/test_constants.py tests/catalog/test_clone_via_bag.py -v 2&gt;&amp;1 | tail -12
+</code></pre>
+<p>Expected: all pass — the no-divergence test AND the pre-existing
+<code>test_clone_via_bag.py</code> assertions (lines 304-305 checking
+<code>("deriva-ml","Execution")</code>/<code>("deriva-ml","Workflow")</code> are still in the
+merged policy). If any clone test fails, the literal→constant swap
+changed a value: stop and reconcile (the values must be identical).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+git add src/deriva_ml/catalog/clone_via_bag.py tests/core/test_constants.py &amp;&amp; \
+git commit -m &quot;refactor(clone): clone_via_bag uses shared PROVENANCE_TERMINAL_TABLES
+
+De-duplicates the {Execution, Workflow} terminal set onto the shared
+constant so it can't diverge from bag_builder's copy (the divergence
+is what let the dataset-export path miss this guard).&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-walk-scope-regression-test-the-explosion-arm-is-severed">Task 4: Walk-scope regression test (the explosion arm is severed)</h2>
+<p><strong>Files:</strong>
+- Test: <code>tests/dataset/test_bag_builder.py</code></p>
+<p>This pins the <em>behavioral</em> fix (not just the policy field): with
+Execution terminal, the reached-table set excludes the
+<code>Execution_Asset</code> explosion arm while keeping <code>Execution</code> and the
+member/feature tables. Uses the live <code>catalog_with_datasets</code> fixture
+(the demo catalog has executions + assets, so the arm is reachable but
+tiny).</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the test</strong></li>
+</ul>
+<p>Add to the same test class in <code>tests/dataset/test_bag_builder.py</code>:</p>
+<pre><code class="language-python">    def test_walk_excludes_execution_asset_closure(
+        self, catalog_with_datasets
+    ) -&gt; None:
+        &quot;&quot;&quot;With Execution terminal, aggregate_queries reaches Execution
+        (provenance link) and member/feature tables, but NOT the
+        Execution_Asset closure the inbound fan-out used to pull in.&quot;&quot;&quot;
+        ml, _ = catalog_with_datasets
+        datasets = list(ml.find_datasets())
+        if not datasets:
+            pytest.skip(&quot;Need at least one dataset.&quot;)
+        dataset = ml.lookup_dataset(datasets[0].dataset_rid)
+        reached = set(DatasetBagBuilder(ml_instance=ml).aggregate_queries(dataset))
+
+        # Provenance link kept:
+        assert &quot;Execution&quot; in reached
+        # Explosion arm severed (these are reached ONLY by following
+        # Execution's inbound FKs outward, which terminal_tables blocks):
+        assert &quot;Execution_Asset&quot; not in reached
+        assert &quot;Execution_Asset_Execution&quot; not in reached
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify it passes (this is the guard, not a red→green pair)</strong></li>
+</ul>
+<p>The fix from Task 2 already makes this pass — it's a behavioral
+regression guard. Run it to confirm the fix produces the claimed walk
+shape:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest \
+  tests/dataset/test_bag_builder.py -k &quot;walk_excludes_execution_asset&quot; -v --timeout=600 2&gt;&amp;1 | tail -8
+</code></pre>
+<p>Expected: PASS. If <code>Execution_Asset</code> IS still reached, the fix is
+incomplete (some other inbound path reaches it) — stop and
+re-investigate; do NOT weaken the assertion.</p>
+<blockquote>
+<p>Sanity note for the implementer: to prove this test has teeth, you
+may temporarily revert Task 2's <code>terminal_tables=</code> line, confirm the
+test FAILS (Execution_Asset reached), then re-apply. Don't commit the
+revert.</p>
+</blockquote>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+git add tests/dataset/test_bag_builder.py &amp;&amp; \
+git commit -m &quot;test(dataset): pin that the Execution_Asset closure is severed from the walk&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-lint-full-bagclone-suite-pr">Task 5: Lint, full bag/clone suite, PR</h2>
+<p><strong>Files:</strong> none new.</p>
+<ul>
+<li>[ ] <strong>Step 1: Lint + format the touched files</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+uv run ruff check src/deriva_ml/core/constants.py src/deriva_ml/dataset/bag_builder.py src/deriva_ml/catalog/clone_via_bag.py tests/core/test_constants.py tests/dataset/test_bag_builder.py &amp;&amp; \
+uv run ruff format src/deriva_ml/core/constants.py tests/core/test_constants.py 2&gt;&amp;1 | tail -2
+</code></pre>
+<p>Expected: ruff clean (pre-existing unrelated findings elsewhere are out
+of scope — only the touched files must be clean).</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the affected suites together</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest \
+  tests/core/test_constants.py tests/dataset/test_bag_builder.py tests/catalog/test_clone_via_bag.py \
+  -q --timeout=600 2&gt;&amp;1 | tail -6
+</code></pre>
+<p>Expected: all pass. (Catalog-dependent tests need the localhost stack;
+if it's down, note it and run at least <code>tests/core/test_constants.py</code>
+which is catalog-free.)</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit any format changes, push, open PR</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; \
+git add -A src tests &amp;&amp; (git diff --cached --quiet || git commit -m &quot;style: ruff format&quot;) ; \
+git push -u origin fix/dataset-export-terminal-tables &amp;&amp; \
+gh pr create --title &quot;fix(dataset): mark Execution/Workflow terminal in bag-export walk&quot; --body &quot;$(cat &lt;&lt;'EOF'
+## Problem
+
+Downloading a dataset bag for a large nested dataset (eye-ai \`2-277G\`, a 50-dataset nested pool) never completes bag formation. The export's deepest query — \`Dataset → Dataset_Image → Image → Annotation → Execution → Execution_Asset_Execution → Execution_Asset\` — ran **18 minutes** before a ConnectionError on a single large child (\`5-WEBG\`, 9,511 images).
+
+## Root cause (verified)
+
+\`DatasetBagBuilder.build_policy\` set **no \`terminal_tables\`**, so the walk entered \`Execution\` — a provenance hub with **21 inbound FKs** (every \`*_Execution\` association, a self-loop via \`Execution_Execution\`, a back-edge to \`Annotation\`) — and fanned out across the whole catalog provenance DAG. Hop-by-hop on a 20-image dataset: \`Annotation\` (100) → \`Execution\` (1 distinct) → \`Execution_Asset_Execution\` (**9,066** — ×1,800 blow-up, every asset of the producing execution). \`clone_via_bag\` already guards this with \`terminal_tables={Execution, Workflow}\`; \`build_policy\` simply omitted it.
+
+## Fix
+
+- Extract \`{Execution, Workflow}\` into \`core/constants.py:PROVENANCE_TERMINAL_TABLES\` (shared so the two bag-producing paths can't diverge again — the divergence is what caused this).
+- \`build_policy\` passes \`terminal_tables=\`; \`clone_via_bag\` consumes the same constant.
+
+## Validation
+
+In-process patch against \`5-WEBG\` (the 18-minute killer): \`aggregate_queries\` built in **1.9 s**; \`Execution_Asset\` / \`Execution_Asset_Execution\` no longer reached; \`Execution\` and \`Annotation\`/\`Dataset_Image\` still reached. Tests pin the policy field, the no-divergence invariant, and the severed-walk behavior.
+
+## Not in scope
+
+deriva-py query-staging/batching (considered and rejected — it would have efficiently fetched a catalog-sized *wrong* result; the problem was traversal scope, not query mechanics). Per-export-configurable terminal tables (YAGNI).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)&quot; 2&gt;&amp;1 | tail -2
+</code></pre>
+<hr />
+<h2 id="self-review">Self-review</h2>
+<ul>
+<li><strong>Spec coverage:</strong> §2 fix → Task 2; §3 shared-constant extraction → Tasks 1+3; §6 testing — policy-field test (Task 2), no-divergence test (Task 3), walk-scope test (Task 4), existing clone suite kept green (Task 3/5); §7 non-goals respected (no deriva-py changes, no configurability). All spec sections map to a task.</li>
+<li><strong>Placeholder scan:</strong> none — every code block is complete; the one "if the class name differs" note is a real fallback, not a TBD.</li>
+<li><strong>Type/name consistency:</strong> <code>PROVENANCE_TERMINAL_TABLES</code> (frozenset) is defined in Task 1 and consumed identically in Tasks 2/3; <code>clone_via_bag._DEFAULT_TERMINAL_TABLES</code> (set) is introduced in Task 3 Step 3 and asserted in Task 3 Step 1 — names match. <code>set(PROVENANCE_TERMINAL_TABLES)</code> is used everywhere a mutable set is needed (the policy field and clone's local var), consistent.</li>
+<li><strong>Branch-first:</strong> the branch already exists with the spec commit; all task commits land on it; Task 5 pushes + opens the PR. Nothing on <code>main</code>.</li>
+<li><strong>Catalog dependency:</strong> Tasks 2 and 4's behavioral tests need the localhost stack (live <code>catalog_with_datasets</code> fixture); Tasks 1 and 3's constant tests are catalog-free. If the stack is down, the constant + policy-field-shape work still proceeds; flag the deferred live tests in the PR.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

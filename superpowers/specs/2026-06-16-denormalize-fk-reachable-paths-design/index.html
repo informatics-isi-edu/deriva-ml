@@ -1,0 +1,2516 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-06-16-denormalize-fk-reachable-paths-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Denormalize planner: union FK-reachable paths (subject-partitioned feature reads) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#denormalize-planner-union-fk-reachable-paths-subject-partitioned-feature-reads" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Denormalize planner: union FK-reachable paths (subject-partitioned feature reads)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verified-root-cause-not-the-reported-framing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified root cause (not the reported framing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chosen-approach-decided-during-brainstorming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chosen approach (decided during brainstorming)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Chosen approach (decided during brainstorming)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-union-distinct-is-correct-verified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why UNION-distinct is correct (verified)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unit-a-path-retention-_prepare_wide_table-phase-1b1c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit A — Path retention (_prepare_wide_table, Phase 1b/1c)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unit-b-union-emission-_denormalize_impl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit B — UNION emission (_denormalize_impl)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unit-c-ambiguity-guard-interaction-_find_path_ambiguities-rule-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit C — Ambiguity guard interaction (_find_path_ambiguities, Rule 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#edge-cases-each-gets-a-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edge cases (each gets a test)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-acceptance-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing &amp; acceptance gates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing &amp; acceptance gates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#net-1-directly-populated-regression-catches-broke-the-normal-case" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net 1 — Directly-populated regression (catches "broke the normal case")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#net-2-exactness-oracle-catches-non-empty-but-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net 2 — Exactness oracle (catches "non-empty but wrong")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#net-3-live-equivalence-real-world-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net 3 — Live equivalence (real-world shape)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tdd-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TDD order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="denormalize-planner-union-fk-reachable-paths-subject-partitioned-feature-reads">Denormalize planner: union FK-reachable paths (subject-partitioned feature reads)</h1>
+<p><strong>Date:</strong> 2026-06-16
+<strong>Status:</strong> Approved design — ready for implementation plan
+<strong>Author:</strong> investigation + design this session</p>
+<h2 id="problem">Problem</h2>
+<p><code>DatasetBag.feature_values</code> / <code>Dataset.feature_values</code> (and therefore
+<code>as_tf_dataset</code> / <code>as_torch_dataset</code> label resolution, and every
+<code>get_denormalized_*</code> consumer) return <strong>zero feature rows</strong> on
+<strong>subject-partitioned</strong> datasets — datasets whose members are <code>Subject</code>s, with
+the asset/element table (<code>Image</code>) reachable only via the FK chain
+<code>Subject → Observation → Image</code>, never as a direct dataset member.</p>
+<p>This is the <strong>label-side</strong> follow-up to the element-enumeration fix
+(deriva-ml #316, the <code>reachable=</code> parameter on <code>as_tf_dataset</code> /
+<code>as_torch_dataset</code> / <code>resolve_element_rids</code>). Element enumeration is now
+FK-reachability-aware; the <strong>feature-value join is not</strong>, so
+<code>as_tf_dataset(element_type="Image", targets={...}, missing="skip")</code> finds the
+elements but resolves <strong>0 labels</strong>, drops all of them under <code>missing="skip"</code>,
+and raises the empty-generator error.</p>
+<h3 id="verified-root-cause-not-the-reported-framing">Verified root cause (not the reported framing)</h3>
+<p>The report framed two distinct problems ("no reachability option" + "returns 0
+even where data is present"). Investigation on the live <code>6-CQZE</code> bag
+(<code>dev.eye-ai.org</code>, training child <code>2-7KA2</code>) proved they are <strong>one root cause</strong>
+in the denormalize planner, and it is <strong>not</strong> a keying bug:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>6-CQZE parent</th>
+<th>2-7KA2 child</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Image_Diagnosis</code> SQLite rows</td>
+<td>591</td>
+<td>591</td>
+</tr>
+<tr>
+<td><code>Image</code> SQLite rows</td>
+<td>102</td>
+<td>102</td>
+</tr>
+<tr>
+<td><code>resolve_element_rids(reachable=True)</code></td>
+<td>102 ✓</td>
+<td>102 ✓</td>
+</tr>
+<tr>
+<td><code>feature_values("Image","Image_Diagnosis")</code></td>
+<td><strong>0</strong> ✗</td>
+<td><strong>0</strong> ✗</td>
+</tr>
+</tbody>
+</table>
+<p><code>feature_values</code> → <code>Denormalizer</code> → planner <code>_prepare_wide_table</code>. Instrumenting
+the planner on the real bag showed it <strong>discovers</strong> the correct path but
+<strong>chooses the wrong one</strong>:</p>
+<ul>
+<li>Discovered by <code>_schema_to_paths()</code>:
+  <code>Dataset → Subject_Dataset → Subject → Observation → Image → Image_Diagnosis</code>
+  (FK-reachable — has data)</li>
+<li><strong>Chosen</strong> by Phase-1b path dedup:
+  <code>Dataset → Image_Dataset → Image → Image_Diagnosis</code>
+  (direct membership — <code>Image_Dataset</code> has <strong>0 rows</strong> on a subject-partitioned
+  dataset)</li>
+</ul>
+<p>Raw SQL on the bag confirmed: the chosen membership join → <strong>0 rows</strong>; the
+FK-reachable chain → <strong>980 raw rows</strong>, which dedups to <strong>591 distinct
+<code>Image_Diagnosis.RID</code></strong> (= the ground-truth count). <code>Subject_Dataset</code> has 25
+rows; <code>Image_Dataset</code> / <code>Dataset_Image_Diagnosis</code> / <code>Dataset_Observation</code> are
+all empty (this is what "subject-partitioned" means).</p>
+<p>The culprit is <code>_prepare_wide_table</code>'s <strong>Phase-1b path dedup</strong>
+(<code>src/deriva_ml/model/denormalize_planner.py</code> ~lines 1746–1783): when an element
+is reachable via several routes it keys by <code>(element, endpoint)</code> and <strong>prefers
+the <code>Dataset_{Element}</code> membership association</strong> (<code>_is_standard_assoc</code>),
+<strong>discarding the FK-reachable chain</strong>. The prefix selection then takes
+<code>paths[0][1]</code> as the single <code>Dataset → assoc → element</code> join prefix
+(~lines 1808–1814). That assumption holds for directly-populated datasets and
+silently produces empty results for subject-partitioned ones.</p>
+<h2 id="goal">Goal</h2>
+<p>Make the denormalize planner <strong>union all reachable <code>Dataset → … → element</code>
+paths</strong> (membership <em>and</em> FK-reachable), <strong>deduplicated RID-distinct on the
+<code>row_per</code> leaf</strong>, so every denormalize consumer returns the correct
+FK-reachable rows on subject-partitioned datasets while returning <strong>identical
+row sets</strong> on directly-populated ones (row-set identity, not SQL identity — the
+demo already has two <code>Dataset → Image</code> routes; see the demo-schema note below).</p>
+<h2 id="chosen-approach-decided-during-brainstorming">Chosen approach (decided during brainstorming)</h2>
+<ul>
+<li><strong>Fix locus:</strong> the <strong>planner path selection</strong> (root), not the feature-read
+  wrapper. One fix corrects <code>feature_values</code>, <code>get_denormalized_*</code>, and
+  <code>describe</code> consistently.</li>
+<li><strong>Trigger rule: Option 2 — always UNION</strong> the membership path and the
+  FK-reachable path(s), <strong>RID-distinct on the <code>row_per</code> leaf</strong> (the same
+  "UNION not UNION ALL" semantics already shipped in
+  <code>DatasetBag._dataset_table_view</code>). One rule for all datasets; constant,
+  predictable behavior. Not the narrower "fall back only when membership is
+  empty" — constant behavior was preferred and the blast radius is covered by
+  the regression nets below.</li>
+</ul>
+<h3 id="why-union-distinct-is-correct-verified">Why UNION-distinct is correct (verified)</h3>
+<p>The FK-reachable join <strong>fans out</strong> (an element reachable via multiple
+<code>Subject → Observation → Image</code> routes appears multiple times): 980 raw rows.
+Deduplicating <strong>DISTINCT on the <code>row_per</code> leaf RID</strong> (<code>Image_Diagnosis.RID</code>)
+collapses to exactly <strong>591</strong> — matching both the total <code>Image_Diagnosis</code> rows in
+the bag and the count whose <code>Image</code> is reachable. <code>DISTINCT Image.RID</code> = 102
+(matches enumeration). The dedup grain is unambiguous: <strong>the <code>row_per</code> leaf
+table's RID</strong>.</p>
+<p>For a <strong>directly-populated</strong> dataset the membership path is non-empty and the FK
+path adds no new leaf RIDs (or duplicates existing ones), so UNION-distinct
+yields exactly today's <strong>row set</strong> — the property the demo regression suite
+enforces.</p>
+<p><strong>Important demo-schema note (verified):</strong> the demo <code>Image</code> table already has
+<strong>two</strong> <code>Dataset → Image</code> routes at the schema level —
+<code>Dataset → Dataset_Image → Image</code> (membership) <strong>and</strong>
+<code>Dataset → Dataset_Subject → Subject → Image</code> (FK-reachable, since
+<code>Image.Subject → Subject</code>). The normal demo datasets (members = Subject + Image)
+mask the bug because the membership route is populated. This means:</p>
+<ol>
+<li>The always-union rule <strong>does</strong> change the demo's <em>generated SQL</em> (one
+   statement → a UNION) even on directly-populated datasets, so the Net-1
+   regression gate is <strong>row-set identity, not SQL identity</strong> — assert the
+   returned record set is unchanged, not that the query string is unchanged.</li>
+<li>The demo therefore <strong>already exercises</strong> the new multi-path code, making the
+   committed gate genuinely representative.</li>
+<li>The demo works today with two routes present, which means the planner does
+   <strong>not</strong> currently classify the two <code>Dataset → Image</code> routes as a Rule-6
+   ambiguity — validating Unit C's premise that <code>Dataset</code>-anchored reachability
+   routes are a different path class from <code>row_per</code>↔include-table column
+   ambiguity.</li>
+</ol>
+<h2 id="components">Components</h2>
+<h3 id="unit-a-path-retention-_prepare_wide_table-phase-1b1c">Unit A — Path retention (<code>_prepare_wide_table</code>, Phase 1b/1c)</h3>
+<p>Today Phase-1b dedups by <code>(element, endpoint)</code> keeping one preferred
+(membership) association route. Change: dedup only <strong>truly identical</strong> paths
+(same table sequence); <strong>retain distinct routes to the same element</strong>
+(membership <em>and</em> FK-reachable). <code>element_tables</code> carries <strong>multiple paths per
+element</strong> instead of one. This is the only structural change; downstream
+already loops over paths.</p>
+<p>The <code>_is_standard_assoc</code> / <code>Dataset_{Element}</code> <em>preference</em> logic is removed as
+the selection mechanism (it currently discards reachable paths). Path ordering
+may still place the membership route first for stable output, but <strong>no route is
+dropped</strong>.</p>
+<h3 id="unit-b-union-emission-_denormalize_impl">Unit B — UNION emission (<code>_denormalize_impl</code>)</h3>
+<p><code>local_db/denormalize.py:420–460</code> already loops over the per-element paths and
+<code>union(*sql_statements)</code> when there is more than one. It currently receives one
+path per element; now it receives N. SQLAlchemy <code>union</code> is <code>UNION</code> (deduped),
+not <code>UNION ALL</code>, so the fan-out collapses automatically.</p>
+<p><strong>Correctness pin:</strong> all paths to a given <code>row_per</code> leaf must project the
+<strong>identical column tuple</strong> (same leaf table → same columns), so <code>UNION</code> dedups
+on leaf-row identity. The plan must assert this invariant (a guard or a test),
+because mismatched projections would silently defeat the dedup.</p>
+<h3 id="unit-c-ambiguity-guard-interaction-_find_path_ambiguities-rule-6">Unit C — Ambiguity guard interaction (<code>_find_path_ambiguities</code>, Rule 6)</h3>
+<p>Rule 6 raises <code>DerivaMLDenormalizeAmbiguousPath</code> when multiple FK paths exist
+between <code>row_per</code> and a requested <strong>column-contributing</strong> <code>include_table</code>.
+Retaining multiple <code>Dataset → element</code> routes must <strong>not</strong> trip Rule 6 — that
+would convert today's silent-empty bug into a loud-raise bug.</p>
+<p>Two path classes must stay distinct:</p>
+<ul>
+<li><strong>Multiple <code>Dataset</code>-anchored membership/reachability routes to an element</strong>
+  → unioned (this fix). NOT a Rule-6 ambiguity.</li>
+<li><strong>Multiple paths between <code>row_per</code> and a column-contributing
+  <code>include_table</code></strong> → still a genuine ambiguity; still raises; still resolved
+  with <code>via=</code>.</li>
+</ul>
+<p>The fix scopes the union to the <strong><code>Dataset</code>-anchored reachability paths</strong> and
+leaves Rule 6's <code>row_per</code>↔include-table column-ambiguity check untouched. The
+plan must include a test that a column-ambiguous request still raises.</p>
+<h2 id="edge-cases-each-gets-a-test">Edge cases (each gets a test)</h2>
+<ol>
+<li><strong>Directly-populated</strong> (demo <code>Image</code> is a direct member) → membership path
+   non-empty, FK path adds nothing new → <strong>identical to today</strong> (regression
+   gate).</li>
+<li><strong>Subject-partitioned</strong> (6-CQZE; demo subject-partitioned fixture) →
+   membership empty, FK path supplies the rows → <strong>0 → N</strong>.</li>
+<li><strong>Mixed</strong> (some direct + some FK-reachable members) → UNION-distinct =
+   correct superset (neither under-returns like today nor double-counts).</li>
+<li><strong>No path at all</strong> → unchanged: empty result / existing orphan handling.</li>
+<li><strong>Fan-out</strong> (980 → 591) → handled by UNION-distinct on the leaf RID.</li>
+</ol>
+<h2 id="testing-acceptance-gates">Testing &amp; acceptance gates</h2>
+<p>Three independent nets; all are mandatory acceptance gates. This is what makes
+the always-union blast radius safe.</p>
+<h3 id="net-1-directly-populated-regression-catches-broke-the-normal-case">Net 1 — Directly-populated regression (catches "broke the normal case")</h3>
+<p>The existing planner suite runs on the <strong>directly-populated demo catalog</strong>.
+Gate: <code>tests/local_db/test_planner_rules.py</code>, <code>test_paths.py</code>,
+<code>test_denormalize_impl.py</code>, <code>test_denormalize_feature_records.py</code>,
+<code>test_denormalizer.py</code>, <code>test_denormalize_selector.py</code> stay <strong>green with no
+expectation edits</strong>. A changed demo result is a finding to explain, not a test
+to update. New unit test: the planner emits <strong>multiple paths</strong> for an element
+reachable two ways, and UNION-distinct yields the same row set as the
+single-path result when membership is populated.</p>
+<h3 id="net-2-exactness-oracle-catches-non-empty-but-wrong">Net 2 — Exactness oracle (catches "non-empty but wrong")</h3>
+<p><code>estimate_bag_size</code> independently computes RID-distinct reachable counts per
+table via the client-side reachability BFS. Gate:
+<code>len(feature_values(T, F))</code> equals the estimate's reachable feature-table count.
+Two independent code paths (planner UNION vs. BFS) must agree. Run on <strong>both</strong>
+the directly-populated demo and a subject-partitioned dataset.</p>
+<h3 id="net-3-live-equivalence-real-world-shape">Net 3 — Live equivalence (real-world shape)</h3>
+<ul>
+<li>
+<p><strong>Committed, demo-based (durable gate):</strong> a <strong>subject-partitioned demo
+  fixture</strong> — a dataset whose members are <code>Subject</code>s only, with <code>Image</code>
+  FK-reachable via <code>Image.Subject</code> (the demo <code>Image</code> table has an <code>Image.Subject
+  → Subject</code> FK; the demo features <code>Image/Quality</code> and <code>Image/BoundingBox</code> hang
+  off <code>Image</code>). Assert: before the fix <code>feature_values("Image","Quality")</code>
+  returns 0 (RED), after the fix it returns the FK-reachable count, and
+  <code>as_tf_dataset(element_type="Image", targets={"Quality": …}, missing="skip")</code>
+  yields one labeled <code>(image, label, rid)</code> per reachable image. The demo chain
+  is one hop (<code>Subject → Image</code>) vs eye-ai's two hops (<code>Subject → Observation →
+  Image</code>); both exercise the same "membership-empty, FK-reachable" planner
+  path, so the demo fixture is a valid committed gate that needs no live
+  eye-ai access.</p>
+</li>
+<li>
+<p><strong>Manual, live eye-ai (not committed — needs a token):</strong></p>
+</li>
+<li><code>6-CQZE</code> child <code>2-7KA2</code>: <code>feature_values("Image","Image_Diagnosis")</code> → <strong>591</strong>
+    (was 0); <code>as_tf_dataset(targets={"Image_Diagnosis": select_initial_diagnosis},
+    missing="skip")</code> → <strong>102</strong> labeled triples.</li>
+<li><code>2-277G</code> v4.8.0 (prod): <code>feature_values("Image","Image_Diagnosis")</code> returns
+    the <code>bag_info</code> count; <code>as_tf_dataset</code> yields ~28,546 labeled triples. Record
+    the actual numbers in the PR.</li>
+</ul>
+<h3 id="tdd-order">TDD order</h3>
+<p>Write the failing subject-partitioned demo <code>feature_values</code> test first
+(RED: 0), implement the planner union (Units A–C), confirm GREEN, then run the
+full planner suite as the Net-1 regression gate, then Net-2 oracle, then the
+live Net-3 checks.</p>
+<h2 id="documentation">Documentation</h2>
+<p><code>docs/reference/denormalization.md</code> documents the path/scoping rules
+(membership is "a filter on what's in scope"). Update it to state the
+union-of-reachable-paths rule and the RID-distinct-on-<code>row_per</code>-leaf dedup, so
+the reference matches the implemented semantics. Tag the rule <code>[deriva-ml]</code>.</p>
+<h2 id="out-of-scope">Out of scope</h2>
+<ul>
+<li>No change to element <strong>enumeration</strong> (<code>resolve_element_rids</code> /
+  <code>_dataset_table_view</code>) — that shipped in #316 and is correct.</li>
+<li>No new public API surface. <code>feature_values</code> keeps its signature; the report's
+  suggested <code>reachable=</code> parameter on <code>feature_values</code> is <strong>not</strong> added — the
+  planner fix makes the correct behavior the default, and a per-call opt-out
+  would re-introduce the inconsistency the union is removing. (If a future
+  caller genuinely needs membership-only scoping, that is a separate, justified
+  request.)</li>
+<li>No change to Rule 6 column-ambiguity semantics.</li>
+</ul>
+<h2 id="risks">Risks</h2>
+<ul>
+<li><strong>Largest risk:</strong> a demo (directly-populated) result silently shifts under the
+  always-union rule. Mitigation: Net-1 forbids expectation edits; any demo diff
+  is investigated, not rubber-stamped.</li>
+<li><strong>Rule 6 false-positive:</strong> retaining multiple element routes trips the
+  ambiguity guard. Mitigation: Unit C scopes the union to <code>Dataset</code>-anchored
+  routes and a test pins that genuine column-ambiguity still raises.</li>
+<li><strong>Projection-mismatch dedup defeat:</strong> Unit B's identical-projection invariant
+  is asserted by guard/test.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2399 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-06-16-bag-add-asset-symlink-resolve-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>BagBuilder.add_asset resolves symlink sources (Linux bag corruption fix) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bagbuilderadd_asset-resolves-symlink-sources-linux-bag-corruption-fix" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              BagBuilder.add_asset resolves symlink sources (Linux bag corruption fix)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#root-cause-proven-on-both-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Root cause (proven on both platforms)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-slipped-through" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it slipped through
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#approach-decided-during-brainstorming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approach (decided during brainstorming)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Approach (decided during brainstorming)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-fix-deriva-py-derivabagbuilderpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The fix (deriva-py, deriva/bag/builder.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-pin-advance-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml (pin advance only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequencing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequencing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="bagbuilderadd_asset-resolves-symlink-sources-linux-bag-corruption-fix"><code>BagBuilder.add_asset</code> resolves symlink sources (Linux bag corruption fix)</h1>
+<p><strong>Date:</strong> 2026-06-16
+<strong>Status:</strong> Approved design — ready for implementation plan
+<strong>Scope:</strong> deriva-py (fix + contract test) + deriva-ml (pin advance only)</p>
+<h2 id="problem">Problem</h2>
+<p>Asset uploads assemble files into a bag via symlinks, then hardlink them in.
+This works on macOS and <strong>corrupts the bag on Linux</strong>.</p>
+<p><code>deriva_ml.execution.asset_upload.asset_file_path()</code> (default <code>copy_file=False</code>)
+creates an <strong>absolute symlink</strong> in the flat staging tree pointing at the original
+source file — which is frequently <em>outside</em> the bag (e.g. Hydra writes
+<code>overrides.yaml</code> / <code>notebook.log</code> to <code>~/.deriva-ml/.../hydra/&lt;timestamp&gt;/</code>, and
+<code>run_notebook.py:869</code> registers it with the default <code>copy_file=False</code>).</p>
+<p><code>deriva_ml.execution.bag_commit._add_asset_rows_to_bag</code> then passes that staging
+path — <strong>which is the symlink</strong> — to deriva-py's
+<code>BagBuilder.add_asset(src, link=True)</code>, which does <code>os.link(src, dest)</code>.</p>
+<h3 id="root-cause-proven-on-both-platforms">Root cause (proven on both platforms)</h3>
+<p><code>os.link(symlink, dest)</code> behaves differently by OS, despite both defaulting to
+<code>follow_symlinks=True</code> and both having <code>os.link in os.supports_follow_symlinks</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th><code>os.link(symlink, dest)</code> hardlinks the…</th>
+<th>Bag result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>macOS</strong> (Darwin)</td>
+<td><strong>target</strong> (real file) — BSD <code>link(2)</code> follows symlinks</td>
+<td>bytes ✅</td>
+</tr>
+<tr>
+<td><strong>Linux</strong></td>
+<td><strong>symlink itself</strong> — POSIX <code>link(2)</code> does not follow</td>
+<td>a symlink to an external absolute path ❌</td>
+</tr>
+</tbody>
+</table>
+<p>Verified empirically: the identical <code>os.link(absolute_symlink, dest)</code> script
+hardlinks the real file on this macOS host and the symlink inode under
+<code>python:3.12-slim</code> (Linux Docker).</p>
+<p>This violates <code>add_asset</code>'s own documented invariant
+(<code>builder.py:397-402</code>: "Hardlinks live inside the bag as regular files, so
+bagit's safety model is satisfied"). Two downstream symptoms result from the
+<em>same</em> defect:</p>
+<ul>
+<li><strong>Symptom A (Linux, <code>os.link</code>):</strong> the bag's <code>data/asset/.../file</code> is a hardlink
+  to the symlink inode whose target is an external absolute path. When the bag is
+  hashed, zipped, moved, or loaded elsewhere, the bytes are missing/broken.</li>
+<li><strong>Symptom B (any OS, bagit):</strong> <code>bdbag.make_bag(update=True)</code> →
+  <code>_load_manifests()</code> → bagit <code>_path_is_dangerous()</code> calls
+  <code>os.path.realpath()</code> on the symlink, escapes the bag root, and the
+  <code>commonprefix</code> check fails → <strong>"unsafe path"</strong> rejection.</li>
+</ul>
+<p>Both are: <em>a symlink-to-an-external-absolute-path ended up in the bag payload.</em></p>
+<h3 id="why-it-slipped-through">Why it slipped through</h3>
+<ul>
+<li>Symlinks are created <strong>by default</strong> (<code>copy_file=False</code>), so every macOS dev run
+  silently works (BSD <code>os.link</code> follows).</li>
+<li>deriva-ml's asset/bag tests need a live catalog and don't run in CI; deriva-ml
+  CI (<code>ubuntu-latest</code>) only runs schema-validation/release/docs — the symlink→bag
+  path is never exercised on Linux in CI.</li>
+<li>deriva-py's existing <code>test_builder_add_asset_link_mode_hardlinks_source</code> links a
+  <strong>regular file</strong> (passes everywhere) and never covers the symlink-source case.</li>
+</ul>
+<h2 id="goal">Goal</h2>
+<p><code>BagBuilder.add_asset(src, link=True)</code> must embed the <strong>real file's bytes as a
+regular file</strong> in the bag on every platform, even when <code>src</code> is a symlink —
+restoring its documented invariant and fixing both symptoms at the source.</p>
+<h2 id="approach-decided-during-brainstorming">Approach (decided during brainstorming)</h2>
+<p><strong>deriva-py-only fix + a deriva-ml pin advance. No deriva-ml code change, no
+temporary bridge</strong> (deploy immediately: the deriva-py fix lands and the pin
+advances in one cycle, so there is no window where deriva-ml runs the broken
+<code>add_asset</code>).</p>
+<h3 id="the-fix-deriva-py-derivabagbuilderpy">The fix (deriva-py, <code>deriva/bag/builder.py</code>)</h3>
+<p>In <code>add_asset</code>, resolve the source to its real target before any link/copy so the
+hardlink always targets the real inode — <strong>but derive the bag-entry name from the
+UNRESOLVED path first</strong>, so the asset keeps the caller's filename (a symlink
+<code>link.bin</code> → real <code>real.bin</code> keeps the bag entry named <code>link.bin</code>):</p>
+<pre><code class="language-python">source_path = Path(source_path)
+name = filename or source_path.name   # caller's name, from the UNRESOLVED path
+source_path = source_path.resolve()   # resolve the link TARGET for link/copy
+</code></pre>
+<blockquote>
+<p><strong>Implementation note (found during TDD):</strong> the naive single-liner
+<code>source_path = Path(source_path).resolve()</code> placed before the existing
+<code>name = filename or source_path.name</code> line is <strong>wrong</strong> — it would name the bag
+entry after the resolved target (<code>real.bin</code>), changing the caller-facing asset
+name. The correct fix reorders so <code>name</code> is taken from the unresolved path, then
+resolves. (~10 lines: the resolve + comment + moving the <code>name =</code> line up and
+deleting its old position.)</p>
+</blockquote>
+<p>Verified-safe against the rest of the method:</p>
+<ul>
+<li><code>.is_file()</code> already follows symlinks — unaffected; resolving first just makes
+  the not-found error report the real path.</li>
+<li><code>os.link(source_path, dest)</code> now links the real file on every platform — the fix.</li>
+<li><code>shutil.copy2</code> copy + EXDEV-fallback paths already follow symlinks — unaffected;
+  resolving makes it explicit.</li>
+<li>Bag-entry naming (<code>name</code>, <code>rel</code>, the stored <code>filename</code>) uses the <strong>unresolved</strong>
+  name; the link/copy and the idempotency <code>source_path</code> use the <strong>resolved</strong> path —
+  the two concerns are cleanly separated.</li>
+<li>Idempotency key <code>_embedded_assets[dest]["source_path"]</code> records the <strong>resolved</strong>
+  path; both compare sides see the resolved form, so re-adding the same logical
+  source (symlink vs resolved) stays consistent rather than spuriously raising the
+  "different source" <code>ValueError</code>.</li>
+<li>The <code>add_asset</code> docstring gains a line noting symlink sources are resolved (bag
+  payload is always a regular file) while the entry keeps the symlink's name.</li>
+</ul>
+<p><code>os</code> and <code>Path</code> are already imported in <code>builder.py</code>. One line.</p>
+<h3 id="deriva-ml-pin-advance-only">deriva-ml (pin advance only)</h3>
+<p>No code change. After the deriva-py PR merges on the <code>deriva-ml</code> branch:</p>
+<ol>
+<li><code>git -C /Users/carl/GitHub/deriva-py rev-parse origin/deriva-ml</code> → the merge SHA.</li>
+<li>Update <strong>both</strong> pin locations in <code>deriva-ml/pyproject.toml</code> in lockstep — the
+   <code>project.dependencies</code> URL <code>deriva @ git+...@&lt;sha&gt;</code> and the <code>[tool.uv.sources]</code>
+   <code>rev = "&lt;sha&gt;"</code>.</li>
+<li><code>uv lock &amp;&amp; uv sync</code>, run the deriva-ml suite, land via PR.</li>
+</ol>
+<h2 id="components">Components</h2>
+<p>This is a single-function fix; the "components" are the two repos' deliverables.</p>
+<ul>
+<li><strong>deriva-py — the fix</strong> (<code>deriva/bag/builder.py::add_asset</code>): one-line resolve.</li>
+<li><strong>deriva-py — the contract test</strong> (<code>tests/deriva/bag/test_builder.py</code>): a new
+  test pinning the symlink-source case (below). Lands in the <strong>same PR</strong> as the
+  fix (never fix-without-test — that opens a regression window in deriva-py's main
+  branch).</li>
+<li><strong>deriva-ml — the pin advance</strong> (<code>pyproject.toml</code> + <code>uv.lock</code>): mechanical,
+  separate PR after upstream merges.</li>
+</ul>
+<h2 id="test-strategy">Test strategy</h2>
+<p><strong>The contract test belongs upstream in deriva-py</strong>, alongside the fix that makes
+the promise (per the deriva-ml CLAUDE.md cross-repo rule). It is a near-twin of
+the existing <code>test_builder_add_asset_link_mode_hardlinks_source</code>, but links a
+<strong>symlink</strong> source — the case that diverges by platform:</p>
+<pre><code class="language-python">def test_builder_add_asset_link_mode_resolves_symlink_source(tmp_path):
+    &quot;&quot;&quot;link=True must embed the REAL file as a regular file in the bag even when
+    the source is a SYMLINK — not hardlink the symlink inode (which on Linux puts
+    a symlink-to-an-external-path in the bag payload and breaks it).&quot;&quot;&quot;
+    real = tmp_path / &quot;real.bin&quot;
+    real.write_bytes(b&quot;real bytes&quot;)
+    link = tmp_path / &quot;link.bin&quot;
+    link.symlink_to(real.resolve())  # absolute symlink, as asset_file_path makes
+
+    out = tmp_path / &quot;bag&quot;
+    bb = BagBuilder(metadata=_two_table_metadata(), output_dir=out)
+    bb.add_asset(&quot;Image&quot;, &quot;I1&quot;, link, link=True)
+    bb.finalize(make_bdbag=False)
+
+    dest = out / &quot;data&quot; / &quot;asset&quot; / &quot;Image&quot; / &quot;I1&quot; / &quot;link.bin&quot;
+    assert dest.is_file()
+    assert not dest.is_symlink(), &quot;bag payload must not contain a symlink&quot;
+    assert dest.read_bytes() == b&quot;real bytes&quot;
+</code></pre>
+<p>The load-bearing assertion is <strong><code>not dest.is_symlink()</code></strong> — exactly what fails on
+Linux today and passes after the resolve. (On macOS it already passes, which is
+why the bug was invisible.)</p>
+<p><strong>Enforcement caveat (verified):</strong> the deriva-py checkout has <strong>no <code>.github/</code>
+workflows</strong> — there is no Linux CI in this branch to automatically catch the
+regression. Therefore the implementation MUST <strong>run the new test on Linux via
+Docker</strong> (<code>python:3.12-slim</code>, the same probe used to prove the bug) as part of the
+fix's verification, not rely on CI. If the test passes only on macOS it has not
+demonstrated the fix. Optionally, the implementation may add a <code>make_bdbag=True</code>
+assertion that bagit validation does not raise "unsafe path" (symptom B) — but a
+regular file cannot trip <code>_path_is_dangerous</code>, so the <code>not is_symlink</code> assertion
+already prevents symptom B; add the bagit-level assertion only if it earns its
+weight.</p>
+<p><strong>deriva-ml verification (not committed):</strong> after the pin advances, re-run the
+Docker-Linux <code>os.link</code>-on-symlink probe against the fixed deriva-py (now embeds
+bytes), and run a real deriva-ml asset-commit on localhost to confirm the bag
+contains regular files with no symlinks and no "unsafe path." These are
+acceptance checks, not new committed deriva-ml tests (the fix isn't in deriva-ml).</p>
+<h2 id="sequencing">Sequencing</h2>
+<ol>
+<li><strong>deriva-py PR</strong> off the <code>deriva-ml</code> branch: the resolve fix <strong>+</strong> the contract
+   test in one PR. Run the deriva-py bag suite locally <strong>and on Linux via Docker</strong>.
+   Human reviews/merges the upstream PR (I open it; I do not self-merge an upstream
+   repo without approval) — so the flow pauses for the merge.</li>
+<li><strong>Capture merge SHA</strong> from <code>origin/deriva-ml</code> after merge.</li>
+<li><strong>deriva-ml pin advance PR</strong>: both pin locations → the SHA, <code>uv lock &amp;&amp; uv sync</code>,
+   deriva-ml suite green, land.</li>
+<li><strong>Verify</strong> (Docker-Linux probe + live localhost asset-commit) against the
+   pinned, fixed deriva-py.</li>
+<li><strong>Release</strong>: <code>bump-version</code> on deriva-ml <code>main</code> after the pin PR merges (the pin
+   advance is part of the bump — never bump with a stale pin). Level chosen at that
+   point (this is a consumer-visible bug fix → likely patch).</li>
+</ol>
+<h2 id="out-of-scope">Out of scope</h2>
+<ul>
+<li>No change to <code>asset_file_path</code>'s default <code>copy_file=False</code> — symlinked staging
+  is a deliberate disk-saving choice; the fix is that <code>add_asset</code> resolves before
+  linking, which makes symlinked staging safe. (Changing the default to copy would
+  pay 1× disk/IO for every asset and is unnecessary once <code>add_asset</code> resolves.)</li>
+<li>No change to <code>restructure.py</code>'s symlink export (ImageFolder trees for third-party
+  trainers) — it has a copy fallback and is not in the bag-upload path.</li>
+<li>No change to the download-side asset-cache symlinks (<code>asset_upload.py:1073/1093</code>)
+  — separate flow, not bag payload.</li>
+<li>No deriva-ml code change and no temporary bridge.</li>
+</ul>
+<h2 id="risks">Risks</h2>
+<ul>
+<li><strong><code>.resolve()</code> on a broken/missing symlink:</strong> if <code>src</code> is a dangling symlink,
+  <code>.resolve()</code> returns a non-existent path and the existing <code>.is_file()</code> check
+  raises <code>FileNotFoundError</code> — same failure class as today (a missing source),
+  just reported with the resolved path. Acceptable; the contract test uses a valid
+  symlink.</li>
+<li><strong>Idempotency-key change:</strong> resolving changes the recorded <code>source_path</code>. A
+  caller that re-adds the <em>same logical file</em> via a symlink then via the resolved
+  path now sees them as equal (both resolved) — strictly better than today's
+  spurious "different source" mismatch. No regression; the existing
+  <code>test_builder_add_asset_idempotent_same_source</code> and
+  <code>...duplicate_destination_different_source</code> tests must still pass.</li>
+<li><strong>No upstream Linux CI:</strong> mitigated by the mandatory Docker-Linux test run during
+  implementation (the regression won't be auto-caught later, but the fix is proven
+  on Linux at land time, and the test is in place for whenever CI is added).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

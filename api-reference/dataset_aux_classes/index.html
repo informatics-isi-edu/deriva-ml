@@ -1,0 +1,5309 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/api-reference/dataset_aux_classes/">
+      
+      
+        <link rel="prev" href="../dataset_split/">
+      
+      
+        <link rel="next" href="../execution/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Dataset Auxiliary Classes - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dataset-auxiliary-classes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dataset Auxiliary Classes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aux_classes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetHistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetHistory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetMinid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetMinid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetReference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetReference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetSpec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DatasetSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetSpec.from_shorthand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_shorthand
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetSpecConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetSpecConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetVersion
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DatasetVersion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        patch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.next_release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        next_release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.to_dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.FeatureReference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FeatureReference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.VersionPart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VersionPart
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aux_classes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetHistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetHistory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetMinid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetMinid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetReference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetReference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetSpec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DatasetSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetSpec.from_shorthand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_shorthand
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetSpecConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetSpecConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetVersion
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DatasetVersion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        patch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.next_release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        next_release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.DatasetVersion.to_dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.FeatureReference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FeatureReference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.dataset.aux_classes.VersionPart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VersionPart
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="dataset-auxiliary-classes">Dataset Auxiliary Classes</h1>
+<p>Supporting classes for dataset operations including version management,
+dataset specifications, and history tracking.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="deriva_ml.dataset.aux_classes"></a>
+    <div class="doc doc-contents first">
+
+        <p>Auxiliary classes for dataset versioning, history, and configuration.</p>
+<p>This module defines VersionPart, DatasetVersion, DatasetHistory,
+DatasetMinid, DatasetSpec, and DatasetSpecConfig -- the value objects
+used throughout DerivaML to represent dataset versions, provenance
+records, and hydra-zen configuration entries.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.dataset.aux_classes.DatasetHistory" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DatasetHistory</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+        <p>Class representing a dataset history.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetHistory.dataset_version">dataset_version</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DatasetVersion (deriva_ml.dataset.aux_classes.DatasetVersion)" href="#deriva_ml.dataset.aux_classes.DatasetVersion">DatasetVersion</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A DatasetVersion object which captures the PEP 440 version of the dataset.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetHistory.dataset_rid">dataset_rid</span></code></td>
+            <td>
+                  <code><span title="deriva_ml.core.definitions.RID">RID</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The RID of the dataset.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetHistory.version_rid">version_rid</span></code></td>
+            <td>
+                  <code><span title="deriva_ml.core.definitions.RID">RID</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The RID of the version record for the dataset in the Dataset_Version table.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetHistory.execution_rid">execution_rid</span></code></td>
+            <td>
+                  <code><span title="deriva_ml.core.definitions.RID">RID</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>RID of the execution that created this
+version, or None when the version was created outside an execution.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetHistory.description">description</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable description recorded with this
+version (empty string when none was supplied).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetHistory.minid">minid</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The URL that represents the handle of the dataset bag.  This will be None if a MINID has not
+         been created yet.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetHistory.spec_hash">spec_hash</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Hash of the dataset spec used to build this
+version, or None when not recorded. Used to detect cache hits.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetHistory.snapshot">snapshot</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Catalog snapshot ID of when the version record was created.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DatasetHistory</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class representing a dataset history.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        dataset_version (DatasetVersion): A DatasetVersion object which captures the PEP 440 version of the dataset.</span>
+<span class="sd">        dataset_rid (RID): The RID of the dataset.</span>
+<span class="sd">        version_rid (RID): The RID of the version record for the dataset in the Dataset_Version table.</span>
+<span class="sd">        execution_rid (RID | None): RID of the execution that created this</span>
+<span class="sd">            version, or None when the version was created outside an execution.</span>
+<span class="sd">        description (str | None): Human-readable description recorded with this</span>
+<span class="sd">            version (empty string when none was supplied).</span>
+<span class="sd">        minid (str): The URL that represents the handle of the dataset bag.  This will be None if a MINID has not</span>
+<span class="sd">                     been created yet.</span>
+<span class="sd">        spec_hash (str | None): Hash of the dataset spec used to build this</span>
+<span class="sd">            version, or None when not recorded. Used to detect cache hits.</span>
+<span class="sd">        snapshot (str): Catalog snapshot ID of when the version record was created.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dataset_version</span><span class="p">:</span> <span class="n">DatasetVersion</span>
+    <span class="n">dataset_rid</span><span class="p">:</span> <span class="n">RID</span>
+    <span class="n">version_rid</span><span class="p">:</span> <span class="n">RID</span>
+    <span class="n">execution_rid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RID</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">minid</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">spec_hash</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">snapshot</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">VALIDATION_CONFIG</span>
+
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;execution_rid&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_default_execution_rid</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">v</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">v</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="k">else</span> <span class="n">v</span>
+
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;description&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_default_description</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">v</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">v</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.dataset.aux_classes.DatasetMinid" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DatasetMinid</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+        <p>Represent information about a MINID that refers to a dataset</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetMinid.dataset_version">dataset_version</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DatasetVersion (deriva_ml.dataset.aux_classes.DatasetVersion)" href="#deriva_ml.dataset.aux_classes.DatasetVersion">DatasetVersion</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A DatasetVersion object which captures the PEP 440 version of the dataset.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetMinid.metadata">metadata</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A dictionary containing metadata from the MINID landing page.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetMinid.minid">minid</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The URL that represents the handle of the MINID associated with the dataset.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetMinid.bag_url">bag_url</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The URL to the dataset bag</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetMinid.identifier">identifier</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The identifier of the MINID in CURI form</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetMinid.landing_page">landing_page</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The URL to the landing page of the MINID</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetMinid.version_rid">version_rid</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>RID of the dataset version.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetMinid.checksum">checksum</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The checksum of the MINID in SHA256 form</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DatasetMinid</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represent information about a MINID that refers to a dataset</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        dataset_version (DatasetVersion): A DatasetVersion object which captures the PEP 440 version of the dataset.</span>
+<span class="sd">        metadata (dict): A dictionary containing metadata from the MINID landing page.</span>
+<span class="sd">        minid (str): The URL that represents the handle of the MINID associated with the dataset.</span>
+<span class="sd">        bag_url (str): The URL to the dataset bag</span>
+<span class="sd">        identifier (str): The identifier of the MINID in CURI form</span>
+<span class="sd">        landing_page (str): The URL to the landing page of the MINID</span>
+<span class="sd">        version_rid (str): RID of the dataset version.</span>
+<span class="sd">        checksum (str): The checksum of the MINID in SHA256 form</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dataset_version</span><span class="p">:</span> <span class="n">DatasetVersion</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">minid</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">alias</span><span class="o">=</span><span class="s2">&quot;compact_uri&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">bag_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">alias</span><span class="o">=</span><span class="s2">&quot;location&quot;</span><span class="p">)</span>
+    <span class="n">identifier</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">landing_page</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">version_rid</span><span class="p">:</span> <span class="n">RID</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">alias</span><span class="o">=</span><span class="s2">&quot;RID&quot;</span><span class="p">)</span>
+    <span class="n">checksum</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">alias</span><span class="o">=</span><span class="s2">&quot;checksums&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+    <span class="nd">@computed_field</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dataset_rid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">rid_parts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">version_rid</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;@&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rid_parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="nd">@computed_field</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dataset_snapshot</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># ``version_rid`` is ``{rid}`` or ``{rid}@{snapshot}`` per</span>
+        <span class="c1"># the validation pattern. The unsnapped form has no</span>
+        <span class="c1"># ``@`` segment; surface that as ``None`` rather than</span>
+        <span class="c1"># IndexError-ing on the missing split component.</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">version_rid</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;@&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">insert_metadata</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s2">&quot;metadata&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">data</span> <span class="o">|</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">data</span>
+
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;bag_url&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">convert_location_to_str</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span>
+
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;checksum&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">convert_checksum_to_value</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">checksums</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">checksum_value</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">checksum</span> <span class="ow">in</span> <span class="n">checksums</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">checksum</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;function&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;sha256&quot;</span><span class="p">:</span>
+                <span class="n">checksum_value</span> <span class="o">=</span> <span class="n">checksum</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">)</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">checksum_value</span>
+
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">VALIDATION_CONFIG</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.dataset.aux_classes.DatasetReference" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DatasetReference</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+        <p>One dataset that references a table through its member association.</p>
+<p>Produced by :meth:<code>DerivaML.find_datasets_referencing</code> for
+schema-evolution impact analysis ("what breaks if I change this
+table?"). Dataset impact is table-granular: membership is row-level,
+so any column change on the member table affects every dataset
+holding rows of that table.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetReference.dataset_rid">dataset_rid</span></code></td>
+            <td>
+                  <code><span title="deriva_ml.core.definitions.RID">RID</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>RID of the referencing dataset.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetReference.element_table">element_table</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the referenced member table.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetReference.member_count">member_count</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows of <code>element_table</code> currently in
+the dataset (unversioned, current membership).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DatasetReference</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One dataset that references a table through its member association.</span>
+
+<span class="sd">    Produced by :meth:`DerivaML.find_datasets_referencing` for</span>
+<span class="sd">    schema-evolution impact analysis (&quot;what breaks if I change this</span>
+<span class="sd">    table?&quot;). Dataset impact is table-granular: membership is row-level,</span>
+<span class="sd">    so any column change on the member table affects every dataset</span>
+<span class="sd">    holding rows of that table.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        dataset_rid: RID of the referencing dataset.</span>
+<span class="sd">        element_table: Name of the referenced member table.</span>
+<span class="sd">        member_count: Number of rows of ``element_table`` currently in</span>
+<span class="sd">            the dataset (unversioned, current membership).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span>
+
+    <span class="n">dataset_rid</span><span class="p">:</span> <span class="n">RID</span>
+    <span class="n">element_table</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">member_count</span><span class="p">:</span> <span class="nb">int</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.dataset.aux_classes.DatasetSpec" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DatasetSpec</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+        <p>Represent a dataset_table in an execution configuration dataset_table list</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpec.rid">rid</span></code></td>
+            <td>
+                  <code><span title="deriva_ml.core.definitions.RID">RID</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A dataset_table RID</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpec.materialize">materialize</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If False do not materialize datasets, only download table data, no assets.  Defaults to True</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpec.version">version</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DatasetVersion (deriva_ml.dataset.aux_classes.DatasetVersion)" href="#deriva_ml.dataset.aux_classes.DatasetVersion">DatasetVersion</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The version of the dataset.  Should follow PEP 440 (see ADR-0004).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpec.description">description</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional human-readable note describing this spec's
+role in the configuration. Defaults to the empty string.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpec.exclude_tables">exclude_tables</span></code></td>
+            <td>
+                  <code><span title="set">set</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional set of table names to exclude from FK path
+traversal during bag export. Tables in this set will not be visited, pruning branches
+of the FK graph. Useful for avoiding query timeouts on large tables.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpec.timeout">timeout</span></code></td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional (connect_timeout, read_timeout) in seconds
+for network requests during bag download. Defaults to (10, 610) if not specified.
+Increase read_timeout for large datasets with deep FK joins.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpec.fetch_concurrency">fetch_concurrency</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of concurrent fetch threads for asset
+download during materialization. Defaults to 8.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpec.reachability_concurrency">reachability_concurrency</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bounded parallelism for the
+client-side edge-table fetch that computes which rows the bag
+contains (drives the estimate AND bag-spec/build). Defaults to 8
+(measured ~1.4x faster than sequential on eye-ai 2-277G, exact);
+pass 1 for the sequential path. Distinct from <code>fetch_concurrency</code>,
+which parallelizes asset <em>file</em> downloads.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DatasetSpec</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represent a dataset_table in an execution configuration dataset_table list</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rid (RID): A dataset_table RID</span>
+<span class="sd">        materialize (bool): If False do not materialize datasets, only download table data, no assets.  Defaults to True</span>
+<span class="sd">        version (DatasetVersion): The version of the dataset.  Should follow PEP 440 (see ADR-0004).</span>
+<span class="sd">        description (str): Optional human-readable note describing this spec&#39;s</span>
+<span class="sd">            role in the configuration. Defaults to the empty string.</span>
+<span class="sd">        exclude_tables (set[str] | None): Optional set of table names to exclude from FK path</span>
+<span class="sd">            traversal during bag export. Tables in this set will not be visited, pruning branches</span>
+<span class="sd">            of the FK graph. Useful for avoiding query timeouts on large tables.</span>
+<span class="sd">        timeout (tuple[int, int] | None): Optional (connect_timeout, read_timeout) in seconds</span>
+<span class="sd">            for network requests during bag download. Defaults to (10, 610) if not specified.</span>
+<span class="sd">            Increase read_timeout for large datasets with deep FK joins.</span>
+<span class="sd">        fetch_concurrency (int): Number of concurrent fetch threads for asset</span>
+<span class="sd">            download during materialization. Defaults to 8.</span>
+<span class="sd">        reachability_concurrency (int): Bounded parallelism for the</span>
+<span class="sd">            client-side edge-table fetch that computes which rows the bag</span>
+<span class="sd">            contains (drives the estimate AND bag-spec/build). Defaults to 8</span>
+<span class="sd">            (measured ~1.4x faster than sequential on eye-ai 2-277G, exact);</span>
+<span class="sd">            pass 1 for the sequential path. Distinct from ``fetch_concurrency``,</span>
+<span class="sd">            which parallelizes asset *file* downloads.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">rid</span><span class="p">:</span> <span class="n">RID</span>
+    <span class="n">version</span><span class="p">:</span> <span class="n">DatasetVersion</span> <span class="o">|</span> <span class="n">conlist</span><span class="p">(</span><span class="n">item_type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">min_length</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span>
+    <span class="n">materialize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">exclude_tables</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">fetch_concurrency</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">reachability_concurrency</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span>
+
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">VALIDATION_CONFIG</span>
+
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">version_field_validator</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">v</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">DatasetVersion</span><span class="p">(</span><span class="o">**</span><span class="n">v</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">DatasetVersion</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DatasetVersion</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">v</span>
+
+    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_bare_rid</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bool</span><span class="p">]:</span>
+        <span class="c1"># If you are just given a string, assume it&#39;s a rid and put into dict for further validation.</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;rid&quot;</span><span class="p">:</span> <span class="n">data</span><span class="p">}</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">data</span>
+
+    <span class="nd">@field_serializer</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">serialize_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="n">DatasetVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">version</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_shorthand</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;DatasetSpec&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Parse ``&#39;RID@version&#39;`` into a :class:`DatasetSpec`.</span>
+
+<span class="sd">        Used by the :meth:`DerivaML.create_execution` kwargs form so</span>
+<span class="sd">        callers can write ``datasets=[&quot;1-XYZ@1.0.0&quot;]`` instead of</span>
+<span class="sd">        instantiating a full ``DatasetSpec`` by hand. Accepts both</span>
+<span class="sd">        ``&#39;RID&#39;`` (bare RID; version defaults to ``0.0.0``) and</span>
+<span class="sd">        ``&#39;RID@version&#39;`` (semantic version string).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            s: The shorthand string. Must contain at most one ``&#39;@&#39;``</span>
+<span class="sd">                separator and a non-empty RID portion.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A :class:`DatasetSpec` instance.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the string is empty or contains more than</span>
+<span class="sd">                one ``&#39;@&#39;`` separator.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            Parse a shorthand with explicit version::</span>
+
+<span class="sd">                &gt;&gt;&gt; spec = DatasetSpec.from_shorthand(&quot;1-XYZ0@2.0.0&quot;)</span>
+<span class="sd">                &gt;&gt;&gt; spec.rid</span>
+<span class="sd">                &#39;1-XYZ0&#39;</span>
+<span class="sd">                &gt;&gt;&gt; str(spec.version)</span>
+<span class="sd">                &#39;2.0.0&#39;</span>
+
+<span class="sd">            Parse a bare RID (version defaults to ``0.0.0``)::</span>
+
+<span class="sd">                &gt;&gt;&gt; spec = DatasetSpec.from_shorthand(&quot;1-XYZ0&quot;)</span>
+<span class="sd">                &gt;&gt;&gt; spec.rid</span>
+<span class="sd">                &#39;1-XYZ0&#39;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;empty dataset shorthand&quot;</span><span class="p">)</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;@&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">rid</span><span class="o">=</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;0.0.0&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">rid</span><span class="o">=</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">version</span><span class="o">=</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dataset shorthand has too many &#39;@&#39; separators: </span><span class="si">{</span><span class="n">s</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="deriva_ml.dataset.aux_classes.DatasetSpec.from_shorthand" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_shorthand</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_shorthand</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetSpec</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Parse <code>'RID@version'</code> into a :class:<code>DatasetSpec</code>.</p>
+<p>Used by the :meth:<code>DerivaML.create_execution</code> kwargs form so
+callers can write <code>datasets=["1-XYZ@1.0.0"]</code> instead of
+instantiating a full <code>DatasetSpec</code> by hand. Accepts both
+<code>'RID'</code> (bare RID; version defaults to <code>0.0.0</code>) and
+<code>'RID@version'</code> (semantic version string).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>s</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The shorthand string. Must contain at most one <code>'@'</code>
+separator and a non-empty RID portion.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>A</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="DatasetSpec (deriva_ml.dataset.aux_classes.DatasetSpec)" href="#deriva_ml.dataset.aux_classes.DatasetSpec">DatasetSpec</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>class:<code>DatasetSpec</code> instance.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the string is empty or contains more than
+one <code>'@'</code> separator.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <p>Parse a shorthand with explicit version::</p>
+<pre><code>&gt;&gt;&gt; spec = DatasetSpec.from_shorthand("1-XYZ0@2.0.0")
+&gt;&gt;&gt; spec.rid
+'1-XYZ0'
+&gt;&gt;&gt; str(spec.version)
+'2.0.0'
+</code></pre>
+<p>Parse a bare RID (version defaults to <code>0.0.0</code>)::</p>
+<pre><code>&gt;&gt;&gt; spec = DatasetSpec.from_shorthand("1-XYZ0")
+&gt;&gt;&gt; spec.rid
+'1-XYZ0'
+</code></pre>
+</details>
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">from_shorthand</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;DatasetSpec&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse ``&#39;RID@version&#39;`` into a :class:`DatasetSpec`.</span>
+
+<span class="sd">    Used by the :meth:`DerivaML.create_execution` kwargs form so</span>
+<span class="sd">    callers can write ``datasets=[&quot;1-XYZ@1.0.0&quot;]`` instead of</span>
+<span class="sd">    instantiating a full ``DatasetSpec`` by hand. Accepts both</span>
+<span class="sd">    ``&#39;RID&#39;`` (bare RID; version defaults to ``0.0.0``) and</span>
+<span class="sd">    ``&#39;RID@version&#39;`` (semantic version string).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        s: The shorthand string. Must contain at most one ``&#39;@&#39;``</span>
+<span class="sd">            separator and a non-empty RID portion.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A :class:`DatasetSpec` instance.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the string is empty or contains more than</span>
+<span class="sd">            one ``&#39;@&#39;`` separator.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Parse a shorthand with explicit version::</span>
+
+<span class="sd">            &gt;&gt;&gt; spec = DatasetSpec.from_shorthand(&quot;1-XYZ0@2.0.0&quot;)</span>
+<span class="sd">            &gt;&gt;&gt; spec.rid</span>
+<span class="sd">            &#39;1-XYZ0&#39;</span>
+<span class="sd">            &gt;&gt;&gt; str(spec.version)</span>
+<span class="sd">            &#39;2.0.0&#39;</span>
+
+<span class="sd">        Parse a bare RID (version defaults to ``0.0.0``)::</span>
+
+<span class="sd">            &gt;&gt;&gt; spec = DatasetSpec.from_shorthand(&quot;1-XYZ0&quot;)</span>
+<span class="sd">            &gt;&gt;&gt; spec.rid</span>
+<span class="sd">            &#39;1-XYZ0&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;empty dataset shorthand&quot;</span><span class="p">)</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;@&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">rid</span><span class="o">=</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;0.0.0&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">rid</span><span class="o">=</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">version</span><span class="o">=</span><span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dataset shorthand has too many &#39;@&#39; separators: </span><span class="si">{</span><span class="n">s</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.dataset.aux_classes.DatasetSpecConfig" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DatasetSpecConfig</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Hydra-zen configuration dataclass for :class:<code>DatasetSpec</code>.</p>
+<p>Use this in hydra-zen <code>store()</code> calls and configuration modules to
+specify dataset inputs.  When instantiated by hydra-zen, it produces a
+:class:<code>DatasetSpec</code> instance.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpecConfig.rid">rid</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dataset RID (e.g., <code>"28CT"</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpecConfig.version">version</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Semantic version string (e.g., <code>"0.21.0"</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpecConfig.materialize">materialize</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If False, download only table metadata, not asset files.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpecConfig.description">description</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable description of the dataset's role in this config.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpecConfig.exclude_tables">exclude_tables</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional table names to exclude from FK path traversal
+during bag export.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpecConfig.timeout">timeout</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional <code>[connect_timeout, read_timeout]</code> in seconds for
+network requests during bag download.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpecConfig.fetch_concurrency">fetch_concurrency</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of concurrent fetch threads for asset download.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.DatasetSpecConfig.reachability_concurrency">reachability_concurrency</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Bounded parallelism for the client-side
+edge-table fetch that computes bag contents (estimate + bag-spec/build).
+Defaults to 8 (~1.4x faster than sequential on eye-ai 2-277G, exact);
+pass 1 for sequential. Distinct from <code>fetch_concurrency</code> (asset file
+downloads).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@hydrated_dataclass</span><span class="p">(</span><span class="n">DatasetSpec</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DatasetSpecConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Hydra-zen configuration dataclass for :class:`DatasetSpec`.</span>
+
+<span class="sd">    Use this in hydra-zen ``store()`` calls and configuration modules to</span>
+<span class="sd">    specify dataset inputs.  When instantiated by hydra-zen, it produces a</span>
+<span class="sd">    :class:`DatasetSpec` instance.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        rid: Dataset RID (e.g., ``&quot;28CT&quot;``).</span>
+<span class="sd">        version: Semantic version string (e.g., ``&quot;0.21.0&quot;``).</span>
+<span class="sd">        materialize: If False, download only table metadata, not asset files.</span>
+<span class="sd">        description: Human-readable description of the dataset&#39;s role in this config.</span>
+<span class="sd">        exclude_tables: Optional table names to exclude from FK path traversal</span>
+<span class="sd">            during bag export.</span>
+<span class="sd">        timeout: Optional ``[connect_timeout, read_timeout]`` in seconds for</span>
+<span class="sd">            network requests during bag download.</span>
+<span class="sd">        fetch_concurrency: Number of concurrent fetch threads for asset download.</span>
+<span class="sd">        reachability_concurrency: Bounded parallelism for the client-side</span>
+<span class="sd">            edge-table fetch that computes bag contents (estimate + bag-spec/build).</span>
+<span class="sd">            Defaults to 8 (~1.4x faster than sequential on eye-ai 2-277G, exact);</span>
+<span class="sd">            pass 1 for sequential. Distinct from ``fetch_concurrency`` (asset file</span>
+<span class="sd">            downloads).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">rid</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">version</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">materialize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">exclude_tables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">fetch_concurrency</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">reachability_concurrency</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.dataset.aux_classes.DatasetVersion" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DatasetVersion</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="packaging.version.Version">Version</span></code></p>
+
+
+
+        <p>A PEP 440 version associated with a dataset.</p>
+<p>Released versions are written as <code>"MAJOR.MINOR.PATCH"</code> (e.g., <code>"0.4.0"</code>).
+Dev versions use the <code>setuptools-scm</code>-compatible post-release form
+<code>"&lt;last_release&gt;.post1.devN"</code> (e.g., <code>"0.4.0.post1.dev3"</code>) — they sort
+<em>after</em> the last release and <em>before</em> the next, and are queryable via
+:attr:<code>is_devrelease</code>. See ADR-0004 for the rationale behind PEP 440 over
+semver pre-release suffixes.</p>
+<p>The wire format for released versions is unchanged from the previous
+semver-backed implementation: a string like <code>"0.4.0"</code> parses and
+serialises identically.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <p>Construct from positional integers (release-segment form):</p>
+<pre><code>&gt;&gt;&gt; v = DatasetVersion(0, 4, 0)
+&gt;&gt;&gt; str(v)
+'0.4.0'
+&gt;&gt;&gt; v.is_devrelease
+False
+</code></pre>
+<p>Construct from a string (any PEP 440 form):</p>
+<pre><code>&gt;&gt;&gt; dev = DatasetVersion.parse("0.4.0.post1.dev3")
+&gt;&gt;&gt; dev.is_devrelease
+True
+&gt;&gt;&gt; DatasetVersion(0, 4, 0) &lt; dev &lt; DatasetVersion(0, 5, 0)
+True
+</code></pre>
+<p>Advance the release-segment for a release:</p>
+<pre><code>&gt;&gt;&gt; from deriva_ml.dataset.aux_classes import VersionPart
+&gt;&gt;&gt; DatasetVersion(0, 4, 0).next_release(VersionPart.minor)
+&lt;DatasetVersion('0.5.0')&gt;
+</code></pre>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DatasetVersion</span><span class="p">(</span><span class="n">Version</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A PEP 440 version associated with a dataset.</span>
+
+<span class="sd">    Released versions are written as ``&quot;MAJOR.MINOR.PATCH&quot;`` (e.g., ``&quot;0.4.0&quot;``).</span>
+<span class="sd">    Dev versions use the ``setuptools-scm``-compatible post-release form</span>
+<span class="sd">    ``&quot;&lt;last_release&gt;.post1.devN&quot;`` (e.g., ``&quot;0.4.0.post1.dev3&quot;``) — they sort</span>
+<span class="sd">    *after* the last release and *before* the next, and are queryable via</span>
+<span class="sd">    :attr:`is_devrelease`. See ADR-0004 for the rationale behind PEP 440 over</span>
+<span class="sd">    semver pre-release suffixes.</span>
+
+<span class="sd">    The wire format for released versions is unchanged from the previous</span>
+<span class="sd">    semver-backed implementation: a string like ``&quot;0.4.0&quot;`` parses and</span>
+<span class="sd">    serialises identically.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Construct from positional integers (release-segment form):</span>
+
+<span class="sd">            &gt;&gt;&gt; v = DatasetVersion(0, 4, 0)</span>
+<span class="sd">            &gt;&gt;&gt; str(v)</span>
+<span class="sd">            &#39;0.4.0&#39;</span>
+<span class="sd">            &gt;&gt;&gt; v.is_devrelease</span>
+<span class="sd">            False</span>
+
+<span class="sd">        Construct from a string (any PEP 440 form):</span>
+
+<span class="sd">            &gt;&gt;&gt; dev = DatasetVersion.parse(&quot;0.4.0.post1.dev3&quot;)</span>
+<span class="sd">            &gt;&gt;&gt; dev.is_devrelease</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; DatasetVersion(0, 4, 0) &lt; dev &lt; DatasetVersion(0, 5, 0)</span>
+<span class="sd">            True</span>
+
+<span class="sd">        Advance the release-segment for a release:</span>
+
+<span class="sd">            &gt;&gt;&gt; from deriva_ml.dataset.aux_classes import VersionPart</span>
+<span class="sd">            &gt;&gt;&gt; DatasetVersion(0, 4, 0).next_release(VersionPart.minor)</span>
+<span class="sd">            &lt;DatasetVersion(&#39;0.5.0&#39;)&gt;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">major</span><span class="p">:</span> <span class="n">SupportsInt</span><span class="p">,</span>
+        <span class="n">minor</span><span class="p">:</span> <span class="n">SupportsInt</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">patch</span><span class="p">:</span> <span class="n">SupportsInt</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a released ``DatasetVersion`` from a release-segment tuple.</span>
+
+<span class="sd">        For PEP 440 forms beyond ``MAJOR.MINOR.PATCH`` (post-release, dev,</span>
+<span class="sd">        local, etc.), use :meth:`parse` with the canonical string form.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            major: Major version number. Schema-altering changes.</span>
+<span class="sd">            minor: Minor version number. Additive changes.</span>
+<span class="sd">            patch: Patch number. Small clean-ups and edits.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">major</span><span class="p">)</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">minor</span><span class="p">)</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">patch</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The patch component of the release segment.</span>
+
+<span class="sd">        ``packaging.Version`` exposes this as :attr:`micro`. ``patch`` is</span>
+<span class="sd">        kept on ``DatasetVersion`` because it matches the ``VersionPart``</span>
+<span class="sd">        vocabulary and the column meaning.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">micro</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialise the release segment as a ``{major, minor, patch}`` dict.</span>
+
+<span class="sd">        Used by :class:`DatasetSpec`&#39;s field serializer for hydra-zen</span>
+<span class="sd">        round-tripping. Pre-release / post-release / dev / local segments</span>
+<span class="sd">        are *not* preserved in this form — it represents only the</span>
+<span class="sd">        release-segment tuple. Use ``str(self)`` for a lossless serialisation.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A dict with integer ``major``, ``minor``, and ``patch`` fields.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; DatasetVersion(1, 2, 3).to_dict()</span>
+<span class="sd">            {&#39;major&#39;: 1, &#39;minor&#39;: 2, &#39;patch&#39;: 3}</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;major&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">major</span><span class="p">,</span> <span class="s2">&quot;minor&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">minor</span><span class="p">,</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">patch</span><span class="p">}</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;DatasetVersion&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Parse a PEP 440 version string into a ``DatasetVersion``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            version: A PEP 440 version string. Released forms like</span>
+<span class="sd">                ``&quot;1.2.3&quot;`` and dev forms like ``&quot;1.2.3.post1.dev4&quot;`` are</span>
+<span class="sd">                both accepted.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A new ``DatasetVersion`` corresponding to the parsed string.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            packaging.version.InvalidVersion: If *version* is not a valid</span>
+<span class="sd">                PEP 440 version string.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; str(DatasetVersion.parse(&quot;0.4.0&quot;))</span>
+<span class="sd">            &#39;0.4.0&#39;</span>
+<span class="sd">            &gt;&gt;&gt; DatasetVersion.parse(&quot;0.4.0.post1.dev3&quot;).is_devrelease</span>
+<span class="sd">            True</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># __new__ on the parent does the parse; we just need to return a</span>
+        <span class="c1"># subclass instance with the same internal state.</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">Version</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+        <span class="n">Version</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">instance</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">next_release</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bump</span><span class="p">:</span> <span class="s2">&quot;VersionPart&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;DatasetVersion&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the next released ``DatasetVersion`` after this one.</span>
+
+<span class="sd">        Applies a release-segment bump to ``(major, minor, patch)`` and</span>
+<span class="sd">        discards any post-release / dev / local segments — the new value</span>
+<span class="sd">        is always a clean released version. Higher-order bumps reset</span>
+<span class="sd">        lower-order components to zero, matching the standard</span>
+<span class="sd">        ``major.minor.patch`` convention.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            bump: Which part of the release segment to advance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A new released ``DatasetVersion`` with the requested</span>
+<span class="sd">            component advanced.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; from deriva_ml.dataset.aux_classes import VersionPart</span>
+<span class="sd">            &gt;&gt;&gt; DatasetVersion(0, 4, 0).next_release(VersionPart.minor)</span>
+<span class="sd">            &lt;DatasetVersion(&#39;0.5.0&#39;)&gt;</span>
+<span class="sd">            &gt;&gt;&gt; DatasetVersion(0, 4, 7).next_release(VersionPart.major)</span>
+<span class="sd">            &lt;DatasetVersion(&#39;1.0.0&#39;)&gt;</span>
+<span class="sd">            &gt;&gt;&gt; DatasetVersion.parse(&quot;0.4.0.post1.dev3&quot;).next_release(</span>
+<span class="sd">            ...     VersionPart.minor</span>
+<span class="sd">            ... )</span>
+<span class="sd">            &lt;DatasetVersion(&#39;0.5.0&#39;)&gt;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">match</span> <span class="n">bump</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">VersionPart</span><span class="o">.</span><span class="n">major</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">DatasetVersion</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">major</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="k">case</span> <span class="n">VersionPart</span><span class="o">.</span><span class="n">minor</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">DatasetVersion</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">major</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">minor</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="k">case</span> <span class="n">VersionPart</span><span class="o">.</span><span class="n">patch</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">DatasetVersion</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">major</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">minor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">patch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>  <span class="c1"># pragma: no cover - defensive; VersionPart is closed</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unknown VersionPart: </span><span class="si">{</span><span class="n">bump</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="deriva_ml.dataset.aux_classes.DatasetVersion.patch" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">patch</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">patch</span><span class="p">:</span> <span class="nb">int</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The patch component of the release segment.</p>
+<p><code>packaging.Version</code> exposes this as :attr:<code>micro</code>. <code>patch</code> is
+kept on <code>DatasetVersion</code> because it matches the <code>VersionPart</code>
+vocabulary and the column meaning.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="deriva_ml.dataset.aux_classes.DatasetVersion.__init__" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">__init__</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">__init__</span><span class="p">(</span>
+    <span class="n">major</span><span class="p">:</span> <span class="n">SupportsInt</span><span class="p">,</span>
+    <span class="n">minor</span><span class="p">:</span> <span class="n">SupportsInt</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">patch</span><span class="p">:</span> <span class="n">SupportsInt</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Construct a released <code>DatasetVersion</code> from a release-segment tuple.</p>
+<p>For PEP 440 forms beyond <code>MAJOR.MINOR.PATCH</code> (post-release, dev,
+local, etc.), use :meth:<code>parse</code> with the canonical string form.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>major</code>
+            </td>
+            <td>
+                  <code><span title="typing.SupportsInt">SupportsInt</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Major version number. Schema-altering changes.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>minor</code>
+            </td>
+            <td>
+                  <code><span title="typing.SupportsInt">SupportsInt</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Minor version number. Additive changes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>patch</code>
+            </td>
+            <td>
+                  <code><span title="typing.SupportsInt">SupportsInt</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Patch number. Small clean-ups and edits.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">major</span><span class="p">:</span> <span class="n">SupportsInt</span><span class="p">,</span>
+    <span class="n">minor</span><span class="p">:</span> <span class="n">SupportsInt</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">patch</span><span class="p">:</span> <span class="n">SupportsInt</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct a released ``DatasetVersion`` from a release-segment tuple.</span>
+
+<span class="sd">    For PEP 440 forms beyond ``MAJOR.MINOR.PATCH`` (post-release, dev,</span>
+<span class="sd">    local, etc.), use :meth:`parse` with the canonical string form.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        major: Major version number. Schema-altering changes.</span>
+<span class="sd">        minor: Minor version number. Additive changes.</span>
+<span class="sd">        patch: Patch number. Small clean-ups and edits.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">major</span><span class="p">)</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">minor</span><span class="p">)</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="deriva_ml.dataset.aux_classes.DatasetVersion.next_release" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">next_release</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">next_release</span><span class="p">(</span>
+    <span class="n">bump</span><span class="p">:</span> <span class="n">VersionPart</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetVersion</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the next released <code>DatasetVersion</code> after this one.</p>
+<p>Applies a release-segment bump to <code>(major, minor, patch)</code> and
+discards any post-release / dev / local segments — the new value
+is always a clean released version. Higher-order bumps reset
+lower-order components to zero, matching the standard
+<code>major.minor.patch</code> convention.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>bump</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="VersionPart (deriva_ml.dataset.aux_classes.VersionPart)" href="#deriva_ml.dataset.aux_classes.VersionPart">VersionPart</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which part of the release segment to advance.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DatasetVersion (deriva_ml.dataset.aux_classes.DatasetVersion)" href="#deriva_ml.dataset.aux_classes.DatasetVersion">DatasetVersion</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new released <code>DatasetVersion</code> with the requested</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DatasetVersion (deriva_ml.dataset.aux_classes.DatasetVersion)" href="#deriva_ml.dataset.aux_classes.DatasetVersion">DatasetVersion</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>component advanced.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>from deriva_ml.dataset.aux_classes import VersionPart
+DatasetVersion(0, 4, 0).next_release(VersionPart.minor)
+<DatasetVersion('0.5.0')>
+DatasetVersion(0, 4, 7).next_release(VersionPart.major)
+<DatasetVersion('1.0.0')>
+DatasetVersion.parse("0.4.0.post1.dev3").next_release(
+...     VersionPart.minor
+... )
+<DatasetVersion('0.5.0')></p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">next_release</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bump</span><span class="p">:</span> <span class="s2">&quot;VersionPart&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;DatasetVersion&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the next released ``DatasetVersion`` after this one.</span>
+
+<span class="sd">    Applies a release-segment bump to ``(major, minor, patch)`` and</span>
+<span class="sd">    discards any post-release / dev / local segments — the new value</span>
+<span class="sd">    is always a clean released version. Higher-order bumps reset</span>
+<span class="sd">    lower-order components to zero, matching the standard</span>
+<span class="sd">    ``major.minor.patch`` convention.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bump: Which part of the release segment to advance.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new released ``DatasetVersion`` with the requested</span>
+<span class="sd">        component advanced.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from deriva_ml.dataset.aux_classes import VersionPart</span>
+<span class="sd">        &gt;&gt;&gt; DatasetVersion(0, 4, 0).next_release(VersionPart.minor)</span>
+<span class="sd">        &lt;DatasetVersion(&#39;0.5.0&#39;)&gt;</span>
+<span class="sd">        &gt;&gt;&gt; DatasetVersion(0, 4, 7).next_release(VersionPart.major)</span>
+<span class="sd">        &lt;DatasetVersion(&#39;1.0.0&#39;)&gt;</span>
+<span class="sd">        &gt;&gt;&gt; DatasetVersion.parse(&quot;0.4.0.post1.dev3&quot;).next_release(</span>
+<span class="sd">        ...     VersionPart.minor</span>
+<span class="sd">        ... )</span>
+<span class="sd">        &lt;DatasetVersion(&#39;0.5.0&#39;)&gt;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">match</span> <span class="n">bump</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">VersionPart</span><span class="o">.</span><span class="n">major</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DatasetVersion</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">major</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">case</span> <span class="n">VersionPart</span><span class="o">.</span><span class="n">minor</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DatasetVersion</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">major</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">minor</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">case</span> <span class="n">VersionPart</span><span class="o">.</span><span class="n">patch</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">DatasetVersion</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">major</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">minor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">patch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>  <span class="c1"># pragma: no cover - defensive; VersionPart is closed</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unknown VersionPart: </span><span class="si">{</span><span class="n">bump</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="deriva_ml.dataset.aux_classes.DatasetVersion.parse" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">parse</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">parse</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetVersion</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Parse a PEP 440 version string into a <code>DatasetVersion</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>version</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A PEP 440 version string. Released forms like
+<code>"1.2.3"</code> and dev forms like <code>"1.2.3.post1.dev4"</code> are
+both accepted.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DatasetVersion (deriva_ml.dataset.aux_classes.DatasetVersion)" href="#deriva_ml.dataset.aux_classes.DatasetVersion">DatasetVersion</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new <code>DatasetVersion</code> corresponding to the parsed string.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="packaging.version.InvalidVersion">InvalidVersion</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>version</em> is not a valid
+PEP 440 version string.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>str(DatasetVersion.parse("0.4.0"))
+'0.4.0'
+DatasetVersion.parse("0.4.0.post1.dev3").is_devrelease
+True</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;DatasetVersion&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse a PEP 440 version string into a ``DatasetVersion``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        version: A PEP 440 version string. Released forms like</span>
+<span class="sd">            ``&quot;1.2.3&quot;`` and dev forms like ``&quot;1.2.3.post1.dev4&quot;`` are</span>
+<span class="sd">            both accepted.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new ``DatasetVersion`` corresponding to the parsed string.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        packaging.version.InvalidVersion: If *version* is not a valid</span>
+<span class="sd">            PEP 440 version string.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; str(DatasetVersion.parse(&quot;0.4.0&quot;))</span>
+<span class="sd">        &#39;0.4.0&#39;</span>
+<span class="sd">        &gt;&gt;&gt; DatasetVersion.parse(&quot;0.4.0.post1.dev3&quot;).is_devrelease</span>
+<span class="sd">        True</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># __new__ on the parent does the parse; we just need to return a</span>
+    <span class="c1"># subclass instance with the same internal state.</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">Version</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+    <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+    <span class="n">Version</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">instance</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="deriva_ml.dataset.aux_classes.DatasetVersion.to_dict" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">to_dict</span>
+
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">to_dict</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Serialise the release segment as a <code>{major, minor, patch}</code> dict.</p>
+<p>Used by :class:<code>DatasetSpec</code>'s field serializer for hydra-zen
+round-tripping. Pre-release / post-release / dev / local segments
+are <em>not</em> preserved in this form — it represents only the
+release-segment tuple. Use <code>str(self)</code> for a lossless serialisation.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A dict with integer <code>major</code>, <code>minor</code>, and <code>patch</code> fields.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>DatasetVersion(1, 2, 3).to_dict()
+{'major': 1, 'minor': 2, 'patch': 3}</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Serialise the release segment as a ``{major, minor, patch}`` dict.</span>
+
+<span class="sd">    Used by :class:`DatasetSpec`&#39;s field serializer for hydra-zen</span>
+<span class="sd">    round-tripping. Pre-release / post-release / dev / local segments</span>
+<span class="sd">    are *not* preserved in this form — it represents only the</span>
+<span class="sd">    release-segment tuple. Use ``str(self)`` for a lossless serialisation.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A dict with integer ``major``, ``minor``, and ``patch`` fields.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; DatasetVersion(1, 2, 3).to_dict()</span>
+<span class="sd">        {&#39;major&#39;: 1, &#39;minor&#39;: 2, &#39;patch&#39;: 3}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;major&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">major</span><span class="p">,</span> <span class="s2">&quot;minor&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">minor</span><span class="p">,</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">patch</span><span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.dataset.aux_classes.FeatureReference" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">FeatureReference</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+        <p>One feature that references a table via its association-table FKs.</p>
+<p>Produced by :meth:<code>DerivaML.find_features_referencing</code>. A feature's
+association table carries FKs to its target table (the self-FK),
+to vocabulary tables (term columns), and to asset tables (asset
+columns) -- dropping any referenced table or key column breaks the
+feature.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.FeatureReference.feature_name">feature_name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the referencing feature.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.FeatureReference.target_table">target_table</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Table the feature is defined ON.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.FeatureReference.feature_table">feature_table</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The feature's association table (where the FK
+lives).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.FeatureReference.referencing_columns">referencing_columns</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>FK column names on <code>feature_table</code> that
+land on the queried table (filtered to FKs referencing the
+queried column when <code>column=</code> was given).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureReference</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One feature that references a table via its association-table FKs.</span>
+
+<span class="sd">    Produced by :meth:`DerivaML.find_features_referencing`. A feature&#39;s</span>
+<span class="sd">    association table carries FKs to its target table (the self-FK),</span>
+<span class="sd">    to vocabulary tables (term columns), and to asset tables (asset</span>
+<span class="sd">    columns) -- dropping any referenced table or key column breaks the</span>
+<span class="sd">    feature.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        feature_name: Name of the referencing feature.</span>
+<span class="sd">        target_table: Table the feature is defined ON.</span>
+<span class="sd">        feature_table: The feature&#39;s association table (where the FK</span>
+<span class="sd">            lives).</span>
+<span class="sd">        referencing_columns: FK column names on ``feature_table`` that</span>
+<span class="sd">            land on the queried table (filtered to FKs referencing the</span>
+<span class="sd">            queried column when ``column=`` was given).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;forbid&quot;</span><span class="p">)</span>
+
+    <span class="n">feature_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">target_table</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">feature_table</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">referencing_columns</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.dataset.aux_classes.VersionPart" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">VersionPart</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.StrEnum">StrEnum</span></code></p>
+
+
+
+        <p>Names the component of a dataset version to advance on release.</p>
+<p>DerivaML uses a <code>major.minor.patch</code> release segment within the broader
+PEP 440 version space (see ADR-0004). Picking a <code>VersionPart</code> selects
+which component is incremented when a dev period is promoted to a
+released version.</p>
+<p>Inherits from :class:<code>enum.StrEnum</code> so members compare equal to their
+raw string values. This matters because <code>VALIDATION_CONFIG</code> has
+<code>use_enum_values=True</code>, so Pydantic's <code>@validate_call</code> coerces
+members to their string values at the call boundary; the
+<code>match</code>/<code>case</code> in :meth:<code>DatasetVersion.next_release</code> needs the
+coerced string to still equal the enum member it's being compared to.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.VersionPart.major">major</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Schema-altering changes that break backward compatibility.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.VersionPart.minor">minor</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additive changes — new members, new feature values, new
+annotations.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.dataset.aux_classes.VersionPart.patch">patch</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Small clean-ups and edits that don't change the dataset's
+shape.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/dataset/aux_classes.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VersionPart</span><span class="p">(</span><span class="n">StrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Names the component of a dataset version to advance on release.</span>
+
+<span class="sd">    DerivaML uses a ``major.minor.patch`` release segment within the broader</span>
+<span class="sd">    PEP 440 version space (see ADR-0004). Picking a ``VersionPart`` selects</span>
+<span class="sd">    which component is incremented when a dev period is promoted to a</span>
+<span class="sd">    released version.</span>
+
+<span class="sd">    Inherits from :class:`enum.StrEnum` so members compare equal to their</span>
+<span class="sd">    raw string values. This matters because ``VALIDATION_CONFIG`` has</span>
+<span class="sd">    ``use_enum_values=True``, so Pydantic&#39;s ``@validate_call`` coerces</span>
+<span class="sd">    members to their string values at the call boundary; the</span>
+<span class="sd">    ``match``/``case`` in :meth:`DatasetVersion.next_release` needs the</span>
+<span class="sd">    coerced string to still equal the enum member it&#39;s being compared to.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        major: Schema-altering changes that break backward compatibility.</span>
+<span class="sd">        minor: Additive changes — new members, new feature values, new</span>
+<span class="sd">            annotations.</span>
+<span class="sd">        patch: Small clean-ups and edits that don&#39;t change the dataset&#39;s</span>
+<span class="sd">            shape.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">major</span> <span class="o">=</span> <span class="s2">&quot;major&quot;</span>
+    <span class="n">minor</span> <span class="o">=</span> <span class="s2">&quot;minor&quot;</span>
+    <span class="n">patch</span> <span class="o">=</span> <span class="s2">&quot;patch&quot;</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../dataset_split/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Dataset Splitting">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Dataset Splitting
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../execution/" class="md-footer__link md-footer__link--next" aria-label="Next: Execution">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Execution
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

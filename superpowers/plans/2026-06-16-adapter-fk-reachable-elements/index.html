@@ -1,0 +1,2451 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-16-adapter-fk-reachable-elements/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>tf/torch adapters: FK-reachable element enumeration — Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tftorch-adapters-fk-reachable-element-enumeration-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              tf/torch adapters: FK-reachable element enumeration — Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-shared-core-resolve_reachable_rows-resolve_element_rids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Shared core resolve_reachable_rows + resolve_element_rids
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-route-restructure_get_reachable_assets-onto-the-shared-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Route restructure._get_reachable_assets onto the shared core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-wire-both-adapters-through-resolve_element_rids-add-reachable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Wire both adapters through resolve_element_rids + add reachable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-surface-reachable-on-the-public-datasetbag-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Surface reachable on the public DatasetBag methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-live-regression-demo-eye-ai-acceptance-lint-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Live regression (demo) + eye-ai acceptance + lint + PR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="tftorch-adapters-fk-reachable-element-enumeration-implementation-plan">tf/torch adapters: FK-reachable element enumeration — Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Make <code>as_tf_dataset</code> / <code>as_torch_dataset</code> enumerate FK-reachable elements (matching <code>restructure_assets</code>), via ONE shared reachability core consumed by all three paths.</p>
+<p><strong>Architecture:</strong> Extract a single layer-1 enumeration core (<code>resolve_reachable_rows</code>) in <code>target_resolution.py</code>; restructure's <code>_get_reachable_assets</code> becomes a thin wrapper over it; a <code>resolve_element_rids</code> projection (RIDs, order-preserving dedup, <code>reachable</code> opt-out) backs both adapters. Layer-2 (materialize-tree vs lazy-yield) stays separate per consumer. Default <code>reachable=True</code>.</p>
+<p><strong>Tech Stack:</strong> Python 3.12, <code>uv</code>, pytest, SQLAlchemy (bag SQLite), live demo + eye-ai catalogs.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-06-16-adapter-fk-reachable-elements-design.md</code></p>
+<hr />
+<h3 id="task-1-shared-core-resolve_reachable_rows-resolve_element_rids">Task 1: Shared core <code>resolve_reachable_rows</code> + <code>resolve_element_rids</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/target_resolution.py</code>
+- Test: <code>tests/dataset/test_reachable_enumeration.py</code> (new)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing unit tests (stub bag — no catalog)</strong></li>
+</ul>
+<pre><code class="language-python">&quot;&quot;&quot;resolve_reachable_rows / resolve_element_rids: the shared FK-reachable
+element enumeration used by restructure_assets + the tf/torch adapters.&quot;&quot;&quot;
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+
+from deriva_ml.dataset.target_resolution import (
+    resolve_reachable_rows,
+    resolve_element_rids,
+)
+
+
+def _stub_bag(rows, *, has_table=True):
+    &quot;&quot;&quot;Bag whose _dataset_table_view-backed reachable query yields `rows`.&quot;&quot;&quot;
+    bag = MagicMock()
+    # resolve_reachable_rows reads rows via the same mechanism _get_reachable_assets
+    # uses; stub the helper boundary so the test is catalog-free.
+    bag._reachable_rows_impl = lambda table: list(rows)  # see Step 3 seam
+    # table-existence check
+    bag.model.name_to_table = {&quot;Image&quot;: object()} if has_table else {}
+    return bag
+
+
+def test_resolve_reachable_rows_returns_rows_for_reachable_table():
+    rows = [{&quot;RID&quot;: &quot;i1&quot;, &quot;Filename&quot;: &quot;a.png&quot;}, {&quot;RID&quot;: &quot;i2&quot;, &quot;Filename&quot;: &quot;b.png&quot;}]
+    bag = _stub_bag(rows)
+    out = resolve_reachable_rows(bag, &quot;Image&quot;)
+    assert out == rows  # full rows, not deduped here
+
+
+def test_resolve_element_rids_reachable_dedups_preserving_order():
+    # Same RID surfaced twice via two FK paths must yield once, in first-seen order.
+    rows = [{&quot;RID&quot;: &quot;i1&quot;}, {&quot;RID&quot;: &quot;i2&quot;}, {&quot;RID&quot;: &quot;i1&quot;}, {&quot;RID&quot;: &quot;i3&quot;}]
+    bag = _stub_bag(rows)
+    assert resolve_element_rids(bag, &quot;Image&quot;, reachable=True) == [&quot;i1&quot;, &quot;i2&quot;, &quot;i3&quot;]
+
+
+def test_resolve_element_rids_direct_uses_list_members():
+    bag = MagicMock()
+    bag.list_dataset_members.return_value = {&quot;Image&quot;: [{&quot;RID&quot;: &quot;d1&quot;}, {&quot;RID&quot;: &quot;d2&quot;}]}
+    out = resolve_element_rids(bag, &quot;Image&quot;, reachable=False)
+    assert out == [&quot;d1&quot;, &quot;d2&quot;]
+    bag.list_dataset_members.assert_called_once_with(recurse=True)
+
+
+def test_resolve_element_rids_unknown_type_raises():
+    from deriva_ml.core.exceptions import DerivaMLException
+
+    bag = _stub_bag([], has_table=False)
+    with pytest.raises(DerivaMLException, match=&quot;not found|not resolvable&quot;):
+        resolve_element_rids(bag, &quot;Nope&quot;, reachable=True)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run → fail (ImportError)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachable_enumeration.py -q</code>
+Expected: FAIL — <code>cannot import name 'resolve_reachable_rows'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the core + projection</strong></li>
+</ul>
+<p>In <code>target_resolution.py</code> add (importing <code>Session</code> from <code>sqlalchemy.orm</code> and the
+exceptions module):</p>
+<pre><code class="language-python">def resolve_reachable_rows(bag, table: str) -&gt; list[dict]:
+    &quot;&quot;&quot;All rows of `table` reachable from this dataset via any FK path.
+
+    Single source of truth for dataset element reachability. Wraps
+    ``bag._dataset_table_view(table)`` (Dataset -&gt; ... -&gt; table UNION over all
+    FK paths, scoped to this dataset + nested datasets). Returns full row dicts.
+    NOT RID-deduped (a UNION can surface a RID via two paths; restructure
+    collapses by filename, the adapters dedup in resolve_element_rids).
+    &quot;&quot;&quot;
+    from sqlalchemy.orm import Session
+
+    if not _bag_has_table(bag, table):
+        raise DerivaMLException(
+            f&quot;Element type {table!r} not found in bag; available types: &quot;
+            f&quot;{sorted(_bag_table_names(bag))}&quot;
+        )
+    sql_query = bag._dataset_table_view(table)
+    with Session(bag.engine) as session:
+        return [dict(m) for m in session.execute(sql_query).mappings().all()]
+
+
+def resolve_element_rids(bag, element_type: str, *, reachable: bool = True) -&gt; list[str]:
+    &quot;&quot;&quot;RIDs of `element_type` rows belonging to this dataset (order-preserving,
+    RID-deduped). reachable=True (default): FK reachability; reachable=False:
+    direct members only.&quot;&quot;&quot;
+    if not reachable:
+        members = bag.list_dataset_members(recurse=True)
+        if element_type not in members:
+            raise DerivaMLException(
+                f&quot;Element type {element_type!r} not found in bag; available &quot;
+                f&quot;types: {sorted(members.keys())}&quot;
+            )
+        rows = members[element_type]
+    else:
+        rows = resolve_reachable_rows(bag, element_type)
+    seen, out = set(), []
+    for r in rows:
+        rid = r[&quot;RID&quot;]
+        if rid not in seen:
+            seen.add(rid)
+            out.append(rid)
+    return out
+</code></pre>
+<p>Add small helpers <code>_bag_has_table(bag, table)</code> / <code>_bag_table_names(bag)</code> using
+the bag's existing model surface (mirror whatever <code>get_table_as_dict</code> / the
+adapters' current <code>_bag_element_is_asset</code> use to resolve a table — reuse, don't
+invent). Adjust the Step-1 stub's <code>_reachable_rows_impl</code> seam to match the real
+attribute the impl reads (likely patch <code>bag._dataset_table_view</code> + <code>bag.engine</code>
+instead — update the test stub accordingly so it exercises the real path).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run → pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachable_enumeration.py -q</code>
+Expected: PASS (4 tests).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/dataset/target_resolution.py tests/dataset/test_reachable_enumeration.py
+git commit -m &quot;feat(dataset): shared FK-reachable element enumeration (resolve_reachable_rows / resolve_element_rids)&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-route-restructure_get_reachable_assets-onto-the-shared-core">Task 2: Route <code>restructure._get_reachable_assets</code> onto the shared core</h3>
+<p>Eliminate restructure's duplicate reachability impl so all paths share one.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/restructure.py</code> (<code>_get_reachable_assets</code>, ~line 207)
+- Test: existing restructure tests must stay green (regression guard)</p>
+<ul>
+<li>[ ] <strong>Step 1: Implement</strong></li>
+</ul>
+<p>Replace <code>_get_reachable_assets</code>'s body (the inline <code>Session</code>/<code>_dataset_table_view</code>
+block) with a delegation:</p>
+<pre><code class="language-python">def _get_reachable_assets(bag, asset_table: str) -&gt; list[dict[str, Any]]:
+    &quot;&quot;&quot;Get all assets reachable from this dataset through any FK path.
+
+    Thin wrapper over the shared reachability core so restructure and the
+    tf/torch adapters use one traversal implementation.
+    &quot;&quot;&quot;
+    from deriva_ml.dataset.target_resolution import resolve_reachable_rows
+
+    return resolve_reachable_rows(bag, asset_table)
+</code></pre>
+<p>Keep the docstring's worked example. Both call sites (lines ~199, ~882) are
+unchanged — they still get full rows.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run restructure tests (no behavior change)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_restructure.py tests/dataset/test_restructure_helpers.py -q</code>
+Expected: PASS (unchanged behavior; restructure now sources rows from the core).</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/dataset/restructure.py
+git commit -m &quot;refactor(dataset): restructure._get_reachable_assets delegates to shared core&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-wire-both-adapters-through-resolve_element_rids-add-reachable">Task 3: Wire both adapters through <code>resolve_element_rids</code> + add <code>reachable</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/tf_adapter.py</code> (<code>build_tf_dataset</code>, lines ~102/126)
+- Modify: <code>src/deriva_ml/dataset/torch_adapter.py</code> (<code>build_torch_dataset</code>, lines ~91/115)
+- Test: <code>tests/dataset/test_format_b_bag.py</code> or a new adapter-wiring test (source-level)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing wiring test</strong></li>
+</ul>
+<pre><code class="language-python">def test_adapters_enumerate_via_resolve_element_rids():
+    &quot;&quot;&quot;Both builders enumerate via resolve_element_rids (FK-reachable), not
+    list_dataset_members directly, and expose a `reachable` param.&quot;&quot;&quot;
+    import inspect
+    from deriva_ml.dataset import tf_adapter, torch_adapter
+
+    for mod, fn in ((tf_adapter, &quot;build_tf_dataset&quot;), (torch_adapter, &quot;build_torch_dataset&quot;)):
+        src = inspect.getsource(getattr(mod, fn))
+        assert &quot;resolve_element_rids&quot; in src, fn
+        assert &quot;members_by_type[element_type]&quot; not in src, fn  # old path gone
+        sig = inspect.signature(getattr(mod, fn))
+        assert &quot;reachable&quot; in sig.parameters, fn
+        assert sig.parameters[&quot;reachable&quot;].default is True, fn
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run → fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py::test_adapters_enumerate_via_resolve_element_rids -q</code>
+Expected: FAIL.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement in BOTH adapters</strong></li>
+</ul>
+<p>Add <code>reachable: bool = True</code> to <code>build_tf_dataset</code> / <code>build_torch_dataset</code>
+signatures. Replace the enumeration+validation block:</p>
+<pre><code class="language-python"># OLD:
+members_by_type = bag.list_dataset_members(recurse=True)
+if element_type not in members_by_type:
+    raise DerivaMLException(...)
+...
+all_rids = [m[&quot;RID&quot;] for m in members_by_type[element_type]]
+
+# NEW:
+from deriva_ml.dataset.target_resolution import resolve_element_rids
+all_rids = resolve_element_rids(bag, element_type, reachable=reachable)
+</code></pre>
+<p>Leave the <code>is_asset</code>/<code>sample_loader</code> check, <code>_resolve_targets</code>,
+<code>targets</code>/<code>missing</code> filtering, <code>_build_row_lookup</code>, and the generator body
+UNCHANGED. (Note <code>_build_row_lookup</code> already uses <code>get_table_as_dict</code> — whole
+table — so reachable RIDs resolve.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Run wiring test + adapter no-catalog tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py::test_adapters_enumerate_via_resolve_element_rids tests/dataset/test_tf_adapter_no_tf.py tests/dataset/test_torch_adapter_no_torch.py -q</code>
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/dataset/tf_adapter.py src/deriva_ml/dataset/torch_adapter.py tests/dataset/test_format_b_bag.py
+git commit -m &quot;fix(dataset): tf/torch adapters enumerate FK-reachable elements via shared core (reachable=True default)&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-surface-reachable-on-the-public-datasetbag-methods">Task 4: Surface <code>reachable</code> on the public DatasetBag methods</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> (<code>as_tf_dataset</code> ~1373, <code>as_torch_dataset</code> ~1199)
+- Test: signature test</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing signature test</strong></li>
+</ul>
+<pre><code class="language-python">def test_public_dataset_methods_expose_reachable():
+    import inspect
+    from deriva_ml.dataset.dataset_bag import DatasetBag
+
+    for name in (&quot;as_tf_dataset&quot;, &quot;as_torch_dataset&quot;):
+        sig = inspect.signature(getattr(DatasetBag, name))
+        assert &quot;reachable&quot; in sig.parameters, name
+        assert sig.parameters[&quot;reachable&quot;].default is True, name
+</code></pre>
+<ul>
+<li>
+<p>[ ] <strong>Step 2: Run → fail.</strong> <code>pytest tests/dataset/test_format_b_bag.py::test_public_dataset_methods_expose_reachable -q</code></p>
+</li>
+<li>
+<p>[ ] <strong>Step 3: Implement</strong></p>
+</li>
+</ul>
+<p>Add <code>reachable: bool = True</code> to both public method signatures; forward
+<code>reachable=reachable</code> into the <code>build_tf_dataset(...)</code> / <code>build_torch_dataset(...)</code>
+calls (lines ~1363/1544). Document the param in each docstring (default True =
+FK-reachable, matching restructure_assets / bag_info; pass False for
+direct-members-only).</p>
+<ul>
+<li>
+<p>[ ] <strong>Step 4: Run signature test + full no-catalog adapter suite.</strong> Expected: PASS.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 5: Commit</strong></p>
+</li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/dataset/dataset_bag.py tests/dataset/test_format_b_bag.py
+git commit -m &quot;feat(dataset): expose reachable on as_tf_dataset / as_torch_dataset&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-live-regression-demo-eye-ai-acceptance-lint-pr">Task 5: Live regression (demo) + eye-ai acceptance + lint + PR</h3>
+<p><strong>Files:</strong>
+- Test: <code>tests/dataset/test_tf_adapter_e2e.py</code> / <code>test_torch_adapter_e2e.py</code> (add subject-partitioned case)</p>
+<ul>
+<li>[ ] <strong>Step 1: Demo-catalog regression test (subject-partitioned)</strong></li>
+</ul>
+<p>Add a live test: build (or use a fixture) dataset whose members are a non-asset
+type with assets reachable only via FK (e.g. members = Subject, Images via
+Subject→...→Image — mirror whatever the demo catalog supports). Assert:
+- <code>as_tf_dataset(element_type="Image")</code> (default reachable) yields a NON-empty
+  set whose RID set == <code>resolve_reachable_rows(bag, "Image")</code> RID set (deduped).
+- <code>restructure_assets(asset_table="Image")</code> finds the same RID set.
+- <code>as_tf_dataset(..., reachable=False)</code> reproduces the (empty or direct-only) set.
+Mirror for torch.</p>
+<pre><code class="language-python">@pytest.mark.skipif(os.environ.get(&quot;DERIVA_HOST&quot;) in (None, &quot;&quot;), reason=&quot;needs catalog&quot;)
+def test_as_tf_dataset_finds_fk_reachable_images(catalog_with_datasets):
+    ml, _ = catalog_with_datasets
+    # ... obtain/build a subject-partitioned dataset bag with FK-reachable Images ...
+    from deriva_ml.dataset.target_resolution import resolve_element_rids
+    expected = set(resolve_element_rids(bag, &quot;Image&quot;, reachable=True))
+    assert expected, &quot;fixture must have FK-reachable images&quot;
+    yielded = {rid for *_rest, rid in bag.as_tf_dataset(element_type=&quot;Image&quot;, sample_loader=lambda p, r: p)}
+    assert yielded == expected
+    # opt-out reproduces direct-members
+    direct = set(resolve_element_rids(bag, &quot;Image&quot;, reachable=False))
+    yielded_direct = {rid for *_rest, rid in bag.as_tf_dataset(element_type=&quot;Image&quot;, sample_loader=lambda p, r: p, reachable=False)} if direct else set()
+    assert yielded_direct == direct
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run demo regression</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_tf_adapter_e2e.py tests/dataset/test_torch_adapter_e2e.py -q</code>
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 3: eye-ai 2-277G acceptance (manual, this session has access — NOT a committed test)</strong></li>
+</ul>
+<p>Run a throwaway script against <code>www.eye-ai.org</code>/<code>eye-ai</code>, dataset <code>2-277G</code>
+v4.8.0: <code>as_tf_dataset(element_type="Image", targets={"Image_Diagnosis":
+select_initial_diagnosis}, missing="skip")</code> → assert it yields ~28,546
+<code>(image, label, rid)</code> triples (not empty), matching
+<code>_get_reachable_assets(bag, "Image")</code> / <code>restructure_assets</code>. Same for torch.
+Record the actual count in the PR. (Do NOT commit a live-eye-ai test — it needs
+a token; the demo regression is the committed gate.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Lint + broad suite</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check --fix &lt;touched files&gt; &amp;&amp; uv run ruff format &lt;touched files&gt;</code> (touched files only — do NOT <code>ruff format tests/dataset/</code> wholesale).
+Then: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_reachable_enumeration.py tests/dataset/test_restructure.py tests/dataset/test_format_b_bag.py tests/dataset/test_tf_adapter_e2e.py tests/dataset/test_torch_adapter_e2e.py tests/dataset/test_tf_adapter_no_tf.py tests/dataset/test_torch_adapter_no_torch.py -q</code>
+Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Branch, commit, PR</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add -A
+git commit -m &quot;test(dataset): live regression — adapters yield FK-reachable elements&quot;
+git push -u origin fix/adapter-fk-reachable-elements
+gh pr create --title &quot;fix(dataset): tf/torch adapters enumerate FK-reachable elements (match restructure_assets)&quot; --body &quot;&lt;summary + spec link + the shared-core architecture + eye-ai 2-277G acceptance count + opt-out&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="self-review-notes">Self-Review notes</h2>
+<ul>
+<li><strong>Spec coverage:</strong> T1 shared core+projection (with dedup); T2 restructure onto core (one impl); T3 both adapters wired + <code>reachable</code>; T4 public methods; T5 live regression + eye-ai acceptance + PR. All spec sections covered.</li>
+<li><strong>One impl of reachability:</strong> after T2, <code>_dataset_table_view</code>-based enumeration exists in exactly one place (<code>resolve_reachable_rows</code>); restructure + both adapters consume it.</li>
+<li><strong>Dedup placement:</strong> in <code>resolve_element_rids</code> (RID iteration), NOT the row core (restructure keeps path-duplicates, collapses by filename). Pinned by <code>test_resolve_element_rids_reachable_dedups_preserving_order</code>.</li>
+<li><strong>Behavior-preserving opt-out:</strong> <code>reachable=False</code> reproduces the old <code>list_dataset_members</code> set everywhere; pinned in T1 + T5.</li>
+<li><strong>Default reachable</strong> = the approved choice; no-op for datasets without FK indirection, fixes subject-partitioned datasets.</li>
+<li><strong>Scope discipline:</strong> lint/format touched files only (avoid the wholesale-format trap from earlier PRs).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

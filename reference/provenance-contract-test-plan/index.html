@@ -1,0 +1,2949 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/reference/provenance-contract-test-plan/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Provenance Contract — Test Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#provenance-contract-test-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Provenance Contract — Test Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#testing-approach-settled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing approach (settled)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-legend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status legend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-execution-state-model-honest-termination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Execution state model &amp; honest termination
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b-failed-executions-are-first-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Failed executions are first-class
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#c-consumed-a-dataset-declared-in-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. "Consumed a dataset" = declared in datasets=
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d-workflow-reproducibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D. Workflow reproducibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#e-inputs-as-assets-files-localfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E. Inputs as assets / files / LocalFile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#f-every-artifact-has-a-producer-the-two-sentinels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F. Every artifact has a producer + the two sentinels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#g-audit-complete-provenance-predicate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        G. Audit &amp; complete-provenance predicate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h-lineage-data-flow-per-adr-0001" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H. Lineage (data-flow, per ADR-0001)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#i-execution-metadata-capture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I. Execution metadata capture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#j-adoption-backfill-migration-out-of-this-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        J. Adoption backfill (migration) — OUT OF THIS SUITE
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coverage-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequencing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequencing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="provenance-contract-test-plan">Provenance Contract — Test Plan</h1>
+<p>Companion to <a href="../provenance-contract/">provenance-contract.md</a>. This is the
+coverage matrix that makes "comprehensive" verifiable: every normative clause
+of the contract maps to at least one test, with its substrate and status.</p>
+<h2 id="testing-approach-settled">Testing approach (settled)</h2>
+<ul>
+<li><strong>TDD acceptance tests.</strong> Tests are written ahead of (or alongside) the
+  implementation and define done. Tests for not-yet-built features start as
+  <code>xfail(strict=True)</code> and flip to pass when the feature lands.</li>
+<li><strong>Mixed substrate.</strong></li>
+<li><strong>Live catalog</strong> (<code>DERIVA_HOST</code>, fixtures <code>test_ml</code> /
+    <code>catalog_with_datasets</code> / <code>populated_catalog</code>) for anything asserting an
+    <strong>edge, role, state transition, or attribution</strong> — the contract is about
+    what gets written to the catalog, and a mocked layer can pass while
+    production breaks (the 2026-05-19 torch-adapter precedent).</li>
+<li><strong>Pure-Python unit</strong> for <strong>shapes</strong>: config classes, validator routing,
+    <code>get_gpu_info()</code> degradation, the state-machine table.</li>
+<li><strong>No literals for RIDs or sentinels.</strong> Every RID and every sentinel
+  reference comes from a fixture/lookup, never a hard-coded string (CLAUDE.md
+  RID discipline). Sentinel-dependent tests reference the sentinel via its
+  accessor; until that accessor exists they are <code>xfail</code>.</li>
+<li><strong>Plan first, then code.</strong> This matrix is reviewed before test code is
+  committed; it is also the implementation's acceptance checklist.</li>
+</ul>
+<h2 id="status-legend">Status legend</h2>
+<ul>
+<li><strong>EXISTS</strong> — current test already covers this; reuse / extend, do not
+  duplicate.</li>
+<li><strong>NEW-LIVE</strong> — new test, live catalog.</li>
+<li><strong>NEW-UNIT</strong> — new test, pure-Python.</li>
+<li><strong>XFAIL</strong> — new test, written now, <code>xfail(strict=True)</code> until the
+  implementation lands.</li>
+<li><strong>DONE</strong> — implemented and passing in the suite (the feature landed; the
+  test's <code>xfail</code> was removed).</li>
+<li><strong>PARTIAL</strong> — the test's feature is implemented for the cases it asserts, but
+  the spec clause has documented remaining extensions (named in the row's note).</li>
+<li><strong>TODO</strong> — a spec clause with no test yet; a planned extension of an
+  already-landed mechanism (e.g. an additional <code>audit_provenance</code> query).</li>
+</ul>
+<p>Existing coverage was surveyed 2026-06-20; file references are to the current
+test suite. Implementation status last updated 2026-06-20 after landing the
+sentinel-seeding, no-input-check, and read-only-audit layers (F0, F2/F2b, G1,
+G7, G8/G10).</p>
+<hr />
+<h2 id="a-execution-state-model-honest-termination">A. Execution state model &amp; honest termination</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause (spec §)</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>State machine transitions</td>
+<td><code>ALLOWED_TRANSITIONS</code> accepts every legal pair, rejects illegal</td>
+<td>unit</td>
+<td>EXISTS</td>
+<td><code>test_state_machine.py</code> — comprehensive</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>7 status values, title-case, catalog round-trip</td>
+<td>enum values + SQLite/catalog parsing</td>
+<td>unit</td>
+<td>EXISTS</td>
+<td><code>test_status_migration.py</code></td>
+</tr>
+<tr>
+<td>A3</td>
+<td><code>update_status</code> valid/invalid + error kwarg</td>
+<td>public API transitions; <code>error=</code> on Failed; warns on non-terminal</td>
+<td>live+unit</td>
+<td>EXISTS</td>
+<td><code>test_update_status.py</code></td>
+</tr>
+<tr>
+<td>A4</td>
+<td>Honest termination — blessed path reaches terminal</td>
+<td><code>with create_execution(...)</code> run ends Uploaded (or Stopped)</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>end-to-end happy path; not currently pinned as a <em>contract</em> test</td>
+</tr>
+<tr>
+<td>A5</td>
+<td>Stranded <code>Running</code>/<code>Pending_Upload</code> is a violation</td>
+<td>a driven-then-abandoned exec is flagged by the audit (A-audit)</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>depends on audit (G1)</td>
+</tr>
+<tr>
+<td>A6</td>
+<td>Never-driven <code>Created</code> is a draft, NOT a violation</td>
+<td>a <code>Created</code>-only exec is reported as draft/cleanup, not a contract breach</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>the §Definitions ruling</td>
+</tr>
+<tr>
+<td>A7</td>
+<td><code>Stopped</code> tiebreaker</td>
+<td>a <code>Stopped</code> exec that does not advance + idle is flagged; a <code>Stopped</code> probe is clean terminal</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>heuristic on <code>last_activity</code>; assert audit treatment, not internal count</td>
+</tr>
+<tr>
+<td>A8</td>
+<td><code>__del__</code> best-effort abort</td>
+<td>non-terminal exec GC'd in-process → Aborted (live session)</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>hard to test deterministically; mark slow</td>
+</tr>
+</tbody>
+</table>
+<h2 id="b-failed-executions-are-first-class">B. Failed executions are first-class</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1</td>
+<td>Failure reason mandatory</td>
+<td>a <code>Failed</code> exec has non-empty <code>Status_Detail</code>/error</td>
+<td>live+unit</td>
+<td>EXISTS (partial)</td>
+<td><code>test_update_status.py</code> pins <code>error=</code>; <strong>NEW</strong>: assert a <code>Failed</code> row with <em>empty</em> reason is an audit violation</td>
+</tr>
+<tr>
+<td>B2</td>
+<td>Commit-path failure → Failed</td>
+<td><code>commit_output_assets</code> raising drives Pending_Upload→Failed with error</td>
+<td>unit</td>
+<td>EXISTS</td>
+<td><code>test_asset_upload.py::test_failure_transitions_to_failed</code></td>
+</tr>
+<tr>
+<td>B3</td>
+<td>Inputs recorded up to failure</td>
+<td>a run that fails mid-materialization records <code>Dataset_Execution</code> edges for datasets that resolved before the failure</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>the partial-input rule; needs a deliberately-failing input</td>
+</tr>
+<tr>
+<td>B4</td>
+<td>Partial outputs recorded under Failed</td>
+<td>outputs written before failure carry their role under the Failed exec</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td></td>
+</tr>
+<tr>
+<td>B5</td>
+<td>Failed/Aborted ≠ complete provenance</td>
+<td>a Failed or Aborted artifact-producer does NOT satisfy the complete-provenance predicate</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>the corrected predicate; assert audit/predicate result</td>
+</tr>
+</tbody>
+</table>
+<h2 id="c-consumed-a-dataset-declared-in-datasets">C. "Consumed a dataset" = declared in <code>datasets=</code></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td>Each declared dataset → 1 pinned input edge</td>
+<td>every <code>DatasetSpec</code> in <code>datasets=</code> yields exactly one version-pinned <code>Dataset_Execution</code> row</td>
+<td>live</td>
+<td>EXISTS</td>
+<td><code>test_dataset_execution_write_path.py</code>, <code>test_find_executions_by_dataset.py</code></td>
+</tr>
+<tr>
+<td>C2</td>
+<td>Undeclared dataset → no input edge</td>
+<td>a dataset <em>not</em> in <code>datasets=</code> produces no <code>Dataset_Execution</code> row, even if its members were read</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>the <code>6-09Z8</code> lesson — directly pins the motivating bug's correct behavior</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>Version pinning</td>
+<td><code>DatasetSpec(rid, version)</code> pins the edge to that <code>Dataset_Version</code> RID; bogus version excluded</td>
+<td>live</td>
+<td>EXISTS</td>
+<td><code>test_find_executions_by_dataset.py</code></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>Role unambiguous</td>
+<td>input lives only in <code>Dataset_Execution</code>; output only in <code>Dataset_Version.Execution</code>; never both</td>
+<td>live</td>
+<td>EXISTS</td>
+<td><code>test_dataset_execution_write_path.py::test_create_dataset_writes_no_dataset_execution_row</code></td>
+</tr>
+<tr>
+<td>C5</td>
+<td>Partial input on failure</td>
+<td>(see B3)</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>shared with B3</td>
+</tr>
+</tbody>
+</table>
+<h2 id="d-workflow-reproducibility">D. Workflow reproducibility</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D1</td>
+<td>Clean workflow → URL + checksum</td>
+<td>committed file yields a well-formed URL and non-empty checksum</td>
+<td>live</td>
+<td>EXISTS</td>
+<td><code>test_dirty_workflow.py</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td>Dirty workflow refused (unless allow_dirty)</td>
+<td>modified file raises; <code>allow_dirty</code> warns + captures anyway</td>
+<td>live</td>
+<td>EXISTS</td>
+<td><code>test_dirty_workflow.py</code></td>
+</tr>
+<tr>
+<td>D3</td>
+<td>Degenerate workflow on artifact-producer = violation</td>
+<td>an artifact-producer whose workflow has an empty checksum is flagged by the audit; commit still warns-and-marks (not blocked)</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>the enforcement-tone rule; needs a way to force a degenerate workflow</td>
+</tr>
+<tr>
+<td>D4</td>
+<td>Probe may carry degenerate workflow</td>
+<td>a probe (no artifact) with a degenerate workflow is NOT a violation</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td></td>
+</tr>
+<tr>
+<td>D5</td>
+<td>Checksum-based dedup</td>
+<td>same URL+checksum resolves to the same Workflow row across two executions</td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>survey flagged this as zero-coverage</td>
+</tr>
+</tbody>
+</table>
+<h2 id="e-inputs-as-assets-files-localfile">E. Inputs as assets / files / LocalFile</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E1</td>
+<td>Input asset → Input edge</td>
+<td><code>assets=[AssetSpec(rid)]</code> yields <code>&lt;Asset&gt;_Execution</code> with <code>Asset_Role="Input"</code> + <code>Input_File</code> tag</td>
+<td>live</td>
+<td>EXISTS</td>
+<td><code>test_asset_role_contract.py</code></td>
+</tr>
+<tr>
+<td>E2</td>
+<td>Output asset → Output edge</td>
+<td>uploaded output gets <code>Asset_Role="Output"</code> + <code>Output_File</code> tag</td>
+<td>live</td>
+<td>EXISTS</td>
+<td><code>test_asset_role_contract.py</code></td>
+</tr>
+<tr>
+<td>E3</td>
+<td><code>add_files</code> can register an Input</td>
+<td><code>add_files(..., asset_role="Input")</code> writes a <code>File_Execution</code> Input edge</td>
+<td>live</td>
+<td>XFAIL</td>
+<td><code>add_files</code> hardcodes Output today; xfail until the param lands</td>
+</tr>
+<tr>
+<td>E4</td>
+<td><code>LocalFile</code> → registered File + Input edge</td>
+<td><code>LocalFile("/path")</code> in <code>assets=</code> mints a <code>File</code> row (computed MD5, tag: URL) and an Input edge; not downloaded</td>
+<td>live</td>
+<td>XFAIL</td>
+<td>depends on <code>LocalFile</code> impl</td>
+</tr>
+<tr>
+<td>E5</td>
+<td>Bare string is always a RID, never a path</td>
+<td>a bare string in <code>assets=</code> resolves as a RID; a non-existent RID <em>fails</em>, never a path read</td>
+<td>live+unit</td>
+<td>XFAIL</td>
+<td>the abuse-surface boundary; unit-test <code>validate_assets</code>, live-test resolution</td>
+</tr>
+<tr>
+<td>E6</td>
+<td><code>validate_assets</code> shape routing</td>
+<td><code>{path: ...}</code> dict/DictConfig → LocalFile; <code>{rid: ...}</code>/bare str → AssetSpec</td>
+<td>unit</td>
+<td>XFAIL</td>
+<td>the hydra seam; pure-Python on the validator</td>
+</tr>
+<tr>
+<td>E7</td>
+<td><code>LocalFileConfig</code> round-trips via hydra</td>
+<td>a <code>.yaml</code> with <code>{path: ...}</code> instantiates and flows to <code>ExecutionConfiguration.assets</code></td>
+<td>unit</td>
+<td>XFAIL</td>
+<td>mirror <code>AssetSpecConfig</code>; no <code>Literal</code> fields</td>
+</tr>
+<tr>
+<td>E8</td>
+<td>File-RID input not downloaded</td>
+<td>an <code>AssetSpec(rid=&lt;file_rid&gt;)</code> / tag:-URI input no-ops the Hatrac fetch</td>
+<td>live</td>
+<td>XFAIL</td>
+<td>the download-skip</td>
+</tr>
+<tr>
+<td>E9</td>
+<td>File MD5 computed from bytes</td>
+<td>a registered <code>File</code>'s MD5 equals the hash of its bytes (not caller-supplied)</td>
+<td>unit</td>
+<td>EXISTS (partial)</td>
+<td><code>test_file.py::test_create_filespecs</code> covers FileSpec; extend for the input path</td>
+</tr>
+<tr>
+<td>E10</td>
+<td>App reads input via <code>asset_paths</code></td>
+<td>a <code>LocalFile</code> input is readable inside the run through the same <code>asset_paths</code> surface as any asset</td>
+<td>live</td>
+<td>XFAIL</td>
+<td>point-3 "looks like an asset"</td>
+</tr>
+</tbody>
+</table>
+<h2 id="f-every-artifact-has-a-producer-the-two-sentinels">F. Every artifact has a producer + the two sentinels</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F0</td>
+<td>Sentinels seeded at catalog init</td>
+<td>a fresh catalog carries the 3 sentinels; accessors resolve them idempotently; they survive <code>reset()</code></td>
+<td>live</td>
+<td><strong>DONE</strong></td>
+<td><code>test_F0…</code>; seeded in <code>initialize_ml_schema._ensure_sentinels</code>, re-seeded by <code>CatalogManager.reset()</code></td>
+</tr>
+<tr>
+<td>F1</td>
+<td>New dataset version has a producer</td>
+<td><code>create_dataset</code> / new version sets a non-null <code>Dataset_Version.Execution</code></td>
+<td>live</td>
+<td>EXISTS (partial)</td>
+<td>implied by write-path tests; <strong>NEW</strong>: assert non-null explicitly</td>
+</tr>
+<tr>
+<td>F2</td>
+<td>No-input artifact-producer → unknown-File sentinel input</td>
+<td>an artifact-producer committing with no declared input gets an Input edge to the unknown-provenance File sentinel</td>
+<td>live</td>
+<td><strong>DONE</strong></td>
+<td><code>test_F2…</code> (dataset path) + <code>test_F2b…</code> (asset path); <code>provenance_enforcement.ensure_artifact_producer_has_input</code> wired at both write paths</td>
+</tr>
+<tr>
+<td>F3</td>
+<td>Sentinel input is compliant, reported as known-degraded</td>
+<td>the F2 exec satisfies the predicate (compliant) AND appears in the audit's known-degraded report (not violations)</td>
+<td>live</td>
+<td>PARTIAL</td>
+<td>the audit's File-sentinel-only-input known-degraded clause is a documented remaining extension of <code>audit_provenance</code></td>
+</tr>
+<tr>
+<td>F4</td>
+<td>Producerless artifact → unknown-Execution sentinel</td>
+<td>an artifact with no real producer attributes to the unknown-Execution sentinel; lineage from it returns "unknown origin", never null</td>
+<td>live</td>
+<td><strong>DONE</strong></td>
+<td><code>test_F4…</code> runs the adoption <strong>backfill</strong> then asserts <code>lookup_lineage</code> resolves to the sentinel; <code>provenance_backfill.py</code> + <code>scripts/provenance_backfill.py</code></td>
+</tr>
+<tr>
+<td>F4b</td>
+<td>Backfill is dry-run-safe + idempotent</td>
+<td>dry-run reports orphans but writes nothing; apply attributes + audit reclassifies violation→known-degraded; second apply is a no-op</td>
+<td>live</td>
+<td><strong>DONE</strong></td>
+<td><code>test_F4b…</code></td>
+</tr>
+<tr>
+<td>F4c</td>
+<td>Backfill unifies prior BlackBox convention</td>
+<td>a legacy BlackBox-attributed dataset version is re-pointed to the sentinel; the now-unreferenced BlackBox execution + workflow are deleted; the dataset reads as known-degraded</td>
+<td>live</td>
+<td><strong>DONE</strong></td>
+<td><code>test_F4c…</code>; <code>_unify_blackbox</code> (Move 3). Detects BlackBox by marker text, not RID</td>
+</tr>
+<tr>
+<td>F5</td>
+<td>Sentinels are exempt bootstrap rows</td>
+<td>the two sentinels are not themselves flagged as artifact-producers / null-producer artifacts by the audit</td>
+<td>live</td>
+<td>XFAIL</td>
+<td>the exemption clause</td>
+</tr>
+<tr>
+<td>F6</td>
+<td>Sentinel File MD5 exemption</td>
+<td>the unknown-File sentinel's marker MD5 is accepted (not subject to computed-from-bytes)</td>
+<td>unit</td>
+<td>XFAIL</td>
+<td></td>
+</tr>
+<tr>
+<td>F7</td>
+<td>Orphan dataset lineage (pre-sentinel)</td>
+<td>a dataset with no producer returns an orphan lineage node</td>
+<td>live+unit</td>
+<td>EXISTS</td>
+<td><code>test_lookup_lineage_*</code> — current behavior; F4 supersedes once sentinels land</td>
+</tr>
+</tbody>
+</table>
+<h2 id="g-audit-complete-provenance-predicate">G. Audit &amp; complete-provenance predicate</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G1</td>
+<td>Audit exists &amp; is read-only</td>
+<td>the audit scans catalog-wide, returns findings, mutates nothing</td>
+<td>live</td>
+<td><strong>DONE</strong></td>
+<td><code>test_G1…</code>; <code>ml.audit_provenance()</code> → <code>ProvenanceAuditReport</code> (<code>provenance_audit.py</code>)</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>Predicate clause 1 — terminal state</td>
+<td>audit flags an artifact-producer not in a terminal state</td>
+<td>live</td>
+<td>TODO</td>
+<td>documented remaining clause; extends <code>audit_provenance</code></td>
+</tr>
+<tr>
+<td>G3</td>
+<td>Predicate clause 2 — workflow URL+checksum</td>
+<td>audit flags an artifact-producer with degenerate workflow</td>
+<td>live</td>
+<td>TODO</td>
+<td>shared with D3; remaining clause</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>Predicate clause 3 — ≥1 input or sentinel</td>
+<td>audit flags an artifact-producer with zero inputs (no sentinel)</td>
+<td>live</td>
+<td>TODO</td>
+<td>remaining clause</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>Predicate — output role-tagged</td>
+<td>audit flags an artifact-producer with an untagged output</td>
+<td>live</td>
+<td>TODO</td>
+<td>remaining clause</td>
+</tr>
+<tr>
+<td>G6</td>
+<td>Predicate — Failed has reason</td>
+<td>audit flags a <code>Failed</code> row with empty reason</td>
+<td>live</td>
+<td>TODO</td>
+<td>shared with B1; remaining clause</td>
+</tr>
+<tr>
+<td>G7</td>
+<td>Null-producer artifact flagged</td>
+<td>audit flags an artifact with a null producer (not sentinel-attributed)</td>
+<td>live</td>
+<td><strong>DONE</strong></td>
+<td><code>test_G7…</code>; <code>category="null_producer"</code></td>
+</tr>
+<tr>
+<td>G8</td>
+<td>Known-degraded reported separately from violations</td>
+<td>sentinel-attributed rows appear in a <em>separate</em> known-degraded list, not the violation list</td>
+<td>live</td>
+<td><strong>DONE</strong></td>
+<td><code>test_G8_G10…</code>; <code>category="sentinel_producer"</code> in <code>known_degraded</code></td>
+</tr>
+<tr>
+<td>G9</td>
+<td>Conformance is whole-catalog &amp; falsifiable</td>
+<td>a clean catalog → zero violations; introduce one violation → audit count increments</td>
+<td>live</td>
+<td>PARTIAL</td>
+<td>falsifiability proven for the null-producer clause (G7); full whole-catalog guarantee tracks the remaining clauses</td>
+</tr>
+<tr>
+<td>G10</td>
+<td>Sentinel-attributed state reads as conformant</td>
+<td>a catalog whose orphan artifacts point at the unknown-Execution sentinel and whose stranded execs are Aborted → audit reports <strong>zero violations</strong> (sentinel/aborted state is compliant, known-degraded)</td>
+<td>live</td>
+<td><strong>DONE</strong> (producer side)</td>
+<td><code>test_G8_G10…</code> covers the sentinel-attributed-producer half; the stranded-→-Aborted half tracks G2</td>
+</tr>
+</tbody>
+</table>
+<h2 id="h-lineage-data-flow-per-adr-0001">H. Lineage (data-flow, per ADR-0001)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H1</td>
+<td>Backward lineage walk</td>
+<td>from an artifact, walk to producing exec → consumed inputs → their producers</td>
+<td>live+unit</td>
+<td>EXISTS</td>
+<td><code>test_lookup_lineage_unit.py</code>, <code>test_lookup_lineage_live.py</code></td>
+</tr>
+<tr>
+<td>H2</td>
+<td>Forward lineage</td>
+<td>find executions that consumed an artifact as input</td>
+<td>live</td>
+<td>EXISTS</td>
+<td><code>test_forward_lineage.py</code></td>
+</tr>
+<tr>
+<td>H3</td>
+<td>Walks data-flow, not orchestration</td>
+<td>lineage does NOT traverse <code>Execution_Execution</code></td>
+<td>unit</td>
+<td>EXISTS (implicit)</td>
+<td><strong>NEW</strong>: add an explicit nested-execution case asserting the sibling is not surfaced as a parent</td>
+</tr>
+<tr>
+<td>H4</td>
+<td>Depth / diamond / cap</td>
+<td>depth control, diamond dedup, max-executions cap</td>
+<td>unit</td>
+<td>EXISTS</td>
+<td><code>test_lookup_lineage_unit.py</code></td>
+</tr>
+<tr>
+<td>H5</td>
+<td>Lineage terminates at sentinel</td>
+<td>from a sentinel-attributed artifact, lineage reports "unknown origin" and stops</td>
+<td>live</td>
+<td>XFAIL</td>
+<td>the F4 read-path</td>
+</tr>
+</tbody>
+</table>
+<h2 id="i-execution-metadata-capture">I. Execution metadata capture</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Clause</th>
+<th>Assertion</th>
+<th>Substrate</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I1</td>
+<td><code>configuration.json</code> captured</td>
+<td>resolved <code>ExecutionConfiguration</code> (+ argv) staged as Execution_Metadata</td>
+<td>live+unit</td>
+<td>EXISTS</td>
+<td><code>test_asset_upload.py</code>, migration tests</td>
+</tr>
+<tr>
+<td>I2</td>
+<td>Environment snapshot captured</td>
+<td>packages, CPU/arch/processor, OS, sys, env vars; JSON-serializable</td>
+<td>unit</td>
+<td>EXISTS</td>
+<td><code>test_environment.py</code></td>
+</tr>
+<tr>
+<td>I3</td>
+<td><code>uv.lock</code> captured when present</td>
+<td>lockfile staged when workflow git root has one</td>
+<td>live</td>
+<td>EXISTS (partial)</td>
+<td>extend: assert conditional behavior</td>
+</tr>
+<tr>
+<td>I4</td>
+<td>Hydra configs captured under hydra-zen</td>
+<td><code>config.yaml</code>/<code>overrides.yaml</code>/<code>hydra.yaml</code> staged</td>
+<td>live+unit</td>
+<td>EXISTS</td>
+<td><code>test_asset_upload.py::test_upload_hydra_config_assets</code></td>
+</tr>
+<tr>
+<td>I5</td>
+<td>Seeds captured via Hydra config</td>
+<td>a seed set in config appears in the captured <code>config.yaml</code></td>
+<td>live</td>
+<td>NEW-LIVE</td>
+<td>the seeds-via-hydra ruling; lightweight</td>
+</tr>
+<tr>
+<td>I6</td>
+<td>GPU info captured best-effort</td>
+<td>env snapshot has a <code>gpu</code> section; degrades to <code>{available: false}</code> with no GPU/torch</td>
+<td>unit</td>
+<td>XFAIL</td>
+<td>depends on <code>get_gpu_info()</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="j-adoption-backfill-migration-out-of-this-suite">J. Adoption backfill (migration) — OUT OF THIS SUITE</h2>
+<p>The adoption backfill is a <strong>one-off migration</strong> (run once per catalog at
+contract adoption, then never again). Its <em>mechanics</em> tests do <strong>not</strong> belong
+in the permanent contract suite — re-running them on every CI pass exercises a
+migration that has already happened. They live <strong>with the backfill script</strong>,
+in their own file (the pattern the prior migration already follows:
+<code>tests/test_migrate_dataset_execution_version.py</code> sits at <code>tests/</code> root, not
+inside <code>tests/execution/</code>), and may be deleted once the migration has run on
+all target catalogs.</p>
+<p>Migration-mechanics tests (co-located with the script, NOT in the contract
+suite): backfill attributes orphans to the unknown-Execution sentinel;
+aborts stranded non-terminal executions with a migration reason; idempotent
+re-run is a no-op; <code>--dry-run</code> mutates nothing; the migration records its own
+provenance (date + touched rows). Prior art for all of these:
+<code>test_migrate_dataset_execution_version.py</code>.</p>
+<p><strong>What stays in the contract suite is the durable invariant, reframed as an
+audit test:</strong> that a catalog in the <em>post-backfill state</em> (orphans attributed
+to the sentinel, stranded execs Aborted) reads as <strong>conformant</strong> — see
+<strong>G10</strong>. That assertion is permanent: it guards against any future code path
+re-introducing a null producer or leaving a sentinel-attributed row
+mis-classified as a violation. It is reachable by seeding sentinel-attributed
+and aborted rows directly, with no dependency on the migration script.</p>
+<hr />
+<h2 id="coverage-summary">Coverage summary</h2>
+<ul>
+<li><strong>EXISTS (reuse/extend):</strong> A1–A3, B1–B2, C1/C3/C4, D1–D2, E1–E2, E9, F7, H1–H4, I1–I4 — the low-level mechanism layer is well covered.</li>
+<li><strong>NEW-LIVE (writable now, no new impl):</strong> A4–A8, B3–B5, C2, D3–D5, I5 — these test contract behaviors over the <em>existing</em> surface (state, edges, audit-of-current-state). Many depend on the audit (G), so sequence G first or assert raw catalog state directly.</li>
+<li><strong>XFAIL (write now, flip on impl):</strong> E3–E8, E10, F2–F6, G1–G10, H5, I6 — every test tied to a not-yet-built deliverable (LocalFile, sentinels, audit, GPU).</li>
+<li><strong>Out of this suite:</strong> adoption-backfill <em>mechanics</em> (one-off migration) live with the backfill script, not here; only the durable post-backfill conformance invariant (G10) stays.</li>
+</ul>
+<h2 id="sequencing">Sequencing</h2>
+<ol>
+<li><strong>Now:</strong> write the EXISTS-extensions + NEW-LIVE that assert raw catalog
+   state (don't need the audit) — A4–A8, B3–B5, C2, D5, F1, H3, I5. These run
+   green against the current code where behavior already conforms, red where
+   it doesn't (surfacing spec/impl gaps early).</li>
+<li><strong>With the audit (G):</strong> the predicate/audit tests, plus the NEW-LIVE that
+   assert "is flagged" (A5, A7, B1-violation, D3).</li>
+<li><strong>With each feature:</strong> flip the matching XFAIL — LocalFile (E), sentinels
+   (F), GPU (I6).</li>
+</ol>
+<h2 id="file-layout">File layout</h2>
+<ul>
+<li><code>tests/execution/test_provenance_contract.py</code> — A, B, C, D, F, H5 (the
+  lifecycle/edge/sentinel contract, live).</li>
+<li><code>tests/execution/test_local_file_input.py</code> — E (LocalFile, validate_assets
+  routing, download-skip); split unit vs live within.</li>
+<li><code>tests/execution/test_provenance_audit.py</code> — G (the audit predicate,
+  including G10 the post-backfill conformance invariant).</li>
+<li>Extend existing files for EXISTS rows; do not duplicate.</li>
+</ul>
+<p><strong>Not in this suite:</strong> adoption-backfill mechanics ship with the backfill
+script as a separate, one-off migration test file at <code>tests/</code> root (the
+<code>test_migrate_dataset_execution_version.py</code> pattern) — deletable once the
+migration has run. Only G10 (the durable invariant) lives here.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

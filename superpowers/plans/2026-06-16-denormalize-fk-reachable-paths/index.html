@@ -1,0 +1,2589 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-16-denormalize-fk-reachable-paths/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Denormalize FK-Reachable Paths Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#denormalize-fk-reachable-paths-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Denormalize FK-Reachable Paths Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-characterization-spike-pin-the-multi-route-prefix-construction-against-the-live-bag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Characterization spike — pin the multi-route prefix construction against the live bag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-failing-catalog-free-planner-unit-test-multiple-routes-emitted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Failing catalog-free planner unit test — multiple routes emitted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-implement-multi-route-emission-in-_prepare_wide_table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Implement multi-route emission in _prepare_wide_table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-rule-6-ambiguity-guard-still-raises-on-genuine-column-ambiguity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Rule-6 ambiguity guard still raises on genuine column ambiguity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-subject-partitioned-demo-fixture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Subject-partitioned demo fixture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-6-live-demo-regression-feature_values-resolves-on-subject-partitioned-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Live demo regression — feature_values resolves on subject-partitioned dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-7-net-2-exactness-oracle-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Net-2 exactness oracle test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-8-docs-broad-suite-eye-ai-acceptance-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Docs + broad suite + eye-ai acceptance + PR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="denormalize-fk-reachable-paths-implementation-plan">Denormalize FK-Reachable Paths Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Make the denormalize planner union ALL reachable <code>Dataset → … → element</code> paths (membership AND FK-reachable), RID-distinct on the <code>row_per</code> leaf, so <code>feature_values</code> / <code>get_denormalized_*</code> return the correct rows on subject-partitioned datasets (members = Subjects, element FK-reachable via <code>Subject → … → element</code>).</p>
+<p><strong>Architecture:</strong> The planner (<code>_prepare_wide_table</code> in <code>model/denormalize_planner.py</code>) currently keeps ONE <code>Dataset → membership-assoc → element</code> path per element (Phase-1b dedup + the <code>paths[0][1]</code> prefix at Phase 3). On a subject-partitioned dataset the membership association is empty, so the join returns 0 rows. Fix: emit one <code>element_tables</code> entry per distinct <code>Dataset → element</code> route (membership AND FK-reachable chain), each keyed <code>f"{element}#{i}"</code>. The consumer <code>_denormalize_impl</code> already iterates <code>join_tables.items()</code> and <code>union(*sql_statements)</code> (UNION, deduped) when there is &gt;1 statement, and projects columns from <code>column_specs</code> (per-table, not per-path) — so the projection is identical across paths and UNION dedups on the leaf row automatically. No value-tuple-shape change; the key is never used semantically (<code>for _key, (path, jc, jt) in ...</code>).</p>
+<p><strong>Tech Stack:</strong> Python 3.12, SQLAlchemy (bag SQLite mirror), pytest, <code>uv</code>, ruff. Live verification against <code>dev.eye-ai.org</code>/<code>eye-ai</code> bag <code>6-CQZE</code> v0.4.0 (already cached) and the localhost demo catalog.</p>
+<hr />
+<h2 id="file-structure">File structure</h2>
+<ul>
+<li><strong>Modify</strong> <code>src/deriva_ml/model/denormalize_planner.py</code> — <code>_prepare_wide_table</code> Phase-1b/1c/3: retain and emit multiple routes per element. The single behavioural change.</li>
+<li><strong>Create</strong> <code>tests/local_db/test_denormalize_fk_reachable_paths.py</code> — catalog-free planner unit tests (stub model) proving multiple routes are emitted and Rule-6 still raises on genuine column ambiguity.</li>
+<li><strong>Modify</strong> <code>tests/conftest.py</code> (or <code>tests/catalog_manager.py</code> / <code>src/deriva_ml/demo_catalog.py</code>) — add a subject-partitioned demo dataset fixture (members = Subjects only; <code>Image</code> FK-reachable via <code>Image.Subject</code>).</li>
+<li><strong>Create</strong> <code>tests/dataset/test_subject_partitioned_feature_values.py</code> — live demo regression: <code>feature_values</code> and <code>as_tf_dataset</code> labels resolve on the subject-partitioned fixture.</li>
+<li><strong>Modify</strong> <code>docs/reference/denormalization.md</code> — document the union-of-reachable-paths + RID-distinct-on-<code>row_per</code>-leaf rule.</li>
+</ul>
+<blockquote>
+<p><strong>CWD:</strong> every command assumes <code>cd /Users/carl/GitHub/DerivaML/deriva-ml</code> chained into the same Bash call. Tests need <code>DERIVA_ML_ALLOW_DIRTY=true</code>; live demo tests need <code>DERIVA_HOST=localhost</code>; the eye-ai check needs network + a token.</p>
+</blockquote>
+<hr />
+<h3 id="task-1-characterization-spike-pin-the-multi-route-prefix-construction-against-the-live-bag">Task 1: Characterization spike — pin the multi-route prefix construction against the live bag</h3>
+<p>The Phase-3 prefix builder (<code>denormalize_planner.py:1808-1857</code>) only handles the 2-table <code>Dataset → assoc → element</code> shape (<code>assoc_name = paths[0][1].name</code>). The FK-reachable route is a multi-hop chain (<code>Dataset → Subject_Dataset → Subject → Observation → Image</code>). This task discovers the EXACT join-condition construction for a multi-hop prefix empirically, so later tasks contain real code, not guesses. <strong>No production edits in this task</strong> — it produces a throwaway probe and a written finding.</p>
+<p><strong>Files:</strong>
+- Create (throwaway, NOT committed): <code>/tmp/spike_multiroute.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write the spike probe</strong></li>
+</ul>
+<pre><code class="language-python"># /tmp/spike_multiroute.py — THROWAWAY. Pin the exact path_names / join_conditions
+# / join_types a multi-hop FK-reachable route must produce for [Image, Image_Diagnosis]
+# on the subject-partitioned 6-CQZE bag.
+import os
+os.environ.setdefault(&quot;DERIVA_ML_ALLOW_DIRTY&quot;, &quot;true&quot;)
+from deriva_ml import DerivaML
+from deriva_ml.dataset.aux_classes import DatasetSpec
+
+ml = DerivaML(hostname=&quot;dev.eye-ai.org&quot;, catalog_id=&quot;eye-ai&quot;)
+bag = ml.download_dataset_bag(DatasetSpec(rid=&quot;6-CQZE&quot;, version=&quot;0.4.0&quot;))
+pl = bag.model._planner
+
+# All Dataset-&gt;...-&gt;Image routes the planner discovers (each is a path of Table objs).
+routes = [p for p in pl._schema_to_paths() if p[-1].name == &quot;Image&quot;]
+for p in routes:
+    print(&quot;ROUTE:&quot;, [t.name for t in p])
+
+# For the FK-reachable route, print the per-edge relationship the prefix builder needs.
+# _table_relationship(from_table, to_table) -&gt; list[(fk_col, pk_col)].
+fkroute = next(p for p in routes if &quot;Subject&quot; in [t.name for t in p])
+print(&quot;\nFK route edges:&quot;)
+for a, b in zip(fkroute[:-1], fkroute[1:]):
+    try:
+        rel = pl._table_relationship(a, b)
+        print(f&quot;  {a.name} -&gt; {b.name}: {rel}&quot;)
+    except Exception as e:
+        print(f&quot;  {a.name} -&gt; {b.name}: RAISE {e!r}&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run the spike</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python /tmp/spike_multiroute.py 2&gt;&amp;1 | grep -E "ROUTE|-&gt;|RAISE"</code>
+Expected: at least two ROUTE lines (<code>Dataset, Image_Dataset, Image</code> and <code>Dataset, Subject_Dataset, Subject, Observation, Image</code>), and a per-edge relationship list for every hop of the FK route with no RAISE. This proves <code>_table_relationship</code> resolves every edge of a multi-hop prefix — the construction Task 3 needs.</p>
+<ul>
+<li>[ ] <strong>Step 3: Record the finding inline in the plan's Task 3 notes</strong></li>
+</ul>
+<p>Confirm the prefix for a multi-hop route is built by walking consecutive <code>(from, to)</code> pairs and calling <code>_table_relationship(from, to)</code> for each — the same call the current 2-table prefix uses, just iterated over the whole chain. If any edge RAISES, STOP and surface it (the construction needs a different relationship resolver). Do NOT proceed to Task 3 until every edge resolves.</p>
+<ul>
+<li>[ ] <strong>Step 4: Delete the throwaway probe</strong></li>
+</ul>
+<pre><code class="language-bash">rm -f /tmp/spike_multiroute.py
+</code></pre>
+<hr />
+<h3 id="task-2-failing-catalog-free-planner-unit-test-multiple-routes-emitted">Task 2: Failing catalog-free planner unit test — multiple routes emitted</h3>
+<p>Prove the planner emits one <code>element_tables</code> entry per distinct <code>Dataset → element</code> route, using a stub model so no catalog is needed. This is the RED test for the core change.</p>
+<p><strong>Files:</strong>
+- Create: <code>tests/local_db/test_denormalize_fk_reachable_paths.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Build the test against the real demo schema fixture the planner tests already use (the demo schema has BOTH <code>Dataset → Dataset_Image → Image</code> and <code>Dataset → Dataset_Subject → Subject → Image</code>, so it exercises two routes without a live catalog). Find the existing pattern first:</p>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -rn "DenormalizePlanner\|_prepare_wide_table\|demo-catalog-schema\|Model.fromfile\|build_local_schema" tests/local_db/test_paths.py tests/local_db/test_planner_rules.py tests/local_db/conftest.py | head</code></p>
+<p>Then write, reusing whatever model-construction fixture those tests use (call it <code>planner_from_demo_schema</code> below — replace with the actual fixture/helper name discovered above):</p>
+<pre><code class="language-python">&quot;&quot;&quot;Planner emits ALL reachable Dataset-&gt;element routes (membership + FK-reachable),
+not just the preferred membership association. Regression for subject-partitioned
+feature_values returning 0 (denormalize-fk-reachable-paths spec).&quot;&quot;&quot;
+
+from __future__ import annotations
+
+
+def test_prepare_wide_table_emits_membership_and_fk_routes(planner_from_demo_schema):
+    &quot;&quot;&quot;The demo schema reaches Image two ways:
+      - Dataset -&gt; Dataset_Image -&gt; Image           (membership)
+      - Dataset -&gt; Dataset_Subject -&gt; Subject -&gt; Image (FK-reachable)
+    Both must appear as separate join_tables entries so the consumer unions them.
+    &quot;&quot;&quot;
+    planner, dataset_stub, dataset_rid = planner_from_demo_schema
+    join_tables, _cols, _multi = planner._prepare_wide_table(
+        dataset_stub, dataset_rid, [&quot;Image&quot;], row_per=&quot;Image&quot;
+    )
+    # Collect the association/second-hop table for every Image route.
+    second_hops = {path[1] for (path, _jc, _jt) in join_tables.values() if len(path) &gt;= 2}
+    assert &quot;Dataset_Image&quot; in second_hops, f&quot;membership route missing: {second_hops}&quot;
+    assert &quot;Dataset_Subject&quot; in second_hops, f&quot;FK-reachable route missing: {second_hops}&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalize_fk_reachable_paths.py::test_prepare_wide_table_emits_membership_and_fk_routes -v</code>
+Expected: FAIL — only <code>Dataset_Image</code> present in <code>second_hops</code> (the membership route); <code>Dataset_Subject</code> missing because Phase-1b dedup discarded it.</p>
+<blockquote>
+<p>If the fixture <code>planner_from_demo_schema</code> does not exist, Step 1 also creates it in <code>tests/local_db/conftest.py</code> from the model-construction pattern discovered by the grep (load <code>tests/dataset/demo-catalog-schema.json</code> into a <code>Model</code>, build the planner, and a minimal dataset stub exposing <code>.dataset_rid</code> and <code>list_dataset_children(recurse=True) -&gt; []</code>). Use the EXACT construction the neighbouring planner tests use — do not invent a new one.</p>
+</blockquote>
+<hr />
+<h3 id="task-3-implement-multi-route-emission-in-_prepare_wide_table">Task 3: Implement multi-route emission in <code>_prepare_wide_table</code></h3>
+<p>Make Phase-1b retain distinct routes and Phase-3 emit one entry per route. Uses the multi-hop prefix construction pinned in Task 1.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/model/denormalize_planner.py</code> (Phase 1b ~1746-1783, Phase 1c ~1785-1791, Phase 3 emission ~1800-1857)</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the current Phase 1b/1c/3 block in full before editing</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; sed -n '1742,1872p' src/deriva_ml/model/denormalize_planner.py</code></p>
+<ul>
+<li>[ ] <strong>Step 2: Replace the <code>(element, endpoint)</code>-collapsing dedup (Phase 1b) so it dedups only identical table-sequence paths, keeping distinct routes</strong></li>
+</ul>
+<p>Change the Phase-1b loop (<code>denormalize_planner.py:1746-1783</code>) so the dedup key is the FULL path signature <code>tuple(t.name for t in path)</code> rather than <code>(element.name, endpoint.name)</code>. Replace the block from <code>deduplicated_paths: list[list[Table]] = []</code> through <code>table_paths = deduplicated_paths</code> with:</p>
+<pre><code class="language-python">        # ── Phase 1b: deduplicate ONLY truly identical paths ─────────────────
+        # Previously this collapsed to one route per (element, endpoint),
+        # preferring the Dataset_{Element} membership association and DISCARDING
+        # the FK-reachable chain (e.g. Dataset -&gt; Subject_Dataset -&gt; Subject -&gt;
+        # Image). On subject-partitioned datasets the membership association is
+        # empty, so that discard produced a silently-empty result. Retain every
+        # distinct route; the consumer UNIONs them (RID-distinct on the row_per
+        # leaf). See docs/superpowers/specs/2026-06-16-denormalize-fk-reachable-paths-design.md.
+        deduplicated_paths: list[list[Table]] = []
+        seen_path_sigs: set[tuple[str, ...]] = set()
+        for path in table_paths:
+            sig = tuple(t.name for t in path)
+            if sig not in seen_path_sigs:
+                seen_path_sigs.add(sig)
+                deduplicated_paths.append(path)
+
+        table_paths = deduplicated_paths
+</code></pre>
+<p>Delete the now-unused <code>_is_standard_assoc</code> helper and <code>seen_element_endpoint</code> dict (they were only used by the replaced dedup).</p>
+<ul>
+<li>[ ] <strong>Step 3: Emit one <code>element_tables</code> entry per route (Phase 1c + Phase 3)</strong></li>
+</ul>
+<p>In Phase 1c (<code>paths_by_element</code>) the value is already <code>list[list[Table]]</code> (all routes per element). In the Phase-2/3 loop (<code>for element_name, paths in paths_by_element.items():</code>), currently ONE entry is built per element using <code>paths[0]</code> as the prefix. Change it to iterate each route and emit <code>element_tables[f"{element_name}#{i}"]</code>. The downstream subtree (<code>_build_join_tree</code>) is the same for all routes of an element; only the <code>Dataset → … → element</code> PREFIX differs per route. Build each route's prefix by walking its consecutive <code>(from, to)</code> pairs (the construction pinned in Task 1):</p>
+<p>Replace the Phase-2/3 per-element loop body (<code>denormalize_planner.py:1800-1857</code>) so that, for each <code>route_index, route in enumerate(paths)</code>:
+- the prefix tables are <code>route[:-? ]</code> up to and including the element (i.e. <code>[t.name for t in route[:route.index(element_table)+1]]</code> — the element is <code>route[2]</code> only for the membership shape; for the FK chain the element is the LAST table of the prefix). Compute the element's position as <code>elem_pos = next(i for i, t in enumerate(route) if t.name == element_name)</code>; the prefix is <code>route[:elem_pos+1]</code>.
+- <code>join_conditions</code> / <code>join_types</code> for the prefix come from <code>_table_relationship(route[j], route[j+1])</code> for each <code>j</code> in <code>range(elem_pos)</code> (inner joins; this is exactly the 2-table prefix code generalised to N hops, validated in Task 1).
+- the downstream subtree (element → endpoint, from the JoinTree <code>tree.walk()</code> / <code>tree.walk_edges()</code>) is appended after the prefix, unchanged.
+- key the result <code>element_tables[f"{element_name}#{route_index}"] = (path_names, join_conditions, join_types)</code>.</p>
+<p>Write the actual replacement code in this step (do not summarise) using the exact variable names from Step 1's <code>sed</code> output and the per-edge relationship call confirmed in Task 1. Keep the JoinTree downstream-subtree code (<code>tree = self._build_join_tree(...)</code>, <code>tree.walk()</code>, <code>tree.walk_edges()</code>) intact — only the PREFIX construction and the dict KEY change.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run the Task-2 test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalize_fk_reachable_paths.py -v</code>
+Expected: PASS — both <code>Dataset_Image</code> and <code>Dataset_Subject</code> routes present.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run the FULL planner/denormalize suite (Net-1 regression gate)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ -q</code>
+Expected: ALL PASS with NO expectation edits. If any test fails, the union changed a directly-populated demo result — STOP, inspect the diff, and explain it (per spec Net-1, a changed demo result is a finding, not a test to update). Common legitimate adjustment: a test that asserted exactly one <code>join_tables</code> entry per element now sees <code>element#0</code>, <code>element#1</code> keys — if such a test asserts the KEY name or COUNT, that is the multi-route behaviour and the assertion (not the code) is what the spec changed; update only assertions that encode the old single-route shape, and note each in the commit message.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/model/denormalize_planner.py tests/local_db/test_denormalize_fk_reachable_paths.py tests/local_db/conftest.py
+git commit -m &quot;fix(denormalize): planner unions all reachable Dataset-&gt;element routes
+
+Phase-1b dedup kept only the preferred Dataset_{Element} membership route and
+discarded the FK-reachable chain, so feature_values returned 0 on
+subject-partitioned datasets. Retain every distinct route and emit one
+join_tables entry per route; the consumer already UNIONs them RID-distinct on
+the row_per leaf.&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-rule-6-ambiguity-guard-still-raises-on-genuine-column-ambiguity">Task 4: Rule-6 ambiguity guard still raises on genuine column ambiguity</h3>
+<p>Pin Unit C: retaining multiple <code>Dataset → element</code> routes must NOT trip Rule 6, but a genuine <code>row_per</code>↔include-table column ambiguity must still raise.</p>
+<p><strong>Files:</strong>
+- Modify: <code>tests/local_db/test_denormalize_fk_reachable_paths.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Find an existing Rule-6 ambiguity test to mirror the construction</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -rn "DerivaMLDenormalizeAmbiguousPath\|AmbiguousPath\|_find_path_ambiguities\|ambigu" tests/local_db/ | head</code></p>
+<ul>
+<li>[ ] <strong>Step 2: Write the guard test (mirroring that construction)</strong></li>
+</ul>
+<p>Add to <code>tests/local_db/test_denormalize_fk_reachable_paths.py</code> a test asserting that a request which IS a genuine column-ambiguity (multiple FK paths between <code>row_per</code> and a column-contributing include-table — reuse the exact include-table pair the existing ambiguity test uses) still raises <code>DerivaMLDenormalizeAmbiguousPath</code>. Use the same fixture and the same ambiguous <code>include_tables</code> the existing test uses; assert <code>pytest.raises(DerivaMLDenormalizeAmbiguousPath)</code>.</p>
+<pre><code class="language-python">import pytest
+from deriva_ml.core.exceptions import DerivaMLDenormalizeAmbiguousPath
+
+
+def test_genuine_column_ambiguity_still_raises(planner_from_demo_schema):
+    &quot;&quot;&quot;Multiple Dataset-&gt;element ROUTES are unioned (not an error), but a genuine
+    row_per&lt;-&gt;include-table column ambiguity must still raise after the change.&quot;&quot;&quot;
+    planner, dataset_stub, dataset_rid = planner_from_demo_schema
+    # &lt;ambiguous include_tables from the existing Rule-6 test&gt;
+    with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
+        planner._prepare_wide_table(
+            dataset_stub, dataset_rid, AMBIGUOUS_INCLUDE_TABLES, row_per=AMBIGUOUS_ROW_PER
+        )
+</code></pre>
+<p>Replace <code>AMBIGUOUS_INCLUDE_TABLES</code> / <code>AMBIGUOUS_ROW_PER</code> with the exact values from the existing ambiguity test found in Step 1. If no such demo-schema ambiguity case exists, SKIP this test with <code>pytest.skip("no column-ambiguous table pair in demo schema")</code> and note it — do NOT fabricate a schema.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalize_fk_reachable_paths.py -v</code>
+Expected: PASS (or one SKIP for the ambiguity case if the demo schema has none).</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add tests/local_db/test_denormalize_fk_reachable_paths.py
+git commit -m &quot;test(denormalize): Rule-6 column ambiguity still raises after multi-route union&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-subject-partitioned-demo-fixture">Task 5: Subject-partitioned demo fixture</h3>
+<p>Add a demo dataset whose members are Subjects only (no direct Image members) so Image is FK-reachable via <code>Image.Subject</code>. This is the committed gate for Net-3.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/demo_catalog.py</code> (add a subject-partitioned dataset builder) OR <code>tests/conftest.py</code> (a fixture that creates one). Prefer a <code>tests/conftest.py</code> fixture so demo-catalog production code is untouched.</p>
+<ul>
+<li>[ ] <strong>Step 1: Read how the existing <code>catalog_with_datasets</code> fixture and <code>create_demo_datasets</code> add members</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; sed -n '143,251p' src/deriva_ml/demo_catalog.py &amp;&amp; grep -n "def catalog_with_datasets\|add_dataset_members\|ensure_datasets\|create_dataset" tests/conftest.py tests/catalog_manager.py</code></p>
+<ul>
+<li>[ ] <strong>Step 2: Add a <code>subject_partitioned_dataset</code> fixture to <code>tests/conftest.py</code></strong></li>
+</ul>
+<pre><code class="language-python">@pytest.fixture(scope=&quot;function&quot;)
+def subject_partitioned_dataset(catalog_with_datasets, tmp_path):
+    &quot;&quot;&quot;A dataset whose members are Subjects ONLY — Image is FK-reachable via
+    Image.Subject, never a direct member. Exercises the FK-reachable feature-read
+    path the denormalize union fixes. Returns (ml, dataset).&quot;&quot;&quot;
+    ml, _desc = catalog_with_datasets
+    workflow = ml.create_workflow(name=&quot;Subject-partitioned&quot;, workflow_type=&quot;Test Workflow&quot;)
+    execution = ml.create_execution(workflow=workflow, configuration=__import__(
+        &quot;deriva_ml.execution&quot;, fromlist=[&quot;ExecutionConfiguration&quot;]).ExecutionConfiguration())
+    with execution.execute() as exe:
+        ds = exe.create_dataset(dataset_types=[&quot;Training&quot;], description=&quot;subject-partitioned&quot;)
+        subjects = [s[&quot;RID&quot;] for s in ml._domain_path().tables[&quot;Subject&quot;].entities().fetch()][:3]
+        assert subjects, &quot;fixture needs Subjects with Images&quot;
+        ds.add_dataset_members({&quot;Subject&quot;: subjects})  # NO Image members
+    execution.commit_output_assets()
+    return ml, ds
+</code></pre>
+<p>Adjust <code>create_dataset</code> / <code>add_dataset_members</code> / execution calls to match the EXACT signatures discovered in Step 1 (the snippet above mirrors <code>create_demo_datasets</code>; reconcile names like <code>exe.create_dataset</code> vs <code>ml.create_dataset</code>).</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify the fixture builds a subject-partitioned dataset (Image FK-reachable, 0 direct)</strong></li>
+</ul>
+<p>Add a smoke test in <code>tests/dataset/test_subject_partitioned_feature_values.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Subject-partitioned feature reads: members are Subjects, Image is FK-reachable.
+Regression for feature_values returning 0 (denormalize-fk-reachable-paths).&quot;&quot;&quot;
+import os
+import pytest
+from deriva_ml.dataset.tf_adapter import resolve_element_rids
+
+
+@pytest.mark.skipif(os.environ.get(&quot;DERIVA_HOST&quot;) in (None, &quot;&quot;), reason=&quot;needs a live catalog&quot;)
+def test_fixture_is_subject_partitioned(subject_partitioned_dataset):
+    ml, ds = subject_partitioned_dataset
+    bag = ds.download_dataset_bag(version=ds.current_version)
+    assert len(resolve_element_rids(bag, &quot;Image&quot;, reachable=False)) == 0  # no direct members
+    assert len(resolve_element_rids(bag, &quot;Image&quot;, reachable=True)) &gt; 0     # FK-reachable
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run the smoke test</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_subject_partitioned_feature_values.py::test_fixture_is_subject_partitioned -v --timeout=600</code>
+Expected: PASS — <code>reachable=False</code> → 0, <code>reachable=True</code> → &gt;0.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add tests/conftest.py tests/dataset/test_subject_partitioned_feature_values.py
+git commit -m &quot;test(dataset): subject-partitioned demo fixture (Image FK-reachable, 0 direct)&quot;
+</code></pre>
+<hr />
+<h3 id="task-6-live-demo-regression-feature_values-resolves-on-subject-partitioned-dataset">Task 6: Live demo regression — feature_values resolves on subject-partitioned dataset</h3>
+<p>The end-to-end gate: <code>feature_values</code> and <code>as_tf_dataset</code> labels must resolve through the FK-reachable path on the demo fixture.</p>
+<p><strong>Files:</strong>
+- Modify: <code>tests/dataset/test_subject_partitioned_feature_values.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Confirm which Image feature the demo has</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -n "create_feature(\"Image\"\|create_feature('Image'\|Image.*Quality\|ImageQuality" src/deriva_ml/demo_catalog.py</code>
+Expected: the demo defines <code>Image / Quality</code> (vocabulary <code>ImageQuality</code>) and <code>Image / BoundingBox</code>. Use <code>Quality</code> (vocabulary-based, one value per image).</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the feature-value regression test</strong></li>
+</ul>
+<p>The demo features are created by <code>create_demo_features</code>, which the <code>catalog_with_datasets</code> fixture runs. Add:</p>
+<pre><code class="language-python">@pytest.mark.skipif(os.environ.get(&quot;DERIVA_HOST&quot;) in (None, &quot;&quot;), reason=&quot;needs a live catalog&quot;)
+def test_feature_values_resolves_via_fk_reachable_path(subject_partitioned_dataset):
+    &quot;&quot;&quot;feature_values('Image','Quality') must return rows for FK-reachable Images
+    even though Image has 0 direct dataset members. Pre-fix this returned 0.&quot;&quot;&quot;
+    ml, ds = subject_partitioned_dataset
+    bag = ds.download_dataset_bag(version=ds.current_version)
+
+    reachable_images = set(resolve_element_rids(bag, &quot;Image&quot;, reachable=True))
+    assert reachable_images, &quot;fixture must have FK-reachable Images&quot;
+
+    fv = list(bag.feature_values(&quot;Image&quot;, &quot;Quality&quot;))
+    assert fv, &quot;feature_values returned 0 — FK-reachable feature read is broken&quot;
+    # Every returned feature row targets a reachable Image (no leakage, no loss).
+    fv_targets = {rec.Image for rec in fv}
+    assert fv_targets &lt;= reachable_images
+    # Exactness oracle (Net-2): the distinct feature-target set equals the
+    # estimate's reachable Image count is asserted separately in Task 7.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Add the <code>as_tf_dataset</code> label end-to-end assertion (the report's acceptance shape)</strong></li>
+</ul>
+<pre><code class="language-python">@pytest.mark.skipif(os.environ.get(&quot;DERIVA_HOST&quot;) in (None, &quot;&quot;), reason=&quot;needs a live catalog&quot;)
+def test_as_tf_dataset_labels_resolve_subject_partitioned(subject_partitioned_dataset):
+    tf = pytest.importorskip(&quot;tensorflow&quot;)
+    ml, ds = subject_partitioned_dataset
+    bag = ds.download_dataset_bag(version=ds.current_version)
+    reachable = set(resolve_element_rids(bag, &quot;Image&quot;, reachable=True))
+
+    dataset = bag.as_tf_dataset(
+        element_type=&quot;Image&quot;,
+        sample_loader=lambda p, row: tf.constant([0.0]),
+        targets=[&quot;Quality&quot;],
+        target_transform=lambda rec: 0,  # any int; we assert count, not value
+        missing=&quot;skip&quot;,
+    )
+    rids = {r.decode() if isinstance(r, bytes) else r
+            for *_rest, r in dataset.as_numpy_iterator()}
+    assert rids, &quot;empty generator — labels did not resolve (the reported bug)&quot;
+    assert rids &lt;= reachable
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run both (torch not required; tf is importorskip)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_subject_partitioned_feature_values.py -v --timeout=600</code>
+Expected: <code>test_feature_values_resolves_via_fk_reachable_path</code> PASS; the tf test PASS or SKIP (no tensorflow installed locally — it runs in CI). Before Task 3's fix these would FAIL/empty; after, they pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add tests/dataset/test_subject_partitioned_feature_values.py
+git commit -m &quot;test(dataset): feature_values + as_tf_dataset labels resolve on subject-partitioned dataset&quot;
+</code></pre>
+<hr />
+<h3 id="task-7-net-2-exactness-oracle-test">Task 7: Net-2 exactness oracle test</h3>
+<p>Assert <code>feature_values</code> count equals the independently-computed reachable count from <code>estimate_bag_size</code> — two code paths must agree, on BOTH a directly-populated and the subject-partitioned dataset.</p>
+<p><strong>Files:</strong>
+- Modify: <code>tests/dataset/test_subject_partitioned_feature_values.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Confirm the estimate's per-table reachable-count shape</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -n "def estimate_bag_size\|row_count\|\"tables\"\|tables\[" src/deriva_ml/dataset/dataset.py src/deriva_ml/core/mixins/dataset.py | head</code>
+Expected: <code>estimate_bag_size(version)["tables"][T]["row_count"]</code> is the RID-distinct reachable count for table <code>T</code> (the BFS oracle). Confirm the exact key names from the output and use them below.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the oracle test</strong></li>
+</ul>
+<pre><code class="language-python">@pytest.mark.skipif(os.environ.get(&quot;DERIVA_HOST&quot;) in (None, &quot;&quot;), reason=&quot;needs a live catalog&quot;)
+def test_feature_count_matches_estimate_oracle(subject_partitioned_dataset):
+    &quot;&quot;&quot;Net-2: feature_values row count == estimate's reachable feature-table count.
+    Two independent code paths (planner UNION vs reachability BFS) must agree.&quot;&quot;&quot;
+    ml, ds = subject_partitioned_dataset
+    est = ds.estimate_bag_size(ds.current_version)
+    # The demo Image/Quality feature association table is &quot;Execution_Image_Quality&quot;
+    # (or the demo's actual Image Quality feature-assoc table name — confirm with
+    # bag.lookup_feature(&quot;Image&quot;,&quot;Quality&quot;).feature_table.name).
+    bag = ds.download_dataset_bag(version=ds.current_version)
+    feat_assoc = bag.lookup_feature(&quot;Image&quot;, &quot;Quality&quot;).feature_table.name
+    expected = est[&quot;tables&quot;].get(feat_assoc, {}).get(&quot;row_count&quot;)
+    if not expected:
+        pytest.skip(f&quot;estimate has no reachable rows for {feat_assoc}&quot;)
+    got = len(list(bag.feature_values(&quot;Image&quot;, &quot;Quality&quot;)))
+    assert got == expected, f&quot;feature_values={got} estimate={expected} for {feat_assoc}&quot;
+</code></pre>
+<p>Replace the <code>row_count</code> / <code>["tables"]</code> keys with the exact names confirmed in Step 1.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_subject_partitioned_feature_values.py::test_feature_count_matches_estimate_oracle -v --timeout=600</code>
+Expected: PASS — the two counts agree.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add tests/dataset/test_subject_partitioned_feature_values.py
+git commit -m &quot;test(dataset): Net-2 exactness oracle — feature_values count == estimate reachable count&quot;
+</code></pre>
+<hr />
+<h3 id="task-8-docs-broad-suite-eye-ai-acceptance-pr">Task 8: Docs + broad suite + eye-ai acceptance + PR</h3>
+<ul>
+<li>[ ] <strong>Step 1: Update <code>docs/reference/denormalization.md</code></strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -n "membership\|scope\|filter\|D5\|D6\|reachable" docs/reference/denormalization.md | head</code>
+Add a rule (tagged <code>[deriva-ml]</code>) stating: the planner unions ALL reachable <code>Dataset → element</code> routes (direct-membership AND FK-reachable chains), and the result is RID-distinct on the <code>row_per</code> leaf. Note that on subject-partitioned datasets (members are an upstream element, target FK-reachable) this is the ONLY way the target's rows appear. Reference the spec.</p>
+<ul>
+<li>[ ] <strong>Step 2: Lint + format ONLY the touched files</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src/deriva_ml/model/denormalize_planner.py tests/local_db/test_denormalize_fk_reachable_paths.py tests/dataset/test_subject_partitioned_feature_values.py tests/conftest.py &amp;&amp; uv run ruff format --check src/deriva_ml/model/denormalize_planner.py tests/local_db/test_denormalize_fk_reachable_paths.py tests/dataset/test_subject_partitioned_feature_values.py tests/conftest.py</code>
+Expected: clean. Do NOT run <code>ruff format</code> on whole directories — touched files only (workspace rule).</p>
+<ul>
+<li>[ ] <strong>Step 3: Broad regression sweep</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/local_db/ tests/dataset/test_subject_partitioned_feature_values.py tests/dataset/test_torch_adapter_e2e.py tests/feature/ -q --timeout=600</code>
+Expected: ALL PASS. <code>tests/local_db/</code> is the Net-1 gate; <code>tests/feature/</code> exercises <code>feature_values</code> on the directly-populated catalog (must be unchanged).</p>
+<ul>
+<li>[ ] <strong>Step 4: eye-ai acceptance (manual, NOT committed — needs a token)</strong></li>
+</ul>
+<pre><code class="language-python"># /tmp/eyeai_fv_acceptance.py — THROWAWAY, not committed.
+import os
+os.environ.setdefault(&quot;DERIVA_ML_ALLOW_DIRTY&quot;, &quot;true&quot;)
+from deriva_ml import DerivaML
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.tf_adapter import resolve_element_rids
+
+ml = DerivaML(hostname=&quot;dev.eye-ai.org&quot;, catalog_id=&quot;eye-ai&quot;)
+bag = ml.download_dataset_bag(DatasetSpec(rid=&quot;6-CQZE&quot;, version=&quot;0.4.0&quot;))
+train = next(k for k in bag.list_dataset_children() if &quot;Training&quot; in (k.dataset_types or []))
+print(&quot;reachable Images:&quot;, len(resolve_element_rids(train, &quot;Image&quot;, reachable=True)))  # 102
+print(&quot;feature_values:  &quot;, len(list(train.feature_values(&quot;Image&quot;, &quot;Image_Diagnosis&quot;))))  # was 0 -&gt; expect 591
+</code></pre>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python /tmp/eyeai_fv_acceptance.py 2&gt;&amp;1 | grep -E "reachable|feature_values"</code>
+Expected: <code>reachable Images: 102</code>, <code>feature_values: 591</code> (was 0). Record the numbers in the PR body. Then: <code>rm -f /tmp/eyeai_fv_acceptance.py</code>. Optionally repeat for prod <code>2-277G</code> v4.8.0 on <code>www.eye-ai.org</code> and record the ~28,546 figure.</p>
+<ul>
+<li>[ ] <strong>Step 5: Branch, push, PR</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git push -u origin fix/denormalize-fk-reachable-paths
+gh pr create --title &quot;fix(denormalize): planner unions FK-reachable paths (subject-partitioned feature reads)&quot; \
+  --body &quot;&lt;summary + spec link + root cause (6-CQZE 0-&gt;591) + the three regression nets + eye-ai acceptance numbers + the demo row-set-identity note&gt;&quot;
+</code></pre>
+<p>The spec and plan are already committed on this branch (from brainstorming). The PR bundles them with the fix.</p>
+<hr />
+<h2 id="self-review-notes">Self-Review notes</h2>
+<ul>
+<li><strong>Spec coverage:</strong> Unit A (path retention) → Task 3 Step 2. Unit B (UNION emission) → consumer already unions; Task 3 Step 3 emits multiple entries; identical-projection invariant holds structurally (columns from <code>column_specs</code>, not per-path) — noted in Architecture. Unit C (Rule-6) → Task 4. Net-1 → Task 3 Step 5 + Task 8 Step 3. Net-2 → Task 7. Net-3 committed → Tasks 5-6; live → Task 8 Step 4. Docs → Task 8 Step 1. Out-of-scope (no <code>reachable=</code> on feature_values) → respected (no API change). Fan-out/dedup → handled by UNION-distinct (Architecture + Task 2/6 assertions).</li>
+<li><strong>Risk front-loaded:</strong> Task 1 spike pins the multi-hop prefix construction empirically before Task 3 writes it, so no guessed code.</li>
+<li><strong>No placeholders:</strong> the only deferred specifics are the exact ambiguous-table pair (Task 4, discovered from existing tests) and exact estimate key names (Task 7, discovered from source) — each step says exactly how to obtain them and what to assert, with a skip fallback rather than fabrication.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4582 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/design/denormalization-contract/">
+      
+      
+        <link rel="prev" href="../../reference/schema/">
+      
+      
+        <link rel="next" href="../bag-based-upload-engine/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Denormalization (implementation contract) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#denormalization-implementation-contract-maintainer-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Denormalization (implementation contract)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-denormalization-is-in-one-paragraph-engineer-facing-restatement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What denormalization is, in one paragraph (engineer-facing restatement)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-pipeline-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Pipeline architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Pipeline architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-planner-is-pure-no-io-actually-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "planner is pure; no I/O" actually means
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-state-ownership-and-lifetime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. State, ownership, and lifetime
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. State, ownership, and lifetime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-two-truths-to-remember" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two truths to remember
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-the-fetcher-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The fetcher contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. The fetcher contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it does NOT do
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-api-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public API summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-the-insert-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. The INSERT contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. The INSERT contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-rid-behavior-engine-enforced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing-RID behavior — engine-enforced
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#foreign-key-enforcement-is-off-during-catalog-fetch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foreign-key enforcement is OFF during catalog fetch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-the-denormalize-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. The denormalize contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. The denormalize contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-source-mode-selection-denormalizer__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Source-mode selection (Denormalizer.__init__)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-the-six-semantic-rules-full-contract-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 The six semantic rules (full contract language)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6.2 The six semantic rules (full contract language)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#row-grain-cardinality-row_per-auto-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Row grain (cardinality + row_per auto-inference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column projection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column-hoisting-star-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column hoisting (star schema)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downstream-leaf-rejection-explicit-row_per-with-downstream-table-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downstream-leaf rejection (explicit row_per with downstream table → error)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-ambiguity-multiple-fk-paths-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path ambiguity (multiple FK paths → error)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-disposition-the-six-anchor-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor disposition (the six anchor cases)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-disposition-the-unrelated-anchor-error-case-6-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor disposition — the unrelated-anchor error (case 6, detail)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nested-dataset-anchor-enumeration-an-anchor-set-definition-not-a-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nested-dataset anchor enumeration (an anchor-set definition, not a rule)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-anchor-classification-nested-datasets-and-the-sql-filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Anchor classification, nested datasets, and the SQL filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-the-row-completeness-invariant-6-step-3-in-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 The row-completeness invariant (§6 step 3 in detail)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-freshness-caveat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Freshness caveat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-fragility-map-known-bug-patterns-and-how-the-contract-prevents-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Fragility map — known bug patterns and how the contract prevents them
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-the-public-denormalizer-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. The public Denormalizer surface
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. The public Denormalizer surface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-constructors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Constructors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.1 Constructors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#denormalizerdataset-versionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Denormalizer(dataset, *, version=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#denormalizerfrom_ridsanchors-mlnone-dataset_ridnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Denormalizer.from_rids(anchors, *, ml=None, dataset_rid=None, ...)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-materialization-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Materialization methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.2 Materialization methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#as_dataframeinclude_tables-row_pernone-vianone-ignore_unrelated_anchorsfalse-pandasdataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_dataframe(include_tables, *, row_per=None, via=None, ignore_unrelated_anchors=False) -&gt; pandas.DataFrame
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#as_dictinclude_tables-row_pernone-vianone-ignore_unrelated_anchorsfalse-generatordict-none-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_dict(include_tables, *, row_per=None, via=None, ignore_unrelated_anchors=False) -&gt; Generator[dict, None, None]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-inspection-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Inspection methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.3 Inspection methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#columnsinclude_tables-row_pernone-vianone-listtuplestr-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        columns(include_tables, *, row_per=None, via=None) -&gt; list[tuple[str, str]]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#describeinclude_tables-row_pernone-vianone-dictstr-any" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        describe(include_tables, *, row_per=None, via=None) -&gt; dict[str, Any]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="describe(include_tables, *, row_per=None, via=None) -&gt; dict[str, Any]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#831-the-dry-run-invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3.1 The dry-run invariant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#832-the-13-key-return-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3.2 The 13-key return shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#833-estimated_row_count-semantics-the-a02-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3.3 estimated_row_count semantics (the A02 fix)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#834-the-describe-vs-run-agreement-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3.4 The describe-vs-run agreement contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list_pathstablesnone-dictstr-any" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list_paths(tables=None) -&gt; dict[str, Any]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-feature-name-resolution-_resolve_table_names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Feature-name resolution (_resolve_table_names)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-denormalization-is-in-one-paragraph-engineer-facing-restatement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What denormalization is, in one paragraph (engineer-facing restatement)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-pipeline-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Pipeline architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Pipeline architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-planner-is-pure-no-io-actually-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "planner is pure; no I/O" actually means
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-state-ownership-and-lifetime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. State, ownership, and lifetime
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. State, ownership, and lifetime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-two-truths-to-remember" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two truths to remember
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-the-fetcher-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The fetcher contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. The fetcher contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it does NOT do
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-api-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public API summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-the-insert-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. The INSERT contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. The INSERT contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-rid-behavior-engine-enforced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing-RID behavior — engine-enforced
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#foreign-key-enforcement-is-off-during-catalog-fetch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foreign-key enforcement is OFF during catalog fetch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-the-denormalize-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. The denormalize contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. The denormalize contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-source-mode-selection-denormalizer__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Source-mode selection (Denormalizer.__init__)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-the-six-semantic-rules-full-contract-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 The six semantic rules (full contract language)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6.2 The six semantic rules (full contract language)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#row-grain-cardinality-row_per-auto-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Row grain (cardinality + row_per auto-inference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column projection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column-hoisting-star-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column hoisting (star schema)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downstream-leaf-rejection-explicit-row_per-with-downstream-table-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downstream-leaf rejection (explicit row_per with downstream table → error)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-ambiguity-multiple-fk-paths-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path ambiguity (multiple FK paths → error)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-disposition-the-six-anchor-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor disposition (the six anchor cases)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anchor-disposition-the-unrelated-anchor-error-case-6-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anchor disposition — the unrelated-anchor error (case 6, detail)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nested-dataset-anchor-enumeration-an-anchor-set-definition-not-a-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nested-dataset anchor enumeration (an anchor-set definition, not a rule)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-anchor-classification-nested-datasets-and-the-sql-filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Anchor classification, nested datasets, and the SQL filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-the-row-completeness-invariant-6-step-3-in-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 The row-completeness invariant (§6 step 3 in detail)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-freshness-caveat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Freshness caveat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-fragility-map-known-bug-patterns-and-how-the-contract-prevents-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Fragility map — known bug patterns and how the contract prevents them
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-the-public-denormalizer-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. The public Denormalizer surface
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. The public Denormalizer surface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-constructors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Constructors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.1 Constructors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#denormalizerdataset-versionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Denormalizer(dataset, *, version=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#denormalizerfrom_ridsanchors-mlnone-dataset_ridnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Denormalizer.from_rids(anchors, *, ml=None, dataset_rid=None, ...)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-materialization-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Materialization methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.2 Materialization methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#as_dataframeinclude_tables-row_pernone-vianone-ignore_unrelated_anchorsfalse-pandasdataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_dataframe(include_tables, *, row_per=None, via=None, ignore_unrelated_anchors=False) -&gt; pandas.DataFrame
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#as_dictinclude_tables-row_pernone-vianone-ignore_unrelated_anchorsfalse-generatordict-none-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_dict(include_tables, *, row_per=None, via=None, ignore_unrelated_anchors=False) -&gt; Generator[dict, None, None]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-inspection-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Inspection methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.3 Inspection methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#columnsinclude_tables-row_pernone-vianone-listtuplestr-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        columns(include_tables, *, row_per=None, via=None) -&gt; list[tuple[str, str]]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#describeinclude_tables-row_pernone-vianone-dictstr-any" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        describe(include_tables, *, row_per=None, via=None) -&gt; dict[str, Any]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="describe(include_tables, *, row_per=None, via=None) -&gt; dict[str, Any]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#831-the-dry-run-invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3.1 The dry-run invariant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#832-the-13-key-return-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3.2 The 13-key return shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#833-estimated_row_count-semantics-the-a02-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3.3 estimated_row_count semantics (the A02 fix)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#834-the-describe-vs-run-agreement-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3.4 The describe-vs-run agreement contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list_pathstablesnone-dictstr-any" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list_paths(tables=None) -&gt; dict[str, Any]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-feature-name-resolution-_resolve_table_names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Feature-name resolution (_resolve_table_names)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="denormalization-implementation-contract-maintainer-guide">Denormalization — Implementation Contract (maintainer guide)</h1>
+<p>!!! warning "This is the internal design contract, not user-facing API docs."
+    This page is for <strong>engineers and auditors</strong> working on
+    <code>deriva_ml.local_db.denormalize</code>, <code>local_db.denormalizer</code>,
+    <code>local_db.paged_fetcher</code>, and <code>model.denormalize_planner</code>. It pins
+    <em>how the code is required to behave</em> — the state model, the fetcher /
+    INSERT contracts, the row-completeness invariant, the fragility map,
+    and the test matrix.</p>
+<pre><code>**If you just want to *use* denormalization**, read the
+[Denormalization user guide](../user-guide/denormalization.md)
+(concepts + examples) and the
+[Denormalization reference](../reference/denormalization.md)
+(formal rules + method signatures) instead.
+</code></pre>
+<p>The six semantic rules (Row grain, Column projection, Column hoisting,
+Downstream-leaf rejection, Path ambiguity, Anchor disposition) are stated
+canonically in the <a href="../../reference/denormalization/#formal-rules">reference</a>;
+§6.2 below restates them in full contract language with the planner-level
+guarantees. If a rule's <em>semantics</em> change, update the reference first,
+then this section.</p>
+<h2 id="1-what-denormalization-is-in-one-paragraph-engineer-facing-restatement">1. What denormalization is, in one paragraph (engineer-facing restatement)</h2>
+<p>A user has a <code>Dataset</code> (live, on the catalog) or a <code>DatasetBag</code>
+(downloaded snapshot). They ask: "give me a wide table joining
+these N tables in the dataset's scope, with one row per X." The
+denormalization pipeline plans the join (which FK chains to
+follow, which table is the "leaf" producing one row per output
+row, what columns each table contributes), populates the local
+SQLite cache from whichever source applies (live catalog,
+downloaded bag, or "local" for tests), runs the join in SQL
+against the local cache, and returns the rows. The user sees a
+pandas DataFrame or a row iterator.</p>
+<p>The six named semantic rules summarised in the
+<a href="../../reference/denormalization/#formal-rules">reference</a> are reproduced
+in §6.2 below with their full contract language.</p>
+<hr />
+<h2 id="2-pipeline-architecture">2. Pipeline architecture</h2>
+<pre><code>┌────────────────────────────────────────────────────────────────────┐
+│ Caller                                                             │
+├────────────────────────────────────────────────────────────────────┤
+│ Dataset.get_denormalized_as_dataframe(...)        ← live catalog   │
+│ DatasetBag.get_denormalized_as_dataframe(...)     ← downloaded bag │
+└────────────────────────────────────────────────────────────────────┘
+              │                                           │
+              ▼                                           ▼
+       Denormalizer(dataset_like)              Denormalizer(bag)
+       source = &quot;catalog&quot;                      source = &quot;local&quot;
+       paged_client = ErmrestPagedClient                  │
+              │                                           │
+              └──────────┬────────────────────────────────┘
+                         ▼
+                   _denormalize_impl(...)                          ← src/deriva_ml/local_db/denormalize.py
+                         │
+                         ├─ _prepare_wide_table(...)               ← src/deriva_ml/model/denormalize_planner.py
+                         │    pure model code; no I/O
+                         │    returns:  join_tables, column_specs, multi_schema
+                         │    FK-graph walking delegated to
+                         │      deriva.bag.path_walker.SchemaPathWalker
+                         │      (shared with deriva-py's CatalogBagBuilder;
+                         │       DerivaML layers skip-tables + nested-dataset
+                         │       loopback as an edge_filter hook)
+                         │
+                         ├─ if source == &quot;catalog&quot;:
+                         │    _populate_from_catalog(...)
+                         │      └─ new PagedFetcher(client, engine)         ← single-use; one per call
+                         │         └─ _populate_from_catalog_inner(...)
+                         │            ├─ fetch_by_rids(&quot;deriva-ml:Dataset&quot;, rids=[dataset_rids], rid_column=&quot;RID&quot;)
+                         │            └─ for each (path, conditions) in join_tables:
+                         │                 for each table_name in path[1:]:
+                         │                   _collect_fk_values(...) → (rids_to_fetch, fk_column_on_target)
+                         │                   fetcher.fetch_by_rids(qualified, rids_to_fetch,
+                         │                                          target_table=target_orm.__table__,
+                         │                                          rid_column=fk_column_on_target)
+                         │
+                         ├─ Step 4: build SQLAlchemy SELECT per element path
+                         ├─ Step 5: UNION → execute against engine → rows
+                         └─ return DenormalizeResult
+</code></pre>
+<p>Three source modes are supported by <code>_denormalize_impl</code>:</p>
+<ul>
+<li><strong><code>source="catalog"</code></strong> — the live path. A <code>PagedClient</code>
+  (<code>ErmrestPagedClient</code> by default) fetches rows from the
+  ERMrest catalog into the workspace's local SQLite. Used by
+  <code>Dataset.get_denormalized_as_dataframe</code>.</li>
+<li><strong><code>source="local"</code></strong> — the bag / unit-test path. Rows are
+  already in the engine (a downloaded bag's SQLite files, or a
+  test fixture's pre-populated tables). No HTTP. Used by
+  <code>DatasetBag.get_denormalized_as_dataframe</code>.</li>
+<li><strong><code>source="slice"</code></strong> — a slice (a subset of a workspace) has
+  been ATTACH'd into the engine and rows are visible that way.
+  Used by some bag-style flows.</li>
+</ul>
+<p>The SQL emission code (Steps 4 &amp; 5) is identical across the
+three modes; only the row-population side differs.</p>
+<p><code>_denormalize_impl</code> validates the <code>source</code> / <code>paged_client</code>
+combination at entry: <code>source="catalog"</code> with <code>paged_client=None</code>
+raises <code>ValueError</code> before any work is done.</p>
+<h3 id="what-planner-is-pure-no-io-actually-means">What "planner is pure; no I/O" actually means</h3>
+<p><code>_prepare_wide_table</code> takes a <code>DatasetLike</code> and a <code>dataset_rid</code>
+as parameters but <strong>does not call any methods on them</strong> in the
+current implementation — anchor enumeration
+(<code>list_dataset_members</code>) and nested-dataset enumeration
+(<code>list_dataset_children</code>) happen in the <code>Denormalizer</code> layer
+above the planner (see §6). "Pure; no I/O" therefore means:</p>
+<ol>
+<li><strong>No HTTP</strong>: the planner does not consult ERMrest. It walks
+   the in-memory <code>DerivaModel</code> only (FK graph, table existence,
+   sink/path enumeration).</li>
+<li><strong>No engine reads</strong>: the planner does not read from the local
+   SQLite engine. It plans purely against schema.</li>
+<li><strong>No dataset I/O</strong>: today the planner accepts the <code>dataset</code>
+   parameter past type-checking but does not invoke methods on
+   it. If a future change adds dataset reads (e.g. to specialize
+   the plan on dataset state), the planner becomes impure and
+   this contract has to be revisited.</li>
+</ol>
+<p>The takeaway: callers may safely invoke <code>_prepare_wide_table</code>
+from a <code>describe</code>-style dry-run path on an offline catalog
+handle, and the only failure modes are model-level (table not
+found, ambiguous path, no sink). SC-08 in the 2026-05-26 audit
+named the "no I/O" claim as ambiguous; this section is the
+tightened wording.</p>
+<hr />
+<h2 id="3-state-ownership-and-lifetime">3. State, ownership, and lifetime</h2>
+<p>Read this table carefully. Every denormalize bug we have shipped
+has been a state-ownership confusion.</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Type</th>
+<th>Owner</th>
+<th>Lifetime</th>
+<th>Visible to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code> (catalog schema + FK graph)</td>
+<td>in-memory</td>
+<td><code>DerivaML</code> / <code>DatasetBag</code></td>
+<td>session</td>
+<td>all calls in the session</td>
+</tr>
+<tr>
+<td><code>engine</code> (SQLAlchemy <code>Engine</code> over a per-catalog SQLite directory)</td>
+<td>sqlite-backed</td>
+<td><code>Workspace</code></td>
+<td><strong>persists to disk; survives the process</strong></td>
+<td>every call against the same catalog, across processes and sessions</td>
+</tr>
+<tr>
+<td><code>orm_resolver</code> (table-name → SQLAlchemy ORM class)</td>
+<td>in-memory</td>
+<td><code>LocalSchema</code></td>
+<td>session</td>
+<td>all calls</td>
+</tr>
+<tr>
+<td><code>PagedClient</code> (<code>ErmrestPagedClient</code>)</td>
+<td>in-memory</td>
+<td><code>Denormalizer</code> instance</td>
+<td>one Denormalizer</td>
+<td>one denormalize call</td>
+</tr>
+<tr>
+<td><code>PagedFetcher</code> instance</td>
+<td>in-memory</td>
+<td><code>_populate_from_catalog</code></td>
+<td><strong>one call to <code>_denormalize_impl</code></strong></td>
+<td>only that fetcher's own methods</td>
+</tr>
+<tr>
+<td><code>PagedFetcher._counts</code> (per-table row count memo)</td>
+<td>in-memory</td>
+<td><code>PagedFetcher</code> instance</td>
+<td>one fetcher lifetime (== one <code>_denormalize_impl</code> call)</td>
+<td>only that fetcher's own cardinality heuristic</td>
+</tr>
+<tr>
+<td>Local SQLite rows (<code>Image</code>, <code>Dataset</code>, <code>Execution_Image_*</code>, …)</td>
+<td>sqlite-backed</td>
+<td>engine</td>
+<td><strong>persists to disk; survives the process</strong></td>
+<td>every later call, every later session</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-two-truths-to-remember">The two truths to remember</h3>
+<ol>
+<li><strong><code>PagedFetcher</code> is single-use.</strong> A fresh one is constructed
+   every time <code>_populate_from_catalog</code> is called. Any cache that
+   lives on a <code>PagedFetcher</code> instance is empty at the start of
+   each denormalize call. <strong>In-memory state on a <code>PagedFetcher</code>
+   cannot carry information across denormalize calls.</strong></li>
+</ol>
+<p>The fetcher does carry one piece of state <strong>within</strong> its
+   lifetime: the <code>_counts</code> dict memoises per-table row counts so
+   the cardinality heuristic (<code>fetch_by_rids_or_predicate</code>) can
+   route without repeated <code>COUNT(*)</code> round-trips. The memo is
+   populated lazily by the first call that needs the count for a
+   given table, and it does <em>not</em> invalidate if the catalog
+   mutates between two <code>fetch_*</code> calls inside the same
+   denormalize. That window is rare-but-not-impossible against a
+   write-active catalog, and acceptable because the heuristic
+   only chooses between two correct strategies — a stale count
+   produces suboptimal HTTP, never wrong rows. (SC-04 in the
+   2026-05-26 audit named the prior "memoised row counts only"
+   phrasing as misleading; this section is the clarification.)</p>
+<ol>
+<li><strong>The local SQLite is the only durable, shared state.</strong> It
+   accumulates rows from every prior fetch. It persists across
+   processes, across DerivaML instances, across days. A
+   denormalize call doesn't start from a blank engine; it starts
+   from whatever the engine has accumulated.</li>
+</ol>
+<p>These two facts together generate every subtle denormalize bug.</p>
+<hr />
+<h2 id="4-the-fetcher-contract">4. The fetcher contract</h2>
+<p><code>PagedFetcher</code> is a <strong>thin transport adapter</strong> with three jobs:</p>
+<ol>
+<li><strong>Fetch.</strong> Given <code>(table, rids, rid_column)</code>, issue HTTP
+   requests to ERMrest and return rows. The <code>rid_column</code> may be
+   a primary key (most often <code>"RID"</code>) <em>or</em> a foreign-key column
+   (e.g. <code>"Image"</code> on <code>Execution_Image_&lt;Feature&gt;</code>). When
+   <code>rid_column</code> is an FK, the server may return many rows per
+   filter value; <code>PagedFetcher</code> must not assume one-to-one.</li>
+<li><strong>Insert.</strong> Write rows into the engine's local SQLite via
+   <code>_insert_rows</code>. Handle conflicts cleanly: a row whose RID
+   already exists must not crash the insert and must not be
+   overwritten.</li>
+<li><strong>Count.</strong> Memoise per-table row counts within one fetcher
+   lifetime so the cardinality heuristic
+   (<code>fetch_by_rids_or_predicate</code>) doesn't re-issue <code>COUNT(*)</code>
+   for repeated visits to the same table.</li>
+</ol>
+<h3 id="what-it-does-not-do">What it does NOT do</h3>
+<ul>
+<li><strong>Network dedup based on engine state.</strong> Do not consult the
+  local SQLite to decide whether to issue a fetch. The local
+  cache is a write-through history of past fetches, not an
+  authoritative answer to "is the server's row for this value
+  already represented here?" This is the bug-class that produced
+  finding <strong>A01</strong> (2026-05-21): v1.37.2 of this library
+  hydrated a "seen" set from the engine keyed by the caller's
+  <code>rid_column</code>, and skipped fetches whenever the FK values
+  appeared in the engine — silently dropping all but one
+  feature row per anchor.</li>
+<li><strong>Make idempotency claims via row dedup.</strong> Use the database's
+  built-in UNIQUE constraint as the authority. Conflict
+  handling belongs at the INSERT, not at the fetch.</li>
+<li><strong>Outlive a single denormalize call.</strong> No long-lived
+  <code>PagedFetcher</code> instances exist or are intended to exist.</li>
+</ul>
+<h3 id="public-api-summary">Public API summary</h3>
+<pre><code class="language-python">PagedFetcher(client: PagedClient, engine: Engine)
+
+  .fetch_by_rids(table, rids, target_table, rid_column=&quot;RID&quot;,
+                 batch_size=DEFAULT_BATCH_SIZE,
+                 max_url_bytes=DEFAULT_MAX_URL_BYTES) -&gt; int
+  .fetch_predicate(table, predicate, target_table, sort=(&quot;RID&quot;,),
+                   page_size=DEFAULT_PAGE_SIZE) -&gt; int
+  .fetch_by_rids_or_predicate(...)             # cardinality heuristic
+  .fetched_rids(table, target_table=None) -&gt; set[str]
+</code></pre>
+<p>Both <code>fetch_*</code> methods return the number of rows actually
+inserted (after conflict skipping). <code>fetched_rids</code> returns the
+set of RIDs in the target_table after the call.</p>
+<hr />
+<h2 id="5-the-insert-contract">5. The INSERT contract</h2>
+<p><code>_insert_rows(target_table, rows)</code> is <strong>the only place that
+mutates engine state</strong>. Its contract:</p>
+<ul>
+<li><strong>Input.</strong> A list of dicts. Each dict has at least the columns
+  the target_table declares; extras are silently dropped. Each
+  dict has a <code>"RID"</code> key (every Deriva-managed table has <code>RID</code>
+  as its primary key — this is invariant across the Deriva
+  catalog schema).</li>
+<li><strong>Behavior.</strong> For each row: if a row with that RID is already
+  in the target_table, <strong>skip</strong> (do not update, do not crash).
+  Otherwise insert. Use dialect-native upsert when available
+  (<code>sqlite_insert(...).on_conflict_do_nothing(index_elements=["RID"])</code>
+  for SQLite; equivalent for any other engine added later).</li>
+<li><strong>Output.</strong> Number of rows actually written (skipped rows do
+  not count).</li>
+<li><strong>Invariant after call.</strong> Every RID from <code>rows</code> appears in
+  <code>target_table</code> exactly once.</li>
+<li><strong>Idempotent.</strong> Calling twice with the same <code>rows</code> yields the
+  same engine state and second call returns <code>0</code>.</li>
+</ul>
+<h3 id="missing-rid-behavior-engine-enforced">Missing-RID behavior — engine-enforced</h3>
+<p>A row whose dict lacks a <code>"RID"</code> key (or has <code>"RID": None</code>) is a
+<strong>programming error</strong> and must surface as an exception. The
+implementation does NOT include an explicit <code>if "RID" not in
+row: raise ValueError(...)</code> guard — instead it relies on the
+engine's <code>NOT NULL</code> constraint on the <code>RID</code> primary key, which
+fires as <code>sqlalchemy.exc.IntegrityError</code>. This contract is
+therefore implemented by the <em>dialect</em>, not by the function. It
+works today on every supported engine (SQLite, per
+<code>local_db/README.md</code>); a future engine with different RID-column
+constraints (e.g. server-generated RIDs) would silently break
+the contract. The dialect coupling is acknowledged here as a
+known seam (SC-05 in the 2026-05-26 audit) — if and when a
+non-SQLite engine is added, this function gains an explicit
+pre-insert guard.</p>
+<h3 id="foreign-key-enforcement-is-off-during-catalog-fetch">Foreign-key enforcement is OFF during catalog fetch</h3>
+<p><code>_populate_from_catalog</code> wraps the entire row-fetch loop in
+<code>_foreign_keys_off</code> (<code>PRAGMA foreign_keys = OFF</code> on every
+connection checkout). Reason: the join-path walk legitimately
+inserts a referencing row before its referent — <code>Dataset_Image</code>
+rows arrive before <code>Image</code> rows because we read
+<code>Dataset_Image.Image</code> to find out which <code>Image</code> RIDs to fetch.
+Real integrity comes from the source ERMrest catalog the rows
+arrived from; the local engine is a <strong>transport mirror</strong>, not
+the authoritative store. FK enforcement is restored on exit
+from the <code>_foreign_keys_off</code> context.</p>
+<p>This is <strong>stateless</strong> — no cache to hydrate, no per-table set
+to track. The database's UNIQUE constraint is the authority.
+This is the only sustainable design: any client-side cache that
+mirrors the engine's content will eventually disagree with it,
+and that disagreement is what we keep tripping on.</p>
+<hr />
+<h2 id="6-the-denormalize-contract">6. The denormalize contract</h2>
+<p><code>Denormalizer(dataset).as_dataframe(include_tables, *, row_per,
+via, ignore_unrelated_anchors)</code>:</p>
+<ul>
+<li><strong>Input.</strong> A <code>DatasetLike</code> (live <code>Dataset</code>, <code>DatasetBag</code>, or
+  test fixture), a list of table names to include, and the four
+  semantic-rule knobs documented in §6.2 below.</li>
+<li><strong>Behavior.</strong></li>
+<li>Resolves source mode from the dataset type (see §6.1).</li>
+<li>Plans the join via <code>_prepare_wide_table</code> (planner is pure;
+     no I/O — see §2). The FK-graph walker is
+     <code>deriva.bag.path_walker.SchemaPathWalker</code>, shared with
+     deriva-py's <code>CatalogBagBuilder</code>; DerivaML-specific rules
+     (the default <code>Dataset_Dataset</code> / <code>Execution</code> skip set and
+     the nested-dataset loopback guard) plug in via the
+     walker's <code>edge_filter</code> hook so the generic walker stays
+     domain-free.</li>
+<li>If <code>source="catalog"</code>: populates the local SQLite via
+     <code>_populate_from_catalog</code>. This step issues catalog fetches
+     and must satisfy the <strong>row-completeness invariant</strong>
+     (§6.4): when the SQL JOIN runs in Step 4, the local cache
+     must contain the union of rows every path's <code>(table,
+     rid_column, rid_set)</code> tuple would fetch. A naïve dedup
+     keyed on table name only violates the invariant when two
+     element paths converge on the same table from different
+     angles (see §7 row F5).</li>
+<li>Emits SQL against the local SQLite, runs it, materialises
+     rows.</li>
+<li>Returns a <code>DenormalizeResult</code> (rows + column metadata).</li>
+<li><strong>Output row count.</strong> Determined by the six rules
+  (§6.2). The pipeline is <em>correct</em> iff that row count matches
+  the server's reality, modulo the freshness caveat below.</li>
+</ul>
+<h3 id="61-source-mode-selection-denormalizer__init__">6.1 Source-mode selection (<code>Denormalizer.__init__</code>)</h3>
+<p><code>Denormalizer.__init__(dataset, *, version=None)</code> derives every
+dependency from the <code>dataset</code> argument:</p>
+<ul>
+<li><strong>Live <code>Dataset</code></strong> (has <code>_ml_instance</code> pointing at a
+  <code>DerivaML</code>): <code>model</code>, <code>catalog</code>, <code>engine</code>, and <code>orm_resolver</code>
+  come from the ML instance's <code>workspace.local_schema</code>.
+  <code>source</code> defaults to <code>"catalog"</code> because a <code>PagedClient</code>
+  (<code>ErmrestPagedClient</code>) can be built against the catalog.</li>
+<li><strong><code>DatasetBag</code> / canned test fixture</strong> (has <code>model</code>, <code>engine</code>,
+  <code>_orm_resolver</code> as direct attributes): <code>source</code> defaults to
+  <code>"local"</code>. The engine is assumed pre-populated.</li>
+</ul>
+<p><code>version</code> (optional <code>DatasetVersion | str | None</code>): when given
+AND the dataset is a live <code>Dataset</code>, the constructor resolves
+the version to a catalog snapshot via the dataset's
+<code>_version_snapshot_catalog</code> resolver, then builds the
+<code>ErmrestPagedClient</code> against that snapshot. Member enumeration
+(<code>_anchors_as_dict</code>) also threads <code>version</code> through to
+<code>list_dataset_members</code> so the anchor set is read from the same
+snapshot the SQL join will use. For <code>DatasetBag</code> and fixtures
+the kwarg is silently ignored — the bag is already pinned to
+whatever version it was built from.</p>
+<p><strong>Failure-handling caveats</strong> (silent fallbacks worth knowing):</p>
+<ul>
+<li>If <code>ErmrestPagedClient</code> construction raises (offline tests,
+  mock catalog, auth not yet established), <code>__init__</code> falls
+  back to <code>source="local"</code> and <code>paged_client=None</code>. A <code>WARNING</code>
+  is logged and an <code>_init_warning</code> string is stashed on the
+  Denormalizer instance for future surfacing via
+  <code>describe()["warnings"]</code>. A user re-running denormalize on a
+  <code>Dataset</code> whose ML instance was constructed before auth
+  completed will get whatever rows are in the engine —
+  possibly zero. (RB-05 in the 2026-05-26 audit named this
+  silent-zero hazard; the logging + stash is the current
+  mitigation, with full <code>describe()["warnings"]</code> surfacing
+  tracked as a future improvement.)</li>
+<li>If snapshot resolution fails (bad version string, history
+  lookup error), the constructor <strong>re-raises</strong> — version-pinned
+  construction is explicit enough that a silent fallback would
+  be worse than the failure.</li>
+</ul>
+<h3 id="62-the-six-semantic-rules-full-contract-language">6.2 The six semantic rules (full contract language)</h3>
+<p>The six named rules are defined in the
+<a href="../../reference/denormalization/#formal-rules">reference</a>; this section
+restates them with the full planner-level contract language and error
+text. <strong>Row grain</strong> and <strong>Anchor disposition</strong> each merge two of the
+earlier numbered rules (cardinality + auto-inference; orphan + unrelated
+anchors); the case numbers under Anchor disposition are stable.
+<strong>Column projection</strong> and <strong>Column hoisting</strong> are descriptive (shape)
+rules; <strong>Downstream-leaf rejection</strong>, <strong>Path ambiguity</strong>, and the
+error-raising cases of <strong>Anchor disposition</strong> are operational (the
+planner enforces them). Nested-dataset enumeration is an anchor-set
+definition (§6.3), not a rule.</p>
+<h4 id="row-grain-cardinality-row_per-auto-inference">Row grain (cardinality + <code>row_per</code> auto-inference)</h4>
+<p>Each output row corresponds to one of:</p>
+<ul>
+<li>A <strong><code>row_per</code> row in scope</strong>: a row of the <code>row_per</code> table
+  that is reachable from at least one anchor via the FK graph.</li>
+<li>An <strong>orphan row</strong>: a row of some anchor whose table is in
+  <code>include_tables</code> and upstream of <code>row_per</code>, when no <code>row_per</code>
+  row is reachable from that anchor. Its columns are populated
+  from the anchor and its own upstream FKs; <code>row_per</code> and
+  downstream columns are NULL (see Anchor disposition case 3).</li>
+</ul>
+<p><code>row_per</code> is auto-inferred when not given:
+given <code>include_tables = {T₁, …, Tₙ}</code>, build the directed graph
+on <code>include_tables ∪ via</code> where an edge <code>A → B</code> means A has an
+outbound FK to B (directly or via non-member association-table
+intermediates). Find sinks — tables with no outbound edges in
+this subgraph.</p>
+<ul>
+<li>Exactly one sink → <code>row_per = that sink</code>.</li>
+<li>Zero sinks → cycle; raise <code>DerivaMLDenormalizeNoSink</code>.</li>
+<li>Multiple sinks → multi-leaf ambiguity; raise
+  <code>DerivaMLDenormalizeMultiLeaf</code> with candidates listed.</li>
+</ul>
+<h4 id="column-projection">Column projection</h4>
+<ul>
+<li>Columns come <strong>only</strong> from tables in <code>include_tables</code>.</li>
+<li><code>via</code> tables contribute to the join path but not to columns.</li>
+<li>Association tables on a necessary chain between two requested
+  tables are <strong>transparent intermediates</strong>: joined through,
+  columns omitted.</li>
+<li>Non-requested tables that are neither <code>via</code> nor transparent
+  intermediates are not joined at all.</li>
+</ul>
+<h4 id="column-hoisting-star-schema">Column hoisting (star schema)</h4>
+<p>For each <code>row_per</code> row R:</p>
+<ul>
+<li>Walk outbound FKs from R to every table T in <code>include_tables</code>.</li>
+<li>The columns of the reached row of T are repeated verbatim in
+  R's output row, labeled with <code>{T}.{column_name}</code> prefix.</li>
+<li>If T is reached via an N-to-N link (through an association
+  table or M-to-N linking table), one output row is emitted per
+  (R, T-row) combination. The <code>row_per</code> count grows accordingly
+  — the output then has <code>|row_per × (average T-links per
+  row_per)|</code> rows.</li>
+<li><strong>Each hop's join type is <code>LEFT OUTER JOIN</code> when the FK column is
+  nullable, <code>INNER JOIN</code> when it is <code>NOT NULL</code></strong> (<code>_build_join_tree</code>
+  sets <code>join_type="left"</code> iff <code>fk_col.nullok</code>; <code>_denormalize_impl</code>
+  emits <code>outerjoin</code> vs <code>join</code> accordingly). A nullable FK therefore
+  never drops a <code>row_per</code> row — the row survives with <code>NULL</code> columns
+  for that upstream table. An <code>INNER JOIN</code> is correct only because the
+  <code>NOT NULL</code> constraint guarantees a match.</li>
+</ul>
+<h4 id="downstream-leaf-rejection-explicit-row_per-with-downstream-table-error">Downstream-leaf rejection (explicit <code>row_per</code> with downstream table → error)</h4>
+<p>If <code>row_per</code> is explicitly specified and any table in
+<code>include_tables</code> is <strong>downstream</strong> of <code>row_per</code> (i.e., <code>row_per</code>
+has an outbound FK path to it), raise
+<code>DerivaMLDenormalizeDownstreamLeaf</code>:</p>
+<pre><code>Table {T} is downstream of row_per={row_per}. One row per
+{row_per} would require aggregating multiple {T} rows per
+{row_per} row — aggregation is not yet supported.
+
+Options:
+  • Drop row_per to get one row per {T}.
+  • Remove {T} from include_tables.
+</code></pre>
+<h4 id="path-ambiguity-multiple-fk-paths-error">Path ambiguity (multiple FK paths → error)</h4>
+<p>If between <code>row_per</code> and another table T in <code>include_tables ∪
+via</code> there exist two or more distinct FK paths, raise
+<code>DerivaMLDenormalizeAmbiguousPath</code>:</p>
+<pre><code>Multiple FK paths between {row_per} and {T}:
+  {path1}
+  {path2}
+  ...
+
+Options:
+  • Add an intermediate table to include_tables (its columns will be in output).
+  • Add an intermediate table to via= (routing only, no columns).
+  • Narrow the requested set to eliminate one path.
+
+Suggested intermediates: {list of candidates}
+</code></pre>
+<p>The "suggested intermediates" list is the set of tables that
+appear in at least one path but not in <code>include_tables</code>.</p>
+<h4 id="anchor-disposition-the-six-anchor-cases">Anchor disposition (the six anchor cases)</h4>
+<p>Every anchor must contribute to the output in exactly one way,
+determined by its table and reachability. Cases 3 and 6 are the
+operational ones (orphan emission, unrelated-anchor error):</p>
+<ol>
+<li><strong>Anchor table == <code>row_per</code></strong>: contributes one output row
+   (the anchor row itself, upstream cols hoisted).</li>
+<li><strong>Anchor table ∈ <code>include_tables</code>, upstream of <code>row_per</code>,
+   reaches at least one <code>row_per</code> row</strong>: filter-only
+   contribution (the <code>row_per</code> rows reachable from this anchor
+   are in scope). Does not produce its own row — that row
+   appears via the <code>row_per</code> row that hoists this anchor.</li>
+<li><strong>Anchor table ∈ <code>include_tables</code>, upstream of <code>row_per</code>,
+   reaches no <code>row_per</code> row</strong>: produces one orphan row (see the
+   Row grain rule's orphan-row clause).</li>
+<li><strong>Anchor table ∉ <code>include_tables</code>, upstream of <code>row_per</code>,
+   reaches at least one <code>row_per</code> row</strong>: filter-only
+   contribution. No orphan row because the anchor's columns
+   aren't in the output.</li>
+<li><strong>Anchor table ∉ <code>include_tables</code>, upstream of <code>row_per</code>,
+   reaches no <code>row_per</code> row</strong>: contributes nothing. Silently
+   dropped (would not affect output either way).</li>
+<li><strong>Anchor table has no FK path to or from any table in
+   <code>include_tables ∪ via</code></strong>: raise
+   <code>DerivaMLDenormalizeUnrelatedAnchor</code> unless
+   <code>ignore_unrelated_anchors=True</code> (the unrelated-anchor case).</li>
+</ol>
+<p>Empty anchor sets (e.g. <code>{"File": []}</code> returned by
+<code>list_dataset_members</code> for an association table whose row
+count is zero) are skipped entirely and never trigger the
+unrelated-anchor error.</p>
+<p>After the main SQL join runs, <code>_run</code> performs a <strong>per-RID
+orphan scan</strong> (Step 4a) to catch upstream scoping anchors whose
+specific RIDs didn't appear in the main result — a Subject
+whose Image set is empty, for example. Those RIDs are added to
+the orphan set and emitted via <code>_emit_orphan_rows</code>, producing
+LEFT-JOIN-shaped output rows with the row_per-side columns set
+to <code>None</code>.</p>
+<h4 id="anchor-disposition-the-unrelated-anchor-error-case-6-detail">Anchor disposition — the unrelated-anchor error (case 6, detail)</h4>
+<p>If any anchor falls under Anchor disposition case 6 and
+<code>ignore_unrelated_anchors=False</code> (the default), raise
+<code>DerivaMLDenormalizeUnrelatedAnchor</code>:</p>
+<pre><code>Anchors of table {T} have no FK path to any table in
+include_tables={list}. They will not affect the output.
+
+Options:
+  • Remove these anchors from the anchor set.
+  • Add {T} (or a linking table) to include_tables.
+  • Pass ignore_unrelated_anchors=True to silently drop them.
+</code></pre>
+<p>When <code>ignore_unrelated_anchors=True</code>, unrelated anchors are
+silently ignored (they contribute no row and no filter).</p>
+<p>Anchors of Anchor disposition case 5 (table ∉ include_tables,
+unreachable) are silently dropped regardless of the flag — they contribute
+no output either way, so there's nothing to warn about.</p>
+<h4 id="nested-dataset-anchor-enumeration-an-anchor-set-definition-not-a-rule">Nested-dataset anchor enumeration (an anchor-set definition, not a rule)</h4>
+<p>When constructed from a <code>Dataset</code>/<code>DatasetBag</code>, the anchor set
+is the dataset's members <strong>recursively</strong>, including all
+members of nested datasets. This matches current
+<code>Dataset.list_dataset_members(recurse=True)</code> behavior. The
+<code>Denormalizer.__init__(dataset)</code> constructor is responsible
+for materializing the recursive member list; <code>from_rids</code> takes
+anchors directly and does no recursion.</p>
+<p><code>_run</code> also pulls <strong>descendant dataset RIDs</strong> via
+<code>dataset.list_dataset_children(recurse=True)</code> when the dataset
+supports it. These RIDs are passed to <code>_denormalize_impl</code> as
+<code>dataset_children_rids</code> and end up in the SQL <code>WHERE
+Dataset.RID IN (dataset_rid, ...children)</code> clause. Without
+them, members of nested datasets (whose <code>Dataset_X.Dataset</code>
+points at a descendant rather than the root) never pass the
+filter and the result comes back empty. If
+<code>list_dataset_children</code> is not implemented or raises, the
+helper falls back to root-only scoping silently —
+fixture-shaped datasets often don't implement it. (RB-06 in
+the 2026-05-26 audit flags this silent-fallback against
+transient network errors as a known robustness gap.)</p>
+<blockquote>
+<p><strong>On <code>version</code>.</strong> Earlier drafts treated <code>version</code> as a deferred
+tenth rule. The current implementation accepts a <code>version</code> kwarg on
+<code>Denormalizer.__init__</code> (and the Dataset-side sugar methods) and
+resolves it to a catalog snapshot via <code>_version_snapshot_catalog</code>.
+Version-pinning is a constructor-level concern, not a semantic rule.</p>
+</blockquote>
+<h3 id="63-anchor-classification-nested-datasets-and-the-sql-filter">6.3 Anchor classification, nested datasets, and the SQL filter</h3>
+<p>The Denormalizer's <code>_run</code> method partitions the anchor set
+(<code>_anchors_as_dict</code>, derived from
+<code>dataset.list_dataset_members(recurse=True, version=...)</code>)
+into three buckets via <code>_classify_anchors</code>:</p>
+<ul>
+<li><strong>Scoping</strong> — anchors whose RIDs filter the row_per side.
+  Anchor disposition cases 1, 2, 4 above.</li>
+<li><strong>Orphan</strong> — case 3: anchor is in include_tables but has no
+  FK path to row_per. Emits LEFT-JOIN-shaped rows via
+  <code>_emit_orphan_rows</code>.</li>
+<li><strong>Ignored</strong> — case 5 (anchor connected to subgraph but
+  doesn't reach row_per; silent drop) and case 6 with the
+  <code>ignore_unrelated_anchors</code> flag set (no FK path at all;
+  would otherwise raise <code>DerivaMLDenormalizeUnrelatedAnchor</code>).</li>
+</ul>
+<h3 id="64-the-row-completeness-invariant-6-step-3-in-detail">6.4 The row-completeness invariant (§6 step 3 in detail)</h3>
+<p>The fetch step must leave the local cache in a state where the
+SQL JOIN in Step 4 returns every row a <em>fully-fetched</em>
+execution against the server would return. Concretely:</p>
+<blockquote>
+<p>For every distinct <code>(table, rid_column, rid_set)</code> tuple that
+the planner emits across the join paths, the local cache
+must contain the rows the server would return for that
+tuple.</p>
+</blockquote>
+<p>This is the <strong>row-completeness invariant</strong>. It implies — but
+is strictly stronger than — "every table appears in the
+cache." Two paths can target the same table with different
+<code>rid_column</code>s or different RID sets; the cache must hold the
+<strong>union</strong> of all rows those parametrizations would fetch, not
+just one path's worth.</p>
+<p>The current implementation enforces the invariant by
+deduplicating fetches on the full tuple <code>(table_name,
+rid_column_on_target, frozenset(rids_to_fetch))</code>. Only
+<strong>true</strong> duplicates (identical table, identical rid column,
+identical rid set) are skipped; every distinct parametrization
+fires its own catalog fetch. Until 2026-05-26 the dedup key
+was the table name only, which only <em>coincidentally</em> satisfied
+the invariant under the planner's current output. See §7 row
+F5 for the full incident write-up.</p>
+<h3 id="65-freshness-caveat">6.5 Freshness caveat</h3>
+<p>The local SQLite is a <strong>write-through cache of past fetches</strong>,
+not a live view of the server. If the catalog mutates between
+two denormalize calls in the same process, the engine still
+holds the old rows in addition to whatever the new fetch adds.
+Specifically:</p>
+<ul>
+<li><strong>Insertions on the server are observed correctly.</strong> Step
+  3's fetch picks up new rows and <code>_insert_rows</code> adds them.</li>
+<li><strong>Deletions on the server are NOT observed.</strong> A row deleted
+  server-side after we cached it remains in the engine and
+  participates in subsequent JOINs.</li>
+<li><strong>Updates on the server are NOT observed.</strong> Same reason.</li>
+</ul>
+<p>This is a real design limitation, not a bug. It is acceptable
+because (a) Deriva data is largely append-only in practice,
+(b) the cache is per-catalog-snapshot conceptually (callers
+who need a snapshot should <code>download_dataset_bag(version=...)</code>
+or pass <code>version=</code> to the Denormalizer), and (c) the fix is
+invasive (we'd need invalidation hooks tied to every server
+mutation).</p>
+<p>Documented; tracked as a known limitation. The deletion/update
+regression test promised in §9 (row C.5x, marked <code>live,
+xfail</code>) is <strong>planned but not yet written</strong> — searching the
+test suite as of 2026-05-26 finds no matching <code>xfail</code> (TC-04
+in the audit).</p>
+<p>There is also no caller-visible signal that a given result
+was affected by a stale-cache window — no last-fetch
+timestamp, no warning on <code>DenormalizeResult</code>, no <code>reason</code>
+field. (SC-03 in the 2026-05-26 audit named this gap;
+surfacing it is a future contract change.)</p>
+<hr />
+<h2 id="7-fragility-map-known-bug-patterns-and-how-the-contract-prevents-them">7. Fragility map — known bug patterns and how the contract prevents them</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Pattern</th>
+<th>Cause</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>F1</strong></td>
+<td>Re-denormalize crashes with <code>UNIQUE constraint failed: Dataset.RID</code></td>
+<td>Plain <code>INSERT</code> against engine that has prior rows.</td>
+<td>Fixed by the INSERT-OR-IGNORE contract in §5. Originally surfaced as 2026-05-21 finding 05 in the model-template e2e run.</td>
+</tr>
+<tr>
+<td><strong>F2</strong></td>
+<td>Re-denormalize silently drops rows</td>
+<td><code>_get_seen</code> (v1.37.2) hydrated a dedup map from the engine keyed by the caller's <code>rid_column</code>. For FK columns with N rows per value, this collapsed the fetch to one row per FK.</td>
+<td>Fixed by removing the engine-hydrated seen-set entirely. The fetcher does not dedup based on engine state; conflict handling belongs at INSERT. Originally surfaced as 2026-05-21 finding A01.</td>
+</tr>
+<tr>
+<td>F3</td>
+<td>Stale local data when server mutates between calls (deletes, updates)</td>
+<td>Cache is write-through, never invalidated.</td>
+<td>Documented as a known limitation. See §6.5 freshness caveat. The promised <code>xfail</code> regression test (row C.5x in §9) is planned but unwritten as of 2026-05-26 (TC-04 in the audit).</td>
+</tr>
+<tr>
+<td>F4</td>
+<td><code>_collect_fk_values</code> walks "values currently present in the engine" to decide what to fetch from the server. If a parent table's membership was updated server-side after the engine cached it, downstream fetches use the stale parent set.</td>
+<td>Same root cause as F3.</td>
+<td>Same status — known limitation, tracked.</td>
+</tr>
+<tr>
+<td><strong>F5</strong></td>
+<td>Path-walk order silently determines which rows get loaded when two element tables share intermediate tables</td>
+<td>The contract (§6 step 3) requires the local cache to contain the union of rows every path's <code>(table, rid_column, rids)</code> tuple would fetch — the <em>row-completeness invariant</em>. Until 2026-05-26 <code>_populate_from_catalog_inner</code> keyed its <code>processed</code> set on table name only, which only <em>coincidentally</em> satisfied the invariant under the current planner's output. A future planner change (new element type, FK refactor, split datasets) could silently break the invariant without any code in <code>_populate_from_catalog_inner</code> changing.</td>
+<td><strong>Fixed</strong> (2026-05-26): the dedup key is now <code>(table_name, rid_column, frozenset(rids))</code>, which implements the invariant directly — each distinct parametrization fires its own fetch; only true duplicates are deduped. Regression test pinned at §8 row D.3 / C.8. Originally surfaced as 2026-05-26 audit finding SC-06 / RB-02.</td>
+</tr>
+<tr>
+<td><strong>F6</strong></td>
+<td><code>describe()</code> / <code>preflight_count</code> reports <code>estimated_row_count.total = 0</code> while the actual fetch returns rows</td>
+<td>The estimator counted anchors whose table literally equals <code>row_per</code>. When <code>row_per</code> is downstream of the anchor table (the common feature-table case), no anchor matches and the sum is silently 0. Mathematically the cardinality is N rows per anchor for an unknown-from-anchor-data N.</td>
+<td>Fixed by honest "unknown" semantics: when anchors are downstream of <code>row_per</code>, <code>in_scope_row_per_rows</code> and <code>total</code> return <code>None</code> and a <code>reason</code> field tells the caller why. The case-1 path (anchor == row_per) still returns an exact integer. Originally surfaced as 2026-05-21 finding A02 (Analyst arc).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-the-public-denormalizer-surface">8. The public Denormalizer surface</h2>
+<p><code>Denormalizer</code> (in <code>src/deriva_ml/local_db/denormalizer.py</code>) is
+the contracted public class. Every method below has a stable
+input/output shape; the docstrings on the implementation carry
+the parameter-level detail. This section pins the <strong>behavioral
+contracts</strong> — what is guaranteed, what can fail, and how the
+methods relate to each other.</p>
+<h3 id="81-constructors">8.1 Constructors</h3>
+<h4 id="denormalizerdataset-versionnone"><code>Denormalizer(dataset, *, version=None)</code></h4>
+<p>Construct from a <code>DatasetLike</code>. Source mode and dependencies are
+derived from the dataset's shape (§6.1). <code>version</code> snapshots
+the catalog for live <code>Dataset</code> inputs and is ignored for
+<code>DatasetBag</code>.</p>
+<h4 id="denormalizerfrom_ridsanchors-mlnone-dataset_ridnone"><code>Denormalizer.from_rids(anchors, *, ml=None, dataset_rid=None, ...)</code></h4>
+<p>Construct from an explicit RID anchor set without a <code>Dataset</code>
+context. Anchors may be bare RIDs (table looked up via catalog)
+or <code>(table_name, RID)</code> tuples. Mixed forms supported. Bare-RID
+lookup prefers <code>ml.resolve_rids</code> (batched, O(tables)
+round-trips) over <code>catalog.resolve_rid</code> (per-RID, O(N)
+round-trips).</p>
+<p><strong><code>dataset_rid</code> is required against a live catalog.</strong> The
+underlying <code>_denormalize_impl</code> scopes its SQL via <code>Dataset.RID
+IN (dataset_rid, ...)</code>. <code>from_rids</code> therefore needs a real
+dataset RID. When the caller omits <code>dataset_rid</code>:</p>
+<ul>
+<li><strong>Live catalog</strong> (an <code>ErmrestPagedClient</code> can be wrapped
+  around the given <code>catalog</code>): the constructor raises
+  <code>ValueError</code> with a message explaining that
+  <code>dataset_rid=&lt;existing dataset RID&gt;</code> must be passed, or
+  suggesting <code>Denormalizer(dataset)</code> if the caller has a
+  <code>Dataset</code> in hand. This guards against the SC-02 / TC-05
+  silent-zero failure mode.</li>
+<li><strong>Local / fixture mode</strong> (no catalog, or a mock that can't be
+  wrapped): the constructor falls back to using the first
+  anchor's RID as a placeholder scope and <strong>logs a warning</strong>.
+  This keeps fixture-shaped flows working where the engine has
+  been pre-populated with arbitrary RIDs.</li>
+</ul>
+<p><code>from_rids</code> always sets <code>source="local"</code> and
+<code>paged_client=None</code>. Callers who want catalog-side fetching
+must pre-populate the engine or use the
+<code>Denormalizer(dataset)</code> constructor with a real <code>Dataset</code>.</p>
+<p><strong>Raises:</strong> <code>ValueError</code> for missing <code>model</code>/<code>ml</code>, unresolvable
+bare RIDs, missing catalog for lookup, malformed <code>(table, RID)</code>
+tuples (arity ≠ 2), or <code>dataset_rid=None</code> against a live
+catalog.</p>
+<h3 id="82-materialization-methods">8.2 Materialization methods</h3>
+<h4 id="as_dataframeinclude_tables-row_pernone-vianone-ignore_unrelated_anchorsfalse-pandasdataframe"><code>as_dataframe(include_tables, *, row_per=None, via=None, ignore_unrelated_anchors=False) -&gt; pandas.DataFrame</code></h4>
+<p>Run the full 4-phase pipeline (planner decisions → anchor
+classification → main SQL join → orphan-row combine) and
+return a DataFrame. One row per <code>row_per</code> instance in scope,
+plus any orphan rows whose <code>row_per</code>-side columns are <code>NaN</code>.</p>
+<p><strong>Raises:</strong>
+<code>DerivaMLDenormalizeMultiLeaf</code>, <code>DerivaMLDenormalizeNoSink</code>,
+<code>DerivaMLDenormalizeDownstreamLeaf</code>,
+<code>DerivaMLDenormalizeAmbiguousPath</code>,
+<code>DerivaMLDenormalizeUnrelatedAnchor</code> — the semantic-rule
+exceptions. Also <code>DerivaMLTableNotFound</code> and
+<code>DerivaMLDenormalizeError</code> from feature-name resolution
+(§8.4). See §6.2 for per-Rule details.</p>
+<h4 id="as_dictinclude_tables-row_pernone-vianone-ignore_unrelated_anchorsfalse-generatordict-none-none"><code>as_dict(include_tables, *, row_per=None, via=None, ignore_unrelated_anchors=False) -&gt; Generator[dict, None, None]</code></h4>
+<p>Same planner, same rules, same exceptions as <code>as_dataframe</code>.
+Yields one <code>dict[str, Any]</code> per row keyed by <code>Table.column</code> /
+<code>schema.Table.column</code> labels.</p>
+<p><strong>Materialization, not streaming.</strong> The implementation builds
+the full row list in <code>_denormalize_impl</code> before any row is
+yielded (rows are eagerly materialised by
+<code>session.execute(final_query)</code> into a Python list). <code>as_dict</code>
+then yields from that list via <code>DenormalizeResult.iter_rows</code>.
+There is no streaming path today. The "yields one at a time"
+interface is preserved (the caller's loop iterates rows one by
+one) but peak memory equals the full result set.</p>
+<p>This is acknowledged as a known gap (SC-07 in the 2026-05-26
+audit). Treat <code>as_dict</code> as "iteration interface, materialised
+internals." True streaming (replacing the materialise step
+with a cursor-driven generator) is tracked as future work.</p>
+<p><strong>Raises:</strong> same as <code>as_dataframe</code>. All planner validation
+runs before any row is yielded (the pipeline materialises up
+front), so exceptions surface on the first <code>next()</code>.</p>
+<h3 id="83-inspection-methods">8.3 Inspection methods</h3>
+<h4 id="columnsinclude_tables-row_pernone-vianone-listtuplestr-str"><code>columns(include_tables, *, row_per=None, via=None) -&gt; list[tuple[str, str]]</code></h4>
+<p>Preview the <code>(column_name, column_type)</code> pairs the matching
+<code>as_dataframe</code> call would produce. Planner-only — no data
+fetch, no catalog query, no anchor classification. Useful as a
+cheap validator of <code>include_tables</code> before committing to a
+full run.</p>
+<p><strong>Raises:</strong> same planner-rule exceptions as <code>as_dataframe</code>
+(Row grain / Downstream-leaf rejection / Path ambiguity) plus the
+resolver exceptions from §8.4. Anchor disposition (orphan + unrelated
+anchors) does NOT fire here — anchor classification runs only when rows
+are materialised.</p>
+<h4 id="describeinclude_tables-row_pernone-vianone-dictstr-any"><code>describe(include_tables, *, row_per=None, via=None) -&gt; dict[str, Any]</code></h4>
+<p><strong>The dry-run inspection method.</strong> Returns a 13-key dict
+describing what a corresponding <code>as_dataframe</code> call would do,
+<strong>without raising</strong>. Every failure mode (planner-rule
+violation, catalog access error, network timeout, ambiguous
+resolution) is <strong>swallowed</strong> and represented in the returned
+dict as <code>None</code> / <code>[]</code> / <code>{}</code> in the affected positions, with
+an entry appended to the <code>warnings</code> list explaining what was
+swallowed. Ambiguities are reported in the <code>ambiguities</code> list
+so the caller can inspect before committing to a real call.</p>
+<h5 id="831-the-dry-run-invariant">8.3.1 The dry-run invariant</h5>
+<p><code>describe()</code> <strong>never raises</strong>. This is a contract, not an
+implementation detail — callers may safely wrap a <code>describe()</code>
+call in code that does not handle exceptions, knowing that any
+failure inside the planner / catalog / schema stack collapses
+to a well-formed dict with sensible defaults.</p>
+<p>The invariant is enforced by wrapping every internal call
+(planner hooks, anchor enumeration, ambiguity finder,
+column-spec builder, classifier) in a broad <code>try/except</code>. The
+<strong>information-preservation invariant</strong> complements the dry-run
+invariant: every broad-except site appends a one-line
+diagnostic to <code>plan["warnings"]</code> naming the failing call, what
+defaulted, and the exception type + truncated message. This
+closes SC-01 / RB-01 / TC-09 in the 2026-05-26 audit — callers
+can distinguish "genuine empty result" from "swallowed
+failure" by inspecting <code>plan["warnings"]</code>.</p>
+<h5 id="832-the-13-key-return-shape">8.3.2 The 13-key return shape</h5>
+<p>The returned dict has these 13 keys. Keys are present in
+<strong>every</strong> call (never omitted), even if their value is the
+empty default.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Meaning when populated</th>
+<th>Meaning when empty</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>row_per</code></td>
+<td><code>str \| None</code></td>
+<td>Resolved leaf table name.</td>
+<td><code>None</code> — planner couldn't resolve (multi-leaf, no sink, bad explicit value).</td>
+</tr>
+<tr>
+<td><code>row_per_source</code></td>
+<td><code>str</code></td>
+<td><code>"explicit"</code> if the caller passed <code>row_per</code>, else <code>"auto-inferred"</code>.</td>
+<td>Always present.</td>
+</tr>
+<tr>
+<td><code>row_per_candidates</code></td>
+<td><code>list[str]</code></td>
+<td>Sink tables from Row-grain sink-finding (what auto-inference considered).</td>
+<td><code>[]</code> — sink-finding raised.</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[tuple[str, str]]</code></td>
+<td><code>(name, type)</code> pairs <code>as_dataframe</code> would produce.</td>
+<td><code>[]</code> — planner raised before columns could be computed.</td>
+</tr>
+<tr>
+<td><code>include_tables</code></td>
+<td><code>list[str]</code></td>
+<td>Echo of the caller's input (post feature-name resolution; see §8.4). On resolver failure, falls back to the original input.</td>
+<td>Always populated.</td>
+</tr>
+<tr>
+<td><code>via</code></td>
+<td><code>list[str]</code></td>
+<td>Echo of the caller's input.</td>
+<td><code>[]</code> if not supplied.</td>
+</tr>
+<tr>
+<td><code>join_path</code></td>
+<td><code>list[str]</code></td>
+<td>Ordered table names on the join chain (excludes <code>Dataset</code> root).</td>
+<td><code>[]</code> — no element tables resolved.</td>
+</tr>
+<tr>
+<td><code>transparent_intermediates</code></td>
+<td><code>list[str]</code></td>
+<td>Subset of <code>join_path</code> not named in <code>include_tables</code> (joined through but not projected).</td>
+<td><code>[]</code> if no transparent tables.</td>
+</tr>
+<tr>
+<td><code>ambiguities</code></td>
+<td><code>list[dict]</code></td>
+<td>Per-Rule-6 entries: <code>{type, from, to, paths, suggestions}</code>.</td>
+<td><code>[]</code> if plan is unambiguous OR if ambiguity detection raised.</td>
+</tr>
+<tr>
+<td><code>estimated_row_count</code></td>
+<td><code>dict</code></td>
+<td><code>{in_scope_row_per_rows, orphan_rows, total[, reason]}</code>. See §8.3.3.</td>
+<td>All three counts <code>None</code> if classification raised.</td>
+</tr>
+<tr>
+<td><code>anchors</code></td>
+<td><code>dict</code></td>
+<td><code>{total, by_type}</code> — RID counts grouped by table.</td>
+<td><code>{total: 0, by_type: {}}</code> if anchor enumeration raised.</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>str</code></td>
+<td><code>"catalog"</code> for live Datasets, <code>"local"</code> for bags/fixtures, <code>"slice"</code> for attached slices.</td>
+<td>Always populated.</td>
+</tr>
+<tr>
+<td><code>warnings</code></td>
+<td><code>list[str]</code></td>
+<td>One short human-readable entry per swallowed exception. Each entry names the failing call, what defaulted, and the exception type + truncated message.</td>
+<td><code>[]</code> — describe ran clean.</td>
+</tr>
+</tbody>
+</table>
+<h5 id="833-estimated_row_count-semantics-the-a02-fix">8.3.3 <code>estimated_row_count</code> semantics (the A02 fix)</h5>
+<p>Three cases drive the row-count estimate:</p>
+<ol>
+<li><strong>Anchor table == row_per</strong> → exact: 1 row per anchor.
+   <code>in_scope_row_per_rows = anchor_count</code>, <code>total =
+   in_scope_row_per_rows + orphan_rows</code>. No <code>reason</code> key.</li>
+<li><strong>Anchor table reaches row_per via FK chain (downstream or
+   upstream) but is NOT row_per itself</strong> → unknown without a
+   catalog query. <code>in_scope_row_per_rows = None</code>, <code>total =
+   None</code>, and a <code>reason</code> string names the downstream anchor
+   tables so the caller knows why. <code>orphan_rows</code> is still
+   exact (orphans contribute exactly one row regardless of
+   row_per cardinality).</li>
+<li><strong>Anchor table has no FK path to row_per</strong> → orphan (Rule
+   7 case 3). Contributes to <code>orphan_rows</code> (exact), not to
+   <code>in_scope_row_per_rows</code>.</li>
+</ol>
+<p>Mixed case-1 and case-2 anchors collapse to the case-2
+behavior: <code>None</code> with a <code>reason</code>. This is the honest answer —
+we can't sum a known integer with an unknown integer.</p>
+<p>The pre-A02 implementation only honored case 1 and silently
+returned 0 for case 2, which produced false "0 rows" estimates
+for every feature-table denormalize (the common case). See §7
+row F6 for the incident.</p>
+<h5 id="834-the-describe-vs-run-agreement-contract">8.3.4 The describe-vs-run agreement contract</h5>
+<p><code>describe(include_tables=X)</code> and <code>as_dataframe(include_tables=X)</code>
+must agree on whether <code>X</code> is a valid input. If <code>describe</code>
+accepts a name and returns a plan, the matching <code>as_dataframe</code>
+call must either succeed with a result of the shape <code>describe</code>
+predicted or raise on a semantic-rule violation <code>describe</code>
+reported in <code>ambiguities</code> — never raise on an input-validation
+failure <code>describe</code> silently accepted.</p>
+<p>The validation is shared via the <code>_resolve_table_names</code>
+helper (introduced by PR #228, the analyst/01 fix; described
+in §8.4). Both paths now recognize <strong>feature names</strong> (e.g.
+<code>"Image_Classification"</code>) as shorthand for the underlying
+feature-association table (e.g.
+<code>"Execution_Image_Image_Classification"</code>).</p>
+<p>The current test suite pins this contract at one place — the
+<code>{name for name, _ in plan["columns"]} == set(df.columns)</code>
+check in
+<code>TestFeatureNameResolution::test_describe_and_run_agree</code>.
+<strong>Every other key in the 13-key envelope has the same
+analyst/01-shaped asymmetry risk and no parity test today</strong>
+(TC-02 in the audit). Future work: a parity test per key.</p>
+<h4 id="list_pathstablesnone-dictstr-any"><code>list_paths(tables=None) -&gt; dict[str, Any]</code></h4>
+<p>Describe the FK graph reachable from the anchor set. Model-only
+analysis: no catalog query, no data fetch. Useful for schema
+exploration — answers "what tables could I reasonably include
+in <code>include_tables</code> given my anchor set?"</p>
+<p>Returns a 6-key dict:</p>
+<ul>
+<li><code>member_types</code>: dataset element types (same as <code>anchor_types</code>
+  for <code>from_rids</code>-constructed Denormalizers).</li>
+<li><code>anchor_types</code>: sorted list of distinct anchor table names.</li>
+<li><code>reachable_tables</code>: <code>{anchor_table: [reachable downstream
+  tables, sorted]}</code>.</li>
+<li><code>association_tables</code>: pure M:N association tables in the
+  schema.</li>
+<li><code>feature_tables</code>: feature tables discovered via
+  <code>DerivaModel.find_features</code>. Empty if the model doesn't
+  expose <code>find_features</code> or has no features.</li>
+<li><code>schema_paths</code>: <code>{(source, target): [{path, direct}]}</code> — FK
+  paths between reachable pairs, with a <code>direct</code> flag for
+  single-hop paths.</li>
+</ul>
+<p>Failures inside the model walk (e.g. catalog unreachable when
+inspecting <code>model.schemas</code>) collapse to empty defaults in the
+affected keys — same dry-run posture as <code>describe</code>.</p>
+<h3 id="84-feature-name-resolution-_resolve_table_names">8.4 Feature-name resolution (<code>_resolve_table_names</code>)</h3>
+<p><code>describe</code>, <code>as_dataframe</code>, <code>as_dict</code>, and <code>columns</code> all share
+the same <code>include_tables</code> / <code>via</code> / <code>row_per</code> validation via
+the private <code>_resolve_table_names</code> helper (introduced by PR</p>
+<h1 id="228-the-helper-translates-feature-names-eg">228). The helper translates <strong>feature names</strong> (e.g.</h1>
+<p><code>"Image_Classification"</code>) into the underlying
+<strong>feature-association table name</strong> (e.g.
+<code>"Execution_Image_Image_Classification"</code>) so callers can pass
+either form symmetrically with the rest of the DerivaML API
+(<code>find_features</code>, <code>feature_values</code>, <code>lookup_feature</code>).</p>
+<p>Resolution algorithm for each input name:</p>
+<ol>
+<li>If <code>model.name_to_table(t)</code> succeeds → keep <code>t</code> as-is.</li>
+<li>Otherwise consult <code>model.find_features()</code>. If exactly one
+   feature has <code>feature_name == t</code> → substitute with
+   <code>feature.feature_table.name</code>. If multiple matches across
+   different target tables → raise <code>DerivaMLDenormalizeError</code>
+   (ambiguous — caller must name the feature-association
+   table directly).</li>
+<li>If neither path works → raise <code>DerivaMLTableNotFound</code>. The
+   error message includes the list of known feature names so
+   the user can tell whether they typo'd a feature or pointed
+   at the wrong table.</li>
+</ol>
+<p>On the <strong>dry-run path</strong> (<code>describe</code>), the entire resolver call
+is wrapped in <code>try/except Exception</code> to preserve the dry-run
+invariant (§8.3.1). On resolver failure, the original input is
+passed through, a <code>warnings</code> entry is appended, and the
+downstream planner calls produce their own empty fields.</p>
+<p>On the <strong>run path</strong> (<code>as_dataframe</code> / <code>as_dict</code> / <code>columns</code>),
+the resolver raises immediately on ambiguous or unknown names,
+so the user gets a clear error before any planner work fires.</p>
+<p>The contract: <strong>if <code>describe(X)</code> accepts X, the matching run
+path accepts X too.</strong> (§8.3.4.)</p>
+<hr />
+<h2 id="9-test-matrix">9. Test matrix</h2>
+<p>The matrix below pins the contracts in §4–§8 against concrete
+pytest cases. Each row is one test. Cases against a live
+catalog are marked <code>live</code>; cases against an in-memory engine +
+<code>FakePagedClient</code> are marked <code>unit</code>.</p>
+<h3 id="layer-a-_insert_rows-the-heart-of-the-new-contract">Layer A — <code>_insert_rows</code> (the heart of the new contract)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Scenario</th>
+<th>Kind</th>
+<th>Assert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A.1</td>
+<td>Insert N rows into empty target</td>
+<td>unit</td>
+<td>engine has N rows; returned count == N</td>
+</tr>
+<tr>
+<td>A.2</td>
+<td>Insert overlapping rows twice into one target</td>
+<td>unit</td>
+<td>engine has N rows; 2nd call returns 0</td>
+</tr>
+<tr>
+<td>A.3</td>
+<td>Insert rows where some RIDs already exist</td>
+<td>unit</td>
+<td>engine = pre ∪ new; returned count == |new only|</td>
+</tr>
+<tr>
+<td>A.4</td>
+<td>Insert rows missing RID — pin behavior</td>
+<td>unit</td>
+<td>raise <code>IntegrityError</code> (engine NOT NULL constraint; see §5 missing-RID note)</td>
+</tr>
+<tr>
+<td>A.5</td>
+<td>Insert rows with extra columns</td>
+<td>unit</td>
+<td>extras silently dropped (existing contract)</td>
+</tr>
+<tr>
+<td>A.6</td>
+<td>Two <code>PagedFetcher</code> instances inserting overlapping rows into one engine</td>
+<td>unit</td>
+<td>no crash; engine = union</td>
+</tr>
+<tr>
+<td>A.7</td>
+<td>Fresh fetcher against pre-populated engine (cross-session simulation)</td>
+<td>unit</td>
+<td>no crash; existing rows preserved</td>
+</tr>
+<tr>
+<td>A.8</td>
+<td>Engine has rows with <code>RID=NULL</code> (defensive)</td>
+<td>unit</td>
+<td>treated as never-seen; insert proceeds (or raise — pin one)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="layer-b-fetch_by_rids-fetch_predicate">Layer B — <code>fetch_by_rids</code> / <code>fetch_predicate</code></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Scenario</th>
+<th>Kind</th>
+<th>Assert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B.1</td>
+<td><code>fetch_by_rids(rid_column="RID")</code>, fresh engine</td>
+<td>unit</td>
+<td>all rows fetched and inserted</td>
+</tr>
+<tr>
+<td>B.2</td>
+<td>Same call repeated within session</td>
+<td>unit</td>
+<td>no crash; engine final state correct</td>
+</tr>
+<tr>
+<td>B.3</td>
+<td>Same call against pre-populated engine</td>
+<td>unit</td>
+<td>no crash; new RIDs inserted; existing untouched</td>
+</tr>
+<tr>
+<td>B.4</td>
+<td><strong><code>fetch_by_rids(rid_column=&lt;FK&gt;)</code>, multiple rows per FK value</strong></td>
+<td>unit</td>
+<td><strong>all matching rows fetched and inserted (A01)</strong></td>
+</tr>
+<tr>
+<td>B.5</td>
+<td><code>fetch_by_rids(rid_column=&lt;FK&gt;)</code>, partial population (some FK values have rows; server has more)</td>
+<td>unit</td>
+<td>all server rows fetched; engine = union</td>
+</tr>
+<tr>
+<td>B.6</td>
+<td><code>fetch_predicate</code> over populated engine</td>
+<td>unit</td>
+<td>no crash; new rows inserted; existing untouched</td>
+</tr>
+<tr>
+<td>B.7</td>
+<td>Empty input list</td>
+<td>unit</td>
+<td>returns 0; no HTTP requests</td>
+</tr>
+<tr>
+<td>B.8</td>
+<td><code>fetch_by_rids</code> with <code>rid_column</code> not in target table</td>
+<td>unit</td>
+<td>clear error</td>
+</tr>
+</tbody>
+</table>
+<h3 id="layer-c-end-to-end-through-the-full-stack">Layer C — End-to-end through the full stack</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Scenario</th>
+<th>Kind</th>
+<th>Assert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C.1</td>
+<td>Live denormalize on a fresh workspace</td>
+<td>live</td>
+<td>correct row count</td>
+</tr>
+<tr>
+<td>C.2</td>
+<td>Live denormalize twice in one session</td>
+<td>live</td>
+<td>both succeed; same result both times</td>
+</tr>
+<tr>
+<td>C.3</td>
+<td>Live denormalize across sessions (two processes, same workspace dir)</td>
+<td>live</td>
+<td>both succeed; same result both times</td>
+</tr>
+<tr>
+<td>C.4</td>
+<td><strong>Live denormalize with N feature rows per anchor (A01 reproduction)</strong></td>
+<td>live</td>
+<td>N × anchor-count rows; all N executions present</td>
+</tr>
+<tr>
+<td>C.5</td>
+<td>Mutation → re-denormalize. <strong>Insertion</strong> server-side between calls.</td>
+<td>live</td>
+<td>second call observes the new row</td>
+</tr>
+<tr>
+<td>C.5x</td>
+<td>Mutation → re-denormalize. <strong>Deletion or update</strong> server-side between calls.</td>
+<td>live, <code>xfail</code> — <strong>planned, not yet written (TC-04)</strong></td>
+<td>freshness limitation — see §6.5</td>
+</tr>
+<tr>
+<td>C.6</td>
+<td><code>split_dataset</code> then live denormalize of the parent</td>
+<td>live</td>
+<td>parent's feature rows visible</td>
+</tr>
+<tr>
+<td>C.7</td>
+<td>Live denormalize a Split parent containing children</td>
+<td>live</td>
+<td>members from children appear</td>
+</tr>
+<tr>
+<td><strong>C.8</strong></td>
+<td><strong>Two element paths converge on the same target table with disjoint rid sets (F5 / SC-06)</strong></td>
+<td>unit</td>
+<td><strong>every Image RID reachable via either path is fetched; local cache equals the union (covered by <code>tests/local_db/test_denormalize_impl.py::TestRowCompletenessInvariant</code>)</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="layer-d-cross-channel-parity">Layer D — Cross-channel parity</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Scenario</th>
+<th>Kind</th>
+<th>Assert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D.1</td>
+<td>Same dataset, same include_tables/row_per, fetched via DatasetBag (source="local") AND Dataset (source="catalog")</td>
+<td>live</td>
+<td>identical row count and column set</td>
+</tr>
+<tr>
+<td>D.2</td>
+<td>Same as D.1 but with multi-feature-per-anchor data (A01 shape)</td>
+<td>live</td>
+<td>identical row count</td>
+</tr>
+<tr>
+<td><strong>D.3</strong></td>
+<td><strong>Same as D.1 but with two element paths converging on one table (F5 / SC-06 shape)</strong></td>
+<td>live</td>
+<td><strong>identical row count and column set; both sources see every reachable row</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="layer-e-describe-preflight-estimated_row_count">Layer E — <code>describe()</code> / preflight estimated_row_count</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Scenario</th>
+<th>Kind</th>
+<th>Assert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E.1</td>
+<td>Anchor table == <code>row_per</code> (case 1)</td>
+<td>live</td>
+<td>exact integer estimate == anchor count</td>
+</tr>
+<tr>
+<td>E.2</td>
+<td><strong>Anchor table is downstream of <code>row_per</code> (case 2 — feature-table common case)</strong></td>
+<td>live</td>
+<td><strong><code>in_scope_row_per_rows</code> and <code>total</code> are <code>None</code>; a <code>reason</code> field is present (A02 regression)</strong></td>
+</tr>
+<tr>
+<td>E.3</td>
+<td>Mixed scoping anchors (some at <code>row_per</code>, some downstream)</td>
+<td>live</td>
+<td>honest <code>None</code> with reason (the case-2 contribution can't be added to the case-1 count)</td>
+</tr>
+<tr>
+<td>E.4</td>
+<td>All anchors orphan (no FK path)</td>
+<td>live</td>
+<td><code>orphan_rows</code> is exact, <code>in_scope_row_per_rows == 0</code>, <code>total == orphan_rows</code></td>
+</tr>
+<tr>
+<td>E.5</td>
+<td><code>describe(&lt;feature_name&gt;)</code> and <code>as_dataframe(&lt;feature_name&gt;)</code> agree on <code>columns</code> (analyst/01 regression)</td>
+<td>live</td>
+<td><code>{name for name, _ in plan["columns"]} == set(df.columns)</code></td>
+</tr>
+<tr>
+<td>E.6</td>
+<td><code>describe(&lt;unknown_name&gt;)</code> never raises (dry-run invariant)</td>
+<td>unit</td>
+<td>returns a 13-key dict with empty defaults; non-empty <code>warnings</code>; no exception</td>
+</tr>
+</tbody>
+</table>
+<h3 id="layer-f-from_rids-constructor">Layer F — <code>from_rids</code> constructor</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Scenario</th>
+<th>Kind</th>
+<th>Assert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F.1</td>
+<td><code>from_rids</code> with <code>(table, RID)</code> tuples and explicit <code>dataset_rid</code></td>
+<td>unit</td>
+<td>correct anchor partitioning; row count matches</td>
+</tr>
+<tr>
+<td>F.2</td>
+<td><code>from_rids</code> with bare RIDs (catalog lookup)</td>
+<td>unit</td>
+<td>resolves to (table, RID) via <code>ml.resolve_rids</code> or <code>catalog.resolve_rid</code></td>
+</tr>
+<tr>
+<td>F.3</td>
+<td><code>from_rids</code> rejects malformed inputs (no model, no catalog for bare RIDs, bad tuple arity)</td>
+<td>unit</td>
+<td><code>ValueError</code> with clear message</td>
+</tr>
+<tr>
+<td>F.4</td>
+<td><code>from_rids</code> without <code>dataset_rid</code> against a real-shaped catalog (TC-05)</td>
+<td>live</td>
+<td><code>ValueError</code> raised; message explains the SQL scoping constraint</td>
+</tr>
+</tbody>
+</table>
+<h3 id="coverage-status-as-of-2026-05-26">Coverage status as of 2026-05-26</h3>
+<ul>
+<li><strong>Layer A</strong>: covered by <code>tests/local_db/test_paged_fetcher.py</code>
+  (A.1–A.7 in <code>TestFetchByRids</code>; A.8 is the new defensive case).</li>
+<li><strong>Layer B</strong>: B.1, B.2, B.7 covered. B.3, B.4, B.5, B.6, B.8
+  are fix-pass additions for A01.</li>
+<li><strong>Layer C</strong>: C.1, C.2, C.6 covered by
+  <code>tests/dataset/test_split.py</code> and <code>test_denormalize.py</code>.
+  C.3, C.4, C.5, C.7 are fix-pass additions. <strong>C.5x is
+  planned but not yet written</strong> (TC-04).</li>
+<li><strong>Layer D</strong>: D.1 is partially covered by
+  <code>test_catalog_and_bag_denormalize_consistency</code> (single-table
+  trivial case only); <strong>D.2 is not yet written</strong> (TC-01,
+  TC-10).</li>
+<li><strong>Layer E</strong>: E.1–E.4 covered by the A02 fix-pass tests in
+  <code>test_denormalizer.py::TestDescribe</code>. E.5 covered by
+  <code>TestFeatureNameResolution::test_describe_and_run_agree</code>
+  (one key, one input; TC-02 names the gap for the other 12
+  keys). E.6 covered by <code>test_describe_never_raises_on_*</code>.</li>
+<li><strong>Layer F</strong>: F.1–F.3 covered by <code>TestFromRids</code> in
+  <code>test_denormalizer.py</code>. F.4 closed by PR #239's
+  <code>dataset_rid</code> guard; the new <code>ValueError</code>-shaped test pins
+  the contract.</li>
+</ul>
+<hr />
+<h2 id="10-process-commitments">10. Process commitments</h2>
+<p>Future engineering on this subsystem should respect:</p>
+<ol>
+<li><strong>Reference this doc</strong>, not the implementation plans. Plans
+   are point-in-time. This doc is current. If a piece of
+   behavior is not in this doc, it is not part of the
+   contract.</li>
+<li><strong>Update this doc</strong> when changing any of: the
+   <code>_insert_rows</code> semantics, the <code>PagedFetcher</code>
+   lifetime/contract, the source-mode selection in
+   <code>Denormalizer.__init__</code>, the freshness model in §6, the
+   <code>describe()</code> envelope shape in §8.3, the
+   <code>_resolve_table_names</code> algorithm in §8.4, or any of the
+   six semantic rules in §6.2.</li>
+<li><strong>Add a test row</strong> to §9 when fixing any denormalize bug.
+   The minimum-failing repro becomes the regression test; the
+   contract it exposed gets restated in §4–§8. If the test is
+   not yet written, add the row anyway and mark it "planned,
+   not yet written" so the gap is visible.</li>
+<li><strong>The six semantic rules are canonical in the
+   <a href="../../reference/denormalization/#formal-rules">reference</a>.</strong>
+   Three documents describe them at different depths and must
+   stay in lockstep when a rule's <em>semantics</em> change:
+   the <a href="../../reference/denormalization/">reference</a> (formal
+   D-rules — the source of record), the
+   <a href="../../user-guide/denormalization/">user guide</a> (the
+   example-led summary), and §6.2 of <em>this</em> doc (full contract
+   language with planner-level guarantees). Update the reference
+   first, then propagate to the other two. The <code>Denormalizer</code>
+   class docstring lists the rule <em>names</em> and links to the
+   reference; it does not restate them.</li>
+<li><strong>Plans go to <code>docs/superpowers/plans/archive/</code> when
+   superseded.</strong> Don't delete them — they're historical
+   context — but don't leave them in <code>plans/</code> where future
+   readers will mistake them for current design.</li>
+<li><strong>Silent zero is a bug class, not an acceptable failure
+   mode.</strong> The audit's cross-cutting observation §5.1 names a
+   half-dozen sites where a code path returns an empty result
+   with no diagnostic — <code>from_rids</code>'s placeholder
+   <code>dataset_rid</code> (closed by PR #239), <code>describe</code>'s
+   broad-except resolver (closed by the <code>warnings</code> envelope),
+   <code>__init__</code>'s fallback to <code>source="local"</code> on
+   <code>ErmrestPagedClient</code> construction failure (logging +
+   <code>_init_warning</code> stash; full <code>describe()["warnings"]</code>
+   surfacing pending), <code>_run</code>'s broad-except around
+   <code>list_dataset_children</code>. New code in this subsystem must
+   either raise on its silent-zero paths or surface a
+   <code>reason</code> / <code>warnings</code> field. The honest-<code>None</code>-plus-
+   <code>reason</code> pattern <code>describe.estimated_row_count</code> already
+   uses (§8.3.3) is the canonical template.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../reference/schema/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Schema">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Schema
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../bag-based-upload-engine/" class="md-footer__link md-footer__link--next" aria-label="Next: Bag-based upload engine">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Bag-based upload engine
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,3247 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-14-reachability-engine-fast-estimate/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Reachability Engine + Fast Estimate — Implementation Plan (Stage A) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reachability-engine-fast-estimate-implementation-plan-stage-a" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reachability Engine + Fast Estimate — Implementation Plan (Stage A)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-is-stage-a-of-two" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this is Stage A of two
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#engine-interface-locked-here-so-all-tasks-agree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engine interface (locked here so all tasks agree)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Engine interface (locked here so all tasks agree)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-engine-module-scaffold-fk-column-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Engine module scaffold + FK-column resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-needed-columns-projection-incl-vocab-fk-name-subtlety" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Needed-columns projection (incl. vocab-FK Name subtlety)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-single-path-bfs-reachability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Single-path BFS reachability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-compute_reachability-orchestration-multi-path-union-asset-bytes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: compute_reachability — orchestration + multi-path union + asset bytes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-csv-byte-sampling-from-fetched-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: CSV-byte sampling from fetched rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-6-wire-estimate_bag_size-to-the-engine-adapt-assemble_estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Wire estimate_bag_size to the engine; adapt assemble_estimate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-7-delete-the-deep-join-path-fix-dependent-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Delete the deep-join path; fix dependent tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-8-live-correctness-test-engine-server-union-on-demo-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Live correctness test — engine == server-union on demo catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-9-update-docs-adr-lint-suites-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Update docs + ADR + lint + suites + PR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="reachability-engine-fast-estimate-implementation-plan-stage-a">Reachability Engine + Fast Estimate — Implementation Plan (Stage A)</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Replace <code>estimate_bag_size</code>'s ~377s of server-side deep-FK-join queries with a client-side FK-reachability engine that fetches each reached table's edge columns once and computes exact per-table RID-union counts in memory (~27s, same exact answer).</p>
+<p><strong>Architecture:</strong> A new pure-Python module <code>dataset/_reachability.py</code> owns the engine: given the bag walk's <code>{(schema,table): [fk_path, ...]}</code> reached-paths map + anchor RIDs + the catalog model, it (1) fetches each involved edge/target table once projecting only RID + FK-join columns + asset <code>Length</code>, (2) reconstructs reachability by in-memory BFS over the symbolic FK paths, hash-indexed, and (3) returns the same <code>rids_by_table</code> / <code>asset_lengths_by_table</code> dicts the existing <code>assemble_estimate</code> already consumes. <code>estimate_bag_size</code> swaps its query layer (<code>build_estimate_queries</code> + <code>run_estimate_queries</code>) for one <code>compute_reachability(...)</code> call; <code>assemble_estimate</code> is unchanged. The deep-join path is deleted (no backwards-compat shim, per CLAUDE.md).</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, deriva-py datapath/model API, deriva-ml <code>DatasetBagBuilder</code>, pytest. The engine is pure (no async, no httpx) — its only catalog contact is whole-table projected fetches via the path builder.</p>
+<hr />
+<h2 id="why-this-is-stage-a-of-two">Why this is Stage A of two</h2>
+<p>This plan is pure deriva-ml and ships the estimate win standalone. Stage B
+(separate plan, written after this lands) productionizes the
+<code>csv-ridset</code> chunk-append processor in deriva-py and rewires bag
+<em>generation</em> to consume the same reachability engine. The reachability
+engine built here is the shared core both stages use — Stage B imports
+<code>compute_reachability</code> to get its per-table RID sets. Design context:
+- <code>docs/superpowers/specs/2026-06-14-portable-bag-csv-contract.md</code> (the bag format / processor design)
+- <code>docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline.md</code> (the estimate's deliberate engine bypass — this plan deepens that bypass, it does not undo it)
+- Memory: <code>estimate-bag-size-client-side-join.md</code> (the proven approach + the vocab-FK <code>Name</code> subtlety) and <code>csv-ridset-chunk-append-proto.md</code> (Stage B's de-risked piece).</p>
+<p>The proven prototype this plan productionizes is <code>/tmp/cside_estimate_proto.py</code> — <strong>27s EXACT match on all 80 tables + 18 GB</strong> for eye-ai 2-277G, vs ~280s server. The plan turns that throwaway into tested, documented production code.</p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Responsibility</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/dataset/_reachability.py</code></td>
+<td>The engine: edge resolution, projected fetch, in-memory BFS, RID-union per table. Pure module — input is reached-paths + anchors + model + a fetch callable; output is the two result dicts.</td>
+<td><strong>Create</strong></td>
+</tr>
+<tr>
+<td><code>tests/dataset/test_reachability.py</code></td>
+<td>Unit tests for the pure engine pieces (FK-column resolution, BFS over a synthetic edge graph, vocab-FK <code>Name</code> join, multi-path union) with a synthetic in-memory catalog — no live server.</td>
+<td><strong>Create</strong></td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/dataset.py</code></td>
+<td><code>estimate_bag_size</code> swaps the query/orchestration layer for one <code>compute_reachability(...)</code> call; keeps snapshot resolution + <code>assemble_estimate</code>.</td>
+<td><strong>Modify</strong> (~2655–2790)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/_estimate.py</code></td>
+<td>Delete <code>build_estimate_queries</code> + <code>run_estimate_queries</code> + <code>QueryItem</code> + <code>QueryType</code> + <code>DEFAULT_ESTIMATE_CONCURRENCY</code> (the deep-join path). Keep <code>assemble_estimate</code> (still consumed).</td>
+<td><strong>Modify</strong></td>
+</tr>
+<tr>
+<td><code>tests/dataset/test_estimate_helpers.py</code></td>
+<td>Drop tests of the deleted functions; keep <code>assemble_estimate</code> tests.</td>
+<td><strong>Modify</strong></td>
+</tr>
+<tr>
+<td><code>tests/dataset/test_estimate_bag_size.py</code> (or wherever the live estimate integration test lives)</td>
+<td>Add a correctness assertion: client-side engine result == reference server-union for the demo catalog.</td>
+<td><strong>Modify</strong></td>
+</tr>
+<tr>
+<td><code>docs/reference/bag-export.md</code></td>
+<td>Update the "Same engine, different consumer" section: the estimate now shares the <em>walk</em> AND uses a client-side reachability engine instead of live aggregate queries.</td>
+<td><strong>Modify</strong> (~277–285)</td>
+</tr>
+<tr>
+<td><code>docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline.md</code></td>
+<td>Note the engine change: bypass is now via client-side reachability, not per-path aggregate queries.</td>
+<td><strong>Modify</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="engine-interface-locked-here-so-all-tasks-agree">Engine interface (locked here so all tasks agree)</h2>
+<pre><code class="language-python"># src/deriva_ml/dataset/_reachability.py
+
+ReachedPaths = dict[tuple[str, str], list[tuple[tuple[str, str], ...]]]
+&quot;&quot;&quot;{(schema, table): [ fk_path, ... ]} from CatalogBagBuilder.iter_reached_paths().
+Each fk_path is a tuple of (schema, table) segments, anchor-first.&quot;&quot;&quot;
+
+FetchFn = Callable[[str, str, set[str]], list[dict]]
+&quot;&quot;&quot;(schema, table, columns) -&gt; list of row dicts. Injected so the engine
+is testable without a live catalog. Production binds it to the path builder.&quot;&quot;&quot;
+
+
+def compute_reachability(
+    *,
+    reached: ReachedPaths,
+    anchor_rids: list[str],
+    model: Any,                 # deriva-py Model (cb._get_model())
+    fetch: FetchFn,
+) -&gt; tuple[dict[str, set[str]], dict[str, dict[str, int]]]:
+    &quot;&quot;&quot;Return (rids_by_table, asset_lengths_by_table).
+
+    rids_by_table:          table_name -&gt; set of reachable RIDs (exact union
+                            across all FK paths to that table).
+    asset_lengths_by_table: table_name -&gt; {RID: Length} for asset tables.
+
+    Shapes match run_estimate_queries' first two outputs so assemble_estimate
+    consumes them unchanged. (sample_rows + failed_by_table are dropped — the
+    engine fetches whole tables, so CSV-byte sampling uses the fetched rows
+    directly and there are no per-query partial failures.)
+    &quot;&quot;&quot;
+</code></pre>
+<p>Note the deliberate shape match: <code>assemble_estimate</code> already takes
+<code>rids_by_table</code> and <code>asset_lengths_by_table</code> as its first two result dicts.
+This plan removes the <code>sample_rows_by_table</code> / <code>failed_by_table</code> inputs (see
+Task 6 for how <code>assemble_estimate</code>'s signature adapts).</p>
+<hr />
+<h3 id="task-1-engine-module-scaffold-fk-column-resolution">Task 1: Engine module scaffold + FK-column resolution</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/dataset/_reachability.py</code>
+- Test: <code>tests/dataset/test_reachability.py</code></p>
+<p>The first pure piece: given two adjacent <code>(schema, table)</code> segments and a model, return the column pairs that join them and which side holds the FK. This mirrors the prototype's <code>fk_join_columns</code> (lines 84–113) and <code>CatalogBagBuilder._composite_fk_on_clause</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Use a synthetic model with a hand-built FK so no catalog is needed. The test model has <code>Parent(RID)</code> and <code>Child(RID, parent_fk -&gt; Parent.RID)</code>.</p>
+<pre><code class="language-python"># tests/dataset/test_reachability.py
+&quot;&quot;&quot;Unit tests for the client-side FK-reachability engine (no live catalog).&quot;&quot;&quot;
+from types import SimpleNamespace
+
+from deriva_ml.dataset._reachability import _fk_join_columns
+
+
+def _col(name):
+    return SimpleNamespace(name=name)
+
+
+def _make_model():
+    &quot;&quot;&quot;Minimal model: Child.parent_fk -&gt; Parent.RID (FK lives on Child).&quot;&quot;&quot;
+    parent = SimpleNamespace(foreign_keys=[], referenced_by=[])
+    fk = SimpleNamespace(
+        foreign_key_columns=[_col(&quot;parent_fk&quot;)],
+        referenced_columns=[_col(&quot;RID&quot;)],
+    )
+    child = SimpleNamespace(foreign_keys=[fk], referenced_by=[])
+    fk.pk_table = parent
+    parent.referenced_by = [fk]
+    schemas = {&quot;S&quot;: SimpleNamespace(tables={&quot;Parent&quot;: parent, &quot;Child&quot;: child})}
+    return SimpleNamespace(schemas=schemas)
+
+
+def test_fk_join_columns_fk_on_child():
+    model = _make_model()
+    # Following Parent -&gt; Child: the FK lives on Child (cur).
+    constraints = _fk_join_columns((&quot;S&quot;, &quot;Parent&quot;), (&quot;S&quot;, &quot;Child&quot;), model)
+    assert constraints == [{&quot;fk_on&quot;: &quot;cur&quot;, &quot;pairs&quot;: [(&quot;RID&quot;, &quot;parent_fk&quot;)]}]
+
+
+def test_fk_join_columns_fk_on_parent():
+    model = _make_model()
+    # Following Child -&gt; Parent: the FK lives on Child (prev).
+    constraints = _fk_join_columns((&quot;S&quot;, &quot;Child&quot;), (&quot;S&quot;, &quot;Parent&quot;), model)
+    assert constraints == [{&quot;fk_on&quot;: &quot;prev&quot;, &quot;pairs&quot;: [(&quot;parent_fk&quot;, &quot;RID&quot;)]}]
+
+
+def test_fk_join_columns_no_edge_returns_empty():
+    model = _make_model()
+    # Parent has no FK to itself.
+    assert _fk_join_columns((&quot;S&quot;, &quot;Parent&quot;), (&quot;S&quot;, &quot;Parent&quot;), model) == []
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py -v</code>
+Expected: FAIL — <code>ModuleNotFoundError: No module named 'deriva_ml.dataset._reachability'</code></p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<pre><code class="language-python"># src/deriva_ml/dataset/_reachability.py
+&quot;&quot;&quot;Client-side FK-reachability engine for fast bag-size estimation.
+
+Replaces the deep-server-join estimate path (which issued ~477 multi-hop
+FK-JOIN queries the server evaluated at 16-60s each) with: fetch each
+reached table's edge columns ONCE (whole-table projected scan, ~0.3s for
+240k rows), then reconstruct FK reachability by in-memory BFS over the
+symbolic FK paths the bag walker discovered. Exact union counts, ~10x
+faster. See docs/adr/0008 and the estimate-bag-size-client-side-join memo.
+
+The engine is pure: its only catalog contact is the injected ``fetch``
+callable, so the BFS and FK-resolution logic are unit-testable against a
+synthetic in-memory catalog with no live server.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import Any, Callable
+
+ReachedPaths = dict[tuple[str, str], list[tuple[tuple[str, str], ...]]]
+FetchFn = Callable[[str, str, set[str]], list[dict]]
+
+
+def _fk_join_columns(
+    prev_seg: tuple[str, str],
+    cur_seg: tuple[str, str],
+    model: Any,
+) -&gt; list[dict]:
+    &quot;&quot;&quot;Return the FK constraints linking two adjacent path segments.
+
+    Each constraint dict is ``{&quot;fk_on&quot;: &quot;prev&quot;|&quot;cur&quot;, &quot;pairs&quot;: [(prev_col,
+    cur_col), ...]}`` where ``pairs[i]`` are column NAMES that must be equal
+    to follow ``prev -&gt; cur``. ``fk_on`` records which table physically
+    holds the FK, which decides the in-memory join direction.
+
+    Args:
+        prev_seg: ``(schema, table)`` of the source segment.
+        cur_seg: ``(schema, table)`` of the destination segment.
+        model: deriva-py Model.
+
+    Returns:
+        List of constraint dicts (one per FK constraint between the tables,
+        in either direction); empty if no FK links them.
+
+    Example:
+        &gt;&gt;&gt; # See tests/dataset/test_reachability.py for synthetic-model
+        &gt;&gt;&gt; # exercises; this needs a Model object.
+        &gt;&gt;&gt; ...  # doctest: +SKIP
+    &quot;&quot;&quot;
+    ps, pt = prev_seg
+    cs, ct = cur_seg
+    prev_tbl = model.schemas[ps].tables[pt]
+    cur_tbl = model.schemas[cs].tables[ct]
+    constraints: list[dict] = []
+    # FK on prev pointing to cur.
+    for fk in prev_tbl.foreign_keys:
+        if fk.pk_table is cur_tbl:
+            pairs = [
+                (fkc.name, rc.name)
+                for fkc, rc in zip(fk.foreign_key_columns, fk.referenced_columns)
+            ]
+            constraints.append({&quot;fk_on&quot;: &quot;prev&quot;, &quot;pairs&quot;: pairs})
+    # FK on cur pointing to prev.
+    for fk in cur_tbl.foreign_keys:
+        if fk.pk_table is prev_tbl:
+            pairs = [
+                (rc.name, fkc.name)  # (prev_col, cur_col)
+                for fkc, rc in zip(fk.foreign_key_columns, fk.referenced_columns)
+            ]
+            constraints.append({&quot;fk_on&quot;: &quot;cur&quot;, &quot;pairs&quot;: pairs})
+    return constraints
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py -v</code>
+Expected: PASS (3 tests)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/_reachability.py tests/dataset/test_reachability.py
+git commit -m &quot;feat(estimate): FK-column resolution for reachability engine&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-needed-columns-projection-incl-vocab-fk-name-subtlety">Task 2: Needed-columns projection (incl. vocab-FK Name subtlety)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/_reachability.py</code>
+- Test: <code>tests/dataset/test_reachability.py</code></p>
+<p>Compute the minimal column set to fetch per table: <code>RID</code> + outbound-FK columns + <strong>inbound-FK referenced columns</strong> (the load-bearing vocab-FK <code>Name</code> subtlety) + asset <code>Length</code>. Mirrors prototype <code>needed_columns</code> (lines 121–148).</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<pre><code class="language-python"># add to tests/dataset/test_reachability.py
+from deriva_ml.dataset._reachability import _needed_columns
+
+
+def _make_vocab_model():
+    &quot;&quot;&quot;Asset_Role(Name) &lt;- Child.role_fk -&gt; Asset_Role.Name (vocab FK to Name).&quot;&quot;&quot;
+    role = SimpleNamespace(foreign_keys=[], column_definitions=SimpleNamespace(elements={}))
+    vocab_fk = SimpleNamespace(
+        foreign_key_columns=[_col(&quot;role_fk&quot;)],
+        referenced_columns=[_col(&quot;Name&quot;)],  # references Name, NOT RID
+    )
+    child = SimpleNamespace(
+        foreign_keys=[vocab_fk],
+        referenced_by=[],
+        column_definitions=SimpleNamespace(elements={}),
+    )
+    vocab_fk.pk_table = role
+    role.referenced_by = [vocab_fk]
+    role.foreign_keys = []
+    child.is_asset = lambda: False
+    role.is_asset = lambda: False
+    schemas = {&quot;S&quot;: SimpleNamespace(tables={&quot;Asset_Role&quot;: role, &quot;Child&quot;: child})}
+    return SimpleNamespace(schemas=schemas)
+
+
+def test_needed_columns_includes_inbound_referenced_name():
+    model = _make_vocab_model()
+    # Asset_Role is the FK TARGET of an inbound vocab FK on Name. The engine
+    # must project Name or the in-memory join silently drops rows.
+    cols = _needed_columns((&quot;S&quot;, &quot;Asset_Role&quot;), model)
+    assert &quot;Name&quot; in cols
+    assert &quot;RID&quot; in cols
+
+
+def test_needed_columns_includes_outbound_fk_and_length():
+    &quot;&quot;&quot;Asset table with an outbound FK and a Length column.&quot;&quot;&quot;
+    length_col = SimpleNamespace(name=&quot;Length&quot;)
+    fk = SimpleNamespace(foreign_key_columns=[_col(&quot;parent_fk&quot;)], referenced_columns=[_col(&quot;RID&quot;)])
+    asset = SimpleNamespace(
+        foreign_keys=[fk],
+        referenced_by=[],
+        column_definitions=SimpleNamespace(elements={&quot;Length&quot;: length_col}),
+    )
+    asset.is_asset = lambda: True
+    model = SimpleNamespace(schemas={&quot;S&quot;: SimpleNamespace(tables={&quot;A&quot;: asset})})
+    cols = _needed_columns((&quot;S&quot;, &quot;A&quot;), model)
+    assert cols == {&quot;RID&quot;, &quot;parent_fk&quot;, &quot;Length&quot;}
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py::test_needed_columns_includes_inbound_referenced_name -v</code>
+Expected: FAIL — <code>ImportError: cannot import name '_needed_columns'</code></p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<pre><code class="language-python"># add to src/deriva_ml/dataset/_reachability.py
+def _needed_columns(seg: tuple[str, str], model: Any) -&gt; set[str]:
+    &quot;&quot;&quot;Minimal column projection to fetch for one table in the walk.
+
+    Returns ``RID`` plus every column the in-memory join needs:
+
+    - **Outbound FK columns** (this table -&gt; parent): needed when this table
+      is the FK-holder for a hop.
+    - **Inbound-FK *referenced* columns** (child -&gt; this table): needed when
+      this table is the FK TARGET. Critically, a vocabulary FK references the
+      target's ``Name`` (e.g. ``*_Execution.Asset_Role -&gt; Asset_Role.Name``),
+      not ``RID`` — omitting ``Name`` silently undercounts vocab-leaf tables
+      (the prototype was off by 817 rows until this was added).
+    - **Asset ``Length``**: for asset-byte summation.
+
+    Args:
+        seg: ``(schema, table)``.
+        model: deriva-py Model.
+
+    Returns:
+        Set of column names to project in the table fetch.
+
+    Example:
+        &gt;&gt;&gt; ...  # doctest: +SKIP  (needs a Model)
+    &quot;&quot;&quot;
+    s, t = seg
+    tbl = model.schemas[s].tables[t]
+    cols = {&quot;RID&quot;}
+    for fk in tbl.foreign_keys:
+        for c in fk.foreign_key_columns:
+            cols.add(c.name)
+    for fk in tbl.referenced_by:
+        for c in fk.referenced_columns:
+            cols.add(c.name)
+    if tbl.is_asset() and &quot;Length&quot; in tbl.column_definitions.elements:
+        cols.add(&quot;Length&quot;)
+    return cols
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py -v</code>
+Expected: PASS (5 tests)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/_reachability.py tests/dataset/test_reachability.py
+git commit -m &quot;feat(estimate): minimal column projection incl. vocab-FK Name&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-single-path-bfs-reachability">Task 3: Single-path BFS reachability</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/_reachability.py</code>
+- Test: <code>tests/dataset/test_reachability.py</code></p>
+<p>Given fetched rows, one FK path, and anchor RIDs, return the set of terminal-table RIDs reachable along that path. Mirrors prototype <code>reached_rids_for_path</code> (lines 213–285) with the hash-indexed FK probe. This is the algorithmic core.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<pre><code class="language-python"># add to tests/dataset/test_reachability.py
+from deriva_ml.dataset._reachability import _reached_rids_for_path
+
+
+def test_reached_rids_single_hop_fk_on_cur():
+    &quot;&quot;&quot;Anchor Parent={p1}; Child rows c1,c2 point to p1, c3 to p2.
+    Following Parent -&gt; Child should reach {c1, c2}.&quot;&quot;&quot;
+    model = _make_model()  # Child.parent_fk -&gt; Parent.RID
+    fetched = {
+        (&quot;S&quot;, &quot;Parent&quot;): [{&quot;RID&quot;: &quot;p1&quot;}, {&quot;RID&quot;: &quot;p2&quot;}],
+        (&quot;S&quot;, &quot;Child&quot;): [
+            {&quot;RID&quot;: &quot;c1&quot;, &quot;parent_fk&quot;: &quot;p1&quot;},
+            {&quot;RID&quot;: &quot;c2&quot;, &quot;parent_fk&quot;: &quot;p1&quot;},
+            {&quot;RID&quot;: &quot;c3&quot;, &quot;parent_fk&quot;: &quot;p2&quot;},
+        ],
+    }
+    fk_path = ((&quot;S&quot;, &quot;Parent&quot;), (&quot;S&quot;, &quot;Child&quot;))
+    result = _reached_rids_for_path(
+        fk_path, anchor_rids={&quot;p1&quot;}, fetched_rows=fetched, model=model
+    )
+    assert result == {&quot;c1&quot;, &quot;c2&quot;}
+
+
+def test_reached_rids_anchor_table_only():
+    &quot;&quot;&quot;A length-1 path (the anchor table itself) returns anchor RIDs that exist.&quot;&quot;&quot;
+    model = _make_model()
+    fetched = {(&quot;S&quot;, &quot;Parent&quot;): [{&quot;RID&quot;: &quot;p1&quot;}, {&quot;RID&quot;: &quot;p2&quot;}, {&quot;RID&quot;: &quot;p3&quot;}]}
+    result = _reached_rids_for_path(
+        ((&quot;S&quot;, &quot;Parent&quot;),), anchor_rids={&quot;p1&quot;, &quot;p2&quot;, &quot;p99&quot;}, fetched_rows=fetched, model=model
+    )
+    assert result == {&quot;p1&quot;, &quot;p2&quot;}  # p99 not in the table
+
+
+def test_reached_rids_no_fk_returns_none():
+    &quot;&quot;&quot;A path with no FK between adjacent segments is unfollowable -&gt; None.&quot;&quot;&quot;
+    model = _make_model()
+    fetched = {(&quot;S&quot;, &quot;Parent&quot;): [{&quot;RID&quot;: &quot;p1&quot;}], (&quot;S&quot;, &quot;Parent2&quot;): []}
+    # Parent -&gt; Parent (no self-FK in the synthetic model)
+    result = _reached_rids_for_path(
+        ((&quot;S&quot;, &quot;Parent&quot;), (&quot;S&quot;, &quot;Parent&quot;)), anchor_rids={&quot;p1&quot;}, fetched_rows=fetched, model=model
+    )
+    assert result is None
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py::test_reached_rids_single_hop_fk_on_cur -v</code>
+Expected: FAIL — <code>ImportError: cannot import name '_reached_rids_for_path'</code></p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<pre><code class="language-python"># add to src/deriva_ml/dataset/_reachability.py
+def _reached_rids_for_path(
+    fk_path: tuple[tuple[str, str], ...],
+    *,
+    anchor_rids: set[str],
+    fetched_rows: dict[tuple[str, str], list[dict]],
+    model: Any,
+) -&gt; set[str] | None:
+    &quot;&quot;&quot;RIDs of the terminal table reachable along one FK path.
+
+    Walks the path hop-by-hop from the anchor RIDs, maintaining the set of
+    in-scope RIDs of the current table. Each hop advances the scope using the
+    FK constraint(s) between adjacent segments, hash-indexed for O(n) probes.
+
+    Args:
+        fk_path: Anchor-first tuple of ``(schema, table)`` segments.
+        anchor_rids: RIDs of ``fk_path[0]`` that seed the walk.
+        fetched_rows: ``{(schema, table): [row dict, ...]}`` — the once-fetched
+            projected rows for every involved table.
+        model: deriva-py Model (for FK resolution).
+
+    Returns:
+        Set of reachable terminal-table RIDs, or ``None`` if any hop has no
+        resolvable FK (an unfollowable path — caller treats as no contribution).
+
+    Example:
+        &gt;&gt;&gt; ...  # doctest: +SKIP  (needs fetched rows + Model)
+    &quot;&quot;&quot;
+    cur_seg = fk_path[0]
+    if len(fk_path) == 1:
+        all_rids = {r[&quot;RID&quot;] for r in fetched_rows.get(cur_seg, [])}
+        return all_rids &amp; anchor_rids
+
+    cur_scope: set[str] = set(anchor_rids)
+    prev_seg = fk_path[0]
+    # Local FK-value index cache: (seg, col) -&gt; {fk_value: {RID, ...}}.
+    fk_index_cache: dict[tuple[tuple[str, str], str], dict] = {}
+
+    def _fk_index(seg: tuple[str, str], col: str) -&gt; dict:
+        keyc = (seg, col)
+        idx = fk_index_cache.get(keyc)
+        if idx is None:
+            idx = defaultdict(set)
+            for r in fetched_rows.get(seg, []):
+                v = r.get(col)
+                if v is not None:
+                    idx[v].add(r[&quot;RID&quot;])
+            fk_index_cache[keyc] = idx
+        return idx
+
+    for nxt_seg in fk_path[1:]:
+        constraints = _fk_join_columns(prev_seg, nxt_seg, model)
+        if not constraints:
+            return None
+        new_scope: set[str] = set()
+        for con in constraints:
+            pairs = con[&quot;pairs&quot;]
+            if con[&quot;fk_on&quot;] == &quot;cur&quot;:
+                if len(pairs) == 1 and pairs[0][0] == &quot;RID&quot;:
+                    cur_col = pairs[0][1]
+                    idx = _fk_index(nxt_seg, cur_col)
+                    for pv in cur_scope:
+                        hit = idx.get(pv)
+                        if hit:
+                            new_scope |= hit
+                else:
+                    prev_rows = fetched_rows.get(prev_seg, [])
+                    allowed = {
+                        tuple(r.get(pc) for pc, _cc in pairs)
+                        for r in prev_rows
+                        if r[&quot;RID&quot;] in cur_scope
+                    }
+                    for r in fetched_rows.get(nxt_seg, []):
+                        if tuple(r.get(cc) for _pc, cc in pairs) in allowed:
+                            new_scope.add(r[&quot;RID&quot;])
+            else:  # fk_on == &quot;prev&quot;
+                prev_rows = fetched_rows.get(prev_seg, [])
+                if len(pairs) == 1 and pairs[0][1] == &quot;RID&quot;:
+                    prev_col = pairs[0][0]
+                    for r in prev_rows:
+                        if r[&quot;RID&quot;] in cur_scope:
+                            v = r.get(prev_col)
+                            if v is not None:
+                                new_scope.add(v)
+                else:
+                    prev_col, cur_col = pairs[0]
+                    idx = _fk_index(nxt_seg, cur_col)
+                    for r in prev_rows:
+                        if r[&quot;RID&quot;] in cur_scope:
+                            v = r.get(prev_col)
+                            if v is not None:
+                                hit = idx.get(v)
+                                if hit:
+                                    new_scope |= hit
+        cur_scope = new_scope
+        prev_seg = nxt_seg
+    return cur_scope
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py -v</code>
+Expected: PASS (8 tests)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/_reachability.py tests/dataset/test_reachability.py
+git commit -m &quot;feat(estimate): single-path BFS reachability walk&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-compute_reachability-orchestration-multi-path-union-asset-bytes">Task 4: compute_reachability — orchestration + multi-path union + asset bytes</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/_reachability.py</code>
+- Test: <code>tests/dataset/test_reachability.py</code></p>
+<p>The public entry point. Determines edge tables, fetches each once via the injected <code>fetch</code>, unions per-table RIDs across all FK paths, and sums asset <code>Length</code> over the reached RIDs. Mirrors prototype main body (lines 61–329) minus the timing/reference scaffolding.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<pre><code class="language-python"># add to tests/dataset/test_reachability.py
+from deriva_ml.dataset._reachability import compute_reachability
+
+
+def test_compute_reachability_unions_paths_and_sums_assets():
+    &quot;&quot;&quot;Two FK paths reach Child; union the RID sets. Child is an asset table;
+    sum Length over reached RIDs only.&quot;&quot;&quot;
+    # Model: Parent &lt;- Child (parent_fk), and an Alt parent &lt;- Child (alt_fk).
+    parent = SimpleNamespace(foreign_keys=[], column_definitions=SimpleNamespace(elements={}))
+    alt = SimpleNamespace(foreign_keys=[], column_definitions=SimpleNamespace(elements={}))
+    fk1 = SimpleNamespace(foreign_key_columns=[_col(&quot;parent_fk&quot;)], referenced_columns=[_col(&quot;RID&quot;)])
+    fk2 = SimpleNamespace(foreign_key_columns=[_col(&quot;alt_fk&quot;)], referenced_columns=[_col(&quot;RID&quot;)])
+    length_col = SimpleNamespace(name=&quot;Length&quot;)
+    child = SimpleNamespace(
+        foreign_keys=[fk1, fk2],
+        referenced_by=[],
+        column_definitions=SimpleNamespace(elements={&quot;Length&quot;: length_col}),
+    )
+    fk1.pk_table = parent; fk2.pk_table = alt
+    parent.referenced_by = [fk1]; alt.referenced_by = [fk2]
+    parent.is_asset = lambda: False; alt.is_asset = lambda: False
+    child.is_asset = lambda: True
+    model = SimpleNamespace(schemas={&quot;S&quot;: SimpleNamespace(
+        tables={&quot;Parent&quot;: parent, &quot;Alt&quot;: alt, &quot;Child&quot;: child})})
+
+    rows = {
+        (&quot;S&quot;, &quot;Parent&quot;): [{&quot;RID&quot;: &quot;p1&quot;}],
+        (&quot;S&quot;, &quot;Alt&quot;): [{&quot;RID&quot;: &quot;a1&quot;}],
+        (&quot;S&quot;, &quot;Child&quot;): [
+            {&quot;RID&quot;: &quot;c1&quot;, &quot;parent_fk&quot;: &quot;p1&quot;, &quot;alt_fk&quot;: None, &quot;Length&quot;: 100},
+            {&quot;RID&quot;: &quot;c2&quot;, &quot;parent_fk&quot;: None, &quot;alt_fk&quot;: &quot;a1&quot;, &quot;Length&quot;: 200},
+            {&quot;RID&quot;: &quot;c3&quot;, &quot;parent_fk&quot;: None, &quot;alt_fk&quot;: None, &quot;Length&quot;: 999},  # unreachable
+        ],
+    }
+
+    def fake_fetch(schema, table, columns):
+        return rows[(schema, table)]
+
+    reached = {
+        (&quot;S&quot;, &quot;Child&quot;): [
+            ((&quot;S&quot;, &quot;Parent&quot;), (&quot;S&quot;, &quot;Child&quot;)),
+            ((&quot;S&quot;, &quot;Alt&quot;), (&quot;S&quot;, &quot;Child&quot;)),
+        ],
+    }
+    rids_by_table, asset_lengths_by_table = compute_reachability(
+        reached=reached, anchor_rids=[&quot;p1&quot;, &quot;a1&quot;], model=model, fetch=fake_fetch,
+    )
+    # c1 reached via Parent, c2 via Alt; c3 via neither. Union = {c1, c2}.
+    assert rids_by_table[&quot;Child&quot;] == {&quot;c1&quot;, &quot;c2&quot;}
+    # Asset bytes only over reached RIDs: 100 + 200 = 300 (c3's 999 excluded).
+    assert asset_lengths_by_table[&quot;Child&quot;] == {&quot;c1&quot;: 100, &quot;c2&quot;: 200}
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py::test_compute_reachability_unions_paths_and_sums_assets -v</code>
+Expected: FAIL — <code>ImportError: cannot import name 'compute_reachability'</code></p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<pre><code class="language-python"># add to src/deriva_ml/dataset/_reachability.py
+def compute_reachability(
+    *,
+    reached: ReachedPaths,
+    anchor_rids: list[str],
+    model: Any,
+    fetch: FetchFn,
+) -&gt; tuple[dict[str, set[str]], dict[str, dict[str, int]]]:
+    &quot;&quot;&quot;Compute exact per-table reachable RID sets + asset byte maps.
+
+    The client-side replacement for the deep-server-join estimate path.
+    Fetches each involved edge/target table once (projected to the columns
+    the in-memory join needs), then for every reached table unions the RID
+    sets contributed by each FK path. For asset tables, builds ``{RID:
+    Length}`` over the reached RIDs only.
+
+    Args:
+        reached: ``CatalogBagBuilder.iter_reached_paths()`` output —
+            ``{(schema, table): [fk_path, ...]}``.
+        anchor_rids: Dataset RID + every recursive descendant dataset RID.
+        model: deriva-py Model (``cb._get_model()``).
+        fetch: ``(schema, table, columns) -&gt; rows`` — injected so the engine
+            is testable. Production binds it to the path builder.
+
+    Returns:
+        ``(rids_by_table, asset_lengths_by_table)`` — shapes matching the
+        first two outputs of the retired ``run_estimate_queries`` so
+        :func:`assemble_estimate` consumes them unchanged.
+
+    Example:
+        &gt;&gt;&gt; ...  # doctest: +SKIP  (needs a live walk + Model)
+    &quot;&quot;&quot;
+    # 1. Every distinct (schema, table) that appears as a hop in any path.
+    edge_tables: set[tuple[str, str]] = set()
+    for fk_paths in reached.values():
+        for fk_path in fk_paths:
+            edge_tables.update(fk_path)
+
+    # 2. Fetch each edge table ONCE, projected.
+    fetched_rows: dict[tuple[str, str], list[dict]] = {}
+    for seg in edge_tables:
+        s, t = seg
+        fetched_rows[seg] = fetch(s, t, _needed_columns(seg, model))
+
+    anchor_set = set(anchor_rids)
+
+    # 3. Union RIDs per reached table across its FK paths.
+    rids_by_table: dict[str, set[str]] = {}
+    client_rids: dict[tuple[str, str], set[str]] = {}
+    for key, fk_paths in reached.items():
+        union: set[str] = set()
+        for fk_path in fk_paths:
+            rr = _reached_rids_for_path(
+                fk_path, anchor_rids=anchor_set, fetched_rows=fetched_rows, model=model
+            )
+            if rr:
+                union |= rr
+        client_rids[key] = union
+        rids_by_table[key[1]] = union
+
+    # 4. Asset Length sums over reached RIDs only.
+    asset_lengths_by_table: dict[str, dict[str, int]] = {}
+    for key, rids in client_rids.items():
+        s, t = key
+        tbl = model.schemas[s].tables[t]
+        if not tbl.is_asset():
+            continue
+        by_rid = {r[&quot;RID&quot;]: r for r in fetched_rows.get(key, [])}
+        lengths: dict[str, int] = {}
+        for rid in rids:
+            r = by_rid.get(rid)
+            if r and r.get(&quot;Length&quot;) is not None:
+                lengths[rid] = int(r[&quot;Length&quot;])
+        asset_lengths_by_table[t] = lengths
+
+    return rids_by_table, asset_lengths_by_table
+
+
+__all__ = [&quot;ReachedPaths&quot;, &quot;FetchFn&quot;, &quot;compute_reachability&quot;]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py -v</code>
+Expected: PASS (9 tests)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/_reachability.py tests/dataset/test_reachability.py
+git commit -m &quot;feat(estimate): compute_reachability orchestration + multi-path union&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-csv-byte-sampling-from-fetched-rows">Task 5: CSV-byte sampling from fetched rows</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/_reachability.py</code>
+- Test: <code>tests/dataset/test_reachability.py</code></p>
+<p>The old path took a 100-row <code>sample</code> query per table. The engine already has every table's rows in memory, so derive the sample directly — no extra query. Return a <code>sample_rows_by_table</code> so <code>assemble_estimate</code> keeps its CSV-byte estimation unchanged.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<pre><code class="language-python"># add to tests/dataset/test_reachability.py
+from deriva_ml.dataset._reachability import sample_rows_from_fetched
+
+
+def test_sample_rows_from_fetched_caps_at_100():
+    fetched = {(&quot;S&quot;, &quot;T&quot;): [{&quot;RID&quot;: f&quot;r{i}&quot;, &quot;x&quot;: i} for i in range(250)]}
+    reached = {(&quot;S&quot;, &quot;T&quot;): [((&quot;S&quot;, &quot;T&quot;),)]}
+    samples = sample_rows_from_fetched(reached=reached, fetched_rows=fetched, limit=100)
+    assert len(samples[&quot;T&quot;]) == 100
+    assert samples[&quot;T&quot;][0] == {&quot;RID&quot;: &quot;r0&quot;, &quot;x&quot;: 0}
+
+
+def test_sample_rows_from_fetched_empty_table_absent():
+    fetched = {(&quot;S&quot;, &quot;T&quot;): []}
+    reached = {(&quot;S&quot;, &quot;T&quot;): [((&quot;S&quot;, &quot;T&quot;),)]}
+    samples = sample_rows_from_fetched(reached=reached, fetched_rows=fetched, limit=100)
+    assert &quot;T&quot; not in samples
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py::test_sample_rows_from_fetched_caps_at_100 -v</code>
+Expected: FAIL — <code>ImportError: cannot import name 'sample_rows_from_fetched'</code></p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<p>Note: <code>compute_reachability</code> must expose the fetched rows for this. Refactor so the fetch map is reusable — change <code>compute_reachability</code> to also return nothing new (keep its 2-tuple contract) but extract sampling as a sibling that re-reads from a shared fetch. Simplest: have the production caller hold the fetched rows. To keep the engine's public surface clean, <code>sample_rows_from_fetched</code> takes the same <code>reached</code> + a <code>fetched_rows</code> map. The caller (Task 6) obtains <code>fetched_rows</code> by having <code>compute_reachability</code> optionally return it.</p>
+<p>Update <code>compute_reachability</code> to return a 3-tuple <code>(rids_by_table, asset_lengths_by_table, fetched_rows)</code> and adjust Task 4's test accordingly (the test unpacks 3 values, ignoring the third). Then:</p>
+<pre><code class="language-python"># add to src/deriva_ml/dataset/_reachability.py
+def sample_rows_from_fetched(
+    *,
+    reached: ReachedPaths,
+    fetched_rows: dict[tuple[str, str], list[dict]],
+    limit: int = 100,
+) -&gt; dict[str, list[dict]]:
+    &quot;&quot;&quot;Take up to ``limit`` sample rows per reached table from fetched rows.
+
+    The CSV-byte estimator needs a few representative rows per table to gauge
+    serialised size. Because the engine already fetched every table's rows,
+    the sample is a slice — no extra query (the old path issued one
+    ``?limit=100`` query per table).
+
+    Args:
+        reached: The reached-paths map (keys identify the tables to sample).
+        fetched_rows: ``{(schema, table): rows}`` from the engine fetch.
+        limit: Max sample rows per table.
+
+    Returns:
+        ``{table_name: [row, ...]}`` — tables with zero fetched rows are omitted.
+
+    Example:
+        &gt;&gt;&gt; rows = {(&quot;S&quot;, &quot;T&quot;): [{&quot;RID&quot;: &quot;r0&quot;}]}
+        &gt;&gt;&gt; sample_rows_from_fetched(reached={(&quot;S&quot;, &quot;T&quot;): [((&quot;S&quot;, &quot;T&quot;),)]},
+        ...                          fetched_rows=rows, limit=10)
+        {'T': [{'RID': 'r0'}]}
+    &quot;&quot;&quot;
+    samples: dict[str, list[dict]] = {}
+    for key in reached:
+        rows = fetched_rows.get(key, [])
+        if rows:
+            samples[key[1]] = rows[:limit]
+    return samples
+</code></pre>
+<p>Also update <code>compute_reachability</code>'s return statement and <code>__all__</code>:</p>
+<pre><code class="language-python">    return rids_by_table, asset_lengths_by_table, fetched_rows
+</code></pre>
+<pre><code class="language-python">__all__ = [&quot;ReachedPaths&quot;, &quot;FetchFn&quot;, &quot;compute_reachability&quot;, &quot;sample_rows_from_fetched&quot;]
+</code></pre>
+<p>And update the Task 4 test's unpacking line to:</p>
+<pre><code class="language-python">    rids_by_table, asset_lengths_by_table, _fetched = compute_reachability(
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py -v</code>
+Expected: PASS (11 tests)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/_reachability.py tests/dataset/test_reachability.py
+git commit -m &quot;feat(estimate): derive CSV-byte samples from fetched rows&quot;
+</code></pre>
+<hr />
+<h3 id="task-6-wire-estimate_bag_size-to-the-engine-adapt-assemble_estimate">Task 6: Wire estimate_bag_size to the engine; adapt assemble_estimate</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code> (~2655–2790)
+- Modify: <code>src/deriva_ml/dataset/_estimate.py</code> (<code>assemble_estimate</code> signature)
+- Test: existing live estimate integration test (see Task 8)</p>
+<p>Replace the query-build + async-orchestration block with: build the walk, get <code>reached</code> + <code>anchor_rids</code> + <code>model</code>, build a <code>fetch</code> closure over the snapshot path builder, call <code>compute_reachability</code> + <code>sample_rows_from_fetched</code>, then <code>assemble_estimate</code>. <code>assemble_estimate</code> loses its <code>failed_by_table</code> param (the engine has no per-query failures).</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>A unit test that <code>estimate_bag_size</code> no longer imports the deleted functions. (Behavioral correctness is the live test in Task 8; this guards the wiring shape.)</p>
+<pre><code class="language-python"># add to tests/dataset/test_reachability.py
+def test_estimate_no_longer_imports_deep_join_helpers():
+    &quot;&quot;&quot;The deep-join path is deleted; estimate must not import it.&quot;&quot;&quot;
+    import inspect
+    from deriva_ml.dataset import dataset as dataset_mod
+    src = inspect.getsource(dataset_mod.Dataset.estimate_bag_size)
+    assert &quot;build_estimate_queries&quot; not in src
+    assert &quot;run_estimate_queries&quot; not in src
+    assert &quot;compute_reachability&quot; in src
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py::test_estimate_no_longer_imports_deep_join_helpers -v</code>
+Expected: FAIL — current source still references <code>build_estimate_queries</code></p>
+<ul>
+<li>[ ] <strong>Step 3: Write minimal implementation</strong></li>
+</ul>
+<p>Replace the body of <code>estimate_bag_size</code> from the import block through the <code>assemble_estimate</code> call with:</p>
+<pre><code class="language-python">        from deriva_ml.dataset._estimate import assemble_estimate
+        from deriva_ml.dataset._reachability import (
+            compute_reachability,
+            sample_rows_from_fetched,
+        )
+
+        if isinstance(version, str):
+            version = DatasetVersion.parse(version)
+
+        # Build a DatasetBagBuilder on the version snapshot. The walk (which
+        # tables are reachable, via which FK paths) is shared with the bag
+        # export; only the *execution* differs — see docs/adr/0008.
+        version_snapshot_catalog = self._version_snapshot_catalog(version)
+        builder = DatasetBagBuilder(
+            ml_instance=version_snapshot_catalog,
+            exclude_tables=exclude_tables,
+        )
+        cb = builder._catalog_bag_builder(dataset=self)
+        reached = cb.iter_reached_paths()
+        anchor_rids = [self.dataset_rid] + list(builder._iter_descendant_rids(self))
+        model = cb._get_model()
+
+        # Fetch closure: whole-table projected scan via the snapshot path
+        # builder. Cheap relative to deep FK joins (a 240k-row scan is ~0.3s;
+        # the join through it was 16-60s). Bound to the version snapshot.
+        pb = version_snapshot_catalog.pathBuilder()
+
+        def _fetch(schema: str, table: str, columns: set[str]) -&gt; list[dict]:
+            tpb = pb.schemas[schema].tables[table]
+            try:
+                attrs = [getattr(tpb, c) for c in sorted(columns)]
+                return list(tpb.attributes(*attrs).fetch())
+            except Exception:  # noqa: BLE001
+                # Defensive fallback: a projection naming a column the table
+                # lacks (model/data skew) degrades to a full-entity fetch
+                # rather than dropping the table from the estimate.
+                return list(tpb.entities().fetch())
+
+        rids_by_table, asset_lengths_by_table, fetched_rows = compute_reachability(
+            reached=reached, anchor_rids=anchor_rids, model=model, fetch=_fetch
+        )
+        sample_rows_by_table = sample_rows_from_fetched(
+            reached=reached, fetched_rows=fetched_rows
+        )
+
+        return assemble_estimate(
+            table_queries={
+                key[1]: [(None, None, model.schemas[key[0]].tables[key[1]].is_asset())]
+                for key in reached
+            },
+            rids_by_table=rids_by_table,
+            asset_lengths_by_table=asset_lengths_by_table,
+            sample_rows_by_table=sample_rows_by_table,
+            estimate_csv_bytes=self._estimate_csv_bytes,
+            human_readable_size=self._human_readable_size,
+        )
+</code></pre>
+<p>Then in <code>_estimate.py</code>, change <code>assemble_estimate</code>'s signature to drop <code>failed_by_table</code> (remove the param, the <code>failed_by_table = failed_by_table or {}</code> line, and all <code>incomplete</code> logic that referenced it — set every table's <code>incomplete</code> to <code>False</code> and top-level <code>incomplete</code> to <code>False</code>, <code>incomplete_tables</code> to <code>[]</code>). The <code>table_queries</code> param keeps the same shape <code>{name: [(_, _, is_asset)]}</code>; the engine supplies <code>(None, None, is_asset)</code> triples since assembly only reads <code>is_asset</code>.</p>
+<blockquote>
+<p><strong>Note on <code>table_queries</code> shape:</strong> <code>assemble_estimate</code> only uses
+<code>table_queries</code> to compute <code>asset_tables</code> via
+<code>any(is_asset for _, _, is_asset in entries)</code>. The <code>None, None</code>
+placeholders for datapath/target_table are never read. This is verified
+by reading <code>assemble_estimate</code> — its only <code>table_queries</code> access is the
+asset-detection comprehension at the top.</p>
+</blockquote>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py::test_estimate_no_longer_imports_deep_join_helpers tests/dataset/test_estimate_helpers.py -v</code>
+Expected: PASS (the import-shape test passes; <code>assemble_estimate</code> tests pass after their <code>failed_by_table</code> args are dropped — fix those in Task 7)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/dataset.py src/deriva_ml/dataset/_estimate.py tests/dataset/test_reachability.py
+git commit -m &quot;feat(estimate): wire estimate_bag_size to reachability engine&quot;
+</code></pre>
+<hr />
+<h3 id="task-7-delete-the-deep-join-path-fix-dependent-tests">Task 7: Delete the deep-join path; fix dependent tests</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/_estimate.py</code>
+- Modify: <code>tests/dataset/test_estimate_helpers.py</code></p>
+<p>Remove the now-dead deep-join functions per CLAUDE.md's "no backwards-compat shims". Keep <code>assemble_estimate</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<pre><code class="language-python"># add to tests/dataset/test_reachability.py
+def test_deep_join_helpers_are_deleted():
+    &quot;&quot;&quot;The retired deep-join estimate functions must be gone.&quot;&quot;&quot;
+    import deriva_ml.dataset._estimate as est
+    assert not hasattr(est, &quot;build_estimate_queries&quot;)
+    assert not hasattr(est, &quot;run_estimate_queries&quot;)
+    assert not hasattr(est, &quot;QueryItem&quot;)
+    assert hasattr(est, &quot;assemble_estimate&quot;)  # kept
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py::test_deep_join_helpers_are_deleted -v</code>
+Expected: FAIL — <code>build_estimate_queries</code> still present</p>
+<ul>
+<li>[ ] <strong>Step 3: Delete the dead code</strong></li>
+</ul>
+<p>From <code>src/deriva_ml/dataset/_estimate.py</code> remove: <code>QueryType</code>, <code>QueryItem</code>, <code>_extract_path</code>, <code>build_estimate_queries</code>, <code>DEFAULT_ESTIMATE_CONCURRENCY</code>, <code>run_estimate_queries</code>, and the <code>TYPE_CHECKING</code> import of <code>AsyncErmrestCatalog</code>/<code>AsyncErmrestSnapshot</code> if now unused. Trim <code>__all__</code> to <code>["assemble_estimate"]</code>. Update the module docstring to describe only <code>assemble_estimate</code>.</p>
+<p>In <code>tests/dataset/test_estimate_helpers.py</code> delete every test exercising the removed functions; keep and fix the <code>assemble_estimate</code> tests (drop any <code>failed_by_table=</code> kwargs from their calls, and drop assertions about <code>incomplete</code>/<code>incomplete_tables</code> being populated by failures — they are now always <code>False</code>/<code>[]</code>).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py tests/dataset/test_estimate_helpers.py -v</code>
+Expected: PASS (all reachability + remaining assemble_estimate tests)</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/_estimate.py tests/dataset/test_estimate_helpers.py tests/dataset/test_reachability.py
+git commit -m &quot;refactor(estimate): delete retired deep-join query path&quot;
+</code></pre>
+<hr />
+<h3 id="task-8-live-correctness-test-engine-server-union-on-demo-catalog">Task 8: Live correctness test — engine == server-union on demo catalog</h3>
+<p><strong>Files:</strong>
+- Modify: the live estimate integration test file (find via <code>grep -rln "estimate_bag_size" tests/</code>)</p>
+<p>Prove the engine produces the exact same per-table counts as the slow server-union path, on the demo catalog (needs <code>DERIVA_HOST</code>). This is the regression guard that makes the "exact" claim enforceable.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<pre><code class="language-python"># in the live estimate test file
+import os
+import pytest
+
+
+@pytest.mark.skipif(
+    os.environ.get(&quot;DERIVA_HOST&quot;) in (None, &quot;&quot;),
+    reason=&quot;needs a live catalog&quot;,
+)
+def test_reachability_matches_server_union(catalog_with_datasets):
+    &quot;&quot;&quot;The client-side engine's per-table counts must equal the server-side
+    RID-union for every reached table (exactness guard).&quot;&quot;&quot;
+    ml = catalog_with_datasets
+    # Pick a nested dataset from the fixture (has multi-path tables).
+    datasets = ml.find_datasets()
+    nested = next(d for d in datasets if ml.lookup_dataset(d[&quot;RID&quot;]).list_dataset_children())
+    ds = ml.lookup_dataset(nested[&quot;RID&quot;])
+    version = ds.dataset_version  # current version
+
+    # Client-side result.
+    est = ds.estimate_bag_size(version)
+    client_counts = {t: d[&quot;row_count&quot;] for t, d in est[&quot;tables&quot;].items()}
+
+    # Server-union reference via aggregate_queries (the retired engine's math,
+    # computed inline here purely as an oracle).
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+    snap = ds._version_snapshot_catalog(version)
+    builder = DatasetBagBuilder(ml_instance=snap)
+    tq = builder.aggregate_queries(ds)
+    for tname, entries in tq.items():
+        union = set()
+        for dp, pb_tbl, _is_asset in entries:
+            for row in dp.attributes(pb_tbl.RID).fetch():
+                union.add(row[&quot;RID&quot;])
+        assert client_counts.get(tname, 0) == len(union), (
+            f&quot;{tname}: client={client_counts.get(tname)} server={len(union)}&quot;
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails (or errors without catalog)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest &lt;test_file&gt;::test_reachability_matches_server_union -v --timeout=600</code>
+Expected: PASS if the engine is correct (this test validates Tasks 1–7 end-to-end). If it FAILS, the mismatch names the offending table — debug the FK resolution for that table before proceeding.</p>
+<ul>
+<li>[ ] <strong>Step 3: (No new impl — this test validates prior tasks)</strong></li>
+</ul>
+<p>If the test fails, the fix is in <code>_reachability.py</code> (likely a missing inbound-referenced column or an unhandled composite FK). Do not weaken the test.</p>
+<ul>
+<li>[ ] <strong>Step 4: Confirm pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest &lt;test_file&gt;::test_reachability_matches_server_union -v --timeout=600</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add &lt;test_file&gt;
+git commit -m &quot;test(estimate): pin engine == server-union exactness on demo catalog&quot;
+</code></pre>
+<hr />
+<h3 id="task-9-update-docs-adr-lint-suites-pr">Task 9: Update docs + ADR + lint + suites + PR</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/reference/bag-export.md</code> (~277–285)
+- Modify: <code>docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Update bag-export.md "Same engine, different consumer"</strong></li>
+</ul>
+<p>Replace the <code>estimate_bag_size</code> bullet (currently "runs live datapath aggregate queries against the reached tables and computes exact RID-union counts client-side") with text describing the client-side reachability engine: it shares the <em>walk</em> (<code>iter_reached_paths</code> + descendant anchors) but, instead of issuing per-FK-path aggregate queries, fetches each reached table's edge columns once and reconstructs reachability in memory — exact union counts, no deep server joins. Reference <code>dataset/_reachability.py::compute_reachability</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update ADR-0008</strong></li>
+</ul>
+<p>Add a dated note: the bypass mechanism changed from "per-FK-path live aggregate queries (async, concurrency-bounded)" to "client-side FK-reachability over once-fetched edge tables". The <em>decision</em> (estimate bypasses the bag export engine) is unchanged; the <em>implementation</em> of the bypass is now the reachability engine. Cross-link <code>docs/superpowers/specs/2026-06-14-portable-bag-csv-contract.md</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Lint + format</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check --fix src/deriva_ml/dataset/_reachability.py src/deriva_ml/dataset/_estimate.py src/deriva_ml/dataset/dataset.py tests/dataset/test_reachability.py &amp;&amp; uv run ruff format src/deriva_ml/dataset/_reachability.py tests/dataset/test_reachability.py
+</code></pre>
+<p>Expected: clean</p>
+<ul>
+<li>[ ] <strong>Step 4: Run the dataset unit + doctest suite</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability.py tests/dataset/test_estimate_helpers.py --doctest-modules src/deriva_ml/dataset/_reachability.py -q
+</code></pre>
+<p>Expected: all pass</p>
+<ul>
+<li>[ ] <strong>Step 5: Live re-measure on eye-ai 2-277G + branch, push, PR</strong></li>
+</ul>
+<p>Run a timed estimate against eye-ai 2-277G (needs a fresh www.eye-ai.org token) to confirm the wall-clock win and the totals (80 tables / 360756 rows / ~18 GB asset). Capture the number for the PR body.</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git checkout -b feature/reachability-engine-fast-estimate
+# (commits from Tasks 1-9 already on this branch if started here; else cherry-pick)
+git push -u origin feature/reachability-engine-fast-estimate
+gh pr create --title &quot;feat(estimate): client-side FK-reachability engine (10x faster, exact)&quot; \
+  --body &quot;Replaces ~377s of server-side deep-FK-join estimate queries with a client-side reachability engine: fetch each reached table's edge columns once, reconstruct FK reachability in memory, exact RID-union counts. eye-ai 2-277G: &lt;N&gt;s vs ~280s, identical totals (80 tables / 360756 rows / 18 GB). Stage A of the fast-estimate + portable-bag effort; Stage B (deriva-py csv-ridset processor + bag-gen rewire) reuses this engine. See docs/superpowers/specs/2026-06-14-portable-bag-csv-contract.md.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)&quot;
+</code></pre>
+<hr />
+<h2 id="self-review">Self-Review</h2>
+<p><strong>1. Spec coverage</strong> (against the connected investigation + memory <code>estimate-bag-size-client-side-join</code>):
+- Client-side reachability replaces deep joins → Tasks 1–6. ✓
+- Vocab-FK <code>Name</code> subtlety (inbound-referenced columns) → Task 2 (explicit test + impl). ✓
+- Multi-path RID-union for exact counts → Task 4. ✓
+- Asset <code>Length</code> sum over reached RIDs → Task 4. ✓
+- CSV-byte sampling preserved → Task 5. ✓
+- Exactness guard vs server-union → Task 8. ✓
+- Delete deep-join path (no shim, per CLAUDE.md) → Task 7. ✓
+- Engine reusable by Stage B → <code>compute_reachability</code> is the public, injectable entry point. ✓
+- Docs/ADR updated → Task 9. ✓</p>
+<p><strong>2. Placeholder scan:</strong> No "TBD"/"handle edge cases"/"similar to Task N". Each code step shows complete code. Task 8 Step 3 intentionally has no new impl (it validates prior tasks) and says so explicitly. ✓</p>
+<p><strong>3. Type consistency:</strong>
+- <code>compute_reachability</code> returns a 3-tuple <code>(rids_by_table, asset_lengths_by_table, fetched_rows)</code> — set in Task 4, amended in Task 5, consumed in Task 6. The Task 4 test unpacks 3 (amended in Task 5 Step 3). ✓
+- <code>_reached_rids_for_path</code> signature (keyword-only <code>anchor_rids</code>/<code>fetched_rows</code>/<code>model</code>) consistent across Tasks 3, 4. ✓
+- <code>_fk_join_columns</code> / <code>_needed_columns</code> signatures consistent across Tasks 1, 2, 3, 4. ✓
+- <code>assemble_estimate</code> loses <code>failed_by_table</code> (Task 6) and its tests are fixed (Task 7) — consistent. ✓
+- <code>FetchFn = (schema, table, columns) -&gt; rows</code> consistent in the interface block, Task 4, Task 6. ✓</p>
+<p><strong>Caveat flagged for the implementer:</strong> Task 5 changes <code>compute_reachability</code>'s return arity (2-tuple → 3-tuple). The implementer must update the Task 4 test's unpacking line when doing Task 5 (called out in Task 5 Step 3). If executing strictly task-by-task, expect the Task 4 test to need a one-line edit during Task 5 — this is intentional, not a defect.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

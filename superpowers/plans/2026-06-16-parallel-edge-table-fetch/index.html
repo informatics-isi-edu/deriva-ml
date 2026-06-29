@@ -1,0 +1,2418 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-16-parallel-edge-table-fetch/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Parallel edge-table fetch in compute_reachability — Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#parallel-edge-table-fetch-in-compute_reachability-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Parallel edge-table fetch in compute_reachability — Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-engine-max_workers-on-compute_reachability-opt-in-parallel-fetch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Engine — max_workers on compute_reachability (opt-in parallel fetch)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-thread-reachability_concurrency-through-_compute_rid_sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Thread reachability_concurrency through _compute_rid_sets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-surface-reachability_concurrency-on-the-public-entry-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Surface reachability_concurrency on the public entry points
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-exactness-gate-lint-optional-live-re-measure-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Exactness gate + lint + (optional) live re-measure + PR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="parallel-edge-table-fetch-in-compute_reachability-implementation-plan">Parallel edge-table fetch in compute_reachability — Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Parallelize the sequential edge-table fetch loop in <code>compute_reachability</code> (opt-in, bounded), speeding up the estimate AND bag generation (spec + build) which share <code>_compute_rid_sets</code>.</p>
+<p><strong>Architecture:</strong> Add <code>max_workers: int = 1</code> to <code>compute_reachability</code>; when &gt;1, run the fetch phase through a bounded <code>ThreadPoolExecutor</code>. Default 1 = current sequential behavior, byte-identical output. Thread a distinct <code>reachability_concurrency</code> knob through <code>_compute_rid_sets</code> (the shared chokepoint reaching all three callers), then surface it on the public entry points alongside — not conflated with — the existing materialization <code>fetch_concurrency</code>.</p>
+<p><strong>Tech Stack:</strong> Python 3.12, <code>uv</code>, pytest, <code>concurrent.futures.ThreadPoolExecutor</code>.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-06-16-parallel-edge-table-fetch-design.md</code></p>
+<hr />
+<h3 id="task-1-engine-max_workers-on-compute_reachability-opt-in-parallel-fetch">Task 1: Engine — <code>max_workers</code> on <code>compute_reachability</code> (opt-in parallel fetch)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/_reachability.py</code> (<code>compute_reachability</code>, the fetch loop ~line 250)
+- Test: <code>tests/dataset/test_reachability.py</code> (add cases; create if absent)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests (equivalence + concurrency + error propagation)</strong></li>
+</ul>
+<pre><code class="language-python"># tests/dataset/test_reachability_concurrency.py
+&quot;&quot;&quot;compute_reachability's opt-in parallel fetch is exact, actually concurrent,
+and propagates fetch errors. Catalog-free: the fetch fn is injected.&quot;&quot;&quot;
+from __future__ import annotations
+
+import threading
+
+import pytest
+
+from deriva_ml.dataset._reachability import compute_reachability
+
+
+class _Model:
+    &quot;&quot;&quot;Minimal model stub: every table non-asset, no inbound FK columns.&quot;&quot;&quot;
+
+    class _T:
+        def is_asset(self):
+            return False
+
+        column_definitions = type(&quot;C&quot;, (), {&quot;elements&quot;: []})()
+        referenced_by = []
+
+    class _S:
+        tables = {}
+
+        def __getitem__(self, name):
+            return _Model._T()
+
+    schemas = {}
+
+    def __init__(self, segs):
+        # every (schema, table) resolves to a non-asset table
+        schemas = {}
+        for s, t in segs:
+            schemas.setdefault(s, _Model._S())
+            schemas[s].tables[t] = _Model._T()
+        self.schemas = _DictSchemas(schemas)
+
+
+class _DictSchemas(dict):
+    def __getitem__(self, k):
+        return super().__getitem__(k)
+
+
+def _reached(segs):
+    # one single-hop path per table: reached[(s,t)] = [ (s,t), ]
+    return {seg: [(seg,)] for seg in segs}
+
+
+def _make_fetch(seen_threads=None):
+    def fetch(s, t, cols):
+        if seen_threads is not None:
+            seen_threads.add(threading.get_ident())
+        # deterministic rows keyed by table; RID equals &quot;&lt;t&gt;-&lt;i&gt;&quot;
+        return [{&quot;RID&quot;: f&quot;{t}-{i}&quot;} for i in range(3)]
+
+    return fetch
+
+
+SEGS = [(&quot;demo&quot;, f&quot;T{i}&quot;) for i in range(6)]
+
+
+def test_parallel_matches_sequential_exactly():
+    model = _Model(SEGS)
+    reached = _reached(SEGS)
+    anchors = []
+
+    seq = compute_reachability(
+        reached=reached, anchor_rids=anchors, model=model, fetch=_make_fetch(), max_workers=1
+    )
+    par = compute_reachability(
+        reached=reached, anchor_rids=anchors, model=model, fetch=_make_fetch(), max_workers=8
+    )
+    assert seq[0] == par[0]  # rids_by_table
+    assert seq[1] == par[1]  # asset_lengths_by_table
+    assert seq[2] == par[2]  # fetched_rows
+
+
+def test_parallel_actually_uses_threads():
+    model = _Model(SEGS)
+    threads_par: set[int] = set()
+    compute_reachability(
+        reached=_reached(SEGS), anchor_rids=[], model=model,
+        fetch=_make_fetch(threads_par), max_workers=4,
+    )
+    assert len(threads_par) &gt; 1, &quot;parallel path did not use multiple threads&quot;
+
+    threads_seq: set[int] = set()
+    compute_reachability(
+        reached=_reached(SEGS), anchor_rids=[], model=model,
+        fetch=_make_fetch(threads_seq), max_workers=1,
+    )
+    assert len(threads_seq) == 1, &quot;sequential path used more than one thread&quot;
+
+
+def test_parallel_propagates_fetch_error():
+    model = _Model(SEGS)
+
+    def boom(s, t, cols):
+        if t == &quot;T3&quot;:
+            raise RuntimeError(&quot;fetch failed&quot;)
+        return [{&quot;RID&quot;: f&quot;{t}-0&quot;}]
+
+    with pytest.raises(RuntimeError, match=&quot;fetch failed&quot;):
+        compute_reachability(
+            reached=_reached(SEGS), anchor_rids=[], model=model, fetch=boom, max_workers=8
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability_concurrency.py -q</code>
+Expected: FAIL — <code>compute_reachability()</code> got an unexpected keyword argument <code>max_workers</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>max_workers</code></strong></li>
+</ul>
+<p>In <code>compute_reachability</code> add <code>max_workers: int = 1</code> to the signature, and replace the fetch loop (currently the <code>for seg in edge_tables: fetched_rows[seg] = fetch(...)</code> block):</p>
+<pre><code class="language-python">def compute_reachability(
+    *,
+    reached: ReachedPaths,
+    anchor_rids: list[str],
+    model: Any,
+    fetch: FetchFn,
+    max_workers: int = 1,
+) -&gt; tuple[...]:
+    ...
+    # 2. Fetch each edge table ONCE, projected. Opt-in bounded parallelism:
+    # the fetches are independent reads writing distinct keys, so order does
+    # not matter; max_workers=1 keeps the exact sequential behavior.
+    fetched_rows: dict[tuple[str, str], list[dict]] = {}
+    if max_workers &gt; 1 and len(edge_tables) &gt; 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        workers = min(max_workers, len(edge_tables))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(fetch, s, t, _needed_columns((s, t), model)): (s, t)
+                for (s, t) in edge_tables
+            }
+            for fut, seg in futures.items():
+                fetched_rows[seg] = fut.result()  # re-raises fetch errors
+    else:
+        for seg in edge_tables:
+            s, t = seg
+            fetched_rows[seg] = fetch(s, t, _needed_columns(seg, model))
+</code></pre>
+<p>Update the docstring <code>Args:</code> to document <code>max_workers</code> (opt-in bounded parallelism; default 1 = sequential, exact).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_reachability_concurrency.py -q</code>
+Expected: PASS (3 tests).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/dataset/_reachability.py tests/dataset/test_reachability_concurrency.py
+git commit -m &quot;perf(reachability): opt-in bounded-parallel edge-table fetch in compute_reachability&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-thread-reachability_concurrency-through-_compute_rid_sets">Task 2: Thread <code>reachability_concurrency</code> through <code>_compute_rid_sets</code></h3>
+<p><code>_compute_rid_sets</code> is the shared chokepoint for the estimate + the two bag-gen paths. Add the knob here so all three benefit.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/bag_builder.py</code> (<code>_compute_rid_sets</code> ~line 604, and its three internal callers within bag_builder.py if they should pass it)
+- Test: <code>tests/dataset/test_format_b_bag.py</code> (extend the existing source-inspection guard)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<pre><code class="language-python">def test_compute_rid_sets_threads_reachability_concurrency():
+    &quot;&quot;&quot;_compute_rid_sets accepts reachability_concurrency and forwards it to
+    compute_reachability as max_workers.&quot;&quot;&quot;
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    sig = inspect.signature(DatasetBagBuilder._compute_rid_sets)
+    assert &quot;reachability_concurrency&quot; in sig.parameters
+    assert sig.parameters[&quot;reachability_concurrency&quot;].default == 1
+
+    src = inspect.getsource(DatasetBagBuilder._compute_rid_sets)
+    assert &quot;max_workers=reachability_concurrency&quot; in src
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py::test_compute_rid_sets_threads_reachability_concurrency -q</code>
+Expected: FAIL.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement</strong></li>
+</ul>
+<p>Add <code>reachability_concurrency: int = 1</code> to <code>_compute_rid_sets</code>'s signature and pass <code>max_workers=reachability_concurrency</code> into the <code>compute_reachability(...)</code> call (~line 655). Document the param.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run test + the broader format-b suite</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_format_b_bag.py -q</code>
+Expected: PASS (existing + new).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/dataset/bag_builder.py tests/dataset/test_format_b_bag.py
+git commit -m &quot;perf(bag): thread reachability_concurrency through _compute_rid_sets (estimate + spec + build)&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-surface-reachability_concurrency-on-the-public-entry-points">Task 3: Surface <code>reachability_concurrency</code> on the public entry points</h3>
+<p>Thread the knob to the user-facing methods. Keep it distinct from the materialization <code>fetch_concurrency</code>.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code> — <code>estimate_bag_size</code>, <code>bag_info</code>, <code>download_dataset_bag</code>, <code>cache</code> (add <code>reachability_concurrency: int = 1</code>, pass to <code>_compute_rid_sets</code> / through to the bag-gen path)
+- Modify: <code>src/deriva_ml/dataset/bag_builder.py</code> — <code>build_bag</code>, <code>generate_dataset_download_spec</code> (accept + forward to <code>_compute_rid_sets</code>)
+- Modify: <code>src/deriva_ml/core/mixins/dataset.py</code> — the <code>DerivaML.estimate_bag_size</code> / <code>bag_info</code> / <code>download_dataset_bag</code> wrappers, if they re-declare the args
+- Test: <code>tests/dataset/test_format_b_bag.py</code> + a signature test</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing signature tests</strong></li>
+</ul>
+<pre><code class="language-python">def test_public_entry_points_expose_reachability_concurrency():
+    import inspect
+
+    from deriva_ml.dataset.dataset import Dataset
+
+    for name in (&quot;estimate_bag_size&quot;, &quot;bag_info&quot;):
+        sig = inspect.signature(getattr(Dataset, name))
+        assert &quot;reachability_concurrency&quot; in sig.parameters, name
+        assert sig.parameters[&quot;reachability_concurrency&quot;].default == 1, name
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_format_b_bag.py::test_public_entry_points_expose_reachability_concurrency -q</code>
+Expected: FAIL.</p>
+<ul>
+<li>
+<p>[ ] <strong>Step 3: Implement the wiring</strong></p>
+</li>
+<li>
+<p><code>Dataset.estimate_bag_size(version, exclude_tables=None, reachability_concurrency=1)</code> → <code>builder._compute_rid_sets(self, reachability_concurrency=reachability_concurrency)</code>.</p>
+</li>
+<li><code>Dataset.bag_info(...)</code> → pass through to <code>estimate_bag_size</code>.</li>
+<li><code>Dataset.build_bag</code> / <code>generate_dataset_download_spec</code> → accept <code>reachability_concurrency</code>, forward to <code>_compute_rid_sets</code>.</li>
+<li><code>Dataset.download_dataset_bag</code> / <code>cache</code> → accept <code>reachability_concurrency</code> <strong>alongside</strong> the existing <code>fetch_concurrency</code>; forward the former to the bag-gen <code>_compute_rid_sets</code> and leave the latter on the asset-download path. Update docstrings to make the distinction explicit (reachability fetch vs asset file download).</li>
+<li>
+<p>Mirror on the <code>DerivaML</code> mixin wrappers in <code>core/mixins/dataset.py</code> where they re-declare args (and on <code>DatasetSpec</code> if it carries <code>fetch_concurrency</code> — check and add <code>reachability_concurrency</code> there too for parity).</p>
+</li>
+<li>
+<p>[ ] <strong>Step 4: Run signature + full format-b + download suites</strong></p>
+</li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_format_b_bag.py tests/dataset/test_download.py -q</code>
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add -A
+git commit -m &quot;perf(bag): surface reachability_concurrency on estimate/bag_info/download/cache (distinct from fetch_concurrency)&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-exactness-gate-lint-optional-live-re-measure-pr">Task 4: Exactness gate + lint + (optional) live re-measure + PR</h3>
+<p><strong>Files:</strong>
+- Test: existing live exactness test (<code>tests/dataset/test_estimate_bag_size.py</code> differential test), re-run with <code>reachability_concurrency&gt;1</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Add a live exactness assertion under concurrency</strong></li>
+</ul>
+<p>Add (or parametrize) a live test that runs the estimate with <code>reachability_concurrency=8</code> and asserts it equals the <code>reachability_concurrency=1</code> result on the demo catalog (per-table counts + asset bytes identical):</p>
+<pre><code class="language-python">@pytest.mark.skipif(os.environ.get(&quot;DERIVA_HOST&quot;) in (None, &quot;&quot;), reason=&quot;needs a live catalog&quot;)
+def test_estimate_parallel_matches_sequential_live(catalog_with_datasets):
+    ml, _ = catalog_with_datasets
+    datasets = list(ml.find_datasets())
+    nested = next((d for d in datasets if d.list_dataset_children()), None)
+    if nested is None:
+        pytest.skip(&quot;need a nested dataset&quot;)
+    v = nested.current_version
+    seq = nested.estimate_bag_size(v, reachability_concurrency=1)
+    par = nested.estimate_bag_size(v, reachability_concurrency=8)
+    # Compare the stable, order-insensitive fields.
+    assert seq[&quot;tables&quot;] == par[&quot;tables&quot;]
+    assert seq[&quot;total_asset_bytes&quot;] == par[&quot;total_asset_bytes&quot;]
+    assert seq[&quot;total_rows&quot;] == par[&quot;total_rows&quot;]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run it + the estimate exactness suite</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_estimate_bag_size.py tests/dataset/test_format_b_bag.py -q</code>
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 3: Lint + format</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check --fix src/deriva_ml/dataset/_reachability.py src/deriva_ml/dataset/bag_builder.py src/deriva_ml/dataset/dataset.py src/deriva_ml/core/mixins/dataset.py tests/dataset/test_reachability_concurrency.py tests/dataset/test_format_b_bag.py &amp;&amp; uv run ruff format &lt;same files&gt;</code>
+Expected: clean. (Scope format args to the touched files only — do NOT <code>ruff format tests/dataset/</code> wholesale; it reformats unrelated files.)</p>
+<ul>
+<li>[ ] <strong>Step 4: (Optional) live 2-277G re-measure</strong></li>
+</ul>
+<p>If an eye-ai bearer token is available: measure <code>estimate_bag_size</code> on 2-277G with <code>reachability_concurrency=1</code> vs <code>8</code>, exactness preserved, record the wall-clock delta in the PR. If no token, state in the PR that the at-scale speedup is unverified and the change is behavior-preserving by default (sequential default).</p>
+<ul>
+<li>[ ] <strong>Step 5: Branch, commit, PR</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add -A
+git commit -m &quot;test(reachability): live exactness under parallel fetch + plan/spec&quot;
+git push -u origin perf/parallel-reachability-fetch
+gh pr create --title &quot;perf(bag): opt-in parallel edge-table fetch for estimate + bag generation&quot; --body &quot;&lt;summary + spec link + the three-caller scope + default-sequential + exactness gate + measurement caveat&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="self-review-notes">Self-Review notes</h2>
+<ul>
+<li><strong>Spec coverage:</strong> Task 1 = engine knob; Task 2 = <code>_compute_rid_sets</code> chokepoint (reaches all 3 callers); Task 3 = public surface (distinct from <code>fetch_concurrency</code>); Task 4 = exactness gate + PR. All spec sections covered.</li>
+<li><strong>Default-preserving:</strong> every new param defaults to 1 → byte-identical current behavior; the parallel path is opt-in. The Task-1 equivalence test + Task-4 live exactness test pin "parallel == sequential."</li>
+<li><strong>Naming:</strong> <code>reachability_concurrency</code> everywhere public; <code>max_workers</code> only inside <code>compute_reachability</code>. Never reuse <code>fetch_concurrency</code> (materialization file downloads).</li>
+<li><strong>Scope discipline:</strong> lint/format only the touched files (the prior PR's wholesale <code>ruff format tests/dataset/</code> swept 17 unrelated files — do not repeat).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

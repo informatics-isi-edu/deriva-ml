@@ -1,0 +1,2737 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-06-27-directory-dataset-root-path-name/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Directory Dataset Root Path Name — Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#directory-dataset-root-path-name-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Directory Dataset Root Path Name — Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#global-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Constraints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Global Constraints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-_root_path_name-helper-writer-change-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: _root_path_name helper + writer change (deriva-ml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-is_source_root-accessor-on-dataset-live-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: is_source_root accessor on Dataset (live) (deriva-ml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-is_source_root-accessor-on-datasetbag-offline-bag-tests-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: is_source_root accessor on DatasetBag (offline) + bag tests (deriva-ml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-schema-comment-remaining-docs-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Schema comment + remaining docs (deriva-ml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-deriva-ml-full-suite-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: deriva-ml full suite + release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-6-cifar-example-readers-lock-bump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: cifar-example readers + lock bump
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-7-cifar-example-test_find_source_dataset-stub-live-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: cifar-example test_find_source_dataset stub + live verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-8-deriva-skills-template-readers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: deriva-skills template readers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="directory-dataset-root-path-name-implementation-plan">Directory Dataset Root Path Name — Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> The root node of an <code>add_files</code> nested File-dataset tree records its directory basename (e.g. <code>cifar10_source</code>) in <code>Directory_Dataset.Path</code> instead of the literal <code>"."</code>, and a new structural <code>is_source_root</code> accessor replaces every <code>source_directory == "."</code> root-identification reader across three repos.</p>
+<p><strong>Architecture:</strong> Add <code>_root_path_name()</code> beside <code>_root_description()</code> in deriva-ml's <code>core/mixins/file.py</code> (shared name precedence: <code>root_name or ingest_root.name or "root"</code>); change the one writer line so the root stores that name. Add an <code>is_source_root</code> property to both <code>Dataset</code> (live) and <code>DatasetBag</code> (offline) defined structurally as "is a directory dataset AND has no parent that is a directory dataset" — name-independent, so it works on both pre-change (<code>"."</code>) and new catalogs. Migrate the five <code>== "."</code> readers to <code>is_source_root</code>. No schema migration, no catalog backfill.</p>
+<p><strong>Tech Stack:</strong> Python 3.13, <code>uv</code>, pytest, deriva-py path/ORM APIs, hydra-zen (cifar-example only), setuptools_scm + <code>bump-version</code>.</p>
+<h2 id="global-constraints">Global Constraints</h2>
+<ul>
+<li><strong>deriva-ml ships first.</strong> It defines <code>is_source_root</code>; cifar-example and deriva-skills consume it. Order: all deriva-ml tasks → release → cifar-example lock bump → deriva-skills.</li>
+<li><strong><code>is_source_root</code> rule (verified live on catalog 328):</strong> <code>self.is_directory and not any(p.is_directory for p in self.list_dataset_parents())</code>. Root <code>AT4</code> → True; <code>train</code>/<code>test</code> children → False; <code>split_dataset()</code> outputs (parents but no <code>Directory_Dataset</code> row) → False.</li>
+<li><strong>Root Path precedence = root Description precedence:</strong> <code>root_name or ingest_root.name or "root"</code>. Never empty. Path and Description name the root identically.</li>
+<li><strong>Children Path unchanged:</strong> still <code>directory.relative_to(ingest_root).as_posix()</code>.</li>
+<li><strong>No schema migration</strong> (only the <code>Directory_Dataset.Path</code> column <em>comment</em> changes) and <strong>no catalog backfill</strong> (<code>is_source_root</code> is structural, works on old <code>"."</code> catalogs).</li>
+<li><strong>Use <code>uv</code> for everything</strong>: <code>uv run python -m pytest …</code>, <code>uv run ruff …</code>. Never bare <code>pytest</code>/<code>python</code>/<code>ruff</code>.</li>
+<li><strong>Google-style docstrings</strong> with runnable <code>Example:</code> on every new function/property.</li>
+<li><strong>Dirty-tree override for live tests:</strong> prefix live-catalog test commands with <code>DERIVA_ML_ALLOW_DIRTY=true</code>.</li>
+<li><strong>deriva-ml is a shared multi-agent repo:</strong> all deriva-ml work happens on branch <code>directory-dataset-root-path-name</code> (already created; the spec is committed there). Do not merge to main without review.</li>
+</ul>
+<hr />
+<h3 id="task-1-_root_path_name-helper-writer-change-deriva-ml">Task 1: <code>_root_path_name</code> helper + writer change (deriva-ml)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>deriva-ml/src/deriva_ml/core/mixins/file.py</code> (add <code>_root_path_name</code> after <code>_root_description</code> at ~line 144; change the writer at line 382)
+- Test: <code>deriva-ml/tests/core/test_file.py</code> (update <code>test_add_files_directory_datasets_record_path</code> at line 145; <code>test_dataset_source_directory_and_is_directory_accessor</code> at line 264)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>_root_description(ingest_root, root_name, description)</code> (existing, file.py:105); <code>add_files</code> <code>root_name</code> param (existing).
+- Produces: <code>_root_path_name(ingest_root: Path, root_name: str | None) -&gt; str</code> — returns <code>root_name or ingest_root.name or "root"</code>. Used only by the <code>add_files</code> writer.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update the writer test to the new contract (failing)</strong></li>
+</ul>
+<p>In <code>tests/core/test_file.py</code>, <code>test_add_files_directory_datasets_record_path</code> (line 173), change the root assertion from <code>"."</code> to the ingest-root basename. The fixture's <code>test_dir</code> is named <code>"test_dir"</code> (file.py setup line 28), so:</p>
+<pre><code class="language-python">        # Root Directory_Dataset.Path is now the ingest-root basename, not &quot;.&quot;.
+        assert path_by_dataset[file_dataset.dataset_rid] == &quot;test_dir&quot;
+        child_paths = {path_by_dataset[c.dataset_rid] for c in file_dataset.list_dataset_children()}
+        assert child_paths == {&quot;d1&quot;, &quot;d2&quot;}
+</code></pre>
+<p>Also update the docstring line 147 from <code>the ingest root stores '.'.</code> to <code>the ingest root stores its directory basename.</code></p>
+<ul>
+<li>[ ] <strong>Step 2: Run it to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/test_file.py::TestFileMixin::test_add_files_directory_datasets_record_path -v</code>
+Expected: FAIL — <code>assert '.' == 'test_dir'</code> (writer still stores <code>"."</code>).</p>
+<p>(If the test class name differs, discover it with <code>uv run python -m pytest tests/core/test_file.py --collect-only -q | grep record_path</code>.)</p>
+<ul>
+<li>[ ] <strong>Step 3: Add <code>_root_path_name</code> helper</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/file.py</code>, immediately after <code>_root_description</code> (ends line 144), add:</p>
+<pre><code class="language-python">def _root_path_name(ingest_root: Path, root_name: str | None) -&gt; str:
+    &quot;&quot;&quot;Folder name to store in ``Directory_Dataset.Path`` for the ingest root.
+
+    Shares precedence with :func:`_root_description` so the root dataset's
+    ``Path`` and ``Description`` name it identically. Unlike the description,
+    there is no caller-``description`` fallback — the root's *folder* is its
+    basename, not a prose blurb — but the empty-basename guard is the same.
+
+    Precedence (first truthy value wins):
+    1. ``root_name`` (explicit caller override)
+    2. ``ingest_root.name`` (basename, if non-empty)
+    3. ``&quot;root&quot;`` (sentinel — never returns an empty string)
+
+    Args:
+        ingest_root: The common-ancestor directory of all ingested files.
+        root_name: Caller-supplied name for the root dataset, or ``None``.
+
+    Returns:
+        str: A non-empty folder name for the root's ``Directory_Dataset.Path``.
+
+    Example:
+        &gt;&gt;&gt; _root_path_name(Path(&quot;/tmp/abc/cifar10_source&quot;), None)
+        'cifar10_source'
+        &gt;&gt;&gt; _root_path_name(Path(&quot;/tmp/abc/cifar10_source&quot;), &quot;CIFAR-10 source&quot;)
+        'CIFAR-10 source'
+        &gt;&gt;&gt; _root_path_name(Path(&quot;/&quot;), None)
+        'root'
+    &quot;&quot;&quot;
+    return root_name or ingest_root.name or &quot;root&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Change the writer to use it</strong></li>
+</ul>
+<p>In <code>add_files</code> (file.py:378-386), change the <code>"Path"</code> value (line 382) from:</p>
+<pre><code class="language-python">                    &quot;Path&quot;: &quot;.&quot; if directory == ingest_root else directory.relative_to(ingest_root).as_posix(),
+</code></pre>
+<p>to:</p>
+<pre><code class="language-python">                    &quot;Path&quot;: _root_path_name(ingest_root, root_name)
+                    if directory == ingest_root
+                    else directory.relative_to(ingest_root).as_posix(),
+</code></pre>
+<p>Also update the comment at line 376 from <code>(the root stores ".")</code> to <code>(the root stores its basename)</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Update the second accessor test to the new contract</strong></li>
+</ul>
+<p>In <code>test_dataset_source_directory_and_is_directory_accessor</code> (line 278), change:</p>
+<pre><code class="language-python">        assert root.source_directory == &quot;.&quot;
+</code></pre>
+<p>to:</p>
+<pre><code class="language-python">        assert root.source_directory == &quot;test_dir&quot;
+</code></pre>
+<p>(The <code>plain.source_directory is None</code> and child <code>{"d1","d2"}</code> assertions stay unchanged.)</p>
+<ul>
+<li>[ ] <strong>Step 6: Run both tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/test_file.py::TestFileMixin::test_add_files_directory_datasets_record_path tests/core/test_file.py::TestFileMixin::test_dataset_source_directory_and_is_directory_accessor -v</code>
+Expected: PASS (2 passed). Also run the doctest on the new helper:
+<code>uv run python -m pytest --doctest-modules src/deriva_ml/core/mixins/file.py -k _root_path_name -q</code> → expected PASS.</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/core/mixins/file.py tests/core/test_file.py
+git commit -m &quot;feat(add_files): root Directory_Dataset.Path stores basename, not '.'
+
+Co-Authored-By: Claude Opus 4.8 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-is_source_root-accessor-on-dataset-live-deriva-ml">Task 2: <code>is_source_root</code> accessor on <code>Dataset</code> (live) (deriva-ml)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>deriva-ml/src/deriva_ml/dataset/dataset.py</code> (add property after <code>is_directory</code> at ~line 216; update <code>source_directory</code> docstring at line 171)
+- Test: <code>deriva-ml/tests/core/test_file.py</code> (new live test)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>Dataset.is_directory</code> (property, dataset.py:197); <code>Dataset.list_dataset_parents()</code> (dataset.py:2331) → <code>list[Dataset]</code>, each with <code>.is_directory</code>.
+- Produces: <code>Dataset.is_source_root</code> (property) → <code>bool</code>. <code>True</code> iff this dataset is a directory dataset and none of its parents is a directory dataset.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing live test</strong></li>
+</ul>
+<p>In <code>tests/core/test_file.py</code>, add a method to the same test class (alongside <code>test_dataset_source_directory_and_is_directory_accessor</code>):</p>
+<pre><code class="language-python">    def test_dataset_is_source_root_accessor(self, file_table_setup):
+        &quot;&quot;&quot;is_source_root is True for the add_files tree root, False for its
+        directory children and for non-directory datasets. Identification is
+        structural (parent graph), not based on the Path string.&quot;&quot;&quot;
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, &quot;Test Directory&quot;)
+            root = exe.add_files(filespecs, description=&quot;Ingest run&quot;)
+            plain = exe.create_dataset(dataset_types=&quot;Complete&quot;, description=&quot;not a dir&quot;)
+
+        # The root is the source root.
+        assert root.is_source_root is True
+        # Directory children are NOT source roots (they have a directory parent).
+        assert all(not child.is_source_root for child in root.list_dataset_children())
+        # A non-directory dataset is never a source root.
+        assert plain.is_source_root is False
+
+        # Identity is structural, independent of the Path value: locate the root
+        # among all CIFAR-tree datasets via is_source_root and confirm it's `root`.
+        tree = [root] + list(root.list_dataset_children())
+        roots = [d for d in tree if d.is_source_root]
+        assert [d.dataset_rid for d in roots] == [root.dataset_rid]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run it to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/test_file.py::TestFileMixin::test_dataset_is_source_root_accessor -v</code>
+Expected: FAIL — <code>AttributeError: 'Dataset' object has no attribute 'is_source_root'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the property</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/dataset.py</code>, after the <code>is_directory</code> property (ends line 216), add:</p>
+<pre><code class="language-python">    @property
+    def is_source_root(self) -&gt; bool:
+        &quot;&quot;&quot;Whether this dataset is the ROOT of an ``add_files`` directory tree.
+
+        ``True`` iff this dataset is a directory dataset (:attr:`is_directory`)
+        and none of its parent datasets is itself a directory dataset. This is
+        the structural, name-independent way to identify the tree root: it does
+        NOT depend on :attr:`source_directory` holding any particular string, so
+        it works on catalogs built before the root began recording its basename
+        (where the root's path is the legacy ``&quot;.&quot;``) as well as new ones.
+
+        Datasets with no ``Directory_Dataset`` row (plain datasets, split-dataset
+        outputs) return ``False`` even when they are the parent of other
+        datasets — only directory datasets can be source roots.
+
+        Returns:
+            bool: True if this dataset is the root of an add_files tree.
+
+        Example:
+            &gt;&gt;&gt; root = exe.add_files(specs, description=&quot;ingest&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; root.is_source_root  # doctest: +SKIP
+            True
+            &gt;&gt;&gt; any(c.is_source_root for c in root.list_dataset_children())  # doctest: +SKIP
+            False
+        &quot;&quot;&quot;
+        if not self.is_directory:
+            return False
+        return not any(parent.is_directory for parent in self.list_dataset_parents())
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run the test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/test_file.py::TestFileMixin::test_dataset_is_source_root_accessor -v</code>
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Update the <code>source_directory</code> docstring</strong></li>
+</ul>
+<p>In <code>dataset.py</code>, the <code>source_directory</code> property docstring (line 176-179 and example 187-188): replace <code>(the\n        ingest root stores ``"."``)</code> with <code>(the ingest root stores its directory basename)</code>, and change the example output from <code>'.'</code> to a basename, e.g.:</p>
+<pre><code class="language-python">            &gt;&gt;&gt; root.source_directory  # doctest: +SKIP
+            'cifar10_source'
+</code></pre>
+<p>Add a final docstring line: <code>See :attr:</code>is_source_root<code>to identify the tree root structurally (independent of this string).</code></p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/dataset/dataset.py tests/core/test_file.py
+git commit -m &quot;feat(dataset): add structural is_source_root accessor
+
+Co-Authored-By: Claude Opus 4.8 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-is_source_root-accessor-on-datasetbag-offline-bag-tests-deriva-ml">Task 3: <code>is_source_root</code> accessor on <code>DatasetBag</code> (offline) + bag tests (deriva-ml)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>deriva-ml/src/deriva_ml/dataset/dataset_bag.py</code> (add property after <code>is_directory</code> at line 283; update <code>source_directory</code> docstring at line 228)
+- Test: <code>deriva-ml/tests/dataset/test_bag_api_coverage.py</code> (update root assertions at lines 519, 530; add a legacy-<code>"."</code> resolution test)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>DatasetBag.is_directory</code> (dataset_bag.py:261); <code>DatasetBag.list_dataset_parents()</code> (dataset_bag.py:943) → <code>list[DatasetBag]</code>, each with <code>.is_directory</code>.
+- Produces: <code>DatasetBag.is_source_root</code> (property) → <code>bool</code>, same semantics as the live one.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update the bag test root assertions + add an <code>is_source_root</code> assertion (failing)</strong></li>
+</ul>
+<p>In <code>tests/dataset/test_bag_api_coverage.py</code>, the directory-bag test (the <code>_make_test_tree</code> root is named <code>"test_dir"</code>):</p>
+<p>Change line 519:</p>
+<pre><code class="language-python">        assert root_dataset.source_directory == &quot;test_dir&quot;, &quot;live: root Dataset.source_directory must be the basename&quot;
+</code></pre>
+<p>Change line 530-532:</p>
+<pre><code class="language-python">        assert bag.source_directory == &quot;test_dir&quot;, (
+            f&quot;bag root .source_directory should be 'test_dir', got {bag.source_directory!r}&quot;
+        )
+</code></pre>
+<p>After line 533 (<code>assert bag.is_directory is True...</code>), add:</p>
+<pre><code class="language-python">        # Structural root identification works offline on the bag.
+        assert root_dataset.is_source_root is True, &quot;live root must be is_source_root&quot;
+        assert bag.is_source_root is True, &quot;bag root must be is_source_root&quot;
+        assert not any(c.is_source_root for c in bag.list_dataset_children()), (
+            &quot;bag directory children must not be source roots&quot;
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run it to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/dataset/test_bag_api_coverage.py -k "directory" -v</code>
+Expected: FAIL — first on <code>source_directory == "test_dir"</code> (writer now stores basename so this <em>passes</em> after Task 1; the genuinely failing line is the new <code>is_source_root</code> assertion → <code>AttributeError</code>). If Task 1 is already committed the source_directory lines pass and only <code>is_source_root</code> fails; that is the expected failure to drive Step 3.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the bag property</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/dataset_bag.py</code>, after the <code>is_directory</code> property (ends line 283), add:</p>
+<pre><code class="language-python">    @property
+    def is_source_root(self) -&gt; bool:
+        &quot;&quot;&quot;Whether this bag is the ROOT of an ``add_files`` directory tree.
+
+        ``True`` iff this dataset is a directory dataset (:attr:`is_directory`)
+        and none of its parent datasets is itself a directory dataset. Structural
+        and name-independent — it does NOT depend on :attr:`source_directory`
+        holding any particular string, so it resolves the root on both legacy
+        catalogs (root path ``&quot;.&quot;``) and new ones (root path = basename).
+
+        The bag is offline — this reads the bag's local SQLite mirror; no catalog
+        connection is used.
+
+        Returns:
+            bool: True if this bag is the root of an add_files tree.
+
+        Example:
+            &gt;&gt;&gt; root_bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
+            &gt;&gt;&gt; root_bag.is_source_root  # doctest: +SKIP
+            True
+        &quot;&quot;&quot;
+        if not self.is_directory:
+            return False
+        return not any(parent.is_directory for parent in self.list_dataset_parents())
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run the bag tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/dataset/test_bag_api_coverage.py -k "directory" -v</code>
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Add a legacy-<code>"."</code> resolution unit test</strong></li>
+</ul>
+<p>This proves no backfill is needed: a dataset whose stored Path is the legacy <code>"."</code> is still found by <code>is_source_root</code>. Add to <code>tests/core/test_file.py</code> (offline, fabricate the legacy shape by directly writing the root's Directory_Dataset.Path back to "."):</p>
+<pre><code class="language-python">    def test_is_source_root_resolves_legacy_dot_path(self, file_table_setup):
+        &quot;&quot;&quot;A pre-change catalog stores the root Path as '.'; is_source_root must
+        still identify it (identity is structural, not string-based).&quot;&quot;&quot;
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, &quot;Test Directory&quot;)
+            root = exe.add_files(filespecs, description=&quot;Ingest run&quot;)
+
+        # Simulate a legacy catalog: rewrite the root's Path back to &quot;.&quot;.
+        pb = ml_instance.pathBuilder()
+        dd = pb.schemas[ml_instance.ml_schema].tables[&quot;Directory_Dataset&quot;]
+        dd.update([{&quot;Dataset&quot;: root.dataset_rid, &quot;Path&quot;: &quot;.&quot;}])
+
+        legacy_root = ml_instance.lookup_dataset(root.dataset_rid)
+        assert legacy_root.source_directory == &quot;.&quot;          # legacy shape restored
+        assert legacy_root.is_source_root is True           # still found structurally
+</code></pre>
+<p>If <code>Directory_Dataset</code> lacks an RID key that <code>update</code> needs, use the table's update form already used elsewhere (grep <code>Directory_Dataset</code> writes); the key column is <code>Dataset</code> (<code>create_schema.py:73</code> <code>KeyDef(columns=["Dataset"])</code>), so <code>update([...])</code> keyed on <code>Dataset</code> is valid.</p>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/test_file.py::TestFileMixin::test_is_source_root_resolves_legacy_dot_path -v</code>
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 6: Update the bag <code>source_directory</code> docstring</strong></li>
+</ul>
+<p>In <code>dataset_bag.py</code>, <code>source_directory</code> docstring (lines 232-233, example 246-247): same edit as the live one — drop <code>(the\n        ingest root stores ``"."``)</code>, change example output <code>'.'</code> → <code>'cifar10_source'</code>, add the <code>See :attr:</code>is_source_root`` pointer.</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/dataset/dataset_bag.py tests/dataset/test_bag_api_coverage.py tests/core/test_file.py
+git commit -m &quot;feat(bag): is_source_root accessor + legacy-path resolution test
+
+Co-Authored-By: Claude Opus 4.8 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-schema-comment-remaining-docs-deriva-ml">Task 4: Schema comment + remaining docs (deriva-ml)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>deriva-ml/src/deriva_ml/schema/create_schema.py:67-70</code> (Path column comment)
+- Modify: <code>deriva-ml/docs/superpowers/plans/2026-06-24-directory-dataset-path.md</code> (note the convention change)</p>
+<p><strong>Interfaces:</strong> none (documentation only).</p>
+<ul>
+<li>[ ] <strong>Step 1: Update the schema column comment</strong></li>
+</ul>
+<p>In <code>create_schema.py</code>, the <code>Path</code> <code>ColumnDef</code> comment (lines 67-70):</p>
+<pre><code class="language-python">                comment=(
+                    &quot;Source directory this dataset represents, relative to &quot;
+                    &quot;the ingest root. The ingest root stores its own directory &quot;
+                    &quot;basename (the same name as its Description); children store &quot;
+                    &quot;paths relative to it. Identify the tree root structurally &quot;
+                    &quot;via Dataset.is_source_root, not by matching this string.&quot;
+                ),
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Note the change in the prior design plan</strong></li>
+</ul>
+<p>Append a dated note to <code>docs/superpowers/plans/2026-06-24-directory-dataset-path.md</code>:</p>
+<pre><code class="language-markdown">
+---
+
+## Amendment (2026-06-27): root Path stores its basename, not &quot;.&quot;
+
+The original design stored the ingest root's `Directory_Dataset.Path` as `&quot;.&quot;`.
+As of the 2026-06-27 root-path-name change, the root stores its directory
+basename (e.g. `cifar10_source`) so the catalog &quot;Folder&quot; column is
+self-describing. Root identification moved from `source_directory == &quot;.&quot;` to the
+structural `Dataset.is_source_root` / `DatasetBag.is_source_root` accessor, which
+works on both old (`&quot;.&quot;`) and new catalogs — no backfill required. See
+`docs/superpowers/specs/2026-06-27-directory-dataset-root-path-name-design.md`.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Verify the schema comment doesn't break a schema test</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/ -k "schema and comment" -q || true</code>
+Then run the full create-schema-touching tests:
+<code>uv run python -m pytest tests/ -k "create_schema or annotation" -q</code>
+Expected: PASS or no-tests-collected (the comment is free text; no test should assert its exact value — if one does, update it to the new text).</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml
+git add src/deriva_ml/schema/create_schema.py docs/superpowers/plans/2026-06-24-directory-dataset-path.md
+git commit -m &quot;docs(schema): Directory_Dataset.Path root stores basename; point to is_source_root
+
+Co-Authored-By: Claude Opus 4.8 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-deriva-ml-full-suite-release">Task 5: deriva-ml full suite + release</h3>
+<p><strong>Files:</strong> none (validation + release).</p>
+<p><strong>Interfaces:</strong> Produces a released deriva-ml version that the consumers pin to.</p>
+<ul>
+<li>[ ] <strong>Step 1: Lint + format</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src tests &amp;&amp; uv run ruff format --check src tests</code>
+Expected: clean. If format flags the touched files, run <code>uv run ruff format src tests</code> and re-commit.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the directory/dataset + file test groups</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/core/test_file.py tests/dataset/test_bag_api_coverage.py -v</code>
+Expected: all PASS. These are the live-catalog tests; if the harness needs a host, they self-skip without <code>DERIVA_HOST</code> — in that case run them against the local test catalog the suite normally uses (the repo's conftest provisions it). If any assert still references <code>"."</code>, grep <code>tests/ -rn '== "\."'</code> and fix.</p>
+<ul>
+<li>[ ] <strong>Step 3: Full offline suite</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run python -m pytest tests/ -q -m "not integration"</code>
+Expected: PASS (no <code>"."</code>-root regressions elsewhere).</p>
+<ul>
+<li>[ ] <strong>Step 4: Confirm the branch is clean and review-ready</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git status --short &amp;&amp; git log --oneline main..HEAD</code>
+Expected: clean tree; commits for Tasks 1-4 + the spec. <strong>STOP here for the whole-branch review</strong> (subagent-driven-development's final review) before releasing — deriva-ml is shared; do not bump/merge without it.</p>
+<ul>
+<li>[ ] <strong>Step 5: Version bump (after review approves)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git checkout main &amp;&amp; git merge --no-ff directory-dataset-root-path-name &amp;&amp; uv run bump-version minor</code>
+Expected: a new minor tag created + pushed (e.g. 1.53.0 → 1.54.0). Record the new version for Task 6.</p>
+<hr />
+<h3 id="task-6-cifar-example-readers-lock-bump">Task 6: cifar-example readers + lock bump</h3>
+<p><strong>Files:</strong>
+- Modify: <code>deriva-ml-cifar-example/src/scripts/load_cifar10.py:170-178</code>
+- Modify: <code>deriva-ml-cifar-example/src/scripts/_cifar10_upload.py:318-320</code> (comment)
+- Modify: <code>deriva-ml-cifar-example/tests/test_lineage_connected.py:211-221</code>
+- Modify: <code>deriva-ml-cifar-example/uv.lock</code> / <code>pyproject.toml</code> (pin to the new deriva-ml)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>Dataset.is_source_root</code> (from the released deriva-ml).</p>
+<ul>
+<li>[ ] <strong>Step 1: Switch the loader's root filter</strong></li>
+</ul>
+<p>In <code>src/scripts/load_cifar10.py</code>, replace lines 170-178:</p>
+<pre><code class="language-python">    # find_datasets(sort=True) returns datasets ordered by RCT desc (newest
+    # first).  We then filter to CIFAR_Source roots: is_source_root identifies
+    # the root of the nested add_files tree (not train/test children),
+    # independent of the stored Directory_Dataset.Path value.
+    all_datasets = list(ml.find_datasets(sort=True))
+    candidates = [
+        d
+        for d in all_datasets
+        if &quot;CIFAR_Source&quot; in d.dataset_types and d.is_source_root
+    ]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Switch the lineage test's root filter</strong></li>
+</ul>
+<p>In <code>tests/test_lineage_connected.py</code>, replace lines 211-221:</p>
+<pre><code class="language-python">        source_root_rid: str | None = None
+        for row in cifar_source_rows:
+            ds = ml.lookup_dataset(row[&quot;Dataset&quot;])
+            if ds.is_source_root:
+                source_root_rid = row[&quot;Dataset&quot;]
+                break
+
+        assert source_root_rid is not None, (
+            f&quot;Could not find a CIFAR_Source dataset that is_source_root. &quot;
+            f&quot;Candidates: {[r['Dataset'] for r in cifar_source_rows]}&quot;
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Update the upload-phase comment</strong></li>
+</ul>
+<p>In <code>src/scripts/_cifar10_upload.py</code>, the comment at lines 319-320:</p>
+<pre><code class="language-python">    # The root dataset (the add_files tree root, identified via is_source_root)
+    # holds labels.csv; partition children (source_directory &quot;train&quot; / &quot;test&quot;)
+    # hold the images.
+</code></pre>
+<p>(No code change here — <code>source_ds</code> is already the root passed in, and the child filter <code>source_directory in {"train","test"}</code> is unchanged.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Bump the deriva-ml pin</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml-cifar-example &amp;&amp; uv lock --upgrade-package deriva-ml &amp;&amp; uv sync</code>
+Then confirm: <code>uv run python -c "import deriva_ml, importlib.metadata as m; print(m.version('deriva-ml'))"</code> shows the new version, and <code>uv run python -c "from deriva_ml import Dataset; print(hasattr(Dataset, 'is_source_root'))"</code> prints <code>True</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Config smoke tests + the source-dataset test</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml-cifar-example &amp;&amp; uv run python -m pytest tests/test_find_source_dataset.py -v</code>
+Expected: PASS. (This test stubs datasets; Task 7 updates its stub if it asserts on <code>source_directory == "."</code>.)</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml-cifar-example
+git add src/scripts/load_cifar10.py src/scripts/_cifar10_upload.py tests/test_lineage_connected.py uv.lock pyproject.toml
+git commit -m &quot;feat: identify add_files source root via is_source_root (deriva-ml bump)
+
+Co-Authored-By: Claude Opus 4.8 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-7-cifar-example-test_find_source_dataset-stub-live-verification">Task 7: cifar-example <code>test_find_source_dataset</code> stub + live verification</h3>
+<p><strong>Files:</strong>
+- Modify: <code>deriva-ml-cifar-example/tests/test_find_source_dataset.py</code> (stub at line 78, docstrings at 20, 69-72)</p>
+<p><strong>Interfaces:</strong> Consumes the updated <code>_find_latest_source_dataset_rid</code> (Task 6) which now filters on <code>is_source_root</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Inspect the stub</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml-cifar-example &amp;&amp; uv run python -m pytest tests/test_find_source_dataset.py -v</code> and read <code>tests/test_find_source_dataset.py</code> around lines 18-90. The stub <code>_make_dataset(rid, types, source_dir)</code> currently sets <code>source_directory</code>; the loader now reads <code>is_source_root</code>. The stub must expose <code>is_source_root</code> matching the intended root.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update the stub to provide <code>is_source_root</code></strong></li>
+</ul>
+<p>In <code>_make_dataset</code> (and the <code>"2-ROOT"</code>/child rows around line 78), set <code>is_source_root=True</code> for the root stub and <code>False</code> for children, e.g. if the stub is a <code>SimpleNamespace</code>/Mock:</p>
+<pre><code class="language-python">    def _make_dataset(rid, types, source_dir, is_root):
+        return SimpleNamespace(
+            dataset_rid=rid,
+            dataset_types=types,
+            source_directory=source_dir,
+            is_source_root=is_root,
+        )
+    # ...
+    _make_dataset(&quot;2-ROOT&quot;, [&quot;CIFAR_Source&quot;], &quot;cifar10_source&quot;, is_root=True),
+    _make_dataset(&quot;2-TRAIN&quot;, [&quot;CIFAR_Source&quot;], &quot;train&quot;, is_root=False),
+</code></pre>
+<p>Update the test docstrings (lines 20, 69-72) to describe identification via <code>is_source_root</code> rather than <code>source_directory == "."</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run the test</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml-cifar-example &amp;&amp; uv run python -m pytest tests/test_find_source_dataset.py -v</code>
+Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 4: Live end-to-end verification</strong></li>
+</ul>
+<p>Load a fresh catalog and confirm the root Folder reads its basename and the loader finds the root:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml-cifar-example
+DERIVA_ML_ALLOW_DIRTY=true uv run python src/scripts/load_cifar10.py \
+  --hostname localhost --create-catalog rootname_verify --num-images 1100 --phase all
+</code></pre>
+<p>Then check the root Path:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;
+from deriva_ml import DerivaML
+ml = DerivaML(hostname='localhost', catalog_id='&lt;NEW_ID&gt;')
+import deriva_ml
+roots = [d for d in ml.find_datasets() if d.is_source_root]
+print('source roots:', [(d.dataset_rid, d.source_directory) for d in roots])
+&quot;
+</code></pre>
+<p>Expected: exactly one source root whose <code>source_directory</code> is the loader's source basename (NOT <code>"."</code>).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml-cifar-example
+git add tests/test_find_source_dataset.py
+git commit -m &quot;test: find-source-dataset stub uses is_source_root
+
+Co-Authored-By: Claude Opus 4.8 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-8-deriva-skills-template-readers">Task 8: deriva-skills template readers</h3>
+<p><strong>Files:</strong>
+- Modify: <code>deriva-ml-skills/skills/setup-ml-catalog/scripts/loader_orchestrator_template.py:70-78</code>
+- Modify: <code>deriva-ml-skills/skills/setup-ml-catalog/scripts/upload_phase_template.py:95-103</code></p>
+<p><strong>Interfaces:</strong> Consumes <code>Dataset.is_source_root</code> (template code users run against the released deriva-ml).</p>
+<ul>
+<li>[ ] <strong>Step 1: Switch the orchestrator template root filter</strong></li>
+</ul>
+<p>In <code>loader_orchestrator_template.py</code>, replace the docstring tail + filter (lines 70-78):</p>
+<pre><code class="language-python">    When ``--phase upload`` runs in isolation, the RID isn't threaded from
+    register — find it from the catalog: newest dataset typed FILE_DATASET_TYPE
+    that is the add_files tree root (``is_source_root``).
+    &quot;&quot;&quot;
+    candidates = [
+        d
+        for d in ml.find_datasets(sort=True)  # newest first
+        if FILE_DATASET_TYPE in d.dataset_types and d.is_source_root
+    ]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Switch the upload-phase template root check</strong></li>
+</ul>
+<p>In <code>upload_phase_template.py</code>, line 102 uses <code>partition == "."</code> where <code>partition</code> is a key iterated from a <code>partitions</code> set/dict. The root partition is whichever child set corresponds to the tree root. Replace the <code>"."</code> sentinel with the root's actual partition name. Read lines 88-110 to see how <code>partitions</code> and <code>children</code> are built (children come from <code>source_ds.list_dataset_children()</code> keyed by <code>source_directory</code>). The root itself is <code>source_ds</code>; change:</p>
+<pre><code class="language-python">            part_ds = source_ds if partition == &quot;.&quot; else children.get(partition)
+</code></pre>
+<p>to identify the root partition by the source dataset's own <code>source_directory</code> (its basename) rather than <code>"."</code>:</p>
+<pre><code class="language-python">            # The root partition is the source dataset itself; children are keyed
+            # by their source_directory (e.g. &quot;train&quot;/&quot;test&quot;).
+            part_ds = source_ds if partition == source_ds.source_directory else children.get(partition)
+</code></pre>
+<p>Verify the surrounding loop's <code>partitions</code> includes <code>source_ds.source_directory</code> for the root case; if <code>partitions</code> is built only from children, the root branch was dead in the template anyway — in that case simplify to <code>part_ds = children.get(partition)</code> and drop the root special-case. Choose based on what lines 88-101 actually construct (read them first; do not guess).</p>
+<ul>
+<li>[ ] <strong>Step 3: Lint the templates (syntax only — these are template scripts)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml-skills &amp;&amp; uv run ruff check skills/setup-ml-catalog/scripts/loader_orchestrator_template.py skills/setup-ml-catalog/scripts/upload_phase_template.py 2&gt;/dev/null || python -m py_compile skills/setup-ml-catalog/scripts/loader_orchestrator_template.py skills/setup-ml-catalog/scripts/upload_phase_template.py</code>
+Expected: no syntax errors. (deriva-ml-skills may not have a uv project; <code>py_compile</code> is the fallback.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml-skills
+git add skills/setup-ml-catalog/scripts/loader_orchestrator_template.py skills/setup-ml-catalog/scripts/upload_phase_template.py
+git commit -m &quot;fix(templates): identify add_files source root via is_source_root, not '.'
+
+Co-Authored-By: Claude Opus 4.8 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="self-review">Self-Review</h2>
+<p><strong>1. Spec coverage:</strong>
+- Structural <code>is_source_root</code> rule → Tasks 2 (live), 3 (bag). ✓
+- Writer change to basename + precedence shared with Description → Task 1. ✓
+- Empty-basename → <code>"root"</code> sentinel → Task 1 (<code>_root_path_name</code>). ✓
+- Schema comment + docstrings + prior-plan note → Tasks 2, 3, 4. ✓
+- 4 existing <code>== "."</code> tests → basename: test_file.py:173 (T1S1), :278 (T1S5); test_bag:519,530 (T3S1). ✓
+- New tests: root True/children False/splits False/non-dir False (T2,T3), identity-not-name (T2S1), legacy-<code>"."</code> resolves (T3S5). ✓
+- 5 readers migrated: load_cifar10:177 (T6S1), test_lineage_connected:214 (T6S2), _cifar10_upload:319 (T6S3 comment), loader_orchestrator_template:75 (T8S1), upload_phase_template:102 (T8S2). ✓
+- No migration/backfill → asserted by T3S5 legacy test + spec "out of scope". ✓
+- deriva-ml-first ordering + minor bump → Global Constraints + Task 5. ✓</p>
+<p><strong>2. Placeholder scan:</strong> No "TBD"/"handle edge cases". The one conditional instruction (T8S2: "read lines 88-101, choose based on what they construct") is bounded with an explicit fallback, not an open TODO — the template's <code>partitions</code> construction genuinely must be read before editing, and both branches are spelled out.</p>
+<p><strong>3. Type consistency:</strong> <code>is_source_root</code> is a <code>bool</code> property on both <code>Dataset</code> and <code>DatasetBag</code>, implemented identically (<code>is_directory and not any(p.is_directory for p in list_dataset_parents())</code>), consumed as <code>d.is_source_root</code> everywhere. <code>_root_path_name(ingest_root: Path, root_name: str | None) -&gt; str</code> matches its sole call site in Task 1 Step 4. Test root basename is <code>"test_dir"</code> for both <code>test_file.py</code> and the bag test (<code>_make_test_tree</code> → <code>base/test_dir</code>), used consistently in T1S1, T1S5, T3S1.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

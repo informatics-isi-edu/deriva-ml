@@ -1,0 +1,3085 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-06-01-split-partition-tag-and-subsample-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Split_Partition tag + subsample primitive + CIFAR migration — Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#split_partition-tag-subsample-primitive-cifar-migration-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Split_Partition tag + subsample primitive + CIFAR migration — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals-and-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals and non-goals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Goals and non-goals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Approach
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Approach">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-vocabulary-seeds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1. Vocabulary seeds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-apply-split_partition-to-every-child-of-split_dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2. Apply Split_Partition to every child of split_dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-document-the-role-types-non-propagation-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3. Document the role-types non-propagation rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-new-primitive-subsample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4. New primitive: subsample()
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.4. New primitive: subsample()">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-dispatch-refactor-in-_compute_partitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5. Dispatch refactor in _compute_partitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-cifar-10-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6. CIFAR-10 migration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.6. CIFAR-10 migration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#361-canonical-split-training-testing-use-split_dataset-with-a-predicate-selector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6.1. Canonical Split / Training / Testing — use split_dataset with a predicate selector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#362-small_training-small_testing-use-subsample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6.2. Small_Training / Small_Testing — use subsample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#363-_require_small_variant_distinct-stays" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6.3. _require_small_variant_distinct stays
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#364-labeled_split-and-small_labeled_split-no-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6.4. Labeled_Split and Small_Labeled_Split — no change
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-the-cifar-migrations-pyproject-pin-bump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7. The CIFAR migration's pyproject pin bump
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-output-format-changed-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Output format / changed surface
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Output format / changed surface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vocab-terms-dataset_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vocab terms (Dataset_Type)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-python-api-additions-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public Python API additions / changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-components-and-module-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Components and module layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Components and module layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subsamplepy-extraction-question-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        subsample.py extraction question (open)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-testing-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Testing strategy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Rollout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="split_partition-tag-subsample-primitive-cifar-migration-design">Split_Partition tag + subsample primitive + CIFAR migration — Design</h1>
+<p><strong>Date:</strong> 2026-06-01
+<strong>Status:</strong> Draft for review.
+<strong>Subproject:</strong> <code>deriva-ml</code> (and <code>deriva-ml-model-template</code> for CIFAR migration).
+<strong>Companion CONTEXT.md update:</strong> new <code>### Datasets — types and partitions</code> subsection.
+<strong>Follow-up PR (separate):</strong> <code>characterize_dataset</code> + <code>compare_datasets</code> + <code>validate_split</code> / <code>validate_subsample</code> — design sketched in task #48, not implemented here.</p>
+<h2 id="1-problem-statement">1. Problem statement</h2>
+<p>A small but real catalog-vocabulary ambiguity has been hiding in
+plain sight. Today a downstream consumer that finds a dataset
+tagged <code>Dataset_Type=["Training"]</code> cannot tell, from the dataset's
+type set alone, whether the dataset is:</p>
+<ul>
+<li>a <strong>training corpus</strong> (<code>Complete</code> + <code>Training</code> + <code>Labeled</code>, hand-built or imported), or</li>
+<li>the <strong>training partition of a split</strong> (<code>Training</code> + <code>Labeled</code>, the Training child of a <code>split_dataset</code> call).</li>
+</ul>
+<p>Both are legitimately tagged <code>Training</code>. The role is the same; the
+<em>origin</em> differs. The 100K vs. 8K example illustrates how this
+matters: <code>find_datasets(dataset_type="Training")</code> today returns both
+and treats them as equivalent. A user (or agent) asking <em>"find every
+training partition of a split"</em> or <em>"find every training corpus that
+isn't itself a partition"</em> has no 1-hop filter to express the
+question.</p>
+<p>Two further smells surface when this is examined alongside the
+existing CIFAR-10 dataset hierarchy in
+<code>deriva-ml-model-template/src/scripts/_cifar10_datasets.py</code>:</p>
+<ul>
+<li>The canonical CIFAR train/test partition is built <strong>by hand</strong>
+  (<code>exe.create_dataset</code> + <code>add_dataset_members</code>) even though
+  <code>split_dataset(selection_fn=...)</code> can express the predicate-based
+  partition.</li>
+<li>The <code>Small_Training</code> / <code>Small_Testing</code> family is also built by
+  hand via <code>stratified_sample_rids</code>, parented under a hand-rolled
+  <code>Small_Split</code>, because there is no primitive for "stratified
+  subsample of a single dataset."</li>
+</ul>
+<p>Both smells perpetuate the type ambiguity: every hand-built
+hierarchy contributes corpus-role <code>Training</code> and partition-role
+<code>Training</code> datasets to the same vocabulary tag with no
+discriminator.</p>
+<p>A third concern, surfaced during code review: <code>split_dataset</code>'s
+selector dispatch has a documented public <code>random_split</code> selector
+that is <strong>never called from <code>src/</code></strong>. The random shuffle-and-slice
+logic is reimplemented inline inside <code>_compute_partitions</code>. A
+duplication audit is overdue.</p>
+<h2 id="2-goals-and-non-goals">2. Goals and non-goals</h2>
+<h3 id="goals">Goals</h3>
+<ul>
+<li>A clean discriminator between corpus-role and partition-role
+  dataset_types — one new vocab term, one extra association row
+  per split child.</li>
+<li>A new primitive <code>subsample(source, size, stratify_by_column=...)</code>
+  that mirrors sklearn's <code>resample(stratify=, replace=False,
+  n_samples=...)</code> semantics but speaks DerivaML's denormalization +
+  partition vocabulary.</li>
+<li>The CIFAR-10 reference template uses the library's API for every
+  partition it builds. No hand-rolled <code>Split</code>-typed datasets.</li>
+<li>One source of truth for the random-selector logic. <code>random_split</code>
+  is the default selector; the inlined shuffle-and-slice is
+  deleted.</li>
+<li>The role-types-don't-inherit-and-don't-propagate rule is made
+  explicit in the docstring and vocabulary descriptions.</li>
+<li>Test coverage closes the contracts listed above (parent Split is
+  not nested under source; new <code>Split_Partition</code> tag lands on each
+  child; source <code>dataset_types</code> are not mutated; row-mode leakage
+  matrix coverage).</li>
+</ul>
+<h3 id="non-goals">Non-goals</h3>
+<ul>
+<li><strong>Catalog-side enforcement.</strong> No CHECK constraints, no
+  triggers, no FK from child_member to source_member, no
+  persistent "validated" tag. Existing write-time disjointness
+  assert in <code>split_dataset</code> stays.</li>
+<li><strong>A <code>subsample_split</code> operation</strong> (parallel-subsample each child
+  of an existing Split, returning a mirror Split hierarchy).
+  Rejected during grilling: <code>subsample</code> is the more fundamental
+  primitive; if <code>subsample_split</code> is ever needed, it composes
+  trivially on top.</li>
+<li><strong>A <code>selection_fn</code> parameter on <code>subsample</code>.</strong> Rejected: the
+  <code>SelectionFunction</code> Protocol returns a multi-key partition dict;
+  a single-key degeneration is awkward. Users who need
+  hand-curated subsampling logic build the dataset manually via
+  <code>create_dataset</code> + <code>add_dataset_members</code>.</li>
+<li><strong>A change to the <code>partition_by</code> defaulting behavior</strong> in
+  <code>split_dataset</code>. The current behavior is surprising but
+  defensible; it sits on top of a real bug fix
+  (curator/02 leakage). Leave alone.</li>
+<li><strong>A <code>validate_split</code> / <code>validate_subsample</code> / <code>compare_datasets</code>
+  / <code>characterize_dataset</code> family.</strong> Sketched in task #48 as a
+  follow-up PR. Out of scope here.</li>
+<li><strong>Skill content updates in deriva-ml-skills.</strong> Tracked separately
+  in task #49 as a post-PR review.</li>
+</ul>
+<h2 id="3-approach">3. Approach</h2>
+<p>The work breaks into five independent edits, each landable in its
+own commit:</p>
+<h3 id="31-vocabulary-seeds">3.1. Vocabulary seeds</h3>
+<p>Add two new vocab terms to <code>_ensure_dataset_types</code>' seed dict in
+<code>src/deriva_ml/dataset/split.py</code>:</p>
+<pre><code class="language-python">required_types = {
+    # ... existing terms unchanged ...
+    &quot;Split_Partition&quot;: (
+        &quot;A child partition of a Split — set by ``split_dataset`` on &quot;
+        &quot;every Training/Testing/Validation child. The discriminator &quot;
+        &quot;that distinguishes a split-partition role tag from a &quot;
+        &quot;corpus role tag.&quot;
+    ),
+    &quot;Subsample&quot;: (
+        &quot;A dataset produced by ``subsample()`` as a stratified &quot;
+        &quot;sample of another dataset. Source relationship is recorded &quot;
+        &quot;in execution provenance, not in Dataset_Dataset edges.&quot;
+    ),
+}
+</code></pre>
+<p><code>_ensure_dataset_types</code> runs idempotently inside <code>split_dataset</code>
+(and will inside <code>subsample</code>). Catalogs created against an older
+deriva-ml release pick up the new terms on first call.</p>
+<h3 id="32-apply-split_partition-to-every-child-of-split_dataset">3.2. Apply <code>Split_Partition</code> to every child of <code>split_dataset</code></h3>
+<p>In <code>_create_split_hierarchy</code> (<code>split.py:962+</code>):</p>
+<pre><code class="language-python"># Before:
+train_types = [&quot;Training&quot;] + (training_types or [])
+test_types  = [&quot;Testing&quot;]  + (testing_types or [])
+val_types   = [&quot;Validation&quot;] + (validation_types or []) if val_size is not None else []
+
+# After:
+train_types = [&quot;Training&quot;,   &quot;Split_Partition&quot;] + (training_types or [])
+test_types  = [&quot;Testing&quot;,    &quot;Split_Partition&quot;] + (testing_types or [])
+val_types   = [&quot;Validation&quot;, &quot;Split_Partition&quot;] + (validation_types or []) if val_size is not None else []
+</code></pre>
+<p>The parent Split's <code>dataset_types</code> is <strong>unchanged</strong> — it stays
+<code>["Split"]</code>. The Split is the container, not a partition.</p>
+<p>The <code>split_params</code> config artifact also receives the updated
+<code>train_types</code>/<code>test_types</code>/<code>val_types</code> (already does, via lines
+1628-1650 — no separate change).</p>
+<h3 id="33-document-the-role-types-non-propagation-rule">3.3. Document the role-types non-propagation rule</h3>
+<p>Update <code>split_dataset</code>'s docstring (around line 1170-1200, in the
+"Provenance" paragraph) to add an explicit rule:</p>
+<blockquote>
+<p><strong>Role types do not inherit from the source and do not
+propagate to children.</strong> The Training/Testing/Validation tags
+on the partition children are assigned based on the partition's
+position in the split, <strong>not</strong> copied from the source's
+<code>dataset_types</code>. A source tagged <code>Testing</code> (because it is a
+testing corpus) produces a Training partition tagged <code>Training</code>
+(because that partition is the training half of the split).
+This is intentional: role-axis types describe a dataset's role
+in its <em>immediate context</em>, not a property the operation should
+preserve.</p>
+</blockquote>
+<p>The same rule is captured in CONTEXT.md as the <strong>role-axis</strong> vs
+<strong>content-axis</strong> vs <strong>origin-axis</strong> decomposition (see CONTEXT.md
+update in this PR).</p>
+<h3 id="34-new-primitive-subsample">3.4. New primitive: <code>subsample()</code></h3>
+<p>Add to <code>src/deriva_ml/dataset/split.py</code> (or a new
+<code>src/deriva_ml/dataset/subsample.py</code> — see §5):</p>
+<pre><code class="language-python">def subsample(
+    ml: DerivaML,
+    source_dataset_rid: str,
+    execution: Execution,
+    *,
+    size: int | float,
+    seed: int = 42,
+    stratify_by_column: str | None = None,
+    stratify_missing: Literal[&quot;error&quot;, &quot;drop&quot;, &quot;include&quot;] = &quot;error&quot;,
+    element_table: str | None = None,
+    include_tables: list[str] | None = None,
+    via: list[str] | None = None,
+    row_per: str | None = None,
+    partition_by: Literal[&quot;element&quot;, &quot;row&quot;] | None = None,
+    dataset_types: list[str] | None = None,
+    description: str | None = None,
+    dry_run: bool = False,
+) -&gt; Dataset:
+    &quot;&quot;&quot;Create a stratified subsample of ``source_dataset_rid``.
+
+    Returns one new dataset whose member set is a stratified
+    random subset of the source's members. The source relationship
+    is recorded as **execution provenance only** — the source is an
+    input of ``execution``; the subsample is an output. No
+    ``Dataset_Dataset`` edge is created between source and
+    subsample (mirroring ``split_dataset``'s design call).
+
+    Mirrors sklearn's ``resample(stratify=y, replace=False,
+    n_samples=N)`` semantics: stratified sample without
+    replacement.
+
+    See ``split_dataset`` for the meaning of ``stratify_by_column``,
+    ``element_table``, ``include_tables``, ``via``, ``row_per``,
+    and ``partition_by`` — they pass through to the same
+    denormalization machinery.
+
+    Args:
+        ml: Connected DerivaML instance.
+        source_dataset_rid: The dataset to sample from.
+        execution: The caller's open Execution; the subsample is
+            attributed to it for provenance.
+        size: If float in (0, 1), fraction of source to sample.
+            If int, absolute sample count. Mirrors sklearn
+            ``train_test_split``'s shape for ``test_size``.
+        seed: Random seed for reproducibility.
+        stratify_by_column: Optional column for stratified
+            sampling (preserves class proportions). When None, the
+            subsample is a uniform random sample.
+        stratify_missing: How to handle nulls in the stratify
+            column. Same semantics as ``split_dataset``.
+        element_table, include_tables, via, row_per, partition_by:
+            Denormalization / partition controls — same semantics
+            as ``split_dataset``.
+        dataset_types: Caller-supplied additional dataset types.
+            ``&quot;Subsample&quot;`` is always appended; do not include it
+            in this list.
+        description: Description for the output dataset. When
+            None, an auto-description is generated.
+        dry_run: If True, return the planned outputs without
+            mutating the catalog.
+
+    Returns:
+        The new :class:`Dataset` instance.
+
+    Raises:
+        ValueError: argument-shape errors (mutually exclusive
+            args, missing required args, size &lt;= 0 or &gt;= total).
+
+    Example:
+        &gt;&gt;&gt; # Take 400 stratified samples from a Training dataset.  # doctest: +SKIP
+        &gt;&gt;&gt; with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+        ...     small = subsample(  # doctest: +SKIP
+        ...         ml, training_rid, exe,  # doctest: +SKIP
+        ...         size=400,  # doctest: +SKIP
+        ...         stratify_by_column=&quot;Image_Class.Name&quot;,  # doctest: +SKIP
+        ...         element_table=&quot;Image&quot;,  # doctest: +SKIP
+        ...         include_tables=[&quot;Image&quot;, &quot;Image_Class&quot;],  # doctest: +SKIP
+        ...         dataset_types=[&quot;Training&quot;, &quot;Labeled&quot;],  # doctest: +SKIP
+        ...     )  # doctest: +SKIP
+        &gt;&gt;&gt; exe.commit_output_assets()  # doctest: +SKIP
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="implementation-strategy">Implementation strategy</h4>
+<p><code>subsample</code> reuses the <strong>same denormalization + selector
+machinery</strong> as <code>split_dataset</code>. The implementation lives behind a
+shared helper:</p>
+<pre><code class="language-python">def _compute_subsample(
+    source_ds: Dataset,
+    *,
+    size: int | float,
+    seed: int,
+    stratify_by_column: str | None,
+    stratify_missing: str,
+    include_tables: list[str] | None,
+    row_per: str | None,
+    via: list[str] | None,
+    element_table: str | None,
+    partition_by: Literal[&quot;element&quot;, &quot;row&quot;] = &quot;element&quot;,
+    ignore_unrelated_anchors: bool = False,
+) -&gt; tuple[list[str], int, str, str]:
+    &quot;&quot;&quot;Resolve the source members to a single stratified sample.
+
+    Reuses the denormalize → dedupe → stratified-or-random
+    selector pipeline from ``_compute_partitions``, but with a
+    single-partition shape (``{&quot;Subsample&quot;: size}``).
+    &quot;&quot;&quot;
+</code></pre>
+<p>Then <code>subsample()</code> calls <code>_compute_subsample</code> and creates one new
+dataset (with <code>["Subsample"]</code> + caller-supplied types) — no parent
+Split, no children, no <code>Dataset_Dataset</code> edges.</p>
+<p><code>subsample</code> writes its own config artifact
+(<code>subsample_config.json</code>) to <code>execution.working_dir</code> for
+reproducibility — same pattern as <code>split_dataset</code>'s
+<code>split_config.json</code>.</p>
+<h3 id="35-dispatch-refactor-in-_compute_partitions">3.5. Dispatch refactor in <code>_compute_partitions</code></h3>
+<p>Today (<code>split.py:888-895</code>):</p>
+<pre><code class="language-python">if stratify_by_column:
+    selector = stratified_split(stratify_by_column, missing=stratify_missing)
+else:
+    logger.info(&quot;Using custom selection function&quot;)
+    selector = selection_fn
+
+partition_indices = selector(df, partition_sizes, seed)
+</code></pre>
+<p>This branch is reached only when <code>use_denormalization</code> is true
+(stratify or selection_fn). When <strong>both</strong> are None, the code falls
+through to an inlined random shuffle-and-slice
+(<code>split.py:920-930</code>):</p>
+<pre><code class="language-python">if shuffle:
+    rng = np.random.default_rng(seed)
+    indices = np.arange(len(all_rids))
+    rng.shuffle(indices)
+    all_rids = [all_rids[i] for i in indices]
+
+partition_rids = {}
+offset = 0
+for name, size in partition_sizes.items():
+    partition_rids[name] = all_rids[offset : offset + size]
+    offset += size
+</code></pre>
+<p>This is functionally <code>random_split</code> — and <code>random_split</code> is the
+public, exported, tested helper that the function never calls.</p>
+<p><strong>Refactor:</strong> make <code>random_split</code> the default selector. The
+dispatch becomes uniform:</p>
+<pre><code class="language-python">if stratify_by_column:
+    selector = stratified_split(stratify_by_column, missing=stratify_missing)
+elif selection_fn is not None:
+    selector = selection_fn
+else:
+    selector = random_split
+
+# Single call path:
+partition_indices = selector(df, partition_sizes, seed)
+partition_rids = {
+    name: df.iloc[indices][rid_column].tolist()
+    for name, indices in partition_indices.items()
+}
+</code></pre>
+<p>The inlined random branch (<code>split.py:920-930</code> and the preceding
+non-denormalization fallback) is <strong>deleted</strong>. <code>use_denormalization</code>
+becomes unconditionally True; the dataframe is always built. (See
+§7 for the cost analysis — denormalizing a flat member list is
+cheap.)</p>
+<p><strong>Subtle consequence:</strong> the random path now goes through the same
+denormalization step that stratified/custom paths use. For the
+no-stratify-no-selection-fn case this is a small extra cost — one
+denormalize call returning the element table's member rows. In
+exchange, we get one selector pipeline instead of two.</p>
+<p>If the denormalize cost is unacceptable (TBD, see §7), an
+alternative is a fast-path:</p>
+<pre><code class="language-python">if selection_fn is None and stratify_by_column is None:
+    # Avoid denormalization. Use random_split directly on the
+    # member RID list (no dataframe needed).
+    ...
+else:
+    # Build the dataframe; use selector.
+    ...
+</code></pre>
+<p>The fast-path keeps <code>random_split</code> as the named operation in
+both branches. The decision between unified-pipeline and
+fast-path is taken in implementation review.</p>
+<p><code>random_split</code>'s test class (<code>TestRandomSplit</code> in
+<code>tests/dataset/test_split.py</code>) is unchanged. The new wiring is
+covered by gap <strong>D</strong> in §6.</p>
+<h3 id="36-cifar-10-migration">3.6. CIFAR-10 migration</h3>
+<p>In <code>deriva-ml-model-template/src/scripts/_cifar10_datasets.py</code>:</p>
+<h4 id="361-canonical-split-training-testing-use-split_dataset-with-a-predicate-selector">3.6.1. Canonical <code>Split</code> / <code>Training</code> / <code>Testing</code> — use <code>split_dataset</code> with a predicate selector</h4>
+<p>Replace lines 445-465 (hand-built Split + Training + Testing +
+<code>add_dataset_members</code> calls plus the subsequent batched RID
+assignment for those three datasets):</p>
+<pre><code class="language-python">def cifar_canonical_partition(
+    df: pd.DataFrame,
+    partition_sizes: dict[str, int],
+    seed: int,
+) -&gt; dict[str, np.ndarray]:
+    &quot;&quot;&quot;Partition CIFAR-10 images by the curators' fixed prefix:
+    ``train_*`` → Training, ``test_*`` → Testing.
+
+    Ignores ``partition_sizes`` — the canonical partition is
+    fully predicate-determined.
+    &quot;&quot;&quot;
+    # The denormalized DataFrame must include Image.filename; the
+    # caller specifies include_tables=[&quot;Image&quot;] accordingly.
+    is_train = df[&quot;Image.filename&quot;].str.startswith(&quot;train_&quot;)
+    return {
+        &quot;Training&quot;: np.flatnonzero(is_train.values),
+        &quot;Testing&quot;:  np.flatnonzero(~is_train.values),
+    }
+
+with ml.create_execution(...) as exe:
+    canonical = split_dataset(
+        ml,
+        datasets[&quot;complete&quot;],
+        exe,
+        # test_size is required by split_dataset's signature but is
+        # effectively ignored when selection_fn is set; pass any
+        # nonzero value just to satisfy validation.
+        test_size=len(test_rids),
+        selection_fn=cifar_canonical_partition,
+        element_table=&quot;Image&quot;,
+        include_tables=[&quot;Image&quot;],
+        training_types=[&quot;Labeled&quot;],
+        testing_types=[&quot;Labeled&quot;],
+        partition_by=&quot;element&quot;,
+        split_description=descriptions[&quot;split&quot;],
+    )
+    datasets[&quot;split&quot;]    = canonical.split.rid
+    datasets[&quot;training&quot;] = canonical.training.rid
+    datasets[&quot;testing&quot;]  = canonical.testing.rid
+</code></pre>
+<p>Note that with <code>split_dataset</code> doing the work, the subsequent
+<code>_batched_add</code> calls for the <code>training</code> and <code>testing</code> datasets
+(lines 506-509) are <strong>redundant</strong> — <code>split_dataset</code> already
+assigns members. Those calls go away.</p>
+<p>The <code>complete</code> dataset (line 439-443) <strong>stays hand-built</strong> — it is
+the input to the split, not a Split itself.</p>
+<h4 id="362-small_training-small_testing-use-subsample">3.6.2. <code>Small_Training</code> / <code>Small_Testing</code> — use <code>subsample</code></h4>
+<p>Replace lines 467-487 (hand-built Small_Split + Small_Training +
+Small_Testing) and lines 517-522 (<code>stratified_sample_rids</code> calls)
+with two <code>subsample()</code> calls inside the same execution:</p>
+<pre><code class="language-python">with ml.create_execution(...) as exe:
+    # ...the split_dataset call from §3.6.1 above...
+
+    small_training = subsample(
+        ml,
+        datasets[&quot;training&quot;],
+        exe,
+        size=SMALL_TRAIN_SIZE,
+        seed=42,
+        stratify_by_column=STRATIFY_COLUMN,
+        element_table=&quot;Image&quot;,
+        include_tables=[&quot;Image&quot;, &quot;Image_Class&quot;],
+        dataset_types=[&quot;Training&quot;, &quot;Labeled&quot;],
+        description=descriptions[&quot;small_training&quot;],
+        partition_by=&quot;element&quot;,
+    )
+    small_testing = subsample(
+        ml,
+        datasets[&quot;testing&quot;],
+        exe,
+        size=SMALL_TEST_SIZE,
+        seed=43,
+        stratify_by_column=STRATIFY_COLUMN,
+        element_table=&quot;Image&quot;,
+        include_tables=[&quot;Image&quot;, &quot;Image_Class&quot;],
+        dataset_types=[&quot;Testing&quot;, &quot;Labeled&quot;],
+        description=descriptions[&quot;small_testing&quot;],
+        partition_by=&quot;element&quot;,
+    )
+    datasets[&quot;small_training&quot;] = small_training.dataset_rid
+    datasets[&quot;small_testing&quot;]  = small_testing.dataset_rid
+</code></pre>
+<p><code>Small_Split</code> parent <strong>is dropped entirely</strong>. The two subsamples
+are siblings under the same execution's outputs; that's where
+the "they go together" relationship lives. The
+<code>stratified_sample_rids</code> import and helper become unused (delete).</p>
+<h4 id="363-_require_small_variant_distinct-stays">3.6.3. <code>_require_small_variant_distinct</code> stays</h4>
+<p>The pool-size guard at the top of <code>create_dataset_hierarchy</code>
+(lines 410-412) still runs. The <code>subsample()</code> calls will raise if
+asked for more samples than the source contains, but failing fast
+at the top of the function is still useful operator UX.</p>
+<h4 id="364-labeled_split-and-small_labeled_split-no-change">3.6.4. <code>Labeled_Split</code> and <code>Small_Labeled_Split</code> — no change</h4>
+<p>These already use <code>split_dataset()</code>. They pick up the new
+<code>Split_Partition</code> tag automatically (deriva-ml side) once the pin
+moves.</p>
+<h3 id="37-the-cifar-migrations-pyproject-pin-bump">3.7. The CIFAR migration's pyproject pin bump</h3>
+<p>deriva-ml-model-template's <code>pyproject.toml</code> pins
+<code>deriva-ml&gt;=1.39,&lt;2.0</code>. The new <code>subsample</code> symbol means the
+template needs a pin bump to whatever release this PR ships in
+(<code>&gt;=1.40,&lt;2.0</code> if the deriva-ml side gets a minor bump, or higher
+patch). Coordinated like the v1.39 cycle — deriva-ml PR ships
+first, then deriva-ml-model-template PR with the migration plus
+pin bump.</p>
+<h2 id="4-output-format-changed-surface">4. Output format / changed surface</h2>
+<h3 id="vocab-terms-dataset_type">Vocab terms (<code>Dataset_Type</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>New?</th>
+<th>Tagged on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Split</code></td>
+<td>existing</td>
+<td>Parent Split dataset</td>
+</tr>
+<tr>
+<td><code>Training</code>, <code>Testing</code>, <code>Validation</code></td>
+<td>existing</td>
+<td>Partition children of a Split (role); also corpora</td>
+</tr>
+<tr>
+<td><code>Labeled</code>, <code>Unlabeled</code>, domain-specific</td>
+<td>existing</td>
+<td>Content axis</td>
+</tr>
+<tr>
+<td><strong><code>Split_Partition</code></strong></td>
+<td><strong>new</strong></td>
+<td>Every child of <code>split_dataset</code></td>
+</tr>
+<tr>
+<td><strong><code>Subsample</code></strong></td>
+<td><strong>new</strong></td>
+<td>Output of <code>subsample()</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="public-python-api-additions-changes">Public Python API additions / changes</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>deriva_ml.dataset.subsample</code></td>
+<td>NEW — primitive</td>
+</tr>
+<tr>
+<td><code>deriva_ml.dataset.split_dataset</code></td>
+<td>unchanged signature; new behavior (<code>Split_Partition</code> tagging, default selector dispatch)</td>
+</tr>
+<tr>
+<td><code>deriva_ml.dataset.random_split</code></td>
+<td>unchanged surface; now load-bearing (becomes default selector)</td>
+</tr>
+<tr>
+<td><code>deriva_ml.dataset.stratified_split</code></td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td><code>deriva_ml.dataset.SelectionFunction</code> Protocol</td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td><code>deriva_ml.dataset.SplitResult</code> / <code>PartitionInfo</code></td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td>Catalog schema</td>
+<td><strong>unchanged</strong> — no new tables, no new columns. Two new <code>Dataset_Type</code> vocab rows seeded by <code>_ensure_dataset_types</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cli">CLI</h3>
+<p>No new CLI verbs. (<code>deriva-ml-split-dataset</code> already exists;
+<code>subsample</code> does not get its own CLI because the migration goal
+is API-driven; an operator-driven <code>deriva-ml-subsample</code> could
+follow if demand surfaces.)</p>
+<h2 id="5-components-and-module-layout">5. Components and module layout</h2>
+<pre><code>src/deriva_ml/dataset/
+    split.py              # split_dataset, subsample (or extract subsample to subsample.py)
+    __init__.py           # re-export subsample
+tests/dataset/
+    test_split.py         # gap A, B, C, D, G mandatory tests added here
+    test_subsample.py     # NEW — full subsample coverage
+    test_split_partition_by.py  # row-mode leakage matrix tests added here
+
+deriva-ml-model-template/src/scripts/
+    _cifar10_datasets.py  # canonical Split and Small Training/Testing migrations
+
+CONTEXT.md                # new ### Datasets — types and partitions subsection
+</code></pre>
+<h3 id="subsamplepy-extraction-question-open"><code>subsample.py</code> extraction question (open)</h3>
+<p><code>split.py</code> is already 2020 lines. Adding ~150 lines of
+<code>subsample</code> + shared helpers pushes it toward 2200. Extracting
+<code>subsample</code> to a sibling module
+(<code>src/deriva_ml/dataset/subsample.py</code>) keeps each file focused on
+one operation; the shared <code>_compute_subsample</code> and the existing
+<code>_compute_partitions</code> would share helpers from a third module
+(<code>_split_internals.py</code> or similar).</p>
+<p><strong>Decision deferred to implementation review.</strong> The cheapest
+landing pattern is to add <code>subsample</code> to <code>split.py</code> first, see
+how the helpers actually shape up, and extract if file size or
+testability suffers. If the audit cycle has guidance on
+2000-line-files (it did — there's a god-file refactor pattern in
+the recent audit reports), follow it; otherwise inline is fine.</p>
+<h2 id="6-testing-strategy">6. Testing strategy</h2>
+<p>Coverage analysis during grilling identified eight gaps. Five are
+mandatory pins (A, B, C, D, G), one is the full subsample suite
+(E), one is row-mode leakage coverage promoted from nice-to-have
+(F), and one is redundant with the new dispatch (H, skipped).</p>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>New test</th>
+<th>File</th>
+<th>LOC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td><code>test_source_does_not_list_split_as_child</code> — <code>source.list_dataset_children()</code> does NOT include the Split</td>
+<td><code>test_split.py</code></td>
+<td>~15</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td><code>test_split_children_carry_split_partition_tag</code> — every child's <code>dataset_types</code> contains <code>Split_Partition</code></td>
+<td><code>test_split.py</code></td>
+<td>~20</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td><code>test_role_types_dont_inherit_from_source</code> — source tagged <code>Testing</code>, children correctly tagged per role</td>
+<td><code>test_split.py</code></td>
+<td>~25</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td><code>test_split_dataset_default_selector_is_random</code> — verify the new dispatch wiring</td>
+<td><code>test_split.py</code></td>
+<td>~15</td>
+</tr>
+<tr>
+<td><strong>G</strong></td>
+<td><code>test_split_does_not_mutate_source_dataset_types</code> — defensive</td>
+<td><code>test_split.py</code></td>
+<td>~10</td>
+</tr>
+<tr>
+<td><strong>F</strong></td>
+<td>row-mode leakage matrix: <code>(element, row) × (random, stratify, custom_fn)</code> cartesian product — what is and isn't disjoint under each combination</td>
+<td><code>test_split_partition_by.py</code></td>
+<td>~80</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>New <code>TestSubsample</code> suite: happy path, stratified, dry-run, single-output (no parent), provenance (source = exe input, subsample = exe output, no Dataset_Dataset edge), <code>Subsample</code> tag check, role-types-don't-propagate, dataset_types argument honored, deterministic by seed</td>
+<td><code>test_subsample.py</code> (new file)</td>
+<td>~250</td>
+</tr>
+</tbody>
+</table>
+<p>Total: ~12-14 tests, ~400 LOC of test additions.</p>
+<p>Doctests on the new <code>subsample</code> Example block run as part of
+pytest collection (deriva-ml's standard pattern) — all
+catalog-dependent lines marked <code># doctest: +SKIP</code>.</p>
+<h2 id="7-risks-and-mitigations">7. Risks and mitigations</h2>
+<p><strong>R1. Random path performance regression.</strong> The dispatch refactor
+makes the random selector go through the same denormalization
+step as stratified/custom selectors. For very large datasets
+where the random path is the hot path, this is a real cost. The
+denormalization for the random case is just "give me the
+element_table's RIDs," which is one path-builder query — not the
+multi-table join the stratified path needs. <strong>Mitigation:</strong> the
+fast-path branch sketched in §3.5 is an explicit out if perf
+measurement shows a regression. Implementer measures on a 100K
+dataset before deciding.</p>
+<p><strong>R2. Hand-built CIFAR canonical may have surprises.</strong> The
+predicate <code>df["Image.filename"].str.startswith("train_")</code> requires
+the denormalized DataFrame to include <code>Image.filename</code>. The
+existing <code>include_tables=["Image"]</code> covers it, but tests should
+verify the column exists by name on a real catalog before the
+migration lands. <strong>Mitigation:</strong> wrap the CIFAR predicate in a
+test that builds a tiny fixture catalog with mixed <code>train_</code> /
+<code>test_</code> prefixes and asserts the partition splits them correctly.</p>
+<p><strong>R3. <code>Split_Partition</code> tag missing on old catalogs.</strong> Pre-existing
+Splits in long-lived catalogs predate this PR and won't carry the
+new tag. <code>find_datasets(dataset_type="Split_Partition")</code> will not
+return historical split children. <strong>Mitigation:</strong> documented
+limitation in the PR description; a one-off backfill script can
+be written if a catalog operator needs it (cheap — walk every
+<code>Dataset_Type=Split</code> parent, find its children via
+<code>Dataset_Dataset</code>, add the tag to each child). Not provided in
+this PR.</p>
+<p><strong>R4. <code>dataset_types</code> mutation surprise.</strong> <code>subsample</code>'s
+<code>dataset_types</code> parameter is documented as "caller-supplied
+additional types; <code>Subsample</code> is always appended." If a caller
+passes <code>dataset_types=["Subsample"]</code> thinking they need to be
+explicit, the result is double-tagging. <strong>Mitigation:</strong>
+<code>_ensure_dataset_types</code> already deduplicates; defensively dedupe
+in <code>subsample</code> too.</p>
+<p><strong>R5. Coordinated PR window.</strong> Same risk as the v1.39 cycle —
+deriva-ml ships, deriva-ml-model-template needs the new symbol +
+pin bump. <strong>Mitigation:</strong> open the deriva-ml-model-template PR
+against the deriva-ml feature branch via direct-git pin, the same
+pattern that worked for v1.39 / v1.40.</p>
+<h2 id="8-rollout">8. Rollout</h2>
+<p>Single PR against deriva-ml <code>main</code>, followed within the same
+session by a companion PR against deriva-ml-model-template (the
+CIFAR migration + pin bump). No feature flag — the new behavior
+is additive at the dataset-types level and the dispatch refactor
+is invisible to existing callers.</p>
+<p>Version bump on deriva-ml: <strong>minor</strong>
+(<code>v1.39.x → v1.40.0</code>). Justification: new public symbol
+(<code>subsample</code>), new vocab terms (additive), new dispatch behavior
+(behavior change for the no-stratify-no-fn random path — same
+results modulo edge-case shuffle determinism, but goes through a
+new code path). Not a breaking change; not a patch.</p>
+<p>If the dispatch refactor (§3.5) is dropped or scoped down during
+implementation, the bump can be patch. The implementer's call.</p>
+<h2 id="9-open-questions">9. Open questions</h2>
+<p>None blocking. Two minor items the implementer can decide:</p>
+<ol>
+<li><strong>Inline vs. extract <code>subsample</code> into its own module.</strong> See §5.</li>
+<li><strong>Fast-path or unified-pipeline for the no-stratify random
+   case.</strong> See §3.5 + §7 R1.</li>
+</ol>
+<h2 id="10-references">10. References</h2>
+<ul>
+<li><code>CONTEXT.md</code> — <code>### Datasets — types and partitions</code> subsection
+  added in the same PR.</li>
+<li><code>docs/superpowers/specs/archive/2026-04-30-association-index-sql-generator-design.md</code>
+  — note: unrelated; archived in this same docs tree.</li>
+<li>ADR-0001 — <em>Lineage walks data flow, not orchestration</em>.
+  Justifies the "source recorded as execution input, not as
+  <code>Dataset_Dataset</code> parent" call for both <code>split_dataset</code> and
+  <code>subsample</code>.</li>
+<li>Task #48 — sketch of the follow-up PR for
+  <code>characterize_dataset</code> / <code>compare_datasets</code> /
+  <code>validate_split</code> / <code>validate_subsample</code>. Out of scope here.</li>
+<li>Task #49 — <code>deriva-ml-skills/dataset-lifecycle</code> review after
+  this PR ships. Out of scope here.</li>
+<li>sklearn <code>resample(stratify=, replace=False, n_samples=N)</code> —
+  conceptual analog for <code>subsample</code>. The new function is named
+  <code>subsample</code> rather than <code>resample</code> to avoid the
+  bootstrap-resampling connotation.</li>
+<li>Hugging Face <code>Dataset.train_test_split(stratify_by_column=)</code> —
+  naming inspiration for the keyword.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

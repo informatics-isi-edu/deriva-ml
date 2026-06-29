@@ -1,0 +1,2436 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-06-27-directory-dataset-root-path-name-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Root directory dataset records its name in Directory_Dataset.Path (not ".") — design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#root-directory-dataset-records-its-name-in-directory_datasetpath-not-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Root directory dataset records its name in Directory_Dataset.Path (not ".") — design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#audit-every-readerwriter-of-directory_datasetpath" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit — every reader/writer of Directory_Dataset.Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-structural-root-rule-is_source_root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Structural root rule (is_source_root)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-writer-change-add_files-coremixinsfilepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Writer change (add_files, core/mixins/file.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-schema-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Schema + docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-repo-migration-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-repo migration &amp; ordering
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cross-repo migration &amp; ordering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#existing-catalogs-no-backfill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing catalogs — no backfill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-offline-testscoretest_filepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml — offline (tests/core/test_file.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-is_source_root-live-bag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml — is_source_root (live + bag)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-cifar-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml-cifar-example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acceptance-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acceptance criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="root-directory-dataset-records-its-name-in-directory_datasetpath-not-design">Root directory dataset records its name in <code>Directory_Dataset.Path</code> (not <code>"."</code>) — design</h1>
+<p><strong>Date:</strong> 2026-06-27
+<strong>Status:</strong> Approved
+<strong>Component:</strong> <code>deriva_ml.core.mixins.file</code> (<code>add_files</code> writer),
+<code>deriva_ml.dataset.dataset</code> / <code>dataset_bag</code> (new <code>is_source_root</code> accessor),
+<code>deriva_ml.schema.create_schema</code> (column comment).
+<strong>Relates to:</strong> <code>docs/superpowers/plans/2026-06-24-directory-dataset-path.md</code>
+(the original <code>Directory_Dataset.Path</code> design this amends), tk-024 (the
+<code>add_files</code> dataset-input edge). Cross-repo: <code>deriva-ml-cifar-example</code> and
+<code>deriva-ml-skills</code> consume the new accessor. Releases as a deriva-ml <strong>minor</strong>
+bump.</p>
+<h2 id="problem">Problem</h2>
+<p><code>add_files</code> builds a nested File-dataset tree and records each node's source
+folder in <code>Directory_Dataset.Path</code> as a path <strong>relative to the ingest root</strong>.
+The ingest root stores the literal <code>"."</code> (<code>core/mixins/file.py:382</code>):</p>
+<pre><code class="language-python">&quot;Path&quot;: &quot;.&quot; if directory == ingest_root else directory.relative_to(ingest_root).as_posix(),
+</code></pre>
+<p>Children store meaningful names (<code>train</code>, <code>test</code>); the root stores <code>"."</code>. When a
+user browses the catalog, the Dataset record page's "Folder" column (Chaise
+annotation, <code>schema/annotations.py:889</code>) shows the root as <code>.</code> — uninformative.
+The root's actual name <em>is</em> recorded, but in a different column
+(<code>Dataset.Description</code>, set by <code>_root_description</code> to the basename, e.g.
+<code>cifar10_source</code>). So "what folder is this?" is split across two columns, and the
+prominent one shows <code>.</code>.</p>
+<p><strong><code>"."</code> is not merely cosmetic — it is a load-bearing root-identification key.</strong>
+An audit (2026-06-27) found five functional readers across three repos that use
+<code>source_directory == "."</code> to <em>find the root</em> of the tree (not just display it),
+plus four deriva-ml tests asserting the root Path is exactly <code>"."</code>, plus
+docstrings and the schema column comment. Naively changing the stored value
+would silently break root identification everywhere.</p>
+<h3 id="audit-every-readerwriter-of-directory_datasetpath">Audit — every reader/writer of <code>Directory_Dataset.Path</code></h3>
+<p><strong>Writer (1):</strong> <code>deriva-ml/src/deriva_ml/core/mixins/file.py:378-386</code> —
+<code>add_files</code> inserts the rows; line 382 is the <code>"."</code>-for-root conditional.</p>
+<p><strong>Functional readers that identify the root via <code>== "."</code> (must migrate):</strong>
+- <code>deriva-ml-cifar-example/src/scripts/load_cifar10.py:177</code> —
+  <code>_find_latest_source_dataset_rid</code> filters <code>source_directory == "."</code>.
+- <code>deriva-ml-cifar-example/src/scripts/_cifar10_upload.py:319</code> — comment + logic
+  that the root holds <code>labels.csv</code> and children are <code>train</code>/<code>test</code>.
+- <code>deriva-ml-cifar-example/tests/test_lineage_connected.py:214</code> — <code>== "."</code> to
+  locate the root.
+- <code>deriva-ml-skills/skills/setup-ml-catalog/scripts/loader_orchestrator_template.py:75</code>
+  — <code>source_directory == "."</code> (shipped to users).
+- <code>deriva-ml-skills/skills/setup-ml-catalog/scripts/upload_phase_template.py:102</code>
+  — <code>partition == "."</code> root check (shipped to users).</p>
+<p><strong>Value-agnostic readers (NO change needed):</strong> <code>Dataset.source_directory</code> /
+<code>Dataset.is_directory</code> (<code>dataset.py:172-216</code>), the <code>DatasetBag</code> equivalents
+(<code>dataset_bag.py:228-283</code>), the Chaise "Folder" annotation
+(<code>annotations.py:889</code>) — all return/display whatever Path is stored without
+assuming <code>"."</code>. The child-partition filter <code>source_directory in {"train","test"}</code>
+(<code>_cifar10_upload.py:344</code>) is also unaffected.</p>
+<p><strong>Tests asserting root Path <code>"."</code> (must update):</strong>
+<code>deriva-ml/tests/core/test_file.py:173,278</code>,
+<code>deriva-ml/tests/dataset/test_bag_api_coverage.py:519,530</code>,
+<code>deriva-ml-cifar-example/tests/test_find_source_dataset.py:78</code> (stub).</p>
+<p><strong>Docs/comments documenting the <code>"."</code> convention (must update):</strong>
+<code>create_schema.py:69</code>, both <code>source_directory</code> docstrings
+(<code>dataset.py:177</code>, <code>dataset_bag.py:232</code>) and their <code>'.'</code> examples,
+<code>docs/superpowers/plans/2026-06-24-directory-dataset-path.md</code>, and the
+cifar-example/skills comments listed above.</p>
+<h2 id="goal">Goal</h2>
+<ol>
+<li>The root directory dataset records its <strong>directory basename</strong> (e.g.
+   <code>cifar10_source</code>) in <code>Directory_Dataset.Path</code>, so the catalog "Folder" column
+   is self-describing for every node.</li>
+<li>Root identification no longer depends on a magic Path string. A <strong>structural,
+   name-independent</strong> rule — exposed as a reusable accessor — replaces every
+   <code>== "."</code> reader, and works on <strong>both old and new catalogs</strong>.</li>
+</ol>
+<h2 id="design">Design</h2>
+<h3 id="1-structural-root-rule-is_source_root">1. Structural root rule (<code>is_source_root</code>)</h3>
+<p><strong>Definition.</strong> A dataset is the <em>source root</em> of an <code>add_files</code> tree iff it has
+a <code>Directory_Dataset</code> row <strong>and</strong> none of its parents (via <code>Dataset_Dataset</code>,
+where <code>Dataset</code> = parent and <code>Nested_Dataset</code> = child) is itself a directory
+dataset (has a <code>Directory_Dataset</code> row).</p>
+<p>This is the dataset's position in the parent graph, independent of the Path
+string — so it identifies the root whether the stored Path is the legacy <code>"."</code>
+or the new basename. Verified live on catalog 328: the rule matches exactly the
+root <code>AT4</code>, excludes the <code>train</code>/<code>test</code> children, and (critically) does <strong>not</strong>
+match the later <code>split_dataset()</code> datasets (<code>ZB8</code>, <code>Y7J</code>, <code>T18</code>) — those are
+parents of their own children but have <strong>no</strong> <code>Directory_Dataset</code> row, so the
+"is a directory dataset" clause excludes them. Scoping to directory datasets is
+what keeps the rule from mis-firing on non-<code>add_files</code> nesting.</p>
+<p><strong>New accessor</strong> — mirror the existing <code>source_directory</code> / <code>is_directory</code>
+shape, on both classes:
+- <code>Dataset.is_source_root</code> (property, live) — <code>dataset.py</code>.
+- <code>DatasetBag.is_source_root</code> (property, offline bag) — <code>dataset_bag.py</code>.</p>
+<p>Returns <code>True</code> for the tree root, <code>False</code> for child directory datasets, <code>False</code>
+for datasets with no <code>Directory_Dataset</code> row (non-directory datasets and
+<code>split_dataset()</code> outputs).</p>
+<p>Implementation: <code>is_directory</code> (already exists) gives the "has a
+<code>Directory_Dataset</code> row" half. For the "no directory-dataset parent" half, fetch
+this dataset's parents (<code>list_dataset_parents</code> exists on <code>Dataset</code>; the bag has
+its own membership tables) and test whether any parent is itself a directory
+dataset. Keep the parent lookup scoped so a single small query suffices (the
+tree is shallow; a root has no directory-dataset parents by definition).</p>
+<p>The five readers replace <code>source_directory == "."</code> with <code>is_source_root</code>. Where
+a reader needs <em>the</em> root RID from a set of candidates
+(<code>_find_latest_source_dataset_rid</code>), it filters its candidate datasets by
+<code>is_source_root</code>.</p>
+<h3 id="2-writer-change-add_files-coremixinsfilepy">2. Writer change (<code>add_files</code>, <code>core/mixins/file.py</code>)</h3>
+<p>The root stores its basename instead of <code>"."</code>:</p>
+<pre><code class="language-python">&quot;Path&quot;: _root_path_name(ingest_root, root_name)
+        if directory == ingest_root
+        else directory.relative_to(ingest_root).as_posix(),
+</code></pre>
+<p>where the root's Path name follows the <strong>same precedence as the root
+Description</strong> so the two columns agree:</p>
+<pre><code class="language-python">def _root_path_name(ingest_root: Path, root_name: str | None) -&gt; str:
+    # Mirrors _root_description's precedence (minus the description fallback):
+    # explicit root_name, else the basename, else the &quot;root&quot; sentinel — never empty.
+    return root_name or ingest_root.name or &quot;root&quot;
+</code></pre>
+<ul>
+<li><strong>Empty-basename edge</strong> (<code>Path("/").name == ""</code>, when file specs span
+  top-level dirs): falls through to <code>"root"</code>, never empty. (<code>_root_description</code>
+  already guards this for the Description; we reuse the same precedence.)</li>
+<li><strong><code>root_name</code> consistency:</strong> today Description respects a caller-supplied
+  <code>root_name</code> but Path is always <code>"."</code> — they can disagree. After this change
+  both derive the root's name from the same precedence, so Path and Description
+  name the root identically.</li>
+<li>Children are <strong>unchanged</strong> — still <code>directory.relative_to(ingest_root).as_posix()</code>.</li>
+</ul>
+<p>Factor <code>_root_path_name</code> alongside <code>_root_description</code> so the shared precedence
+lives in one place (DRY); <code>_root_description</code> keeps its extra <code>description</code>
+fallback for the prose field.</p>
+<h3 id="3-schema-docs">3. Schema + docs</h3>
+<ul>
+<li><code>create_schema.py:69</code> column comment: replace "The ingest root stores '.'."
+  with language describing that the root stores its directory basename (the same
+  name as its Description), children store paths relative to the root.</li>
+<li><code>source_directory</code> docstrings (<code>dataset.py</code>, <code>dataset_bag.py</code>): drop the
+  "ingest root stores '.'" sentence and the <code>'.'</code> doctest examples; document the
+  new behavior and point to <code>is_source_root</code> for root identification.</li>
+<li><code>is_source_root</code>: full Google-style docstring with a runnable <code>Example:</code>.</li>
+<li>Amend <code>docs/superpowers/plans/2026-06-24-directory-dataset-path.md</code> with a note
+  that the root Path convention changed from <code>"."</code> to the basename, and why.</li>
+</ul>
+<h2 id="cross-repo-migration-ordering">Cross-repo migration &amp; ordering</h2>
+<p>deriva-ml ships first (defines <code>is_source_root</code>); consumers then pin to it.</p>
+<p><strong>deriva-ml</strong> (minor bump): writer change, <code>is_source_root</code> (×2 classes),
+schema-comment + docstring updates, tests (below).</p>
+<p><strong>deriva-ml-cifar-example</strong> (lock bump to new deriva-ml):
+<code>load_cifar10.py:177</code> and <code>test_lineage_connected.py:214</code> switch
+<code>source_directory == "."</code> → <code>is_source_root</code>; <code>_cifar10_upload.py:319</code> comment +
+root reasoning updated (its child filter <code>in {"train","test"}</code> is unchanged).</p>
+<p><strong>deriva-ml-skills</strong> (template fixes): <code>loader_orchestrator_template.py:75</code> and
+<code>upload_phase_template.py:102</code> switch <code>== "."</code> → <code>is_source_root</code>, with their
+surrounding comments.</p>
+<h3 id="existing-catalogs-no-backfill">Existing catalogs — no backfill</h3>
+<p><code>is_source_root</code> keys off the parent graph, not the Path string, so it identifies
+the root correctly on <strong>pre-change catalogs</strong> (whose root Path is still <code>"."</code>)
+<em>and</em> new ones. Therefore root identification keeps working everywhere with no
+migration. The only residue on an already-loaded catalog is cosmetic: its root
+"Folder" still displays <code>"."</code>. Rewriting old roots' Path is <strong>out of scope</strong> — not
+worth a migration for a display nit; new loads get the descriptive name. (If a
+backfill is ever wanted, it is a separate, optional one-shot: for each dataset
+where <code>is_source_root</code> and <code>source_directory == "."</code>, set Path to the root's
+Description/basename.)</p>
+<h2 id="testing">Testing</h2>
+<h3 id="deriva-ml-offline-testscoretest_filepy">deriva-ml — offline (<code>tests/core/test_file.py</code>)</h3>
+<ul>
+<li>After <code>add_files</code>, the root row's Path equals the ingest-root <strong>basename</strong>
+  (not <code>"."</code>); children unchanged (<code>{"d1","d2"}</code>).</li>
+<li>A <code>root_name="Custom Name"</code> case: the root row's Path <strong>and</strong> its Description
+  both equal <code>"Custom Name"</code> (Path/Description agree).</li>
+<li>The four existing <code>== "."</code> assertions
+  (<code>test_file.py:173,278</code>, <code>test_bag_api_coverage.py:519,530</code>) become
+  basename assertions.</li>
+</ul>
+<h3 id="deriva-ml-is_source_root-live-bag">deriva-ml — <code>is_source_root</code> (live + bag)</h3>
+<ul>
+<li><code>is_source_root</code> is <code>True</code> for the tree root, <code>False</code> for <code>train</code>/<code>test</code>
+  children, <code>False</code> for a non-directory dataset and for a <code>split_dataset()</code>
+  output (the parent-but-not-directory case the rule must exclude).</li>
+<li><strong>Identity-not-name test:</strong> locate the root via <code>is_source_root</code> and assert it
+  is the expected dataset <em>without</em> referencing any Path string — so root
+  identification can never silently regress to depending on <code>"."</code> or on the
+  basename value.</li>
+<li><strong>Legacy-catalog test (offline/bag):</strong> a fixture whose root Path is <code>"."</code>
+  (the pre-change shape) still resolves <code>is_source_root == True</code> for the root —
+  proves no backfill is required.</li>
+</ul>
+<h3 id="deriva-ml-cifar-example">deriva-ml-cifar-example</h3>
+<ul>
+<li><code>test_find_source_dataset.py</code>: stub/filter switches to <code>is_source_root</code>; the
+  test asserts the root is found regardless of its Path value.</li>
+<li><code>test_lineage_connected.py</code>: root located via <code>is_source_root</code>; lineage still
+  connects end-to-end.</li>
+<li>The existing live end-to-end load confirms the real root's Folder reads its
+  basename (e.g. <code>cifar10_source</code>).</li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ol>
+<li>A fresh <code>add_files</code>/<code>load-cifar10</code> catalog shows the root's "Folder" as its
+   directory basename (e.g. <code>cifar10_source</code>); children show <code>train</code>/<code>test</code>.</li>
+<li>All five former <code>== "."</code> readers identify the root via <code>is_source_root</code> and
+   work on both new and pre-change catalogs.</li>
+<li>Root Path and Description name the root identically (incl. when <code>root_name</code> is
+   supplied).</li>
+<li>End-to-end lineage still connects source → split → run.</li>
+<li>No schema migration and no catalog backfill required.</li>
+</ol>
+<h2 id="out-of-scope">Out of scope</h2>
+<ul>
+<li>Backfilling existing catalogs' root Path from <code>"."</code> to the basename.</li>
+<li>Changing child Path semantics (they remain relative to the ingest root).</li>
+<li>Any change to <code>Dataset.Description</code> derivation beyond sharing the name
+  precedence with the new root Path.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4288 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase3-schema/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml audit 2026-05 — Phase 3: schema/ - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-audit-2026-05-phase-3-schema" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml audit 2026-05 — Phase 3: schema/
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsystem-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsystem inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-workspace-usage-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-workspace usage check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-1-legacy-dead-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 1 — Legacy / dead code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 1 — Legacy / dead code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-validationpy-expected_-constants-drift-from-create_schemapy-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 validation.py EXPECTED_* constants drift from create_schema.py reality
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-check_schemapy-is-a-redundant-third-validator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 check_schema.py is a redundant third validator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-table_comments_utilspy-is-dead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 table_comments_utils.py is dead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-validationpy-has-no-external-consumer-and-overlaps-toolsvalidate_schema_docpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 validation.py has no external consumer and overlaps tools/validate_schema_doc.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-reset_ml_schema-has-zero-callers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 reset_ml_schema has zero callers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-create_schemapymain-is-dead-and-broken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6 create_schema.py:main() is dead and broken
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-_post_clone_operations-is-a-fictional-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.7 _post_clone_operations is a fictional guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-annotationspymain-is-dead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.8 annotations.py:main() is dead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-table_comments_utilspymain-is-dead-alongside-the-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.9 table_comments_utils.py:main() is dead alongside the module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#110-annotationspy-importlibimport_module-workaround" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.10 annotations.py importlib.import_module workaround
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-2-privatization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 2 — Privatization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 2 — Privatization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-schemavalidator-should-be-private-or-deleted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 SchemaValidator should be private (or deleted)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-validationissue-and-validationseverity-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 ValidationIssue and ValidationSeverity are
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-normalize_schema-should-be-private" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 normalize_schema should be private
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-build_navbar_menu-exposure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 build_navbar_menu exposure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-3-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 3 — Coverage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 3 — Coverage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-no-cascade-safety-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 No CASCADE-safety test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-no-acl-application-test-for-create_ml_catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 No ACL-application test for create_ml_catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-deriva-ml-referencejson-drift-is-itself-a-coverage-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 deriva-ml-reference.json drift is itself a coverage gap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-testsschematest_validationpy-tests-do-not-assert-ground-truth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 tests/schema/test_validation.py tests do not assert ground truth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-testsschematest_vocab_fk_conventionpy-is-the-strong-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 tests/schema/test_vocab_fk_convention.py is the strong test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-policyjson-has-no-test-asserting-its-content" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 policy.json has no test asserting its content
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-no-test-for-annotationspybuild_navbar_menu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 No test for annotations.py:build_navbar_menu
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-4-docs-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 4 — Docs sync
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 4 — Docs sync">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-create_schemapy312-references-a-fictional-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 create_schema.py:312 references a fictional guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-docstring-examples-without-doctest-skip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Docstring examples without # doctest: +SKIP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-create_schemapy-module-docstring-lists-symbols-correctly-but-does-not-warn-about-reset_ml_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 create_schema.py module docstring lists symbols correctly but does not warn about reset_ml_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-validationpy-module-docstring-is-accurate-but-the-file-does-not-deliver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 validation.py module docstring is accurate but the file does not deliver
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-check_schemapy9-describes-a-cli-that-doesnt-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 check_schema.py:9 describes a CLI that doesn't work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-policyjson-has-no-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 policy.json has no documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-5-deriva-py-api-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 5 — deriva-py API conventions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 5 — deriva-py API conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-create_ml_schema-uses-raw-model-api-correctly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 create_ml_schema uses raw model API correctly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-annotationspy-importlibimport_module-is-non-idiomatic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 annotations.py importlib.import_module is non-idiomatic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-check_schemapy67-constructs-ermrestcatalog-directly-with-raw-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 check_schema.py:67 constructs ErmrestCatalog directly with raw scheme
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-create_ml_catalog-shells-out-to-derivaconfigacl_config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 create_ml_catalog shells out to deriva.config.acl_config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-initialize_ml_schema-uses-datapath-fetch-insert" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 initialize_ml_schema uses datapath fetch + insert
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-dump_ml_schema-uses-catalogdelete_ermrest_catalogreallytrue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 dump_ml_schema uses catalog.delete_ermrest_catalog(really=True)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lens-6-maintainability-naming-class-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lens 6 — Maintainability / naming / class size
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lens 6 — Maintainability / naming / class size">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-annotationspy649-loc-is-borderline-module-is-coherent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 annotations.py:649 LoC is borderline; module is coherent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-build_navbar_menu-repeats-fchaiserecordsetcatalog_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 build_navbar_menu repeats f"/chaise/recordset/#{catalog_id}/..."
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-create_schemapy662-loc-is-mostly-load-bearing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 create_schema.py:662 LoC is mostly load-bearing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-validationpy602-loc-is-mostly-drift-prone-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 validation.py:602 LoC is mostly drift-prone constants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-dataclasses-vs-pydantic-for-schemavalidationreport-validationissue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Dataclasses-vs-Pydantic for SchemaValidationReport / ValidationIssue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-_ensure_terms-repeated-in-initialize_ml_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 _ensure_terms repeated in initialize_ml_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#67-missing-__all__-on-check_schemapy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.7 Missing __all__ on check_schema.py,
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persona-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persona check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worst-offender-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worst-offender modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-audit-2026-05-phase-3-schema">deriva-ml audit 2026-05 — Phase 3: schema/</h1>
+<p>Reviewed <code>/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/schema/</code>
+(2 105 LoC across six Python files: <code>__init__.py</code> 20,
+<code>annotations.py</code> 649, <code>check_schema.py</code> 118, <code>create_schema.py</code>
+662, <code>table_comments_utils.py</code> 56, <code>validation.py</code> 602) plus two
+static assets (<code>deriva-ml-reference.json</code> 9 881 lines,
+<code>policy.json</code> 81 lines) and the corresponding test surface
+<code>/Users/carl/GitHub/DerivaML/deriva-ml/tests/schema/</code> (319 LoC,
+2 test files, ~22 tests) at the tip of
+<code>fix/catalog-manager-state-guards</code> (HEAD <code>4442f82</code>).
+Cross-workspace references were grepped against
+<code>/Users/carl/GitHub/DerivaML/{deriva-mcp,deriva-mcp-core,deriva-ml-mcp,deriva-ml-model-template,deriva-skills,deriva-ml-skills}/</code>.</p>
+<p>Phase 3 prior art: <code>phase3-execution.md</code>, <code>phase3-core.md</code>,
+<code>phase3-catalog.md</code>. The schema subsystem differs from those:
+it is <strong>the catalog's birth canal</strong> — every test catalog, every
+fresh deploy, every demo flows through <code>create_ml_catalog</code>
+→ <code>create_ml_schema</code>. Cleanup must not change observable
+schema, vocabulary terms, or ACL policy.</p>
+<h2 id="executive-summary">Executive summary</h2>
+<p>Overall posture: <strong>the load-bearing core
+(<code>create_schema.py</code>'s table construction + <code>annotations.py</code>'s
+Chaise display) is in good shape and externally consumed; the
+periphery is a museum of three half-finished validators, one
+dead CLI, and three broken <code>pyproject.toml</code> entry points.</strong>
+<code>create_ml_catalog</code>, <code>create_ml_schema</code>, <code>asset_annotation</code>,
+and <code>build_navbar_menu</code> carry their weight — the
+model-template, the legacy MCP test fixtures, and several
+internal sites all depend on them. The other 35 % of the
+subsystem is sediment from earlier validation strategies that
+never got pruned.</p>
+<p>Top themes ranked by impact:</p>
+<ol>
+<li>
+<p><strong>Three <code>[project.scripts]</code> entry points point at a
+   package name that no longer exists.</strong> <code>pyproject.toml</code>
+   lines 34–36:
+   <code>deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:main"</code>,
+   <code>deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"</code>,
+   <code>deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"</code>.
+   The package was renamed <code>schema_setup</code> → <code>schema</code> at some
+   point; the script targets were never updated. <code>pip install
+   deriva-ml &amp;&amp; deriva-ml-create-schema</code> raises
+   <code>ModuleNotFoundError: deriva_ml.schema_setup</code> immediately.
+   Worse: <code>deriva-ml-alter-annotation</code> points at
+   <code>alter_annotation:main</code> — a module that does not exist
+   under either name (<code>find</code> returns no <code>alter_annotation*</code>
+   anywhere in <code>src/</code>). The user-facing CLI surface is
+   silently 30 % broken.</p>
+</li>
+<li>
+<p><strong><code>schema/validation.py</code> and the existing
+   <code>tools/validate_schema_doc.py</code> are two competing
+   validators with overlapping intent.</strong> <code>validation.py</code>
+   (602 LoC) introspects a <em>live catalog</em> and compares
+   against hand-maintained Python constants
+   (<code>EXPECTED_TABLE_COLUMNS</code>, <code>EXPECTED_VOCABULARY_TABLES</code>,
+   <code>EXPECTED_VOCABULARY_TERMS</code>,
+   <code>EXPECTED_ASSOCIATION_TABLES</code>); the constants are
+   already drifting (<code>EXPECTED_VOCABULARY_TABLES</code> is missing
+   <code>Execution_Status</code>, <code>EXPECTED_VOCABULARY_TERMS</code> is missing
+   all 7 <code>Execution_Status</code> terms and has 1 of the 8
+   <code>Dataset_Type</code> terms — see §1.1).
+   <code>tools/validate_schema_doc.py</code> (registered as
+   <code>deriva-ml-validate-schema</code>) compares
+   <code>docs/reference/schema.md</code> against <code>create_schema.py</code> via
+   AST. The doc-vs-code validator is in CI and tracked in
+   ADR/superpowers; the live-catalog validator is invoked
+   only through <code>DerivaML.validate_schema()</code> and has no
+   listed external consumer. The duplication is real —
+   <code>validation.py</code> is the older of the two and was
+   superseded by the doc-source-of-truth approach
+   documented in
+   <code>docs/superpowers/specs/2026-04-21-schema-doc-source-of-truth-design.md</code>.</p>
+</li>
+<li>
+<p><strong><code>check_schema.py</code> (the catalog-vs-JSON differ) is a
+   third validator on top of those two — and its CLI is
+   silently destructive.</strong> <code>dump_ml_schema</code> (line 78) calls
+   <code>create_ml_catalog(hostname, "reference-catalog")</code> →
+   writes <code>model.prejson()</code> to a file → <code>catalog.delete_ermrest_catalog(really=True)</code>.
+   In other words, "dump the schema reference" <strong>creates a
+   real catalog on the live server and tries to delete it
+   afterwards.</strong> If the dump fails between the create and
+   the delete (e.g., disk-full on the file write), the
+   stray catalog is leaked. The CLI also crashes on the
+   call path because <code>CheckMLSchemaCLI.main</code> invokes
+   <code>dump_ml_schema(hostname, catalog_id)</code> — two args — but
+   <code>dump_ml_schema(hostname, filename)</code> ignores <code>catalog_id</code>
+   and writes to the default <code>deriva-ml-reference.json</code> in
+   <code>cwd</code>. The 9 881-line reference JSON the validator
+   compares against was last generated when <code>Execution</code>
+   table had no <code>Execution_Status</code> vocabulary
+   (<code>grep -c "Execution_Status" deriva-ml-reference.json</code> = 0
+   in the worktree). So <code>check_ml_schema</code> against a current
+   catalog <strong>reports the entire execution-status surface
+   as drift</strong>, every time. Whole module is rotting in
+   place.</p>
+</li>
+<li>
+<p><strong><code>create_schema.py:main()</code> is dead and broken.</strong> Lines
+   636–658 define a CLI entry point that (a) is never
+   wired into <code>pyproject.toml</code> under any name that resolves
+   (the closest entry, <code>deriva-ml-create-schema</code>, points at
+   the wrong package — see theme 1), (b) declares
+   <code>required=True</code> on a <em>positional</em> argparse argument
+   (raises <code>TypeError</code> at parse-config time), (c)
+   references <code>args.catalog_id</code> which is never declared,
+   and (d) passes a <code>Model</code> object where <code>create_ml_schema</code>
+   expects an <code>ErmrestCatalog</code>. Five separate code-quality
+   smoke alarms in 23 lines. Per CLAUDE.md ("No
+   backwards-compat shims — if something is unused, delete
+   it"), this is a delete.</p>
+</li>
+<li>
+<p><strong>The <code>_post_clone_operations</code> guard the
+   <code>create_ml_schema</code> docstring promises does not exist.</strong>
+   <code>create_schema.py:312</code> reads: "If the schema already
+   exists, it will be DROPPED with CASCADE, destroying all
+   data in the schema. Use <code>_post_clone_operations</code> guard
+   when calling from clone context." A workspace-wide grep
+   for <code>_post_clone_operations</code> returns <strong>zero</strong> hits — no
+   function, no method, no comment elsewhere. The
+   CLAUDE.md-required CASCADE warning is in place at the
+   docstring level, but the <em>guard</em> the docstring tells the
+   reader to use is fictional. The actual guard against
+   CASCADE-on-populated-catalog comes from
+   <code>catalog/clone_via_bag.py</code> having no code path that
+   calls <code>create_ml_schema</code> at all (the bag-pipeline loads
+   schema differently). So the safety property holds, but
+   not for the reason the docstring claims.</p>
+</li>
+</ol>
+<p>Worst-offending modules within <code>schema/</code>:</p>
+<ol>
+<li>
+<p><strong><code>check_schema.py</code></strong> (118 LoC). Three names
+   (<code>check_ml_schema</code>, <code>dump_ml_schema</code>, <code>CheckMLSchemaCLI</code>)
+   exposing two CLI entry points (<code>main</code> + the
+   <code>BaseCLI</code> subclass). Zero callers anywhere in the
+   workspace except the wired-up <code>pyproject.toml</code> console
+   script (which itself doesn't appear to be invoked by
+   anyone). Reference JSON is stale by months. <code>dump_ml_schema</code>
+   has a silent live-catalog side effect plus a signature
+   bug. Cleanest delete target in the audit.</p>
+</li>
+<li>
+<p><strong><code>validation.py</code></strong> (602 LoC). Two <code>@dataclass</code>es,
+   one enum, one validator class, five expected-shape
+   constants, one convenience function. Constants drift
+   from <code>create_schema.py</code> reality (missing
+   <code>Execution_Status</code>, missing 7 <code>dataset_type</code> terms,
+   etc.). Tests exist (<code>tests/schema/test_validation.py</code>)
+   but they assert the constants are non-empty rather than
+   that they match the schema. Externally:
+   <code>validate_ml_schema</code> and <code>SchemaValidationReport</code> are
+   exposed on <code>deriva_ml/__init__.py</code> lazy loader; zero
+   external callers in any sibling project. Overlap with
+   <code>tools/validate_schema_doc.py</code> is structural — the
+   doc-source-of-truth approach made this module
+   redundant, but it was never retired.</p>
+</li>
+<li>
+<p><strong><code>create_schema.py:main()</code></strong> (lines 636–658). 23 LoC
+   of broken CLI code. The other 639 LoC in the file are
+   load-bearing.</p>
+</li>
+<li>
+<p><strong><code>annotations.py</code></strong> (649 LoC). Healthy core. One
+   <code>importlib.import_module</code> workaround (lines 22–27)
+   that's stale (see §5.2), some doctest gaps (§4.2),
+   and a structural observation that <code>build_navbar_menu</code>
+   uses raw <code>/chaise/recordset/#{catalog_id}/...</code> URL
+   construction rather than a helper (low-severity, but
+   the same pattern appears 19 times in one function and
+   could be a <code>_chaise_url</code> helper).</p>
+</li>
+<li>
+<p><strong><code>table_comments_utils.py</code></strong> (56 LoC). Dead code.
+   Zero internal callers; the registered CLI
+   <code>deriva-ml-table-comments-utils</code> points at the wrong
+   package (see theme 1) and would fail to import. No
+   tests. No documentation. The module reads comment text
+   from a <code>docs/&lt;schema&gt;/&lt;table&gt;/[table|&lt;column&gt;].Md</code>
+   directory structure that doesn't exist anywhere in the
+   workspace. Delete candidate.</p>
+</li>
+</ol>
+<hr />
+<h2 id="subsystem-inventory">Subsystem inventory</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th style="text-align: right;">LoC</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__.py</code></td>
+<td style="text-align: right;">20</td>
+<td>Public surface. Five symbols from <code>create_schema.py</code>, five from <code>validation.py</code>. Healthy — but exports validators with no external consumers (see §1.4).</td>
+</tr>
+<tr>
+<td><code>annotations.py</code></td>
+<td style="text-align: right;">649</td>
+<td>Chaise display annotations applied at <code>create_ml_schema</code> time. <code>build_navbar_menu</code>, <code>catalog_annotation</code>, <code>asset_annotation</code>, <code>generate_annotation</code>. <strong>Load-bearing.</strong> Used by <code>core/base.py:1095</code> (<code>apply_catalog_annotations</code>) and <code>core/mixins/asset.py:175</code> (per-asset annotation). The 19 hand-built Chaise URLs in <code>build_navbar_menu</code> are a minor maintainability flag.</td>
+</tr>
+<tr>
+<td><code>check_schema.py</code></td>
+<td style="text-align: right;">118</td>
+<td><strong>Third (and worst) validator.</strong> <code>check_ml_schema</code> diffs live catalog vs <code>deriva-ml-reference.json</code>. JSON is stale. <code>dump_ml_schema</code> has a silent catalog-create side effect and a signature mismatch. Zero in-repo callers.</td>
+</tr>
+<tr>
+<td><code>create_schema.py</code></td>
+<td style="text-align: right;">662</td>
+<td>The core constructor. <code>create_ml_catalog</code>, <code>create_ml_schema</code>, <code>initialize_ml_schema</code>, <code>reset_ml_schema</code>, six private table-creation helpers, plus a dead-and-broken <code>main</code>. <strong>Load-bearing.</strong></td>
+</tr>
+<tr>
+<td><code>table_comments_utils.py</code></td>
+<td style="text-align: right;">56</td>
+<td>Comment-import helper. Zero callers. <code>[project.scripts]</code> entry broken (wrong package).</td>
+</tr>
+<tr>
+<td><code>validation.py</code></td>
+<td style="text-align: right;">602</td>
+<td><strong>Second validator.</strong> <code>validate_ml_schema</code>, <code>SchemaValidator</code>, <code>SchemaValidationReport</code>, <code>ValidationIssue</code>. Constants drift from <code>create_schema.py</code>. Tests pass largely because they don't compare against truth.</td>
+</tr>
+<tr>
+<td><code>deriva-ml-reference.json</code></td>
+<td style="text-align: right;">9 881</td>
+<td>Static catalog reference, stale.</td>
+</tr>
+<tr>
+<td><code>policy.json</code></td>
+<td style="text-align: right;">81</td>
+<td>ACL policy applied via <code>deriva.config.acl_config</code> from <code>create_ml_catalog</code>. <strong>Load-bearing and externally referenced.</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Internal call sites (deriva-ml <code>src/</code>):</p>
+<ul>
+<li><code>src/deriva_ml/demo_catalog.py:33-34</code> — imports
+  <code>create_ml_catalog</code> from <code>deriva_ml.schema</code>.</li>
+<li><code>src/deriva_ml/__init__.py:78, 82</code> — lazy-loads
+  <code>SchemaValidationReport</code> and <code>validate_ml_schema</code> from
+  <code>deriva_ml.schema.validation</code>.</li>
+<li><code>src/deriva_ml/core/base.py:74</code> — type-only import of
+  <code>SchemaValidationReport</code> (under <code>TYPE_CHECKING</code>).</li>
+<li><code>src/deriva_ml/core/base.py:1095</code> — imports
+  <code>catalog_annotation</code> inside
+  <code>DerivaML.apply_catalog_annotations</code>.</li>
+<li><code>src/deriva_ml/core/base.py:1655</code> — imports
+  <code>validate_ml_schema</code> inside <code>DerivaML.validate_schema</code>.</li>
+<li><code>src/deriva_ml/core/mixins/asset.py:30</code> — imports
+  <code>asset_annotation</code> (used at <code>mixins/asset.py:175</code> when
+  a new asset table is created at runtime via
+  <code>DerivaML.add_asset</code>).</li>
+<li><code>src/deriva_ml/schema/check_schema.py:26</code> — imports
+  <code>create_ml_catalog</code> from <code>deriva_ml.schema.create_schema</code>
+  (only path that touches <code>check_schema.py</code>).</li>
+<li><code>src/deriva_ml/schema/create_schema.py:36</code> — imports
+  <code>asset_annotation, generate_annotation</code> from
+  <code>deriva_ml.schema.annotations</code>.</li>
+</ul>
+<p>Internal test call sites:</p>
+<ul>
+<li><code>tests/catalog_manager.py:51, 104</code> — creates the test
+  catalog via <code>create_ml_catalog</code>.</li>
+<li><code>tests/catalog/test_clone_via_bag_integration.py:36</code> —
+  same.</li>
+<li><code>tests/schema/test_validation.py</code> — imports the five
+  validation symbols.</li>
+<li><code>tests/schema/test_vocab_fk_convention.py:31</code> — imports
+  <code>create_ml_catalog</code>.</li>
+</ul>
+<p><code>reset_ml_schema</code>, <code>initialize_ml_schema</code>, every symbol in
+<code>check_schema.py</code>, every symbol in <code>table_comments_utils.py</code>,
+and the <code>SchemaValidator</code> class itself have <strong>zero internal
+call sites</strong> (the closest, <code>SchemaValidator</code>, is
+instantiated only inside <code>validate_ml_schema</code> which is in
+the same file).</p>
+<hr />
+<h2 id="cross-workspace-usage-check">Cross-workspace usage check</h2>
+<p>Verification per the audit prompt: every symbol whose
+deletion or privatization is proposed was grepped across
+<code>deriva-mcp</code>, <code>deriva-mcp-core</code>, <code>deriva-ml-mcp</code>,
+<code>deriva-ml-model-template</code>, <code>deriva-skills</code>, and
+<code>deriva-ml-skills</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>External callers</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_ml_catalog</code></td>
+<td><code>deriva-mcp/src/deriva_mcp/tools/catalog.py:200, 203</code>; <code>deriva-mcp/tests/conftest.py:407, 409</code>; <code>deriva-mcp/tests/test_catalog.py:253, 285, 300</code> (mock targets); <code>deriva-ml-model-template/src/scripts/_cifar10_schema.py:47, 99</code>; <code>deriva-ml-model-template/docs/superpowers/plans/2026-05-13-e2e-platform-test.md:1245</code> (doc example)</td>
+<td><strong>Live external API.</strong> Used by the model-template's catalog bootstrap and the legacy MCP's <code>create_catalog</code> tool. Both pass <code>(hostname, project_name)</code>; only the model-template plan-doc shows a <code>catalog_alias=</code> use. Signature is stable; don't change.</td>
+</tr>
+<tr>
+<td><code>create_ml_schema</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Indirect via <code>create_ml_catalog</code> only.</td>
+</tr>
+<tr>
+<td><code>initialize_ml_schema</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>The execution.py docstring mentions it as a fix-up command (<code>execution.py:1805</code>) but nothing calls it.</td>
+</tr>
+<tr>
+<td><code>reset_ml_schema</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Zero internal callers either — see §1.5.</td>
+</tr>
+<tr>
+<td><code>catalog_annotation</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Called only via <code>DerivaML.apply_catalog_annotations</code> method (which is the externally-visible surface).</td>
+</tr>
+<tr>
+<td><code>asset_annotation</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Same — called via <code>DerivaML.add_asset</code> and inside <code>create_asset_table</code>.</td>
+</tr>
+<tr>
+<td><code>generate_annotation</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Internal to <code>create_ml_schema</code>.</td>
+</tr>
+<tr>
+<td><code>build_navbar_menu</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Pure helper for <code>catalog_annotation</code>.</td>
+</tr>
+<tr>
+<td><code>check_ml_schema</code></td>
+<td>None anywhere in workspace</td>
+<td>Wired to <code>deriva-ml-check-catalog-schema</code> console script in <code>pyproject.toml:43</code>. No file or doc references the CLI.</td>
+</tr>
+<tr>
+<td><code>dump_ml_schema</code></td>
+<td>None anywhere in workspace</td>
+<td>Same.</td>
+</tr>
+<tr>
+<td><code>CheckMLSchemaCLI</code></td>
+<td>None anywhere in workspace</td>
+<td>Same.</td>
+</tr>
+<tr>
+<td><code>normalize_schema</code></td>
+<td>None outside <code>check_schema.py</code></td>
+<td>Helper function of <code>check_ml_schema</code>.</td>
+</tr>
+<tr>
+<td><code>update_table_comments</code></td>
+<td>None anywhere in workspace</td>
+<td>The registered CLI (<code>deriva-ml-table-comments-utils</code>) points at the wrong package and would fail to import.</td>
+</tr>
+<tr>
+<td><code>update_schema_comments</code></td>
+<td>None anywhere in workspace</td>
+<td>Same.</td>
+</tr>
+<tr>
+<td><code>validate_ml_schema</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Exposed via <code>deriva_ml/__init__.py</code> lazy loader but no sibling project imports it. The closest external touch is <code>DerivaML.validate_schema</code> (<code>core/base.py:1597</code>), not the bare function.</td>
+</tr>
+<tr>
+<td><code>SchemaValidator</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Same; used only inside <code>validate_ml_schema</code> and in the test suite.</td>
+</tr>
+<tr>
+<td><code>SchemaValidationReport</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Same. The class is the return type of <code>DerivaML.validate_schema</code>, so it's <em>visible</em> externally as a return-type annotation, but no sibling project handles or imports it.</td>
+</tr>
+<tr>
+<td><code>ValidationSeverity</code> / <code>ValidationIssue</code></td>
+<td>None outside <code>deriva-ml/</code></td>
+<td>Same.</td>
+</tr>
+<tr>
+<td><code>EXPECTED_TABLE_COLUMNS</code> / <code>EXPECTED_VOCABULARY_TABLES</code> / <code>EXPECTED_VOCABULARY_TERMS</code> / <code>EXPECTED_ASSOCIATION_TABLES</code> / <code>EXPECTED_VOCABULARY_COLUMNS</code> / <code>SYSTEM_COLUMNS</code></td>
+<td>Only <code>tests/schema/test_validation.py:8-11</code> imports four of these</td>
+<td>Test-only consumers. The constants are module-internal; the test imports them only to assert non-emptiness.</td>
+</tr>
+<tr>
+<td><code>deriva-ml-create-schema</code> console script</td>
+<td>None</td>
+<td>Wired to <code>deriva_ml.schema_setup.create_schema:main</code> — wrong package, will <code>ImportError</code>.</td>
+</tr>
+<tr>
+<td><code>deriva-ml-alter-annotation</code> console script</td>
+<td>None</td>
+<td>Wired to <code>deriva_ml.schema_setup.alter_annotation:main</code> — wrong package AND wrong module (no <code>alter_annotation</code> exists anywhere).</td>
+</tr>
+<tr>
+<td><code>deriva-ml-table-comments-utils</code> console script</td>
+<td>None</td>
+<td>Wired to <code>deriva_ml.schema_setup.table_comments_utils:main</code> — wrong package.</td>
+</tr>
+<tr>
+<td><code>deriva-ml-check-catalog-schema</code> console script</td>
+<td>None</td>
+<td>Wired to <code>deriva_ml.schema.check_schema:main</code> — correct path; <code>main</code> function exists. But nothing in any project references the CLI by name.</td>
+</tr>
+<tr>
+<td><code>policy.json</code> (file)</td>
+<td><code>deriva_ml/schema/create_schema.py:571</code> (load via <code>importlib.resources</code>); referenced by name in the <code>_cifar10_schema.py</code> doc example</td>
+<td><strong>Load-bearing.</strong> Don't touch without verifying ACLs.</td>
+</tr>
+<tr>
+<td><code>deriva-ml-reference.json</code> (file)</td>
+<td>Only <code>check_schema.py</code> reads it</td>
+<td>Stale (see §3.3). Delete with <code>check_schema.py</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusions from the table:</strong></p>
+<ul>
+<li><strong><code>create_ml_catalog</code> and <code>policy.json</code> are the
+  externally-load-bearing surface.</strong> The model-template's
+  catalog bootstrap depends on <code>create_ml_catalog(hostname,
+  project_name)</code> returning an <code>ErmrestCatalog</code> with ACLs
+  applied. Don't break the signature, don't break the ACL
+  apply, don't break the schema content.</li>
+<li><strong>The two console scripts that resolve to nonexistent
+  module paths (<code>deriva-ml-create-schema</code>,
+  <code>deriva-ml-alter-annotation</code>, <code>deriva-ml-table-comments-utils</code>)
+  are CLI dark matter — <code>pip install</code> succeeds, <code>pip
+  show -f</code> lists them, <code>which</code> finds them, but invoking
+  them fails with <code>ModuleNotFoundError</code> immediately.</strong> Fix
+  is mechanical (one-line <code>pyproject.toml</code> edit per
+  script, or delete the entries). No external CLI user
+  exists per the workspace grep, so any cleanup direction
+  is safe.</li>
+<li><strong><code>check_schema.py</code>, <code>table_comments_utils.py</code>, and
+  the two stale CLI entries together represent ~290 LoC
+  of confirmed dead surface.</strong> Combined with the
+  validator overlap (§1.2), the cleanup ceiling on
+  <code>schema/</code> is in the 700–900 LoC range.</li>
+<li><strong><code>validation.py</code> has no external consumer but is
+  reachable through <code>DerivaML.validate_schema</code> (which has
+  six docstring example references in <code>core/base.py</code>).</strong>
+  Privatizing the module is fine; deleting it requires
+  either replacing <code>DerivaML.validate_schema</code> (and the doc
+  examples) with a thin wrapper around <code>tools/validate_schema_doc.py</code>'s
+  approach, or accepting the duplication is irreducible
+  because one validates against doc/source while the other
+  validates against a live catalog. The two are different
+  enough that "delete validation.py" is not free.</li>
+</ul>
+<hr />
+<h2 id="lens-1-legacy-dead-code">Lens 1 — Legacy / dead code</h2>
+<h3 id="11-validationpy-expected_-constants-drift-from-create_schemapy-reality">1.1 <code>validation.py</code> <code>EXPECTED_*</code> constants drift from <code>create_schema.py</code> reality</h3>
+<p><code>validation.py:274-280</code> declares the canonical list of
+ML-schema vocabulary tables:</p>
+<pre><code class="language-python">EXPECTED_VOCABULARY_TABLES: list[str] = [
+    MLVocab.dataset_type,
+    MLVocab.workflow_type,
+    MLVocab.asset_type,
+    MLVocab.asset_role,
+    MLVocab.feature_name,
+]
+</code></pre>
+<p><code>MLVocab.execution_status</code> is <strong>missing</strong>, even though
+<code>create_schema.py:349-351</code> creates it and seeds 7 terms
+(<code>Created</code>, <code>Running</code>, <code>Stopped</code>, <code>Failed</code>,
+<code>Pending_Upload</code>, <code>Uploaded</code>, <code>Aborted</code>). The validation
+report on a freshly-created catalog will pass — but only
+because the validator literally doesn't look at
+<code>Execution_Status</code>.</p>
+<p><code>EXPECTED_VOCABULARY_TERMS</code> (<code>validation.py:293-330</code>)
+omits <code>execution_status</code> entirely (consistent with the
+missing table) and lists only <strong>1 of the 8</strong> <code>dataset_type</code>
+terms that <code>create_schema.py:462-474</code> seeds. (<code>File</code> is
+the only one in the expected list; the other seven —
+<code>Complete</code>, <code>Training</code>, <code>Testing</code>, <code>Validation</code>, <code>Split</code>,
+<code>Labeled</code>, <code>Unlabeled</code> — are absent.) Same shape:
+validator never reports them as missing because the
+validator never asks.</p>
+<p>Per the testing-engineer persona: <strong>the validator
+silently agrees with whatever the actual schema is on
+these dimensions</strong>, which is the worst kind of validator
+— it produces green-light reports without checking.
+<code>tests/schema/test_validation.py::test_validate_valid_schema</code>
+passes against a real catalog, but the test would also
+pass if <code>create_schema.py</code> had subtly broken vocabulary
+seeding because the validator doesn't cover the seeded
+terms.</p>
+<p>This is a symptom of two validators competing (theme 2):
+nobody is updating these constants because the
+doc-source-of-truth flow in
+<code>tools/validate_schema_doc.py</code> is the active path.</p>
+<p><strong>Fix:</strong>
+- (a) Add <code>MLVocab.execution_status</code> to
+  <code>EXPECTED_VOCABULARY_TABLES</code> and the full term list to
+  <code>EXPECTED_VOCABULARY_TERMS</code>. Likewise expand
+  <code>dataset_type</code> and <code>workflow_type</code> (the latter currently
+  has 13 of 13, but does not list <code>Visualization</code> →
+  actually it does; spot check confirms <code>workflow_type</code> is
+  consistent). <strong>Pure documentation-of-truth fix; ~30 lines
+  changed.</strong> <strong>Risk: trivial.</strong> Subsumed by (b) if (b)
+  is chosen.
+- (b) Replace <code>EXPECTED_*</code> with a runtime
+  introspection of <code>tools/validate_schema_doc.py</code>'s
+  doc-derived model (<code>docs/reference/schema.md</code>'s
+  YAML-fenced sections are the canonical truth per ADR /
+  superpowers spec). <code>SchemaValidator</code> becomes "compare
+  live catalog to doc-derived model" instead of "compare
+  live catalog to in-file Python constants." This
+  resolves the duplication. <strong>Risk: medium</strong>;
+  cross-module wiring.
+- (c) Delete <code>validation.py</code> entirely; replace
+  <code>DerivaML.validate_schema</code> with a thin wrapper that
+  invokes <code>tools/validate_schema_doc.py</code>'s validator
+  programmatically against the <em>running catalog's</em>
+  <code>prejson()</code> rather than against the source AST. <strong>Risk:
+  medium</strong>; touches public API.</p>
+<p><strong>Recommended:</strong> (b). The doc is already the source of
+truth per ADR-0007's neighborhood and the
+superpowers spec; the validator should consult it rather
+than maintain a third hand-written copy.</p>
+<p><strong>Severity: medium.</strong> Hidden coverage gap. Has been live
+since <code>execution_status</code> shipped (April 2026).</p>
+<h3 id="12-check_schemapy-is-a-redundant-third-validator">1.2 <code>check_schema.py</code> is a redundant third validator</h3>
+<p>The schema subsystem now contains three validators:</p>
+<table>
+<thead>
+<tr>
+<th>Validator</th>
+<th>Compares</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tools/validate_schema_doc.py</code></td>
+<td><code>docs/reference/schema.md</code> ↔ <code>create_schema.py</code> (AST)</td>
+<td><strong>Active.</strong> Wired to <code>deriva-ml-validate-schema</code> CLI; documented in CLAUDE.md; ADR-tier rationale in superpowers/specs.</td>
+</tr>
+<tr>
+<td><code>schema/validation.py</code></td>
+<td>Live catalog ↔ <code>EXPECTED_*</code> Python constants</td>
+<td>Reachable via <code>DerivaML.validate_schema</code>. Constants drift (§1.1).</td>
+</tr>
+<tr>
+<td><code>schema/check_schema.py</code></td>
+<td>Live catalog ↔ <code>deriva-ml-reference.json</code></td>
+<td>Wired to <code>deriva-ml-check-catalog-schema</code> CLI. <strong>No external referent.</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The three validators differ in what they consider truth:
+the docstring/Markdown, the Python constants, or the
+prejson snapshot. The doc-source-of-truth spec says the
+Markdown is canonical. Therefore the JSON snapshot is
+obsolete and the Python constants are duplicate.</p>
+<p><code>check_schema.py</code> is the clearest delete:</p>
+<ul>
+<li>The reference JSON it consults (<code>deriva-ml-reference.json</code>,
+  9 881 lines) is months stale. <code>grep -c "Execution_Status"</code>
+  on the JSON returns 0, but <code>create_schema.py</code> seeds 7
+  terms there. Any current diff would flag the entire
+  execution-status surface as "drift."</li>
+<li><code>dump_ml_schema</code> (the way to refresh the JSON) creates
+  a real catalog on the live server, dumps, then deletes
+  — but if the dump fails before the delete, the catalog
+  leaks (line 80-87, no try/finally around the create or
+  the file write — only around the model fetch and dump).
+  Actually inspect: <code>try: ... finally: catalog.delete_ermrest_catalog(really=True)</code>
+  <em>does</em> wrap the file write. So the delete is safe.
+  But the side effect (creating a real catalog on
+  <code>localhost</code>) is undocumented in the CLI help.</li>
+<li><code>CheckMLSchemaCLI.main</code> calls <code>dump_ml_schema(hostname,
+  catalog_id)</code> — 2 args — but <code>dump_ml_schema(hostname,
+  filename)</code> accepts <code>(hostname, filename="deriva-ml-reference.json")</code>.
+  The CLI passes <code>catalog_id</code> where the function expects
+  <code>filename</code>; <code>dump_ml_schema</code> happily uses
+  <code>args.catalog</code>'s value (an int or string like <code>"1"</code>)
+  as the output filename. <strong>Bug.</strong></li>
+<li><code>check_ml_schema(hostname, catalog_id)</code> opens an
+  <code>ErmrestCatalog</code> for the target catalog <strong>without
+  applying credentials</strong> — actually no, line 67 does
+  <code>credentials=get_credential(hostname)</code>. OK. But the
+  result is printed via <code>pprint(diff, indent=2)</code> and
+  the diff is a <code>DeepDiff</code> tree — pprint of a <code>DeepDiff</code>
+  tree is mostly unreadable hieroglyphics. The CLI is
+  not user-friendly even when correct.</li>
+</ul>
+<p><strong>Fix:</strong> delete <code>check_schema.py</code> entirely, remove
+the <code>deriva-ml-check-catalog-schema = ...</code> line from
+<code>pyproject.toml:43</code>, delete
+<code>deriva-ml-reference.json</code> (9 881 lines of stale data),
+and (if anyone really needs runtime catalog-vs-source
+diff) recommend <code>deriva-ml-validate-schema</code> plus
+inspecting the live catalog's <code>prejson()</code> ad-hoc.
+<strong>LoC: −118</strong> (file) <strong>−9 881</strong> (JSON) <strong>−1</strong>
+(pyproject). <strong>Risk: low</strong> — zero external callers.
+<strong>Severity: high</strong> — the live CLI is broken, stale, and
+exposed as an entry point that pip-installs into user
+<code>$PATH</code>.</p>
+<h3 id="13-table_comments_utilspy-is-dead">1.3 <code>table_comments_utils.py</code> is dead</h3>
+<p><code>schema/table_comments_utils.py</code> (56 LoC) reads
+<code>.Md</code>-suffixed text files from a hierarchical directory
+(<code>docs/&lt;schema&gt;/&lt;table&gt;/[table|&lt;column&gt;].Md</code>) and applies
+them as table/column <code>comment</code> properties. Zero callers
+in the workspace; no doc reference; no example
+filesystem matching the expected layout (a workspace-wide
+search for files matching <code>*/Md</code> under <code>docs/</code> returns
+nothing of that shape).</p>
+<p>The registered CLI (<code>deriva-ml-table-comments-utils =
+"deriva_ml.schema_setup.table_comments_utils:main"</code>)
+points at the wrong package — running it raises
+<code>ModuleNotFoundError: deriva_ml.schema_setup</code>.</p>
+<p>The functionality the module nominally provides
+(file-based catalog comment management) duplicates what
+the per-column <code>comment=</code> parameter in
+<code>create_schema.py</code> already does. The DBA persona
+question — "is there a curator workflow that runs
+this?" — has the answer "no, the workflow doesn't
+exist."</p>
+<p><strong>Fix:</strong> delete the file, remove the
+<code>deriva-ml-table-comments-utils</code> entry from
+<code>pyproject.toml</code>. <strong>LoC: −56.</strong> <strong>Risk: low</strong> — zero
+callers, zero docs. <strong>Severity: medium</strong> — confirmed
+dead, exposed as a (broken) CLI.</p>
+<h3 id="14-validationpy-has-no-external-consumer-and-overlaps-toolsvalidate_schema_docpy">1.4 <code>validation.py</code> has no external consumer and overlaps <code>tools/validate_schema_doc.py</code></h3>
+<p>See §1.1. The whole module is reachable only via
+<code>DerivaML.validate_schema</code>. The constants drift (§1.1).
+The validator class structure adds 250 LoC of
+boilerplate (<code>SchemaValidator</code>, <code>SchemaValidationReport</code>,
+<code>ValidationIssue</code>, <code>ValidationSeverity</code>) that the
+already-active <code>tools/validate_schema_doc.py</code> validator
+doesn't need.</p>
+<p><strong>Fix options:</strong> (a) Migrate <code>DerivaML.validate_schema</code>
+to call <code>tools/validate_schema_doc.py</code>'s validator against
+the live catalog's <code>prejson()</code>, then delete
+<code>schema/validation.py</code>. Most aggressive — <strong>LoC: −602.</strong>
+(b) Keep <code>validation.py</code> but rewrite
+<code>SchemaValidator._validate_vocabulary_terms</code> etc. to
+read from <code>docs/reference/schema.md</code> (the canonical
+source) instead of the hand-maintained constants. <strong>LoC:
+unchanged</strong>, but the drift in §1.1 disappears
+permanently.</p>
+<p><strong>Recommended:</strong> (b) for the short-term — fixes drift
+without touching public API — then (a) when the
+<code>DerivaML.validate_schema</code> consumers are mapped (the
+six docstring examples in <code>core/base.py:1597-1657</code>
+need rewording). <strong>Risk: medium</strong> in either case.
+<strong>Severity: medium.</strong></p>
+<h3 id="15-reset_ml_schema-has-zero-callers">1.5 <code>reset_ml_schema</code> has zero callers</h3>
+<p><code>create_schema.py:627-633</code>:</p>
+<pre><code class="language-python">def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -&gt; None:
+    model = catalog.getCatalogModel()
+    schemas = [schema for sname, schema in model.schemas.items() if sname not in [&quot;public&quot;, &quot;WWW&quot;]]
+    for s in schemas:
+        s.drop(cascade=True)
+    model = catalog.getCatalogModel()
+    create_ml_schema(catalog, ml_schema)
+</code></pre>
+<p><strong>Drops every non-public/WWW schema with CASCADE.</strong>
+This is the most destructive function in the subsystem
+— more aggressive than <code>create_ml_schema</code> itself, which
+only drops <code>deriva-ml</code>. <code>reset_ml_schema</code> drops every
+domain schema too.</p>
+<p>Workspace-wide grep returns hits only inside the file
+itself plus the docstring of <code>create_schema.py:12</code> and
+the schema/<strong>init</strong>.py export. No code calls it. No
+test calls it.</p>
+<p>Docstring is one line: <code>"""Reset ML schema (test/dev
+helper)."""</code> — but no test uses it (the test catalog
+manager creates and destroys whole catalogs instead, see
+<code>tests/catalog_manager.py:104, 118</code>).</p>
+<p>There is no signature parameter or env-var guard against
+accidental invocation. A user who imports
+<code>reset_ml_schema</code> from <code>deriva_ml.schema</code> (it's in
+<code>__all__</code>) and calls it on a production catalog
+destroys every domain schema on that catalog with no
+prompt and no audit log.</p>
+<p><strong>Fix:</strong> (a) delete the function, remove the export
+from <code>__init__.py</code> and <code>__all__</code>; or (b) rename to
+<code>_reset_ml_schema</code>, add a <code>confirm: bool = False</code>
+keyword that raises if not True, and add a <code>logger.warning</code>
+that logs the dropped schemas to the audit log. The
+function may be useful to someone running a test harness
+outside the repo, but the lack of any guard makes the
+current shape dangerous.</p>
+<p><strong>Recommended:</strong> (a). The function is unused, the
+delete-and-recreate flow is better served by
+<code>catalog.delete_ermrest_catalog(really=True)</code> followed
+by <code>create_ml_catalog(...)</code>. <strong>LoC: −7.</strong> <strong>Risk: low</strong>
+(zero callers per cross-workspace check). <strong>Severity:
+medium</strong> — dangerous public function with no audience.</p>
+<h3 id="16-create_schemapymain-is-dead-and-broken">1.6 <code>create_schema.py:main()</code> is dead and broken</h3>
+<p>Lines 636–658 define a CLI. Issues:</p>
+<ol>
+<li>Line 649: <code>parser.add_argument("curie_prefix",
+   type=str, required=True)</code> — <code>required=</code> is not valid
+   on a positional argument (positional args are always
+   required; passing <code>required=True</code> raises <code>TypeError:
+   'required' is an invalid argument for positionals</code>
+   when <code>parse_args()</code> runs).</li>
+<li>Line 648: <code>parser.add_argument("schema-name",
+   default="deriva-ml", ...)</code> — argparse stores
+   positional <code>schema-name</code> as <code>args.__getattribute__("schema-name")</code>
+   (hyphen → not a valid attribute). Line 655 reads
+   <code>args.schema_name</code> (underscore) which doesn't exist;
+   <code>AttributeError</code>.</li>
+<li>Line 654: <code>server.connect_ermrest(args.catalog_id)</code> —
+   <code>args.catalog_id</code> is never declared. The CLI has no
+   such argument. <code>AttributeError</code>.</li>
+<li>Line 655: <code>create_ml_schema(model, ...)</code> — passes a
+   <code>Model</code> where the function signature expects an
+   <code>ErmrestCatalog</code>. The function would call
+   <code>model.getCatalogModel()</code> on a <code>Model</code>, which doesn't
+   have that method.</li>
+<li>The <code>[project.scripts]</code> entry that nominally invokes
+   this <code>main</code> (<code>deriva-ml-create-schema =
+   "deriva_ml.schema_setup.create_schema:main"</code>) points
+   at the wrong package and would <code>ImportError</code> before
+   any of 1–4 fired.</li>
+</ol>
+<p>This is five separate bugs in 23 lines of code that have
+been sitting in <code>main</code> since the <code>schema_setup</code> →
+<code>schema</code> rename. Nothing exercises this CLI.</p>
+<p><strong>Fix:</strong> delete <code>main</code> and the
+<code>if __name__ == "__main__": sys.exit(main())</code> block.
+The proper CLI surface for "create an ML catalog from
+the command line" is the demo / test harness, not a
+half-finished argparse stub. <strong>LoC: −23.</strong> <strong>Risk:
+trivial</strong> (zero callers — the entry point doesn't
+resolve). <strong>Severity: medium</strong> — the file presents
+itself as having a CLI in its docstring (line 11
+mentions <code>create_ml_catalog</code> as a "main entry point"),
+but the actual <code>main</code> is broken.</p>
+<h3 id="17-_post_clone_operations-is-a-fictional-guard">1.7 <code>_post_clone_operations</code> is a fictional guard</h3>
+<p><code>create_schema.py:312</code>:</p>
+<blockquote>
+<p>WARNING: If the schema already exists, it will be
+DROPPED with CASCADE, destroying all data in the
+schema. Use <code>_post_clone_operations</code> guard when
+calling from clone context.</p>
+</blockquote>
+<p>Workspace-wide grep for <code>_post_clone_operations</code>: zero
+hits. No function, no method, no class, no comment
+elsewhere. The "guard" the docstring tells the reader
+to consult does not exist.</p>
+<p>The actual CASCADE-safety property of the codebase
+comes from a different fact: <code>catalog/clone_via_bag.py</code>
+does not call <code>create_ml_schema</code> at all (the bag pipeline
+applies schema via <code>BagCatalogLoader</code>, which creates
+tables from a bag's <code>schema.json</code>, not from
+<code>create_ml_schema</code>). So the property "clone won't
+clobber an existing schema" holds, but for an unrelated
+reason.</p>
+<p><strong>Fix:</strong> delete the broken cross-reference. The
+docstring should just say "If the schema already
+exists, it will be DROPPED with CASCADE. Caller is
+responsible for ensuring this is desired; the bag-based
+clone path in <code>catalog/clone_via_bag.py</code> does not invoke
+<code>create_ml_schema</code> and is unaffected." <strong>LoC: ±0.</strong>
+<strong>Severity: low</strong> — doc-only, but the safety claim
+is misleading.</p>
+<h3 id="18-annotationspymain-is-dead">1.8 <code>annotations.py:main()</code> is dead</h3>
+<p><code>annotations.py:632-649</code>:</p>
+<pre><code class="language-python">def main():
+    parser = argparse.ArgumentParser(description=&quot;Apply annotations to ML schema&quot;)
+    parser.add_argument(&quot;hostname&quot;, help=&quot;Hostname for the catalog&quot;)
+    parser.add_argument(&quot;catalog_id&quot;, help=&quot;Catalog ID&quot;)
+    parser.add_argument(&quot;schema-name&quot;, default=&quot;deriva-ml&quot;, help=&quot;Schema name (default: deriva-ml)&quot;)
+    args = parser.parse_args()
+    generate_annotation(args.catalog_id, args.schema_name)
+</code></pre>
+<p>Same shape as §1.6: hyphenated positional
+(<code>schema-name</code>), reads <code>args.schema_name</code> (no such
+attribute), and <code>generate_annotation</code> expects
+<code>(model: Model, schema: str)</code> — not
+<code>(args.catalog_id, args.schema_name)</code> (both strings,
+neither a Model). Pure typo dead code.</p>
+<p>No <code>[project.scripts]</code> entry resolves to this <code>main</code>.</p>
+<p><strong>Fix:</strong> delete <code>main</code> and the
+<code>if __name__ == "__main__": sys.exit(main())</code> block.
+<strong>LoC: −19.</strong> <strong>Severity: low.</strong></p>
+<h3 id="19-table_comments_utilspymain-is-dead-alongside-the-module">1.9 <code>table_comments_utils.py:main()</code> is dead alongside the module</h3>
+<p>Subsumed by §1.3.</p>
+<h3 id="110-annotationspy-importlibimport_module-workaround">1.10 <code>annotations.py</code> <code>importlib.import_module</code> workaround</h3>
+<p><code>annotations.py:18-27</code>:</p>
+<pre><code class="language-python"># Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+import sys
+
+_ermrest_model = importlib.import_module(&quot;deriva.core.ermrest_model&quot;)
+_core_utils = importlib.import_module(&quot;deriva.core.utils.core_utils&quot;)
+
+Model = _ermrest_model.Model
+Table = _ermrest_model.Table
+deriva_tags = _core_utils.tag
+</code></pre>
+<p>The comment claims this avoids shadowing by "local
+<code>deriva.py</code> files." A workspace-wide search for
+<code>deriva.py</code> (anywhere within <code>src/</code>) returns no hits —
+this workaround was for a long-since-removed local file.
+The rest of the codebase imports
+<code>from deriva.core.ermrest_model import Model, Table</code>
+and <code>from deriva.core.utils.core_utils import tag</code>
+directly without trouble (e.g., <code>core/base.py:1095</code>
+imports <code>catalog_annotation</code> from this module without
+any shadowing issue).</p>
+<p><code>import sys</code> (line 20) is imported but never used in
+<code>annotations.py</code> — <code>sys.exit(main())</code> at line 649
+references it but the <code>main</code> function (§1.8) is dead.</p>
+<p><strong>Fix:</strong> replace the <code>importlib.import_module</code> dance
+with normal imports:</p>
+<pre><code class="language-python">from deriva.core.ermrest_model import Model, Table
+from deriva.core.utils.core_utils import tag as deriva_tags
+</code></pre>
+<p>Drop <code>import sys</code> once <code>main</code> deletes. <strong>LoC: −7
+roughly.</strong> <strong>Risk: low.</strong> <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-2-privatization">Lens 2 — Privatization</h2>
+<h3 id="21-schemavalidator-should-be-private-or-deleted">2.1 <code>SchemaValidator</code> should be private (or deleted)</h3>
+<p><code>validation.py:352</code> defines the validator class. It's
+exported via <code>__init__.py:4</code> and <code>__all__:16</code>. Its only
+external use is in tests. No sibling project imports it.</p>
+<p>If §1.4 lands and <code>validation.py</code> survives, the
+<code>SchemaValidator</code> class should be underscore-prefixed —
+the public API is <code>validate_ml_schema()</code> (the
+convenience function) and <code>SchemaValidationReport</code> (the
+return type). The class itself is an implementation
+detail.</p>
+<p><strong>Fix:</strong> rename <code>SchemaValidator</code> → <code>_SchemaValidator</code>,
+drop from <code>__all__</code> and <code>__init__.py</code>, update
+<code>tests/schema/test_validation.py</code> to use the private
+import (the test convention permits private imports).
+<strong>LoC: ±0.</strong> <strong>Risk: trivial.</strong> <strong>Severity: low.</strong></p>
+<h3 id="22-validationissue-and-validationseverity-are">2.2 <code>ValidationIssue</code> and <code>ValidationSeverity</code> are</h3>
+<p>exported but rarely useful externally</p>
+<p><code>validation.py:32, 41</code> define <code>ValidationSeverity</code> and
+<code>ValidationIssue</code>. Both are exported. A user inspecting
+a <code>SchemaValidationReport.issues</code> list does encounter
+them as element types — so they're not purely internal.
+But the user's typical pattern is to read
+<code>report.errors</code>, <code>report.warnings</code>, <code>report.is_valid</code> —
+not to construct or destructure <code>ValidationIssue</code>
+manually.</p>
+<p><strong>Fix:</strong> keep public; they're return-type-adjacent.
+<strong>Severity: none</strong> — flag only.</p>
+<h3 id="23-normalize_schema-should-be-private">2.3 <code>normalize_schema</code> should be private</h3>
+<p><code>check_schema.py:29</code> is a helper for <code>check_ml_schema</code>.
+Not underscore-prefixed; not in <code>__all__</code> (the module
+has no <code>__all__</code>). Confusing.</p>
+<p><strong>Fix:</strong> subsumed by §1.2 (delete the file). If not
+deleted, rename to <code>_normalize_schema</code>. <strong>Severity:
+low.</strong></p>
+<h3 id="24-build_navbar_menu-exposure">2.4 <code>build_navbar_menu</code> exposure</h3>
+<p><code>annotations.py:34</code> is a pure helper for
+<code>catalog_annotation</code>. Not underscore-prefixed. No
+external callers per the cross-workspace check.</p>
+<p>Per its docstring (lines 35-55), the function is
+designed to be a "single source of truth" for the
+navbar layout. If we expect deriva-skills or
+deriva-ml-skills to ever build their own catalog
+annotation flow that reuses the navbar layout, this is
+a valid public surface. Otherwise it's an internal
+helper.</p>
+<p><strong>Fix:</strong> keep public for now (the docstring's "single
+source of truth" framing is forward-looking). If the
+six-month follow-up audit finds it still has no
+external consumer, privatize. <strong>Severity: none.</strong></p>
+<hr />
+<h2 id="lens-3-coverage">Lens 3 — Coverage</h2>
+<h3 id="31-no-cascade-safety-test">3.1 No CASCADE-safety test</h3>
+<p><code>create_ml_schema</code> (<code>create_schema.py:304</code>) drops the
+existing <code>deriva-ml</code> schema with CASCADE if it exists.
+No test in <code>tests/schema/</code> covers this branch. The
+existing tests use the catalog manager's create-and-destroy
+flow (a fresh catalog per session), so <code>create_ml_schema</code>
+is only ever called against a known-empty catalog.</p>
+<p>The CLAUDE.md "Special focus areas" section called out:</p>
+<blockquote>
+<p>CASCADE safety: <code>create_ml_schema</code> drops the existing
+schema if present. This is documented; verify the
+warning is in the docstring, that the function is
+gated behind some explicit confirmation in any CLI
+surface, and that tests don't accidentally call it
+without isolation.</p>
+</blockquote>
+<p>The warning is in the docstring (line 311-313, plus the
+module-level docstring at line 6-8). It is <strong>not</strong> gated
+behind explicit confirmation in any CLI surface — the
+CLI surfaces that would invoke it are all broken (§1.6,
+§1.8). Tests are isolated per-session (the catalog
+manager destroys catalogs in teardown). No test asserts
+the CASCADE behavior actually fires or that data loss
+on re-creation is the documented behavior.</p>
+<p>A user picking up the module and writing a test that
+calls <code>create_ml_schema</code> twice on the same catalog
+would observe the CASCADE behavior. There is no
+regression guard if some future refactor swapped the
+DROP-CASCADE for a "drop-only-if-empty" check.</p>
+<p><strong>Fix:</strong> add <code>tests/schema/test_cascade_behavior.py</code>
+with one test:</p>
+<pre><code class="language-python">def test_create_ml_schema_drops_existing(test_ml):
+    &quot;&quot;&quot;create_ml_schema CASCADE-drops the existing schema.&quot;&quot;&quot;
+    # Insert a row into Dataset so we can prove it's gone after.
+    ml = test_ml
+    # ... insert row, capture RID ...
+    create_ml_schema(ml.catalog, project_name=&quot;deriva-ml&quot;)
+    # ... assert the RID is no longer findable ...
+</code></pre>
+<p>Marker: <code>@pytest.mark.integration</code> (it needs a real
+catalog). <strong>Effort: low.</strong> <strong>Risk: low</strong> — the test
+asserts existing behavior. <strong>Severity: high</strong> for the
+DBA persona — this is a load-bearing destructive
+operation with no regression test.</p>
+<h3 id="32-no-acl-application-test-for-create_ml_catalog">3.2 No ACL-application test for <code>create_ml_catalog</code></h3>
+<p><code>create_ml_catalog</code> (<code>create_schema.py:545</code>) shells out
+to <code>deriva.config.acl_config</code> to apply
+<code>policy.json</code> (lines 588-611). The error path
+(subprocess.CalledProcessError → DerivaMLConfigurationError)
+is well-handled in code, but no test covers either the
+success path or the failure path. The model-template's
+catalog-bootstrap test is the closest external test of
+this — but its scope is "the catalog is created,"
+not "the ACL bindings are present and correct."</p>
+<p>A failure mode the audit hypothesizes (<code>create_schema.py</code>
+comment at lines 580-588 calls it out): the row-level
+update bindings might silently fail to apply, and
+subsequent uploads would HTTP 403 with no clear cause.</p>
+<p><strong>Fix:</strong> add <code>tests/schema/test_acl_application.py</code>:</p>
+<pre><code class="language-python">@pytest.mark.integration
+def test_create_ml_catalog_applies_row_owner_binding(test_ml):
+    &quot;&quot;&quot;Newly-created catalog has the row_owner_guard binding on Execution.&quot;&quot;&quot;
+    model = test_ml.catalog.getCatalogModel()
+    exec_table = model.schemas[&quot;deriva-ml&quot;].tables[&quot;Execution&quot;]
+    assert &quot;row_owner_guard&quot; in exec_table.acl_bindings
+</code></pre>
+<p><strong>Effort: low.</strong> <strong>Risk: low.</strong> <strong>Severity: medium</strong> —
+ACL silent-failure is a known hairy debug class.</p>
+<h3 id="33-deriva-ml-referencejson-drift-is-itself-a-coverage-gap">3.3 <code>deriva-ml-reference.json</code> drift is itself a coverage gap</h3>
+<p>The 9 881-line reference JSON in <code>schema/</code> purports to
+describe the canonical <code>deriva-ml</code> schema for diffing.
+It is months stale (no <code>Execution_Status</code> references,
+likely no <code>Dataset_Version.Minid_Spec_Hash</code> column
+either — the column was added recently). Anyone running
+<code>deriva-ml-check-catalog-schema</code> against a current
+catalog gets a noisy diff of the entire delta since the
+last refresh — drowning real drift in known drift.</p>
+<p>The refresh path (<code>dump_ml_schema</code>) has the bugs
+described in §1.2 (signature mismatch with the CLI;
+live-catalog side effect).</p>
+<p><strong>Fix:</strong> subsumed by §1.2 (delete the whole module
+plus the JSON). <strong>Severity: medium</strong> — long-standing
+silent staleness in a file presented as canonical.</p>
+<h3 id="34-testsschematest_validationpy-tests-do-not-assert-ground-truth">3.4 <code>tests/schema/test_validation.py</code> tests do not assert ground truth</h3>
+<p>The unit tests in <code>test_validation.py:199-227</code>
+(<code>TestExpectedSchemaStructure</code>) assert that the
+constants are non-empty:</p>
+<pre><code class="language-python">def test_expected_tables_not_empty(self):
+    assert len(EXPECTED_TABLE_COLUMNS) &gt; 0
+    assert &quot;Dataset&quot; in EXPECTED_TABLE_COLUMNS
+    ...
+</code></pre>
+<p>These pass as long as the constants exist. They do not
+catch the drift identified in §1.1 — they would still
+pass with <code>Execution_Status</code> missing from
+<code>EXPECTED_VOCABULARY_TABLES</code>.</p>
+<p>The integration tests (lines 119-196) assert the
+validator runs successfully against a real catalog — but
+since the validator doesn't check <code>Execution_Status</code> or
+the unlisted vocabulary terms, the integration tests
+pass trivially in that dimension too.</p>
+<p><strong>Fix:</strong> add a test that asserts the constants match the
+seed lists in <code>create_schema.py</code> (e.g., parse
+<code>initialize_ml_schema</code> for the literal terms; compare).
+Or — better — replace the constants with a doc-derived
+model (§1.4 option b) and delete this test class.
+<strong>Severity: medium.</strong></p>
+<h3 id="35-testsschematest_vocab_fk_conventionpy-is-the-strong-test">3.5 <code>tests/schema/test_vocab_fk_convention.py</code> is the strong test</h3>
+<p>The one test in <code>test_vocab_fk_convention.py:29</code> is the
+right shape: it creates a fresh catalog from
+<code>create_ml_catalog</code>, introspects every FK in the
+<code>deriva-ml</code> schema, and asserts the convention. It's the
+gold-standard pattern for this subsystem — pin a
+load-bearing invariant against a live catalog.</p>
+<p>The test could be expanded (1-2 more invariants:
+"every vocab table has the standard columns",
+"every association table has both endpoints
+constrained") but it's healthy as-is. <strong>No fix.</strong></p>
+<h3 id="36-policyjson-has-no-test-asserting-its-content">3.6 <code>policy.json</code> has no test asserting its content</h3>
+<p>The ACL groups and bindings in <code>policy.json</code> (81 lines)
+are load-bearing — they control who can do what in every
+catalog created. A typo in the file is caught only when
+ACLs misbehave in production. There's no syntactic check
+that the file is valid JSON, no semantic check that the
+required groups (<code>isrd-systems</code>, <code>local-admin</code>, etc.)
+are present, no check that the required ACL definitions
+(<code>read_only</code>, <code>self_serve</code>) are present.</p>
+<p><strong>Fix:</strong> add <code>tests/schema/test_policy_validation.py</code>:</p>
+<pre><code class="language-python">def test_policy_json_loads_and_has_required_acls():
+    from importlib.resources import files
+    import json
+    policy = json.loads(files(&quot;deriva_ml.schema&quot;).joinpath(&quot;policy.json&quot;).read_text())
+    assert &quot;self_serve&quot; in policy[&quot;acl_definitions&quot;]
+    assert &quot;row_owner_guard&quot; in policy[&quot;acl_bindings&quot;]
+    assert policy[&quot;catalog_acl&quot;][&quot;acl&quot;] == &quot;self_serve&quot;
+</code></pre>
+<p><strong>Effort: trivial.</strong> <strong>Risk: trivial.</strong> <strong>Severity:
+low-medium</strong> — the file is small enough that a typo is
+unlikely, but the test costs nothing.</p>
+<h3 id="37-no-test-for-annotationspybuild_navbar_menu">3.7 No test for <code>annotations.py:build_navbar_menu</code></h3>
+<p><code>build_navbar_menu</code> is a pure function with no
+side-effects (line 34, docstring at line 47-49 explicitly
+calls this out). It's perfectly testable but has no
+test. The closest is <code>tests/core/test_catalog_annotations.py</code>
+which tests the higher-level <code>DerivaML.apply_catalog_annotations</code>
+that calls it — those tests are integration (real
+catalog) and don't isolate the navbar-generation logic.</p>
+<p><strong>Fix:</strong> add <code>tests/schema/test_annotations.py</code>:</p>
+<pre><code class="language-python">def test_build_navbar_menu_includes_deriva_ml_section(test_ml):
+    menu = build_navbar_menu(test_ml.model)
+    deriva_ml_section = next(c for c in menu[&quot;children&quot;] if c[&quot;name&quot;] == &quot;Deriva-ML&quot;)
+    expected = {&quot;Workflow&quot;, &quot;Execution&quot;, &quot;Execution_Metadata&quot;, &quot;Execution_Asset&quot;, &quot;Dataset&quot;, &quot;Dataset_Version&quot;}
+    actual = {item[&quot;name&quot;] for item in deriva_ml_section[&quot;children&quot;]}
+    assert expected.issubset(actual)
+</code></pre>
+<p>(Plus tests for "Vocabulary" section, "Assets" section,
+the per-domain-schema sections.) <strong>Effort: low.</strong>
+<strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-4-docs-sync">Lens 4 — Docs sync</h2>
+<h3 id="41-create_schemapy312-references-a-fictional-guard">4.1 <code>create_schema.py:312</code> references a fictional guard</h3>
+<p>Subsumed by §1.7.</p>
+<h3 id="42-docstring-examples-without-doctest-skip">4.2 Docstring examples without <code># doctest: +SKIP</code></h3>
+<p><code>create_schema.py:562-565</code> (<code>create_ml_catalog</code> example):</p>
+<pre><code class="language-python">Example:
+    # Create catalog with alias
+    catalog = create_ml_catalog(&quot;localhost&quot;, &quot;my_project&quot;, catalog_alias=&quot;my-project&quot;)
+    # Now accessible as both /ermrest/catalog/&lt;id&gt; and /ermrest/catalog/my-project
+</code></pre>
+<p>The example is written with <code>#</code>-prefixed comment lines
+(not <code>&gt;&gt;&gt;</code> interactive lines), so doctest collection
+ignores it. <strong>No actual doctest risk</strong>, but the
+formatting differs from CLAUDE.md's Google-style with
+<code>&gt;&gt;&gt;</code> prefix — readers expect a runnable example and
+have to read carefully to see it's not interactive.</p>
+<p><code>validation.py:594-600</code> (<code>validate_ml_schema</code> example):</p>
+<pre><code class="language-python">Example:
+    &gt;&gt;&gt; from deriva_ml import DerivaML
+    &gt;&gt;&gt; ml = DerivaML('localhost', 'my_catalog')
+    &gt;&gt;&gt; report = validate_ml_schema(ml, strict=False)
+    &gt;&gt;&gt; if not report.is_valid:
+    ...     print(report.to_text())
+</code></pre>
+<p>No <code># doctest: +SKIP</code>. Per CLAUDE.md: "Catalog-dependent
+examples must carry <code># doctest: +SKIP</code> on the first
+interactive line." This block tries to instantiate
+<code>DerivaML('localhost', 'my_catalog')</code> at doctest time —
+it fails because there's no live catalog. The
+<code>--doctest-modules</code> run would surface this. (Unless
+caught by an existing pytest filter; verify.)</p>
+<p><code>validation.py:200-208</code> (<code>to_json</code> example):</p>
+<pre><code class="language-python">Example:
+    &gt;&gt;&gt; report = ml.validate_schema()
+    &gt;&gt;&gt; print(report.to_json())
+    {
+      &quot;schema_name&quot;: &quot;deriva-ml&quot;,
+      ...
+    }
+</code></pre>
+<p>Same — <code>ml.validate_schema()</code> requires a catalog.
+Needs <code># doctest: +SKIP</code>.</p>
+<p><strong>Fix:</strong> add <code># doctest: +SKIP</code> markers to both blocks
+in <code>validation.py</code>. Convert the
+<code>create_ml_catalog</code> example to <code>&gt;&gt;&gt;</code> form with <code>SKIP</code>.
+<strong>LoC: ±0.</strong> <strong>Risk: trivial.</strong> <strong>Severity: low.</strong></p>
+<h3 id="43-create_schemapy-module-docstring-lists-symbols-correctly-but-does-not-warn-about-reset_ml_schema">4.3 <code>create_schema.py</code> module docstring lists symbols correctly but does not warn about <code>reset_ml_schema</code></h3>
+<p>Lines 1-13 describe the four public entry points
+(<code>create_ml_schema</code>, <code>initialize_ml_schema</code>,
+<code>create_ml_catalog</code>, <code>reset_ml_schema</code>). The CASCADE
+warning is correctly attached to <code>create_ml_schema</code>.
+<code>reset_ml_schema</code> is described as "Drop and recreate the
+schema (test/dev helper)" — but reset_ml_schema's
+<em>actual</em> behavior is to drop <strong>every</strong> schema except
+<code>public</code> and <code>WWW</code>, not just <code>deriva-ml</code>. The docstring
+is misleading.</p>
+<p><strong>Fix:</strong> subsumed by §1.5 (delete the function). If
+kept, rewrite the docstring entry to say "Drops every
+non-public/WWW schema with CASCADE and recreates the
+ML schema." <strong>Severity: medium.</strong></p>
+<h3 id="44-validationpy-module-docstring-is-accurate-but-the-file-does-not-deliver">4.4 <code>validation.py</code> module docstring is accurate but the file does not deliver</h3>
+<p>Lines 1-17 describe the file as validating:</p>
+<blockquote>
+<ul>
+<li>Required tables and their columns</li>
+<li>Required vocabulary tables and their initial terms</li>
+<li>Foreign key relationships</li>
+<li>Extra tables/columns (in strict mode)</li>
+</ul>
+</blockquote>
+<p>"Foreign key relationships" is in the docstring but
+the validator class (lines 408-578) has no FK
+validation. There's <code>_validate_association_tables</code>
+(which checks association tables exist by name) and
+<code>_validate_table_columns</code> (which checks column name +
+type) but no <code>_validate_foreign_keys</code> that walks the
+declared FK list against <code>EXPECTED_*</code> shape. The
+docstring lies.</p>
+<p><strong>Fix:</strong> either implement FK validation (closing the
+gap between docstring claim and behavior) or update the
+docstring to match. <strong>Severity: low.</strong></p>
+<h3 id="45-check_schemapy9-describes-a-cli-that-doesnt-work">4.5 <code>check_schema.py:9</code> describes a CLI that doesn't work</h3>
+<pre><code>- ``check_ml_schema``: Connect to a catalog and diff its schema against the
+  reference (or a provided file). Prints differences to stdout.
+- ``dump_ml_schema``: Export the current catalog schema to a JSON file
+  (for updating the reference baseline).
+- ``CheckMLSchemaCLI`` / ``main``: CLI wrappers for the above.
+</code></pre>
+<p><code>dump_ml_schema</code> doesn't "export the current catalog
+schema" — it <em>creates a new catalog</em> and exports
+that, then deletes it. Highly misleading.</p>
+<p><strong>Fix:</strong> subsumed by §1.2 (delete the module). If kept,
+rewrite the docstring to describe the actual behavior.
+<strong>Severity: medium.</strong></p>
+<h3 id="46-policyjson-has-no-documentation">4.6 <code>policy.json</code> has no documentation</h3>
+<p>The file's contents (ACL groups, definitions, bindings)
+are load-bearing. The <code>_cifar10_schema.py</code> doc-example
+in the model-template references it indirectly through
+<code>create_ml_catalog</code>, but nowhere in <code>deriva-ml/docs/</code> is
+the ACL design documented. A DBA or operations user
+inspecting a <code>403</code> response on a row update needs to
+know that:
+- The <code>row_owner_guard</code> binding (<code>projection: ["RCB"]</code>)
+  restricts updates/deletes to the row's creator.
+- The <code>self_serve</code> definition is applied at the catalog
+  level.
+- Non-public schemas inherit <code>row_owner_guard</code>.</p>
+<p><strong>Fix:</strong> add <code>docs/reference/acl-policy.md</code> (or a
+section under <code>docs/architecture.md</code>) that describes the
+policy. Not strictly schema/-subsystem work, but flagged
+here because the file lives in <code>schema/</code> and its
+visibility is low. <strong>Effort: low.</strong> <strong>Severity: low.</strong></p>
+<hr />
+<h2 id="lens-5-deriva-py-api-conventions">Lens 5 — deriva-py API conventions</h2>
+<h3 id="51-create_ml_schema-uses-raw-model-api-correctly">5.1 <code>create_ml_schema</code> uses raw model API correctly</h3>
+<p><code>create_schema.py:322</code> uses <code>catalog.getCatalogModel()</code>,
+the model API. Table creation goes through <code>schema.create_table(TableDef(...))</code>
+(the typed-def constructors from <code>deriva.core.typed</code>)
+rather than raw POSTs to ERMrest. This is the correct
+pattern per CLAUDE.md "API Priority" — model API ahead
+of raw ERMrest URLs. <strong>No fix.</strong></p>
+<h3 id="52-annotationspy-importlibimport_module-is-non-idiomatic">5.2 <code>annotations.py</code> <code>importlib.import_module</code> is non-idiomatic</h3>
+<p>Subsumed by §1.10. The pattern is unique to this file in
+the workspace; everywhere else <code>deriva.core.ermrest_model</code>
+and <code>deriva.core.utils.core_utils</code> are imported normally.</p>
+<h3 id="53-check_schemapy67-constructs-ermrestcatalog-directly-with-raw-scheme">5.3 <code>check_schema.py:67</code> constructs <code>ErmrestCatalog</code> directly with raw scheme</h3>
+<pre><code class="language-python">catalog = ErmrestCatalog(&quot;https&quot;, hostname, catalog_id, credentials=get_credential(hostname))
+</code></pre>
+<p>This is fine — the only way to bind to a specific
+<code>catalog_id</code> for a read-only diff. <strong>No fix.</strong></p>
+<h3 id="54-create_ml_catalog-shells-out-to-derivaconfigacl_config">5.4 <code>create_ml_catalog</code> shells out to <code>deriva.config.acl_config</code></h3>
+<p>Lines 588-611. The reasons (PATH/version mismatch, stale
+venv shebangs) are correct and documented in the
+multi-line comment block (lines 572-587). The fallback
+to <code>sys.executable -m</code> is the right idiom.</p>
+<p><strong>Note:</strong> the comment block (lines 572-587) is one of
+the best examples of inline-documentation-of-why in the
+entire codebase. It explains the rationale, the failure
+modes, and what the user would see. <strong>Preserve this
+pattern.</strong> <strong>No fix.</strong></p>
+<h3 id="55-initialize_ml_schema-uses-datapath-fetch-insert">5.5 <code>initialize_ml_schema</code> uses datapath fetch + insert</h3>
+<p><code>create_schema.py:416-422</code> uses
+<code>table.entities()</code> + <code>table.insert(missing, defaults={"ID", "URI"})</code>.
+Correct datapath usage. No raw ERMrest URLs.
+<strong>No fix.</strong></p>
+<h3 id="56-dump_ml_schema-uses-catalogdelete_ermrest_catalogreallytrue">5.6 <code>dump_ml_schema</code> uses <code>catalog.delete_ermrest_catalog(really=True)</code></h3>
+<p>The destructive side-effect (§1.2) — the deriva-py
+pattern itself is correct (the canonical way to delete
+a catalog). Issue is the API contract, not the call.</p>
+<hr />
+<h2 id="lens-6-maintainability-naming-class-size">Lens 6 — Maintainability / naming / class size</h2>
+<h3 id="61-annotationspy649-loc-is-borderline-module-is-coherent">6.1 <code>annotations.py:649</code> LoC is borderline; module is coherent</h3>
+<p>The audit prompt flagged the ~650 LoC module size as a
+size flag. Reading the file: <code>build_navbar_menu</code> (182
+LoC), <code>catalog_annotation</code> (37 LoC),
+<code>asset_annotation</code> (109 LoC), <code>generate_annotation</code>
+(252 LoC), <code>main</code> (19 LoC, dead per §1.8).
+<code>generate_annotation</code> is the largest single function.</p>
+<p>The function bodies are long because the structures
+they build (Chaise annotations) are inherently
+verbose JSON. Splitting <code>generate_annotation</code> into
+four functions (one per table-type annotation:
+<code>_workflow_annotation</code>, <code>_execution_annotation</code>,
+<code>_dataset_annotation</code>, <code>_dataset_version_annotation</code>)
+would improve readability without losing cohesion.</p>
+<p><strong>Fix (optional refactor):</strong> split <code>generate_annotation</code>
+into named per-table helpers; keep the public function
+as a thin aggregator. <strong>LoC: ±0.</strong> <strong>Risk: low</strong> —
+purely structural. <strong>Severity: low.</strong></p>
+<h3 id="62-build_navbar_menu-repeats-fchaiserecordsetcatalog_id">6.2 <code>build_navbar_menu</code> repeats <code>f"/chaise/recordset/#{catalog_id}/..."</code></h3>
+<p>19 occurrences of this URL pattern (<code>annotations.py:70,
+82, 92, 104, 115, 126, 138, 143, 147, 155, 160, 164,
+167, 171, 176, 184, 189, 199, 209</code>). A <code>_chaise_url</code>
+helper would reduce the repetition:</p>
+<pre><code class="language-python">def _chaise_url(catalog_id, schema, table):
+    return f&quot;/chaise/recordset/#{catalog_id}/{schema}:{table}&quot;
+</code></pre>
+<p>Trivial code smell. <strong>LoC: ±0</strong> (net). <strong>Risk: trivial.</strong>
+<strong>Severity: low.</strong></p>
+<h3 id="63-create_schemapy662-loc-is-mostly-load-bearing">6.3 <code>create_schema.py:662</code> LoC is mostly load-bearing</h3>
+<p>Reading the file: six table-creation helpers (210 LoC
+total), <code>create_ml_schema</code> (94 LoC),
+<code>initialize_ml_schema</code> (142 LoC),
+<code>create_ml_catalog</code> (80 LoC), <code>reset_ml_schema</code> (7
+LoC), <code>main</code> (23 LoC, dead per §1.6).</p>
+<p>The file is at the natural breaking point: if it grew
+much further, splitting tables into one-per-file would
+help. As-is, the seven tables (Dataset,
+Dataset_Version, Execution, Workflow, asset tables ×3)
+plus initialization plus catalog creation form a
+coherent unit.</p>
+<p>The <code>initialize_ml_schema</code> function (142 LoC) is mostly
+literal term lists (lines 424-542). The lists could be
+JSON or YAML files in the package data; the
+<code>initialize_ml_schema</code> body would then load them.
+This would also resolve §1.1 (validator could read the
+same JSON for its expected-terms list).</p>
+<p><strong>Fix (optional):</strong> extract the four vocabulary term
+lists to <code>schema/vocabulary_terms.json</code> (or similar)
+and load via <code>importlib.resources</code> like <code>policy.json</code>.
+<strong>LoC: small reduction.</strong> <strong>Risk: low.</strong> <strong>Severity:
+low.</strong></p>
+<h3 id="64-validationpy602-loc-is-mostly-drift-prone-constants">6.4 <code>validation.py:602</code> LoC is mostly drift-prone constants</h3>
+<p>Reading the file: the <code>EXPECTED_*</code> constants are 113
+LoC (lines 219-346); the data classes are 110 LoC
+(lines 32-189); the <code>SchemaValidator</code> class is 230 LoC
+(lines 352-578); the convenience function is 22 LoC.</p>
+<p>If §1.4 (b) lands (read constants from <code>schema.md</code>),
+the constants section deletes — file shrinks to ~480
+LoC. If §1.4 (a) lands (delete the whole module), 602
+LoC delete.</p>
+<h3 id="65-dataclasses-vs-pydantic-for-schemavalidationreport-validationissue">6.5 Dataclasses-vs-Pydantic for <code>SchemaValidationReport</code> / <code>ValidationIssue</code></h3>
+<p><code>validation.py:40, 62</code> are <code>@dataclass</code>es. Per
+CLAUDE.md "Class idiom choice — Pydantic vs <code>@dataclass</code>":</p>
+<blockquote>
+<p>Use Pydantic BaseModel when ANY of these apply: ...
+The class may be serialized or cross a boundary (JSON
+I/O, logs, cache, API, bag metadata). Users should
+reach for one API (.model_dump()) rather than
+juggling dataclasses.asdict() depending on type.</p>
+</blockquote>
+<p><code>SchemaValidationReport</code> has <code>to_dict()</code> and
+<code>to_json()</code> methods (lines 143-210) — i.e., it's a
+boundary type, exposed as the return type of a public
+method (<code>DerivaML.validate_schema</code>). Same with
+<code>ValidationIssue</code>. Both should be Pydantic per the
+convention.</p>
+<p>The conversion cost: replace <code>@dataclass</code> with
+<code>class ... (BaseModel)</code>, replace <code>field(default_factory=list)</code>
+with <code>Field(default_factory=list)</code> (or just use the
+shorter form), delete the manual <code>to_dict()</code> (replaced
+by <code>.model_dump()</code>), keep <code>to_text()</code> and <code>to_json()</code>
+as convenience methods.</p>
+<p><strong>Fix:</strong> convert the three dataclasses
+(<code>ValidationIssue</code>, <code>SchemaValidationReport</code>, plus
+nothing else in the module) to Pydantic
+<code>BaseModel</code>s. <strong>LoC: −30</strong> (manual <code>to_dict</code> deletes).
+<strong>Risk: medium</strong> — <code>dataclasses.replace</code> doesn't work
+on Pydantic; if any callers use it, they break. Per
+cross-workspace check, no callers exist. <strong>Severity:
+medium</strong> — explicit CLAUDE.md convention violation.</p>
+<h3 id="66-_ensure_terms-repeated-in-initialize_ml_schema">6.6 <code>_ensure_terms</code> repeated in <code>initialize_ml_schema</code></h3>
+<p><code>create_schema.py:416-422</code> defines <code>_ensure_terms</code> as a
+closure inside <code>initialize_ml_schema</code>. The closure is
+correct; deduplicating "Name → row" insertion is the
+right pattern. But the function shape ("insert if not
+present, skip if present") is exactly what
+<code>DerivaML.add_term(... if_not_exists=True)</code> already
+provides (or did — verify). If the term-list extraction
+from §6.3 lands, the closure could move to a top-level
+helper.</p>
+<p><strong>Severity: low.</strong></p>
+<h3 id="67-missing-__all__-on-check_schemapy">6.7 Missing <code>__all__</code> on <code>check_schema.py</code>,</h3>
+<p><code>table_comments_utils.py</code>, <code>create_schema.py</code>,
+<code>annotations.py</code></p>
+<p>Of the six files, only <code>__init__.py</code> and (effectively)
+<code>validation.py</code> have curated public surfaces — but
+<code>validation.py</code> itself has no <code>__all__</code>; the public
+surface is the re-export through <code>schema/__init__.py</code>.
+The other three executable modules (<code>check_schema.py</code>,
+<code>table_comments_utils.py</code>, <code>create_schema.py</code>,
+<code>annotations.py</code>) export everything by default. If any
+of them grew, an <code>__all__</code> would be useful.</p>
+<p><strong>Fix:</strong> add <code>__all__</code> to each module after the
+deletions in §1.2, §1.3, §1.6, §1.8 settle. Defer.
+<strong>Severity: low.</strong></p>
+<hr />
+<h2 id="persona-check">Persona check</h2>
+<p><strong>Senior engineer:</strong>
+- §1.2 (<code>check_schema.py</code> redundancy + stale JSON +
+  signature bug) is the cleanest delete in the audit.
+- §1.4 (validator overlap) is the biggest structural
+  cleanup; option (b) — read constants from
+  <code>schema.md</code> — kills the drift problem and the
+  duplicated-truth problem in one move.
+- §1.5 (<code>reset_ml_schema</code> with no guard) is the most
+  dangerous unused public function in the file. The
+  delete is small.</p>
+<p><strong>Testing engineer:</strong>
+- §3.1 (no CASCADE-safety test) is the biggest
+  coverage gap — the most destructive operation in the
+  subsystem has no regression guard.
+- §3.4 (existing validation tests don't assert ground
+  truth) is the second-biggest gap. The tests pass
+  because the validator doesn't ask the right
+  questions.
+- §3.2 (no ACL test) is cheap and worth landing.</p>
+<p><strong>Technical writer:</strong>
+- §1.7 (<code>_post_clone_operations</code> is fictional) and §4.3
+  (<code>reset_ml_schema</code> docstring misleads on scope) are
+  the load-bearing docstring corrections.
+- §4.5 (<code>dump_ml_schema</code> docstring claim vs reality) is
+  subsumed by §1.2.
+- §4.6 (<code>policy.json</code> has no doc) is a real gap for
+  DBA-persona users tracking down ACL failures.</p>
+<p><strong>ML-developer user:</strong>
+- A user installing <code>deriva-ml</code> and trying
+  <code>deriva-ml-create-schema</code> or
+  <code>deriva-ml-table-comments-utils</code> from <code>$PATH</code>
+  encounters <code>ModuleNotFoundError</code> immediately
+  (theme 1). This is the most user-visible
+  brokenness.
+- <code>create_ml_catalog</code> is healthy and the model-template
+  test confirms it works end-to-end. The CASCADE warning
+  in the docstring is sufficient if the user reads the
+  docstring; the warning is <strong>not</strong> repeated at the CLI
+  or hooked into a confirmation prompt anywhere. A user
+  who imports <code>create_ml_schema</code> and calls it on an
+  existing catalog loses data with no second chance.
+- <code>validate_schema</code> (the public method) returns a
+  report that misses the <code>Execution_Status</code> vocabulary
+  and most <code>Dataset_Type</code> terms. A user trusting the
+  validator's "VALID" verdict has a false sense of
+  security on those dimensions.</p>
+<p><strong>DBA:</strong>
+- §3.1 (CASCADE regression test) — load-bearing.
+- §3.2 (ACL test) — load-bearing.
+- §1.5 (<code>reset_ml_schema</code>) — public delete-everything
+  function with no audit log. Delete or guard.
+- §3.6 (policy.json test) — trivial to add, catches
+  typos that would otherwise show up as silent ACL
+  failures.</p>
+<hr />
+<h2 id="ranked-actions">Ranked actions</h2>
+<p>Numbered by recommended landing order, balancing impact,
+risk, and whether one item subsumes another.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Effort</th>
+<th>Risk</th>
+<th>LoC</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Theme 1 — Fix or remove the three broken <code>[project.scripts]</code> entries.</strong> <code>pyproject.toml:34-36</code> reference <code>deriva_ml.schema_setup</code> which doesn't exist. <code>deriva-ml-alter-annotation</code> also references a non-existent module. Either (a) delete the three entries (cleanest, no caller), or (b) rewrite to <code>deriva_ml.schema.*</code>. <strong>Recommend: delete.</strong></td>
+<td>trivial</td>
+<td>trivial</td>
+<td>−3</td>
+<td>high</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>§1.7 — Delete the fictional <code>_post_clone_operations</code> docstring reference in <code>create_schema.py:312</code>.</strong> Replace with the actual safety property (bag clone doesn't call <code>create_ml_schema</code>).</td>
+<td>trivial</td>
+<td>trivial</td>
+<td>±0</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>§3.1 — Add <code>tests/schema/test_cascade_behavior.py</code> to pin the CASCADE behavior.</strong> One integration test, ~30 LoC.</td>
+<td>low</td>
+<td>low</td>
+<td>+30 (test)</td>
+<td>high</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>§3.2 — Add <code>tests/schema/test_acl_application.py</code>.</strong> One integration test for <code>row_owner_guard</code> binding presence.</td>
+<td>low</td>
+<td>low</td>
+<td>+25 (test)</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>§3.6 — Add <code>tests/schema/test_policy_validation.py</code>.</strong> Three asserts; no integration mark needed (loads JSON only).</td>
+<td>trivial</td>
+<td>trivial</td>
+<td>+15 (test)</td>
+<td>low</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>§1.1 — Sync <code>EXPECTED_*</code> constants with <code>create_schema.py</code> reality.</strong> Add <code>MLVocab.execution_status</code>, expand vocabulary term lists. <strong>Or</strong> (preferred) collapse the constants into a read-from-<code>schema.md</code> derivation (option b of §1.4).</td>
+<td>low (sync) / medium (b)</td>
+<td>low / medium</td>
+<td>±0 / −113</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>§1.5 — Delete <code>reset_ml_schema</code>.</strong> Zero callers, dangerous if invoked, public function.</td>
+<td>trivial</td>
+<td>low</td>
+<td>−7</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>§1.6 — Delete <code>create_schema.py:main()</code>.</strong> 23 LoC of broken CLI; entry-point doesn't resolve.</td>
+<td>trivial</td>
+<td>trivial</td>
+<td>−23</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>§1.8 — Delete <code>annotations.py:main()</code>.</strong> Same shape — broken CLI, no entry point.</td>
+<td>trivial</td>
+<td>trivial</td>
+<td>−19</td>
+<td>low</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>§1.10 — Replace <code>importlib.import_module</code> workaround in <code>annotations.py</code> with normal imports.</strong></td>
+<td>trivial</td>
+<td>low</td>
+<td>−7</td>
+<td>low</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>§4.2 — Add <code># doctest: +SKIP</code> to <code>validation.py:200-208, 594-600</code> and convert <code>create_schema.py:562-565</code> to <code>&gt;&gt;&gt;</code> form with <code>SKIP</code>.</strong></td>
+<td>trivial</td>
+<td>trivial</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>§1.3 — Delete <code>table_comments_utils.py</code> and its <code>pyproject.toml</code> entry.</strong> Zero callers, broken CLI, no doc.</td>
+<td>low</td>
+<td>low</td>
+<td>−56</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>§1.2 — Delete <code>check_schema.py</code>, <code>deriva-ml-reference.json</code>, and the <code>deriva-ml-check-catalog-schema</code> <code>pyproject.toml</code> entry.</strong> Stale JSON, redundant validator, signature bug, no callers.</td>
+<td>low</td>
+<td>low</td>
+<td>−10 000 (mostly JSON)</td>
+<td>high</td>
+</tr>
+<tr>
+<td>14</td>
+<td><strong>§3.4 — Either drop <code>TestExpectedSchemaStructure</code> or rewrite to assert ground truth.</strong> If §1.4 (a) deletes <code>validation.py</code>, this drops with it.</td>
+<td>low</td>
+<td>low</td>
+<td>±0</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>15</td>
+<td><strong>§1.4 — Decide on <code>validation.py</code>'s future.</strong> Option (b): rewrite <code>SchemaValidator</code> to use the doc-derived model. Option (a): delete <code>validation.py</code>, replace <code>DerivaML.validate_schema</code> with a thin wrapper over <code>tools/validate_schema_doc.py</code>.</td>
+<td>medium-high</td>
+<td>medium</td>
+<td>−113 / −602</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>16</td>
+<td><strong>§6.5 — Convert <code>SchemaValidationReport</code> and <code>ValidationIssue</code> to Pydantic.</strong> Per CLAUDE.md class-idiom rules.</td>
+<td>low</td>
+<td>medium</td>
+<td>−30</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>17</td>
+<td><strong>§3.7 — Add <code>tests/schema/test_annotations.py</code> for <code>build_navbar_menu</code>.</strong></td>
+<td>low</td>
+<td>trivial</td>
+<td>+60 (test)</td>
+<td>low</td>
+</tr>
+<tr>
+<td>18</td>
+<td><strong>§4.6 — Add <code>docs/reference/acl-policy.md</code>.</strong></td>
+<td>low</td>
+<td>trivial</td>
+<td>+60 (doc)</td>
+<td>low</td>
+</tr>
+<tr>
+<td>19</td>
+<td><strong>§6.1 — Optional: split <code>generate_annotation</code> into per-table helpers.</strong></td>
+<td>low</td>
+<td>low</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+<tr>
+<td>20</td>
+<td><strong>§6.2 — Add <code>_chaise_url</code> helper for the 19 URL repetitions in <code>build_navbar_menu</code>.</strong></td>
+<td>trivial</td>
+<td>trivial</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+<tr>
+<td>21</td>
+<td><strong>§6.3 — Extract vocabulary term lists from <code>initialize_ml_schema</code> to a JSON/YAML resource.</strong> Makes them shareable with the validator (§1.1).</td>
+<td>low</td>
+<td>low</td>
+<td>small reduction</td>
+<td>low</td>
+</tr>
+<tr>
+<td>22</td>
+<td><strong>§2.1 — Privatize <code>SchemaValidator</code> to <code>_SchemaValidator</code>.</strong> Only if validation.py survives §1.4.</td>
+<td>trivial</td>
+<td>low</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+<tr>
+<td>23</td>
+<td><strong>§4.3 — Fix <code>reset_ml_schema</code> docstring</strong> if §1.5 doesn't delete the function.</td>
+<td>trivial</td>
+<td>trivial</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+<tr>
+<td>24</td>
+<td><strong>§4.4 — Either implement FK validation in <code>validation.py</code> or remove the docstring claim.</strong> Subsumed by §1.4 (a).</td>
+<td>low</td>
+<td>low</td>
+<td>±0</td>
+<td>low</td>
+</tr>
+</tbody>
+</table>
+<p>Items 1, 2, 3, 4, 5 are quick wins for the next cleanup
+PR — five small changes covering the highest-severity
+items.</p>
+<p>Items 7, 8, 9, 10 are mechanical deletes and can ride
+along.</p>
+<p>Item 11 is the doctest hygiene fix.</p>
+<p>Items 12, 13 are the major deletes — <code>table_comments_utils.py</code>
+and <code>check_schema.py</code> together remove 174 LoC of code
+plus 9 881 lines of stale JSON. These want their own
+small PR to avoid mixing deletions of executable code
+with deletions of static data.</p>
+<p>Item 15 is the strategic call: deduplicate the
+validators or accept the overlap. Item 6 fixes the
+immediate symptom; item 15 fixes the root cause.</p>
+<p>Combined cleanup ceiling if every "delete" branch lands:
+<strong>−10 348 LoC</strong> (mostly the stale JSON) <strong>+130 LoC of
+tests.</strong> Net is comfortably negative.</p>
+<hr />
+<h2 id="worst-offender-modules">Worst-offender modules</h2>
+<ol>
+<li>
+<p><strong><code>check_schema.py</code></strong> (118 LoC) + <code>deriva-ml-reference.json</code>
+   (9 881 LoC). Stale JSON, signature-mismatched CLI,
+   silent live-catalog side effect, redundant with the
+   two other validators. Cleanest large delete.</p>
+</li>
+<li>
+<p><strong><code>table_comments_utils.py</code></strong> (56 LoC). Zero callers,
+   broken CLI, no doc, no example directory in the
+   repo. Confirmed dead.</p>
+</li>
+<li>
+<p><strong><code>validation.py</code></strong> (602 LoC). Load-bearing in shape
+   (return type of <code>DerivaML.validate_schema</code>), but the
+   constants drift from <code>create_schema.py</code> reality, the
+   tests don't assert ground truth, and the
+   doc-source-of-truth flow in
+   <code>tools/validate_schema_doc.py</code> has superseded the
+   premise. The strategic call (§1.4) determines
+   whether this module shrinks by 113 LoC or deletes
+   entirely.</p>
+</li>
+<li>
+<p><strong><code>create_schema.py:main()</code> + <code>annotations.py:main()</code></strong>
+   (42 LoC combined). Two broken CLI entry points with
+   no resolving <code>pyproject.toml</code> reference.</p>
+</li>
+<li>
+<p><strong><code>pyproject.toml:34-36</code> console scripts</strong> (3 lines,
+   workspace-wide visibility). Broken at install time;
+   <code>pip show -f</code> lists them, <code>which</code> finds them, invoking
+   them errors. User-visible.</p>
+</li>
+<li>
+<p><strong><code>reset_ml_schema</code></strong> (7 LoC). Public delete-every-schema
+   function with no callers and no guard. The most
+   dangerous unused symbol in the subsystem.</p>
+</li>
+<li>
+<p><strong><code>annotations.py:build_navbar_menu</code></strong> (182 LoC).
+   Healthy; one structural improvement opportunity
+   (<code>_chaise_url</code> helper for the 19 URL repetitions).
+   Not a worst-offender; flagged only because it's the
+   single longest function in <code>schema/</code>.</p>
+</li>
+<li>
+<p><strong><code>create_schema.py:312</code> docstring</strong> (1 line).
+   References <code>_post_clone_operations</code> which doesn't
+   exist. The CLAUDE.md-flagged CASCADE safety claim
+   points the reader at a fictional guard.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
