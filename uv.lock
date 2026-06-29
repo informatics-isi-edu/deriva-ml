@@ -321,7 +321,7 @@ wheels = [
 [[package]]
 name = "bdbag"
 version = "1.9.0.dev2"
-source = { git = "https://github.com/fair-research/bdbag?rev=1.9.0-dev#bebcd1cedf44581e0078bfc97799da841ad38cd7" }
+source = { git = "https://github.com/fair-research/bdbag.git?rev=1.9.0-dev#bebcd1cedf44581e0078bfc97799da841ad38cd7" }
 dependencies = [
     { name = "bagit" },
     { name = "bagit-profile" },
@@ -853,7 +853,7 @@ wheels = [
 [[package]]
 name = "deriva"
 version = "2.0.0.dev0"
-source = { git = "https://github.com/informatics-isi-edu/deriva-py?rev=943bfa394c8246ae379b4a15b3f7b615d7da1fdd#943bfa394c8246ae379b4a15b3f7b615d7da1fdd" }
+source = { git = "https://github.com/informatics-isi-edu/deriva-py?rev=c93e71e480e2ef501ed58077e5fff3705bcdb5a1#c93e71e480e2ef501ed58077e5fff3705bcdb5a1" }
 dependencies = [
     { name = "bdbag" },
     { name = "fair-identifiers-client" },
@@ -866,6 +866,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
     { name = "requests" },
+    { name = "setuptools" },
     { name = "sqlalchemy" },
     { name = "urllib3" },
 ]
@@ -928,7 +929,7 @@ requires-dist = [
     { name = "bdbag", git = "https://github.com/fair-research/bdbag?rev=1.9.0-dev" },
     { name = "bump-my-version" },
     { name = "deepdiff" },
-    { name = "deriva", git = "https://github.com/informatics-isi-edu/deriva-py?rev=943bfa394c8246ae379b4a15b3f7b615d7da1fdd" },
+    { name = "deriva", git = "https://github.com/informatics-isi-edu/deriva-py?rev=c93e71e480e2ef501ed58077e5fff3705bcdb5a1" },
     { name = "hydra-zen" },
     { name = "nbconvert" },
     { name = "nbstripout" },
