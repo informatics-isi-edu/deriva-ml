@@ -454,13 +454,14 @@ class DerivaML(
         working directory reads the JSON we write here. Online mode
         never reads it back.
 
-        No pre-flight auth probe: the legacy ``/authn/session`` endpoint
-        that deriva-py's ``get_authn_session()`` calls is not exposed by
-        credenza, which is now the only supported auth backend.
-        Authentication failures surface as 401s on the first real
-        ermrest call (``getCatalogSchema()`` below) — accurate and
-        source-true, instead of a synthetic "you are not authorized"
-        wrapper masking the real cause.
+        No pre-flight auth probe *here*: ``_init_online`` does not gate
+        construction on a session — authentication failures surface as
+        401s on the first real ermrest call (``getCatalogSchema()``
+        below), source-true rather than a synthetic wrapper. (Callers who
+        want an explicit, friendly check before doing work can use
+        :meth:`is_authenticated` / :meth:`whoami`, which DO hit
+        ``GET /authn/session`` and return a clean result — verified
+        returning 200 + the client identity on current servers.)
         """
         from deriva_ml.model.catalog import DerivaModel
 
@@ -804,6 +805,75 @@ class DerivaML(
             True if the underlying catalog has a snapshot timestamp, False otherwise.
         """
         return hasattr(self.catalog, "_snaptime")
+
+    def whoami(self) -> dict | None:
+        """Return the authenticated client identity, or ``None`` if not logged in.
+
+        Asks the **server** for the current session via
+        ``GET /authn/session`` (deriva-py's
+        :meth:`~deriva.core.ErmrestCatalog.get_authn_session`). On a valid
+        session the server returns the logged-in client, and this returns that
+        ``client`` dict (``id``, ``display_name``, ``email``, ``full_name``,
+        ``identities``). When there is no session the endpoint returns 401/404
+        and this returns ``None``.
+
+        This makes a network call. A successful (non-``None``) result is a safe
+        bet that catalog operations will work — it proves the credential is
+        present, unexpired, and accepted by the server's auth layer (the thing
+        that otherwise blanket-401s). It confirms *authentication* (the server
+        knows who you are), not *authorization* for any specific operation — a
+        write to a read-only table can still be refused with a valid session.
+
+        Returns:
+            dict | None: The ``client`` identity dict, or ``None`` if there is
+                no authenticated session.
+
+        Raises:
+            requests.exceptions.HTTPError: For HTTP errors other than 401/404
+                (e.g. a 5xx server error) — these are real failures, not a
+                "no session" answer, so they propagate.
+
+        Example:
+            >>> who = ml.whoami()  # doctest: +SKIP
+            >>> who["display_name"] if who else "not logged in"  # doctest: +SKIP
+            'user@example.org'
+        """
+        from requests.exceptions import HTTPError
+
+        try:
+            session = self.catalog.get_authn_session()
+        except HTTPError as e:
+            # 401 (classic webauthn) and 404 (no session on the current backend)
+            # both mean "not authenticated". Anything else is a real error.
+            if e.response is not None and e.response.status_code in (401, 404):
+                return None
+            raise
+        return session.json().get("client")
+
+    def is_authenticated(self) -> bool:
+        """Whether there is a valid authenticated session for this catalog.
+
+        Thin boolean over :meth:`whoami`: ``True`` if the server returns a
+        client identity (``GET /authn/session`` → 200), ``False`` if there is no
+        session (401/404). Makes one network call.
+
+        A ``True`` result is a safe bet that catalog operations will work (the
+        credential is accepted by the server). It means "I am logged in," not
+        "every privileged operation will pass ACLs" — see :meth:`whoami` for the
+        authentication-vs-authorization distinction.
+
+        Returns:
+            bool: True if authenticated, False otherwise.
+
+        Raises:
+            requests.exceptions.HTTPError: For non-auth HTTP errors (propagated
+                from :meth:`whoami`).
+
+        Example:
+            >>> if not ml.is_authenticated():  # doctest: +SKIP
+            ...     raise SystemExit("Log in first: deriva-globus-auth-utils login --host ...")
+        """
+        return self.whoami() is not None
 
     def catalog_snapshot(self, version_snapshot: str) -> Self:
         """Return a new DerivaML instance connected to a specific catalog snapshot.
