@@ -367,3 +367,106 @@ def test_catalog_snapshot_forwards_connection_kwargs():
     # The schema-reuse fast path (perf spec §3.1) forwards the parent's
     # already-parsed schema so the snapshot skips its own /schema fetch.
     assert captured["reuse_schema_json"] == {"schemas": {}}
+
+
+# ---------------------------------------------------------------------------
+# is_authenticated / whoami — session check via the server-level
+# get_authn_session() (GET /authn/session). 200+client → authenticated;
+# 401/404 → not. Pure unit tests: the catalog binding is mocked so both
+# the success and no-session paths are deterministic with no live server.
+# ---------------------------------------------------------------------------
+
+
+def _ml_with_mock_catalog(catalog):
+    """A DerivaML instance with only its ``catalog`` attribute set.
+
+    Built via ``__new__`` to bypass ``__init__`` (no network) — these tests
+    exercise only the auth methods, which touch ``self.catalog``.
+    """
+    from deriva_ml.core.base import DerivaML
+
+    ml = DerivaML.__new__(DerivaML)
+    ml.catalog = catalog
+    return ml
+
+
+def test_whoami_returns_client_identity_when_session_valid():
+    """whoami() returns the server's ``client`` identity dict on a 200."""
+    from unittest.mock import MagicMock
+
+    client = {
+        "id": "https://auth.globus.org/abc",
+        "display_name": "user@example.org",
+        "full_name": "Example User",
+        "email": "user@example.org",
+        "identities": [],
+    }
+    resp = MagicMock()
+    resp.json.return_value = {"client": client, "seconds_remaining": 3600}
+    catalog = MagicMock()
+    catalog.get_authn_session.return_value = resp
+
+    ml = _ml_with_mock_catalog(catalog)
+    who = ml.whoami()
+
+    assert who == client
+    catalog.get_authn_session.assert_called_once()
+
+
+def test_whoami_returns_none_when_no_session():
+    """whoami() returns None when /authn/session 404s (no session)."""
+    from unittest.mock import MagicMock
+
+    from requests.exceptions import HTTPError
+
+    err = HTTPError()
+    err.response = MagicMock(status_code=404)
+    catalog = MagicMock()
+    catalog.get_authn_session.side_effect = err
+
+    ml = _ml_with_mock_catalog(catalog)
+    assert ml.whoami() is None
+
+
+def test_is_authenticated_true_when_session_valid():
+    """is_authenticated() is True when a session resolves."""
+    from unittest.mock import MagicMock
+
+    resp = MagicMock()
+    resp.json.return_value = {"client": {"id": "x"}}
+    catalog = MagicMock()
+    catalog.get_authn_session.return_value = resp
+
+    ml = _ml_with_mock_catalog(catalog)
+    assert ml.is_authenticated() is True
+
+
+def test_is_authenticated_false_on_401_and_404():
+    """is_authenticated() is False for both 401 and 404 (no session)."""
+    from unittest.mock import MagicMock
+
+    from requests.exceptions import HTTPError
+
+    for status in (401, 404):
+        err = HTTPError()
+        err.response = MagicMock(status_code=status)
+        catalog = MagicMock()
+        catalog.get_authn_session.side_effect = err
+        ml = _ml_with_mock_catalog(catalog)
+        assert ml.is_authenticated() is False, f"status {status} should be not-authenticated"
+
+
+def test_is_authenticated_reraises_unexpected_http_error():
+    """A non-auth HTTPError (e.g. 500) propagates — not swallowed as 'not authed'."""
+    from unittest.mock import MagicMock
+
+    from requests.exceptions import HTTPError
+
+    err = HTTPError()
+    err.response = MagicMock(status_code=500)
+    catalog = MagicMock()
+    catalog.get_authn_session.side_effect = err
+
+    ml = _ml_with_mock_catalog(catalog)
+    with pytest.raises(HTTPError):
+        ml.is_authenticated()
