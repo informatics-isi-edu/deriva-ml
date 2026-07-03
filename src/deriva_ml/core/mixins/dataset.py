@@ -267,7 +267,9 @@ class DatasetMixin:
         """
         return self.model.list_dataset_element_types()
 
-    def find_datasets_referencing(self, table: str | Table, column: str | None = None) -> list[DatasetReference]:
+    def find_datasets_referencing(
+        self, table: str | Table, column: str | None = None, deleted: bool = False
+    ) -> list[DatasetReference]:
         """Find the datasets impacted by a change to ``table`` (schema-evolution impact analysis).
 
         Answers the catalog-evolver question "what breaks if I change
@@ -281,15 +283,24 @@ class DatasetMixin:
         narrow the result; pair the two methods for a full impact
         report.
 
-        One bulk query per call: the association table's dataset FK
-        column is fetched once and grouped in memory (same pattern as
-        the asset bulk reads).
+        Soft-deleted datasets are **excluded by default**, so this surface
+        agrees with :meth:`find_datasets` and :meth:`lookup_dataset` (both
+        default-exclude ``Deleted`` datasets). A soft delete keeps the
+        membership junction rows, so an association-only query would otherwise
+        report datasets that ``lookup_dataset`` then refuses (issue #355). Pass
+        ``deleted=True`` to include tombstoned datasets.
+
+        One bulk query for the members, plus one bulk query for the datasets'
+        ``Deleted`` status (skipped when ``deleted=True``).
 
         Args:
             table: Name of the table (str) or ``Table`` object to check.
             column: Optional column name, accepted for API symmetry.
                 Dataset impact is table-granular, so this does not
                 narrow the result.
+            deleted: If True, include soft-deleted datasets. Defaults to False
+                (soft-deleted datasets are excluded), matching
+                :meth:`find_datasets` / :meth:`lookup_dataset`.
 
         Returns:
             One :class:`DatasetReference` per dataset with members in
@@ -319,6 +330,20 @@ class DatasetMixin:
         for row in apath.attributes(apath.columns[dataset_col]).fetch():
             rid = row[dataset_col]
             counts[rid] = counts.get(rid, 0) + 1
+
+        if not deleted and counts:
+            # Drop soft-deleted datasets so this surface agrees with
+            # find_datasets / lookup_dataset. The membership junctions persist
+            # after a soft delete, so the counts above can include tombstoned
+            # datasets. One bulk read of the Dataset table's Deleted column.
+            dpath = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
+            deleted_rids = {
+                row["RID"]
+                for row in dpath.attributes(dpath.RID, dpath.Deleted).fetch()
+                if row.get("Deleted")
+            }
+            counts = {rid: n for rid, n in counts.items() if rid not in deleted_rids}
+
         return [
             DatasetReference(dataset_rid=rid, element_table=target.name, member_count=n)
             for rid, n in sorted(counts.items())

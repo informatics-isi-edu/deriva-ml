@@ -48,6 +48,57 @@ class TestFindDatasetsReferencing:
         by_column = impact_ml.find_datasets_referencing("Image", column="URL")
         assert {r.dataset_rid for r in by_column} == {r.dataset_rid for r in by_table}
 
+    @staticmethod
+    def _soft_delete_an_image_dataset(impact_ml):
+        """Soft-delete one Image-referencing dataset; return its RID.
+
+        Sets ``Deleted=true`` directly on the Dataset row (what a soft delete
+        does at the data level), which keeps the membership junction rows — the
+        exact state that made #355's association-only query leak the dataset.
+        Done via the path-builder rather than ``delete_dataset`` so the test is
+        independent of that method's nesting guard (the demo datasets are
+        nested).
+        """
+        refs = impact_ml.find_datasets_referencing("Image")
+        assert refs, "fixture must have Image-referencing datasets"
+        victim = refs[0].dataset_rid
+
+        pb = impact_ml.pathBuilder()
+        ds_table = pb.schemas[impact_ml._dataset_table.schema.name].tables[impact_ml._dataset_table.name]
+        ds_table.update([{"RID": victim, "Deleted": True}])
+
+        # Sanity: it is now soft-deleted (lookup_dataset refuses it by default).
+        from deriva_ml import DerivaMLException
+
+        try:
+            impact_ml.lookup_dataset(victim)
+            raise AssertionError("victim should be soft-deleted (lookup_dataset should refuse it)")
+        except DerivaMLException:
+            pass
+        return victim
+
+    def test_soft_deleted_datasets_excluded_by_default(self, impact_ml):
+        """A soft-deleted dataset must NOT appear in the default result — it
+        agrees with find_datasets / lookup_dataset, which default-exclude
+        deleted datasets. Junction rows persist after a soft delete, so the
+        association-only query would otherwise leak the deleted dataset (#355).
+        """
+        victim = self._soft_delete_an_image_dataset(impact_ml)
+
+        # Default: the soft-deleted dataset is gone; the surface now agrees
+        # with lookup_dataset (which raises for the same RID).
+        default_rids = {r.dataset_rid for r in impact_ml.find_datasets_referencing("Image")}
+        assert victim not in default_rids, "soft-deleted dataset must be excluded by default"
+
+    def test_soft_deleted_datasets_included_with_flag(self, impact_ml):
+        """``deleted=True`` opts back into soft-deleted datasets — the
+        impact-analysis 'what still references this row, even in tombstoned
+        datasets' use case."""
+        victim = self._soft_delete_an_image_dataset(impact_ml)
+
+        with_deleted = {r.dataset_rid for r in impact_ml.find_datasets_referencing("Image", deleted=True)}
+        assert victim in with_deleted, "deleted=True must include soft-deleted datasets"
+
 
 class TestFindFeaturesReferencing:
     def test_features_on_target_table(self, impact_ml):
