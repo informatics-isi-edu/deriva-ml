@@ -7,10 +7,13 @@ Workflow / Workflow Name / Workflow Type provenance facets — to every feature
 table.
 
 Target resolution: the ``Execution_<Target>_<Feature>`` naming convention picks
-the target FK for 8 tables. ``find_features()`` is NOT used for this because it
-mis-reports the target on multi-FK tables (it returns ``Image_Side`` for
-``Execution_Subject_Chart_Label``, whose real target is ``Subject``). The two
-tables that predate the naming convention are resolved from an explicit map.
+the target FK. ``find_features()`` is NOT used for this because it mis-reports
+the target on multi-FK tables (it returns ``Image_Side`` for
+``Execution_Subject_Chart_Label``, whose real target is ``Subject``).
+
+Tables that don't follow the convention are skipped with a warning rather than
+guessed at. On eye-ai the only two non-conforming tables (``Annotation``,
+``Image_Diagnosis``) are slated for deletion, so skipping them is correct.
 
 Usage:
     # Show the diff without writing anything (default):
@@ -34,18 +37,14 @@ from deriva_ml.schema.annotations import feature_annotation
 
 SCHEMA = "eye-ai"
 
-# Feature tables whose name predates the Execution_<Target>_<Feature> convention.
-# Both plainly target Image (they carry an Image FK + Feature_Name + Execution).
-LEGACY_TARGETS = {
-    "Annotation": "Image",
-    "Image_Diagnosis": "Image",
-}
-
 
 def resolve_target(table) -> str | None:
-    """Return the feature table's target-table FK column name, or None."""
-    if table.name in LEGACY_TARGETS:
-        return LEGACY_TARGETS[table.name]
+    """Return the feature table's target-table FK column name, or None.
+
+    Only the ``Execution_<Target>_<Feature>`` convention is honored. A table
+    that doesn't conform returns None and is skipped — guessing the target
+    would annotate the row-name and target facet against the wrong column.
+    """
     if not table.name.startswith("Execution_"):
         return None
     rest = table.name[len("Execution_") :]
