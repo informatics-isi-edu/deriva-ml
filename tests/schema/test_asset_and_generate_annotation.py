@@ -13,12 +13,16 @@ non-determinism in ``asset_annotation``).
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock
 
+import pytest
 from deriva.core import tag as deriva_tags
 
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.schema.annotations import (
     asset_annotation,
+    feature_annotation,
     generate_annotation,
 )
 
@@ -334,33 +338,178 @@ class TestDatasetAnnotationFolderColumn:
         compact = vc.get("*", [])
 
         # Must be present in detailed.
-        folder_sources = [
-            s for s in detailed
-            if isinstance(s, dict) and s.get("markdown_name") == "Folder"
-        ]
+        folder_sources = [s for s in detailed if isinstance(s, dict) and s.get("markdown_name") == "Folder"]
         assert folder_sources, "Dataset detailed visible-columns must include a 'Folder' source"
 
         # Must NOT be present in compact (*).
-        assert not any(
-            isinstance(s, dict) and s.get("markdown_name") == "Folder" for s in compact
-        ), "Folder must NOT appear in the compact (*) context"
+        assert not any(isinstance(s, dict) and s.get("markdown_name") == "Folder" for s in compact), (
+            "Folder must NOT appear in the compact (*) context"
+        )
 
         folder = folder_sources[0]
         src_path = folder["source"]
 
         # Source walks inbound to Directory_Dataset then reads Path.
         assert any(
-            isinstance(seg, dict)
-            and "inbound" in seg
-            and "Directory_Dataset" in seg["inbound"][1]
-            for seg in src_path
+            isinstance(seg, dict) and "inbound" in seg and "Directory_Dataset" in seg["inbound"][1] for seg in src_path
         ), f"Folder source must walk inbound via Directory_Dataset; got source={src_path!r}"
-        assert src_path[-1] == "Path", (
-            f"Folder source must terminate with 'Path'; got source={src_path!r}"
-        )
+        assert src_path[-1] == "Path", f"Folder source must terminate with 'Path'; got source={src_path!r}"
 
         # show_null false → Chaise hides the field when Path is null.
         assert folder.get("display", {}).get("show_null") is False, (
-            "Folder source must have display.show_null=False so Chaise hides it "
-            "on non-directory datasets"
+            "Folder source must have display.show_null=False so Chaise hides it on non-directory datasets"
         )
+
+
+# ---------------------------------------------------------------------------
+# feature_annotation — workflow provenance facets
+# ---------------------------------------------------------------------------
+
+
+def _make_feature_table(
+    *,
+    schema_name: str = "eye-ai",
+    table_name: str = "Execution_Subject_Subject_Diagnosis",
+    target: str = "Subject",
+    execution_fkey_name: str | None = None,
+    target_fkey_name: str | None = None,
+) -> MagicMock:
+    """Build a minimal ``Table``-shaped mock for feature_annotation tests.
+
+    ``execution_fkey_name`` / ``target_fkey_name`` default to the natural
+    ``{table}_{col}_fkey`` form but can be overridden to simulate the
+    truncated + hash-suffixed constraint names ERMrest generates when the
+    natural name exceeds Postgres's 63-char limit.
+    """
+    table = MagicMock()
+    table.schema.name = schema_name
+    table.name = table_name
+
+    class _Columns(dict):
+        def __iter__(self):
+            return iter(self.values())
+
+    col_objs = {}
+    for name in ("RID", "RCT", "RMT", "RCB", "RMB", "Execution", "Feature_Name", target):
+        c = MagicMock()
+        c.name = name
+        col_objs[name] = c
+    table.columns = _Columns(col_objs)
+
+    def _fk(col_name: str, pk_table_name: str, constraint_name: str) -> MagicMock:
+        fk = MagicMock()
+        col = MagicMock()
+        col.name = col_name
+        fk.columns = [col]
+        fk.column_map = [col]
+        fk.pk_table.name = pk_table_name
+        fk.constraint_name = constraint_name
+        fk.name = (MagicMock(name=schema_name), constraint_name)
+        fk.name[0].name = schema_name
+        return fk
+
+    table.foreign_keys = [
+        _fk("Execution", "Execution", execution_fkey_name or f"{table_name}_Execution_fkey"),
+        _fk(target, target, target_fkey_name or f"{table_name}_{target}_fkey"),
+    ]
+    table.annotations = {}
+    return table
+
+
+def _facets(table) -> list:
+    return table.annotations[deriva_tags.visible_columns]["filter"]["and"]
+
+
+def _facet_by_name(table, markdown_name: str):
+    for f in _facets(table):
+        if isinstance(f, dict) and f.get("markdown_name") == markdown_name:
+            return f
+    raise AssertionError(f"no facet named {markdown_name!r}")
+
+
+class TestFeatureAnnotationWorkflowFacets:
+    """Pin the workflow provenance facets on feature tables.
+
+    Feature values are selected by *what produced them* — the workflow behind
+    the execution — not only by their own value. Three facets ride the
+    provenance chain; ``Workflow_Type`` is many-to-many so its facet must
+    traverse the ``Workflow_Workflow_Type`` association rather than a plain
+    FK chain.
+    """
+
+    def test_workflow_facet_hops_execution_then_workflow(self):
+        table = _make_feature_table()
+        feature_annotation(table, "Subject")
+
+        source = _facet_by_name(table, "Workflow")["source"]
+        assert source == [
+            {"outbound": ["eye-ai", "Execution_Subject_Subject_Diagnosis_Execution_fkey"]},
+            {"outbound": ["deriva-ml", "Execution_Workflow_fkey"]},
+            "RID",
+        ]
+
+    def test_workflow_name_facet_targets_name_column(self):
+        """Workflow has no Workflow_Type column; Name is the readable axis."""
+        table = _make_feature_table()
+        feature_annotation(table, "Subject")
+
+        source = _facet_by_name(table, "Workflow Name")["source"]
+        assert source[-1] == "Name"
+        assert source[1] == {"outbound": ["deriva-ml", "Execution_Workflow_fkey"]}
+
+    def test_workflow_type_facet_traverses_association_table(self):
+        """Workflow_Type is many-to-many: inbound to the association, then
+        outbound to the vocabulary term."""
+        table = _make_feature_table()
+        feature_annotation(table, "Subject")
+
+        source = _facet_by_name(table, "Workflow Type")["source"]
+        assert source == [
+            {"outbound": ["eye-ai", "Execution_Subject_Subject_Diagnosis_Execution_fkey"]},
+            {"outbound": ["deriva-ml", "Execution_Workflow_fkey"]},
+            {"inbound": ["deriva-ml", "Workflow_Workflow_Type_Workflow_fkey"]},
+            {"outbound": ["deriva-ml", "Workflow_Workflow_Type_Workflow_Type_fkey"]},
+            "Name",
+        ]
+
+    def test_workflow_facets_do_not_leak_into_visible_columns(self):
+        """Facet-only change: the row rendering must be untouched."""
+        table = _make_feature_table()
+        feature_annotation(table, "Subject")
+
+        vc = table.annotations[deriva_tags.visible_columns]
+        for context in ("*", "detailed"):
+            rendered = json.dumps(vc[context])
+            assert "Execution_Workflow_fkey" not in rendered
+            assert "Workflow_Workflow_Type" not in rendered
+
+
+class TestFeatureAnnotationResolvesTruncatedFkeyNames:
+    """FK constraint names must come from the model, not string interpolation.
+
+    Postgres truncates constraint names past 63 chars and ERMrest appends a
+    hash — and the same logical FK carries *different* hashes in different
+    catalogs. A constructed ``f"{table}_Execution_fkey"`` silently produces a
+    dead facet on those tables.
+    """
+
+    def test_truncated_execution_fkey_is_used_verbatim(self):
+        truncated = "Execution_Obs.._Execution_fkey_hQUme"
+        table = _make_feature_table(
+            table_name="Execution_Observation_Observation_Diagnosis",
+            target="Observation",
+            execution_fkey_name=truncated,
+        )
+        feature_annotation(table, "Observation")
+
+        # Every provenance facet must ride the real (truncated) name.
+        for name in ("Produced By", "Workflow", "Workflow Name", "Workflow Type"):
+            source = _facet_by_name(table, name)["source"]
+            assert source[0] == {"outbound": ["eye-ai", truncated]}
+
+    def test_missing_execution_fkey_raises(self):
+        table = _make_feature_table()
+        table.foreign_keys = [fk for fk in table.foreign_keys if fk.pk_table.name != "Execution"]
+
+        with pytest.raises(DerivaMLException, match="missing a required outbound FK"):
+            feature_annotation(table, "Subject")
