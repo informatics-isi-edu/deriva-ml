@@ -15,7 +15,8 @@ Public entry points:
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
 
-from deriva_ml.core.constants import DerivaAssetColumns
+from deriva_ml.core.constants import ML_SCHEMA, DerivaAssetColumns
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.upload_layout import bulk_upload_configuration
 from deriva_ml.model.catalog import DerivaModel
 
@@ -446,7 +447,19 @@ def feature_annotation(feature_table: Table, target_table_name: str) -> None:
     * **visible-columns** leads with the target, the feature's own value/term/asset
       columns, then the producing Execution (provenance) and audit columns;
     * **facets** on the target, the feature's term columns (the natural
-      "show me all rows labelled X" axis), and the producing Execution.
+      "show me all rows labelled X" axis), the producing Execution, and the
+      workflow behind that execution (RID, name, and type).
+
+    **Workflow facets** let a user select feature values by *what produced them*
+    rather than only by the value itself ("show me every Chart_Label from a
+    Prediction-type workflow"). Three facets ride the provenance FK chain:
+
+    * *Workflow* — ``Execution -> Workflow``, faceted on RID;
+    * *Workflow Name* — the same hop faceted on ``Workflow.Name``, the
+      human-readable axis (``Workflow`` has no ``Workflow_Type`` column);
+    * *Workflow Type* — ``Workflow_Type`` is a **many-to-many** behind the
+      ``Workflow_Workflow_Type`` association, so this facet is a 4-hop
+      outbound/inbound/outbound path rather than a plain FK chain.
 
     Mutates ``feature_table.annotations`` and applies the model.
 
@@ -454,9 +467,37 @@ def feature_annotation(feature_table: Table, target_table_name: str) -> None:
         feature_table: The ``Execution_<Target>_<Feature>`` association table.
         target_table_name: Name of the feature's target table (its FK column on
             the feature table — e.g. ``"Subject"`` or ``"Image"``).
+
+    Raises:
+        DerivaMLException: If the feature table has no outbound FK to
+            ``Execution`` or to ``target_table_name`` — without those the
+            provenance facets can't be built.
     """
     schema = feature_table.schema.name
     fname = feature_table.name
+
+    # Resolve FK constraint names from the MODEL rather than interpolating
+    # f"{fname}_Execution_fkey". Postgres truncates constraint names past 63
+    # chars and ERMrest appends a hash — e.g.
+    # "Execution_Obs.._Glaucoma_Diagnosis_fkey_hQUme". Those truncated names
+    # differ per catalog (dev and prod carry *different* hashes for the same
+    # logical FK), so a constructed name silently produces a dead facet.
+    def _fkey_name_to(pk_table_name: str, from_column: str) -> str | None:
+        """Return the constraint name of feature_table's FK on ``from_column``."""
+        for fk in feature_table.foreign_keys:
+            cols = [c.name for c in fk.columns]
+            if cols == [from_column] and fk.pk_table.name == pk_table_name:
+                return fk.constraint_name
+        return None
+
+    execution_fkey = _fkey_name_to("Execution", "Execution")
+    target_fkey = _fkey_name_to(target_table_name, target_table_name)
+    if execution_fkey is None or target_fkey is None:
+        raise DerivaMLException(
+            f"Feature table {schema}:{fname} is missing a required outbound FK "
+            f"(Execution={execution_fkey}, {target_table_name}={target_fkey}); "
+            "cannot build feature annotation."
+        )
 
     # The feature's own payload columns: everything that isn't a system column,
     # the structural Execution/Feature_Name FKs, or the target FK. Sorted for
@@ -477,23 +518,58 @@ def feature_annotation(feature_table: Table, target_table_name: str) -> None:
         return [fk[0].name, fk[1]] if fk else col_name
 
     target_source = {
-        "source": [{"outbound": [schema, f"{fname}_{target_table_name}_fkey"]}, "RID"],
+        "source": [{"outbound": [schema, target_fkey]}, "RID"],
         "markdown_name": target_table_name,
     }
     execution_source = {
-        "source": [{"outbound": [schema, f"{fname}_Execution_fkey"]}, "RID"],
+        "source": [{"outbound": [schema, execution_fkey]}, "RID"],
         "markdown_name": "Produced By",
     }
 
-    # Facets: the target, the producing execution, and each term/asset (FK-backed)
-    # payload column — the natural "filter rows by this label/value" axes.
-    facet_sources = [target_source, execution_source]
+    # Provenance facets that reach past the Execution into the Workflow that
+    # produced it. The first two hops are shared by all three; only the tail
+    # differs. Constraint names in the deriva-ml schema are fixed by
+    # create_schema.py (short enough never to truncate), so they're literals.
+    _to_workflow = [
+        {"outbound": [schema, execution_fkey]},
+        {"outbound": [ML_SCHEMA, "Execution_Workflow_fkey"]},
+    ]
+    workflow_source = {
+        "source": [*_to_workflow, "RID"],
+        "markdown_name": "Workflow",
+    }
+    workflow_name_source = {
+        "source": [*_to_workflow, "Name"],
+        "markdown_name": "Workflow Name",
+    }
+    # Workflow_Type is many-to-many behind Workflow_Workflow_Type: hop *into*
+    # the association (inbound), then back *out* to the vocabulary term.
+    workflow_type_source = {
+        "source": [
+            *_to_workflow,
+            {"inbound": [ML_SCHEMA, "Workflow_Workflow_Type_Workflow_fkey"]},
+            {"outbound": [ML_SCHEMA, "Workflow_Workflow_Type_Workflow_Type_fkey"]},
+            "Name",
+        ],
+        "markdown_name": "Workflow Type",
+    }
+
+    # Facets: the target, the producing execution, the workflow behind it
+    # (RID / name / type), and each term/asset (FK-backed) payload column —
+    # the natural "filter rows by this label/value" axes.
+    facet_sources = [
+        target_source,
+        execution_source,
+        workflow_source,
+        workflow_name_source,
+        workflow_type_source,
+    ]
     for c in payload_columns:
         if c in fk_by_column:
             facet_sources.append({"source": [{"outbound": [schema, fk_by_column[c][1]]}, "RID"], "markdown_name": c})
 
     # Row name: "<target RID>: <feature name>" via the target FK pseudo-column.
-    target_fkey_ref = f"$fkey_{schema}_{fname}_{target_table_name}_fkey"
+    target_fkey_ref = f"$fkey_{schema}_{target_fkey}"
     row_name_pattern = "{{{" + target_fkey_ref + ".RID}}}: {{{Feature_Name}}}"
 
     feature_table.annotations.update(
