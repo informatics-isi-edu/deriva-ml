@@ -5,7 +5,7 @@ of each section.
 
 ## Execution / commit
 
-### 2026-07-17 — RID-lease POST retry design (issue #360)
+### 2026-07-17 — RID-lease POST retry design (issue #360, PR #361)
 
 **Bug:** `post_lease_batch` (`execution/rid_lease.py`) issues a bare
 `catalog.post("/entity/public:ERMrest_RID_Lease", ...)` with no retry.
