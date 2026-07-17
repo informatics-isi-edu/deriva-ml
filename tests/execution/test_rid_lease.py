@@ -5,6 +5,21 @@ from __future__ import annotations
 import uuid
 
 import pytest
+import requests
+
+
+def _terminal_http_error(status: int = 403) -> requests.HTTPError:
+    """A non-transient HTTP error (default 403) for the lease POST.
+
+    Terminal 4xx statuses are NOT retried by ``post_lease_batch``;
+    only transient failures (timeouts, 5xx, spurious 409) are. See
+    ``test_rid_lease_retry.py`` for the transient-path coverage.
+    """
+    resp = requests.Response()
+    resp.status_code = status
+    resp._content = b"forbidden"
+    resp.reason = "Forbidden"
+    return requests.HTTPError(f"{status} error", response=resp)
 
 
 class _MockLeaseCatalog:
@@ -18,7 +33,10 @@ class _MockLeaseCatalog:
 
     def post(self, path: str, json=None, **_kw):
         if self.fail:
-            raise RuntimeError("simulated lease failure")
+            # A terminal (non-transient) error must propagate without
+            # retry; use 403 so the retry classifier treats it as
+            # terminal rather than a transport hiccup.
+            raise _terminal_http_error()
         assert "ERMrest_RID_Lease" in path
         assert isinstance(json, list)
         self.post_calls.append(json)
@@ -83,9 +101,14 @@ def test_post_lease_batch_empty_is_noop():
     assert cat.post_calls == []
 
 
-def test_post_lease_batch_propagates_catalog_error():
+def test_post_lease_batch_propagates_terminal_error():
+    """A terminal (non-transient) catalog error propagates immediately,
+    without burning retry attempts (transient handling is covered in
+    test_rid_lease_retry.py)."""
     from deriva_ml.execution.rid_lease import post_lease_batch
 
     cat = _MockLeaseCatalog(fail=True)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(requests.HTTPError):
         post_lease_batch(catalog=cat, tokens=["T"])
+    # Exactly one POST attempt — no retry on a terminal 4xx.
+    assert len(cat.post_calls) == 0  # POST raised before recording

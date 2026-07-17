@@ -7,10 +7,38 @@ before adding asset / association rows to the transient commit bag.
 Why a dedicated module: the POST body format, chunking, and
 error-handling choices are specific to the lease table and worth
 isolating from higher-level orchestration.
+
+Transient-failure handling (issue #360)
+---------------------------------------
+The lease POST is the *last* step of an arbitrarily long commit
+(assets + feature rows + provenance already landed). A single
+transient ERMrest hiccup on this bookkeeping POST must not discard
+the success signal of the whole run, so ``post_lease_batch`` retries
+transient failures with bounded exponential backoff.
+
+The retry is **reconcile-based**, not blind re-POST. It relies on an
+ERMrest guarantee about ``public:ERMrest_RID_Lease``:
+
+    The table has a composite unique key ``(RCB, ID)``, where ``RCB``
+    is the row-created-by (authenticated client) and ``ID`` is our
+    client-generated UUID4 lease token. ``ID`` alone is NOT unique.
+
+Because of that key, a POST that *landed* on the server but whose
+response was lost cannot simply be re-sent — re-POSTing the same
+tokens would 409 against the rows that already succeeded. So before
+each retry we query which of our tokens already exist and re-POST
+only the missing ones. This is exactly what the UUID4 ``ID`` token
+was designed for (see :func:`generate_lease_token`).
+
+This ERMrest guarantee is pinned for *our* CI by
+``tests/execution/test_rid_lease_idempotency_contract.py`` — if a
+future server/deriva-py change drops the ``(RCB, ID)`` unique key,
+that test fails and this reconcile logic must be revisited.
 """
 
 from __future__ import annotations
 
+import time
 import uuid
 from typing import TYPE_CHECKING, Iterable
 
@@ -24,6 +52,178 @@ logger = get_logger(__name__)
 # ERMrest URL and body-size limits while amortizing round-trip cost.
 # See spec §2.6 — may be tuned by tests via monkeypatch.
 PENDING_ROWS_LEASE_CHUNK = 500
+
+# Reconcile-retry tuning for the lease POST (issue #360). Mirrors
+# deriva-py's ``datapath._request_with_retry`` shape (exponential
+# backoff of ``factor ** (attempt - 1)`` seconds), with 409 added to
+# the transient set because the observed production failure was a
+# *spurious* 409 ("Schema public does not exist") against a healthy
+# lease table. Reconciliation makes retrying a 409 safe.
+# Tunable by tests via monkeypatch.
+LEASE_MAX_ATTEMPTS = 5
+LEASE_BACKOFF_FACTOR = 2
+# HTTP status codes we treat as transient for the lease POST. 409 is
+# included here (unlike a generic insert) — see module docstring.
+LEASE_TRANSIENT_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504})
+
+
+def _http_status(exc: BaseException) -> int | None:
+    """Return the HTTP status code carried by ``exc``, or None.
+
+    Args:
+        exc: An exception raised by a catalog POST.
+
+    Returns:
+        The integer status code if ``exc`` is a
+        :class:`requests.HTTPError` whose ``response`` carries a
+        status; otherwise ``None`` (e.g. a bare transport error).
+
+    Example:
+        >>> import requests
+        >>> r = requests.Response()
+        >>> r.status_code = 503
+        >>> _http_status(requests.HTTPError(response=r))
+        503
+        >>> _http_status(RuntimeError("boom")) is None
+        True
+    """
+    resp = getattr(exc, "response", None)
+    status = getattr(resp, "status_code", None)
+    return int(status) if status is not None else None
+
+
+def _is_transient_lease_error(exc: BaseException) -> bool:
+    """Classify a lease-POST exception as transient (retry) or terminal.
+
+    Transient: an :class:`requests.HTTPError` whose status is in
+    :data:`LEASE_TRANSIENT_STATUS`, or a non-HTTP exception presumed
+    to be a transport error (timeout, connection reset) with no
+    status attached. Terminal: any other 4xx (e.g. 403 forbidden,
+    404) — re-sending will not help.
+
+    Args:
+        exc: The exception raised by the catalog POST.
+
+    Returns:
+        ``True`` if the caller should retry, ``False`` to raise.
+
+    Example:
+        >>> import requests
+        >>> r = requests.Response(); r.status_code = 409
+        >>> _is_transient_lease_error(requests.HTTPError(response=r))
+        True
+        >>> r2 = requests.Response(); r2.status_code = 403
+        >>> _is_transient_lease_error(requests.HTTPError(response=r2))
+        False
+        >>> _is_transient_lease_error(ConnectionError("reset"))
+        True
+    """
+    status = _http_status(exc)
+    if status is None:
+        # No HTTP status → transport-level error; presume transient.
+        return True
+    return status in LEASE_TRANSIENT_STATUS
+
+
+def _fetch_landed_leases(
+    catalog: "ErmrestCatalog",
+    tokens: list[str],
+) -> dict[str, str]:
+    """Return token→RID for tokens already present in ERMrest_RID_Lease.
+
+    Reconciliation query for the retry path: after a transient POST
+    failure we cannot know which rows landed, so we ask the server.
+    Filters by our client's tokens (the ``ID`` column); the
+    ``(RCB, ID)`` unique key means each token maps to at most one row
+    created by this client.
+
+    Args:
+        catalog: Live ErmrestCatalog to query.
+        tokens: Lease tokens to look up.
+
+    Returns:
+        Mapping of every token found in the lease table to its
+        server-assigned RID. Tokens not yet landed are absent.
+    """
+    found: dict[str, str] = {}
+    if not tokens:
+        return found
+    pb = catalog.getPathBuilder()
+    lease_table = pb.schemas["public"].tables["ERMrest_RID_Lease"]
+    for i in range(0, len(tokens), PENDING_ROWS_LEASE_CHUNK):
+        chunk = tokens[i : i + PENDING_ROWS_LEASE_CHUNK]
+        rows = lease_table.filter(lease_table.ID.in_(chunk)).attributes(lease_table.RID, lease_table.ID).fetch()
+        for row in rows:
+            found[row["ID"]] = row["RID"]
+    return found
+
+
+def _lease_chunk_with_retry(
+    *,
+    catalog: "ErmrestCatalog",
+    tokens: list[str],
+) -> dict[str, str]:
+    """POST one chunk of lease tokens, reconciling+retrying transients.
+
+    Args:
+        catalog: Live ErmrestCatalog to POST against.
+        tokens: The chunk of lease tokens to POST (already sized to
+            :data:`PENDING_ROWS_LEASE_CHUNK`).
+
+    Returns:
+        Mapping of every input token to its leased RID.
+
+    Raises:
+        Exception: The last exception seen, if a terminal (non-
+            transient) error occurs or all attempts are exhausted.
+    """
+    resolved: dict[str, str] = {}
+    last_exc: BaseException | None = None
+
+    for attempt in range(LEASE_MAX_ATTEMPTS):
+        if attempt > 0:
+            delay = LEASE_BACKOFF_FACTOR ** (attempt - 1)
+            logger.debug("lease POST retry %d: sleeping %ss", attempt, delay)
+            time.sleep(delay)
+            # Reconcile: learn which tokens already landed so we
+            # don't re-POST them (that would 409 on (RCB, ID)).
+            landed = _fetch_landed_leases(catalog, tokens)
+            resolved.update(landed)
+
+        missing = [t for t in tokens if t not in resolved]
+        if not missing:
+            return resolved
+
+        try:
+            response = catalog.post(
+                "/entity/public:ERMrest_RID_Lease",
+                json=[{"ID": t} for t in missing],
+            )
+            for row in response.json():
+                # ERMrest echoes both ID (our token) and RID (assigned).
+                resolved[row["ID"]] = row["RID"]
+            return resolved
+        except Exception as exc:  # noqa: BLE001 — reclassified below
+            last_exc = exc
+            if not _is_transient_lease_error(exc):
+                raise
+            logger.warning(
+                "Transient lease-POST failure (attempt %d/%d): %s",
+                attempt + 1,
+                LEASE_MAX_ATTEMPTS,
+                exc,
+            )
+
+    # Exhausted every attempt on transient failures. A final
+    # reconcile may still have completed the batch (e.g. the last
+    # POST landed but its response was lost); check before giving up.
+    resolved.update(_fetch_landed_leases(catalog, tokens))
+    if all(t in resolved for t in tokens):
+        return resolved
+
+    logger.error("Lease POST exhausted %d attempts", LEASE_MAX_ATTEMPTS)
+    assert last_exc is not None  # loop ran at least once with a failure
+    raise last_exc
 
 
 def generate_lease_token() -> str:
@@ -57,10 +257,15 @@ def post_lease_batch(
         Dict mapping each input token to its server-assigned RID.
 
     Raises:
-        Exception: Whatever the catalog raises on POST failure.
-            Partial progress is NOT rolled back — the caller is
-            responsible for recording which tokens landed (via the
-            two-phase SQLite write in Task F2).
+        Exception: Whatever the catalog raises on a *terminal*
+            (non-transient) POST failure, or the last transient
+            error after exhausting :data:`LEASE_MAX_ATTEMPTS`.
+            Transient failures (timeouts, 5xx, spurious 409) are
+            retried with reconcile-based backoff so a single hiccup
+            on this finalize-step POST does not fail an otherwise
+            complete commit (issue #360). Partial progress is not
+            rolled back, but retries reconcile against the server's
+            lease rows, so re-running is idempotent by construction.
 
     Example:
         >>> tokens = [generate_lease_token() for _ in range(100)]  # doctest: +SKIP
@@ -72,14 +277,12 @@ def post_lease_batch(
         return {}
 
     result: dict[str, str] = {}
-    # Chunk to keep URL + body sizes bounded.
+    # Chunk to keep URL + body sizes bounded. Each chunk POST retries
+    # transient failures independently, reconciling against the
+    # server's lease rows so a landed-but-lost POST is not re-sent.
     for i in range(0, len(tokens), PENDING_ROWS_LEASE_CHUNK):
         chunk = tokens[i : i + PENDING_ROWS_LEASE_CHUNK]
-        body = [{"ID": t} for t in chunk]
-        response = catalog.post("/entity/public:ERMrest_RID_Lease", json=body)
-        for row in response.json():
-            # ERMrest echoes both ID (our token) and RID (assigned).
-            result[row["ID"]] = row["RID"]
+        result.update(_lease_chunk_with_retry(catalog=catalog, tokens=chunk))
     return result
 
 
