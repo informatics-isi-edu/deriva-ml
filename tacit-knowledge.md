@@ -58,3 +58,22 @@ upstream. Mitigation: the reconcile-retry lives in
 own CI catches a future server/deriva-py change that would break the
 idempotency assumption. Document the ERMrest dependency inline in the
 lease module.
+
+**Codex-review hardening (same day, PR #361):** an independent Codex
+review caught two real gaps in the first cut, both fixed:
+1. **Reconcile must be RCB-scoped.** The first reconcile query filtered
+   on `ID` alone. Since `ID` is unique only within `(RCB, ID)`, a token
+   value colliding under *another* client's RCB could be adopted —
+   returning a RID we never leased. Fixed: scope the reconcile to
+   `RCB == _client_rcb(catalog)` (whoami's `client.id`). UUID4 makes the
+   collision astronomically unlikely, but the query now matches the
+   stated contract instead of relying on that luck.
+2. **The reconcile query itself must tolerate transients.** The retry
+   hardened the POST but left `_fetch_landed_leases` unguarded — a 503/
+   timeout on the reconcile GET propagated straight out, re-introducing
+   the exact false-failure #360 fixes, one call over. Fixed: the
+   reconcile is wrapped so a transient failure consumes a retry attempt
+   (like a POST failure) instead of aborting; terminal reconcile errors
+   still propagate. Lesson: when you add a bookkeeping query *inside* a
+   retry loop to make it safe, that query inherits the same
+   transient-failure obligation as the operation it guards.

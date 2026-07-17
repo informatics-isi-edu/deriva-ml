@@ -86,6 +86,7 @@ def test_reconcile_recovers_leased_rid_after_landed_post(test_ml):
     must return the token→RID mapping so the retry does not re-POST.
     """
     from deriva_ml.execution.rid_lease import (
+        _client_rcb,
         _fetch_landed_leases,
         generate_lease_token,
     )
@@ -95,7 +96,8 @@ def test_reconcile_recovers_leased_rid_after_landed_post(test_ml):
     assert len(posted) == 1
     leased_rid = posted[0]["RID"]
 
-    recovered = _fetch_landed_leases(test_ml.catalog, [token])
+    rcb = _client_rcb(test_ml.catalog)
+    recovered = _fetch_landed_leases(test_ml.catalog, [token], rcb=rcb)
     assert recovered.get(token) == leased_rid, (
         "reconcile query failed to recover a landed lease token → RID; the retry would incorrectly re-POST it."
     )

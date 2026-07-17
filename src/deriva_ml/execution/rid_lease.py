@@ -125,24 +125,49 @@ def _is_transient_lease_error(exc: BaseException) -> bool:
     return status in LEASE_TRANSIENT_STATUS
 
 
+def _client_rcb(catalog: "ErmrestCatalog") -> str:
+    """Return this client's identity, used as the ``RCB`` scope.
+
+    The reconcile query must be scoped to the rows *this* client
+    created, because the lease table's uniqueness is ``(RCB, ID)`` —
+    ``ID`` alone is not unique. Without the scope, a token value that
+    happens to exist under another client's ``RCB`` could be adopted,
+    returning a RID we never leased.
+
+    Args:
+        catalog: Live ErmrestCatalog whose authenticated session
+            identifies the current client.
+
+    Returns:
+        The client id string that ERMrest records as ``RCB`` on rows
+        this client inserts.
+    """
+    return catalog.get_authn_session().json()["client"]["id"]
+
+
 def _fetch_landed_leases(
     catalog: "ErmrestCatalog",
     tokens: list[str],
+    *,
+    rcb: str,
 ) -> dict[str, str]:
-    """Return token→RID for tokens already present in ERMrest_RID_Lease.
+    """Return token→RID for our tokens already present in ERMrest_RID_Lease.
 
     Reconciliation query for the retry path: after a transient POST
     failure we cannot know which rows landed, so we ask the server.
-    Filters by our client's tokens (the ``ID`` column); the
-    ``(RCB, ID)`` unique key means each token maps to at most one row
-    created by this client.
+    Scoped to ``RCB == rcb`` **and** our token set (the ``ID`` column),
+    matching the ``(RCB, ID)`` unique key — so each token maps to at
+    most one row created by this client, and a colliding token value
+    under a different client is never adopted.
 
     Args:
         catalog: Live ErmrestCatalog to query.
         tokens: Lease tokens to look up.
+        rcb: This client's identity (from :func:`_client_rcb`); rows
+            created by any other client are excluded.
 
     Returns:
-        Mapping of every token found in the lease table to its
+        Mapping of every token found under this client to its
         server-assigned RID. Tokens not yet landed are absent.
     """
     found: dict[str, str] = {}
@@ -152,7 +177,12 @@ def _fetch_landed_leases(
     lease_table = pb.schemas["public"].tables["ERMrest_RID_Lease"]
     for i in range(0, len(tokens), PENDING_ROWS_LEASE_CHUNK):
         chunk = tokens[i : i + PENDING_ROWS_LEASE_CHUNK]
-        rows = lease_table.filter(lease_table.ID.in_(chunk)).attributes(lease_table.RID, lease_table.ID).fetch()
+        rows = (
+            lease_table.filter(lease_table.RCB == rcb)
+            .filter(lease_table.ID.in_(chunk))
+            .attributes(lease_table.RID, lease_table.ID)
+            .fetch()
+        )
         for row in rows:
             found[row["ID"]] = row["RID"]
     return found
@@ -179,16 +209,44 @@ def _lease_chunk_with_retry(
     """
     resolved: dict[str, str] = {}
     last_exc: BaseException | None = None
+    # Resolved lazily on first need (the reconcile / final-sweep paths),
+    # so a happy-path first-try success never pays the whoami round-trip.
+    rcb: str | None = None
+
+    def _reconcile() -> None:
+        """RCB-scoped reconcile, transient failures folded into the loop.
+
+        Both the ``POST`` and this reconcile query can fail transiently;
+        neither should escape until attempts are exhausted (Codex #360
+        follow-up). A transient reconcile failure records ``last_exc``
+        and returns, consuming the current attempt. A terminal reconcile
+        failure propagates immediately.
+        """
+        nonlocal last_exc, rcb
+        try:
+            if rcb is None:
+                rcb = _client_rcb(catalog)
+            resolved.update(_fetch_landed_leases(catalog, tokens, rcb=rcb))
+        except Exception as exc:  # noqa: BLE001 — reclassified below
+            if not _is_transient_lease_error(exc):
+                raise
+            last_exc = exc
+            logger.warning(
+                "Transient lease-reconcile failure (attempt %d/%d): %s",
+                attempt + 1,
+                LEASE_MAX_ATTEMPTS,
+                exc,
+            )
 
     for attempt in range(LEASE_MAX_ATTEMPTS):
         if attempt > 0:
             delay = LEASE_BACKOFF_FACTOR ** (attempt - 1)
-            logger.debug("lease POST retry %d: sleeping %ss", attempt, delay)
+            logger.debug("lease retry %d: sleeping %ss", attempt, delay)
             time.sleep(delay)
-            # Reconcile: learn which tokens already landed so we
-            # don't re-POST them (that would 409 on (RCB, ID)).
-            landed = _fetch_landed_leases(catalog, tokens)
-            resolved.update(landed)
+            # Reconcile: learn which tokens already landed so we don't
+            # re-POST them (that would 409 on (RCB, ID)). A transient
+            # failure here just consumes the attempt.
+            _reconcile()
 
         missing = [t for t in tokens if t not in resolved]
         if not missing:
@@ -214,10 +272,11 @@ def _lease_chunk_with_retry(
                 exc,
             )
 
-    # Exhausted every attempt on transient failures. A final
-    # reconcile may still have completed the batch (e.g. the last
-    # POST landed but its response was lost); check before giving up.
-    resolved.update(_fetch_landed_leases(catalog, tokens))
+    # Exhausted every attempt on transient failures. A final reconcile
+    # may still have completed the batch (e.g. the last POST landed but
+    # its response was lost). If that reconcile itself fails
+    # transiently, we fall through to raising last_exc below.
+    _reconcile()
     if all(t in resolved for t in tokens):
         return resolved
 
