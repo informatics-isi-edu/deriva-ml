@@ -287,3 +287,46 @@ path only. This is a docs concern for the consumer, not an API gap.
 only when it hands the consumer an iterator with no cheap global
 shuffle. If the adapter returns something randomly-addressable, the
 framework's sampler is the correct place — leave it there.
+
+### 2026-08-03 — Adapter logic tests were 100% broken behind `importorskip` (PR #363 follow-up)
+
+**What was found:** every test in `test_tf_adapter_logic.py` (11) and
+`test_torch_adapter_logic.py` (13) failed on `main` — 24 tests, both
+files entirely. Root cause: their MagicMock bags predate the adapters'
+`reachable=True` default, which routes through
+`resolve_reachable_rows` →
+`Session(bag.engine).execute(bag._dataset_table_view(t))` — real SQL.
+A MagicMock returns a MagicMock where SQLAlchemy wants a `text()`
+construct, so every test raised `ArgumentError`.
+
+**Why it went unnoticed for so long — the load-bearing lesson.** Both
+modules open with `pytest.importorskip`, and neither torch nor
+tensorflow is in the default dev environment. **A module that skips
+its entire contents is indistinguishable, in summary output, from one
+that passes.** `uv run pytest` reported green while 24 tests were
+uncollected. Discovering this required `uv sync --extra tf --extra
+torch` — something no routine workflow does.
+
+**Compounding factor:** this repo has **no CI test workflow at all**
+(`.github/workflows/` holds only `validate-schema`, `publish-docs`,
+`release`). So there is no pipeline where a "wholesale skip" check
+would even run today. Adding one is a real decision with real cost —
+the suite needs a live Deriva catalog and runs 30–90 min — so it was
+left to the maintainer rather than bundled into a test-fix PR.
+
+**Fix chosen: stub the SQLAlchemy Session, don't opt out.** The quick
+fix was passing `reachable=False` everywhere, and the first cut of the
+#362 shuffle tests did exactly that. Rejected on reflection: it opts
+the logic tests out of the branch **real callers take**, leaving the
+`reachable=True` default with zero logic coverage. Instead
+`tests/dataset/_reachable_stub.py` patches
+`target_resolution.Session` so mock bags resolve the reachable path to
+their own `list_dataset_members` rows. Verified non-vacuous: breaking
+`resolve_reachable_rows` to return `[]` fails 22 of 34 tests, which
+`reachable=False` versions could not have caught.
+
+**Rule this generalizes to:** when an optional-dependency module is
+gated by `importorskip`, *someone must actually install the extra and
+run it* — periodically, or in CI. Otherwise the gate silently converts
+"broken" into "green". Treat a fully-skipped module as an untested
+module, not a passing one.

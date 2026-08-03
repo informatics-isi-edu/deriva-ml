@@ -27,6 +27,20 @@ from deriva_ml.core.exceptions import DerivaMLException  # noqa: E402
 from deriva_ml.dataset.torch_adapter import build_torch_dataset  # noqa: E402
 from deriva_ml.feature import FeatureRecord  # noqa: E402
 
+from ._reachable_stub import patch_session  # noqa: E402
+from ._reachable_stub import wire_reachable as _wire_reachable
+
+
+@pytest.fixture(autouse=True)
+def _serve_reachable_rows():
+    """Let this module's MagicMock bags satisfy ``reachable=True``.
+
+    See ``tests/dataset/_reachable_stub.py`` for why the tests stub the
+    Session rather than opting out with ``reachable=False``.
+    """
+    with patch_session():
+        yield
+
 
 class _FakeRecord(FeatureRecord):
     """Minimal FeatureRecord stand-in for torch adapter tests."""
@@ -49,6 +63,7 @@ def _mock_bag_with_labeled_images(rids_and_labels: dict[str, str]):
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
     bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": rid} for rid in rids_and_labels]})
+    _wire_reachable(bag, {"Image": [{"RID": rid} for rid in rids_and_labels]})
 
     def fake_feature_values(element_type, feature_name, selector=None):
         for rid, label in rids_and_labels.items():
@@ -86,6 +101,7 @@ def _mock_non_asset_bag(rids_and_labels: dict[str, str]):
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
     bag.list_dataset_members = MagicMock(return_value={"Subject": [{"RID": rid} for rid in rids_and_labels]})
+    _wire_reachable(bag, {"Subject": [{"RID": rid} for rid in rids_and_labels]})
 
     def fake_feature_values(element_type, feature_name, selector=None):
         for rid, label in rids_and_labels.items():
@@ -146,6 +162,7 @@ def test_missing_error_raises_at_construction():
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
     bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": "1-IMG1"}, {"RID": "1-IMG2"}]})
+    _wire_reachable(bag, {"Image": [{"RID": "1-IMG1"}, {"RID": "1-IMG2"}]})
     bag.feature_values = MagicMock(return_value=iter([_FakeRecord(Image="1-IMG1", Grade="Mild")]))
     bag.model = MagicMock()
     bag.model.is_asset = MagicMock(return_value=True)
@@ -235,6 +252,7 @@ def test_multi_target_target_transform_receives_dict():
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
     bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": "1-IMG1"}]})
+    _wire_reachable(bag, {"Image": [{"RID": "1-IMG1"}]})
 
     class _FakeGradeRecord(FeatureRecord):
         Image: str
