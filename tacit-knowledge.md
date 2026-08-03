@@ -77,3 +77,213 @@ review caught two real gaps in the first cut, both fixed:
    still propagate. Lesson: when you add a bookkeeping query *inside* a
    retry loop to make it safe, that query inherits the same
    transient-failure obligation as the operation it guards.
+
+## Dataset / ML-framework adapters
+
+### 2026-08-03 — Sample-ordering shuffle belongs to `as_tf_dataset` only (issue #362)
+
+**Decision:** implement the `shuffle=`/`seed=` parameters from #362 on
+`as_tf_dataset` / `build_tf_dataset` **and nowhere else**. Do *not* add
+a matching parameter to `as_torch_dataset` or `restructure_assets`.
+
+**Why this is a deliberate asymmetry, not an oversight.** The three
+bag-to-ML paths differ in whether the *consumer* can shuffle cheaply:
+
+- **`as_torch_dataset`** returns a **map-style** dataset (`__len__` +
+  `__getitem__`, `torch_adapter.py`). `DataLoader(shuffle=True)` wraps
+  it in a `RandomSampler` that permutes *indices* — a true global
+  shuffle costing one permuted index array, no decoded sample held in
+  memory — and it reshuffles **every epoch**.
+- **`as_tf_dataset`** returns `tf.data.Dataset.from_generator`
+  (`tf_adapter.py`) — **iterator-style, no random access**. See the
+  `.shuffle()` note below: TF *does* ship a shuffle, but it operates at
+  the wrong layer, so deriva-ml must shuffle the RID list itself.
+- **`restructure_assets`** writes `{training,testing}/{label}/file`.
+  The class grouping there **is the contract**, not a hazard:
+  `ImageFolder` derives its class list and integer label mapping from
+  those directory names. A shuffle parameter would have nothing to
+  shuffle — interleaving classes would destroy the labeling scheme.
+  Shuffling belongs in the consumer's sampler.
+
+**Why class-ordered data breaks training at all** (the prior question a
+reviewer asks before "why global?"). Two distinct failures:
+1. **Biased per-step gradients.** SGD assumes each minibatch is roughly
+   an unbiased sample of the training distribution. An all-class-A
+   batch yields a gradient pointing at "always predict A". With
+   momentum and BatchNorm it compounds — BN statistics are computed
+   per-batch, so a single-class batch calibrates the layer on a
+   distribution never seen at inference. The #362 signature is exactly
+   this: val_acc oscillating 0.623 ↔ 0.377 *is* the model alternating
+   between "everything is A" and "everything is B", and those two
+   numbers are the class proportions; AUC ~0.5 confirms no ranking was
+   learned.
+2. **Catastrophic forgetting.** All of A then all of B yields a
+   B-predictor — nothing re-exposes A after B's updates.
+
+**Why pure-TF users usually don't hit this** (so "TF has no such knob,
+why do we need one?" has an answer): they do — it's a known footgun,
+hence `image_dataset_from_directory(shuffle=True)` as the default and
+`.shuffle()` in nearly every tutorial. It stays invisible because their
+data is typically already shuffled on disk or across TFRecord shards;
+**or their elements are cheap** (CSV rows, pre-decoded vectors), so
+`buffer_size=50_000` is affordable and the reservoir *is* global in
+practice; **or they shuffle file paths before the expensive decode**
+(`list_files(shuffle=True)` → `.map(decode)`).
+
+That last pattern is precisely what #362 does — the RID list *is* our
+file-path list. So this is not deriva-ml inventing something un-TF-ish;
+it reproduces the idiomatic TF pattern at the only layer where we still
+hold cheap handles. Our case is the intersection of the two conditions
+that make it bite: **class-grouped at the source AND elements too
+expensive to buffer whole.** Neither alone is fatal.
+
+**Why *global*, given weaker options exist.** The requirement is only
+that batches be class-mixed. Alternatives: a `.shuffle()` buffer larger
+than the longest single-class run (≥3000 decoded images here, and it
+scales with the dataset — doesn't hold up); interleaving per-class
+streams via `sample_from_datasets` (needs classes as separate datasets;
+we have one RID list); class-balanced sampling (same problem, and it
+alters the effective class distribution). Since we already hold the
+full RID list in memory, a global permutation is simply the cheapest
+correct option — one `random.Random(seed).shuffle()` over short
+strings. The weaker alternatives cost more machinery for a worse
+guarantee.
+
+**Corollary — the fixed-order limitation is not a real weakness.** A
+single build-time permutation already eliminates both failure modes
+above: every batch is class-mixed from epoch 1. Per-epoch reshuffling
+only reduces overfitting to a particular batch composition — real, but
+second-order. That is the correct division of labor between
+`shuffle_rids=` and a chained `.shuffle()`.
+
+**`tf.data.Dataset.shuffle()` exists — and is not a substitute.** This
+is the first objection anyone raises, so state the answer precisely.
+`.shuffle(buffer_size)` is a **reservoir shuffle over a sliding
+window**, not a global permutation: it fills a buffer, emits one
+element at random, refills from the stream. An element can therefore
+only move `buffer_size` positions from where it started. On a
+class-grouped bag — `[3000 class-A][1800 class-B]` with a typical
+`buffer_size=1000` — the buffer is *entirely class-A* for the first
+~3000 elements, so every batch in that stretch is still single-class.
+It shuffles within class A and changes nothing about the collapse. A
+true global shuffle needs `buffer_size >= len(dataset)`, and because
+`.shuffle()` sits **downstream of the generator**, that buffer holds
+*decoded* samples — the whole image set in RAM.
+
+The contrast with torch is the whole point: `DataLoader(shuffle=True)`
+permutes an *index array* before any loading happens. `tf.data` cannot,
+because a `from_generator` dataset is an opaque iterator with no
+indices to permute. Shuffling the RID list inside `build_tf_dataset`
+reorders short strings *before* the generator closes over them — the
+same index-level trick, applied at the only layer where TF still has
+cheap handles on the elements.
+
+**The two compose; recommend both.** The build-time RID shuffle is
+fixed for all epochs (#362 acknowledges this). Chaining a modest
+`.shuffle(buffer_size=1000)` on top adds per-epoch variation *within*
+an already class-mixed stream, which is cheap and effective precisely
+because the global ordering was fixed upstream. Guidance is "both, for
+different jobs" — never "adapter instead of `.shuffle()`".
+
+**Name the parameter `global_shuffle`, not `shuffle` — deliberately
+diverging from `tf.data` vocabulary.** #362 proposes `shuffle=` /
+`seed=`. Those names collide with `tf.data.Dataset.shuffle(buffer_size,
+seed=...)`, which a TF user already knows and which behaves
+**differently on the axis they care about**: `.shuffle()` reshuffles
+every epoch by default (`reshuffle_each_iteration=True`); ours is one
+build-time permutation, identical every epoch. Same word, opposite
+epoch semantics, and the mismatch is *silent* — training converges and
+looks plausible while epoch 7 replays epoch 1's exact order.
+
+The second-order trap is the real cost: a user who sees `shuffle=True`
+in the constructor concludes shuffling is handled and **drops
+`.shuffle()` from their pipeline**, trading a per-epoch shuffle for a
+fixed one without being told. The parameter's presence invites removing
+the thing doing the more useful work. `seed` compounds it — in
+`tf.data` it seeds the reservoir, in ours a `random.Random` over the
+RID list; two RNGs, two scopes, one name.
+
+So: `global_shuffle: bool = False`, `shuffle_seed: int | None = None`.
+
+**Why `global_shuffle` and not `shuffle_rids`** (the first cut, rejected
+same day): `shuffle_rids` names the *mechanism*, `global_shuffle` names
+the **guarantee** — and the guarantee is the axis the user actually
+needs. "RIDs vs. samples" is deriva-ml-internal vocabulary a TF user
+doesn't carry; "global vs. windowed" is precisely where `.shuffle()`
+falls short. `global_shuffle=True` beside `.shuffle(buffer_size=1000)`
+reads as a coherent pair — one global, one buffered — so a user who
+understands why the buffer is bounded immediately understands why a
+separate knob exists, without knowing what a RID is. It also survives
+implementation drift: if we ever permute a row index instead of the RID
+list, `shuffle_rids` becomes a lie while `global_shuffle` stays true.
+Name the guarantee, not the mechanism.
+
+**What the name still cannot carry:** epoch semantics. A user may read
+"global" as "strictly better" and infer it subsumes `.shuffle()`,
+dropping theirs and silently losing per-epoch variation. The docstring's
+**first line** must say: shuffles once at construction, same order every
+epoch, chain `.shuffle()` for per-epoch variation. No name fixes this.
+
+Cost is divergence from the torch adapter's vocabulary — which is no
+cost, since the torch adapter has no such parameter and shouldn't.
+eye-ai-vgg19's `TypeError` guard fails loud on the wrong name, so the
+rename surfaces at once instead of silently no-op'ing. Do not "fix"
+this back toward TF's vocabulary for consistency; the divergence is
+the point.
+
+**Do NOT add a passthrough seed for the native `.shuffle()`.** Asked
+and rejected. `.shuffle()` is called on the **returned** dataset, in
+user code, after `as_tf_dataset` returns — the caller already has
+direct access to `seed=` there. Accepting a `tf_shuffle_seed=` would
+force us to also accept `buffer_size`, then
+`reshuffle_each_iteration`, then `.batch()`'s arguments: wrapping the
+`tf.data` builder API one parameter at a time, for zero gain, since
+every knob is already reachable on the returned object. (This is the
+"too many interfaces" failure the repo's class-idiom guidance warns
+about.) It would also undo the naming decision above — the entire
+argument is that `global_shuffle` and `.shuffle()` are *different
+operations at different layers*; putting a `tf.data` concern back on
+our constructor re-muddies the boundary we just drew.
+
+Clean division: **deriva-ml owns everything before the generator**
+(`global_shuffle`, `shuffle_seed`); **the user owns everything
+downstream on the returned `tf.data.Dataset`** (`.shuffle()`,
+`.batch()`, `.prefetch()`, and their seeds).
+
+Two consequences for docs, not for the API:
+- **Full reproducibility needs both seeds.** `shuffle_seed` pins the
+  build-time order; `.shuffle(seed=...)` pins the per-epoch reservoir.
+  Setting only ours still leaves epoch-to-epoch ordering
+  nondeterministic. Show the complete two-seed recipe in the docstring
+  — "I set the seed and still can't reproduce" is the predictable
+  support question.
+- **Provenance callers must record both.** eye-ai-vgg19 records
+  `shuffle_seed` in `run_config.json` to make batch composition
+  recoverable; that only holds if the rest of the pipeline is
+  deterministic, so if it chains `.shuffle()`, that seed belongs in the
+  recorded hyperparameters too. Caller-side note, not a library change.
+
+**Why adding it to torch anyway would be actively harmful** (not merely
+redundant): a user who sets *only* the adapter-level flag gets one
+build-time permutation reused for **every epoch**, silently losing the
+per-epoch reshuffling `DataLoader` gives by default — worse than the
+status quo. It also makes `seed` ambiguous, since `DataLoader`
+reproducibility is governed by torch's global RNG / `generator=`, not
+by an adapter argument.
+
+**Residual risk to document, not to code around:** a third-party
+trainer that walks the `restructure_assets` tree *without* shuffling
+(a hand-rolled `glob`-and-iterate) hits the same class-grouped
+collapse. `ImageFolder` + `DataLoader(shuffle=True)` and
+`tf.keras.utils.image_dataset_from_directory` (`shuffle=True` by
+default) are both safe — and note *why* the latter is safe, since it
+is a `tf.data` path: it shuffles the **file list** it builds by walking
+the tree, before any decoding. That is a global index-level shuffle,
+structurally like `DataLoader`'s, not a reservoir over decoded
+samples. The `.shuffle()` limitation above applies to the *generator*
+path only. This is a docs concern for the consumer, not an API gap.
+
+**Rule of thumb for future adapters:** deriva-ml owns sample ordering
+only when it hands the consumer an iterator with no cheap global
+shuffle. If the adapter returns something randomly-addressable, the
+framework's sampler is the correct place — leave it there.

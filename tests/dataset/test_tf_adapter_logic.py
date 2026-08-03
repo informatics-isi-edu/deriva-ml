@@ -14,6 +14,7 @@ Coverage matrix (spec §6.2):
 - Asset-table element with no sample_loader raises at construction
 - Non-asset-table element works without sample_loader
 - output_signature=None triggers first-sample inference
+- global_shuffle= reorders the RID list; shuffle_seed= makes it reproducible
 """
 
 from __future__ import annotations
@@ -455,3 +456,230 @@ def test_output_signature_none_infers_from_first_sample():
     # All elements should be present (inference must not drop the first sample)
     count = sum(1 for _ in ds)
     assert count == 2
+
+
+# ---------------------------------------------------------------------------
+# global_shuffle= / shuffle_seed= (issue #362)
+#
+# The bug these pin: a bag whose members are grouped by class yields
+# single-class batches from the head of the stream, which collapses
+# training. tf.data's own .shuffle() is a bounded reservoir over *decoded*
+# samples and cannot un-group it without buffering the whole dataset, so
+# the adapter shuffles the RID list before the generator closes over it.
+#
+# RIDs here come from the class-grouped mock bag the fixture helper builds,
+# never from literals written into an assertion — the tests compare orders
+# and set-identity against what they read back out of the bag.
+# ---------------------------------------------------------------------------
+
+
+def _class_grouped_bag(n_per_class: int = 6):
+    """Build a mock bag whose members are grouped by class.
+
+    Emulates a dataset assembled one class at a time: every class-A RID
+    precedes every class-B RID. This is the ordering that collapses
+    training when the stream is consumed un-shuffled.
+
+    Args:
+        n_per_class: Number of elements to generate per class.
+
+    Returns:
+        Tuple of ``(bag, rids_in_bag_order, labels_by_rid)``. The RID
+        strings are generated here and returned, so tests assert against
+        values the fixture produced rather than hard-coded literals.
+    """
+    labels_by_rid: dict[str, str] = {}
+    for i in range(n_per_class):
+        labels_by_rid[f"1-A{i:03d}"] = "ClassA"
+    for i in range(n_per_class):
+        labels_by_rid[f"1-B{i:03d}"] = "ClassB"
+
+    rids_in_bag_order = list(labels_by_rid)
+    bag = _mock_bag_with_labeled_images(labels_by_rid)
+    bag.get_table_as_dict = MagicMock(
+        side_effect=lambda *_a, **_kw: iter([{"RID": rid, "Filename": f"{rid}.jpg"} for rid in rids_in_bag_order])
+    )
+    return bag, rids_in_bag_order, labels_by_rid
+
+
+def _emitted_rids(ds) -> list[str]:
+    """Consume a tf.data.Dataset and return its RIDs in emission order.
+
+    The RID is always the last positional value in a yielded element.
+    """
+    return [element[-1].numpy().decode() for element in ds]
+
+
+def _build(bag, **kwargs):
+    """Build an unlabeled tf dataset over the mock bag's Image elements.
+
+    Uses ``reachable=False`` so RIDs come from the mocked
+    ``list_dataset_members``. The ``reachable=True`` default walks FK
+    paths through SQL, which a MagicMock bag cannot serve.
+    """
+    return build_tf_dataset(
+        bag,
+        "Image",
+        sample_loader=lambda p, row: tf.constant([1.0]),
+        targets=None,
+        reachable=False,
+        output_signature=(
+            tf.TensorSpec(shape=(1,), dtype=tf.float32),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
+        ),
+        **kwargs,
+    )
+
+
+def test_global_shuffle_default_preserves_bag_order():
+    """Default (global_shuffle=False) iterates the bag's natural order.
+
+    Pins the no-op default: existing callers must see byte-identical
+    ordering after this parameter was added.
+    """
+    bag, rids_in_bag_order, _ = _class_grouped_bag()
+    assert _emitted_rids(_build(bag)) == rids_in_bag_order
+
+
+def test_global_shuffle_reorders_rids():
+    """global_shuffle=True changes the emission order."""
+    bag, rids_in_bag_order, _ = _class_grouped_bag()
+    shuffled = _emitted_rids(_build(bag, global_shuffle=True, shuffle_seed=42))
+    assert shuffled != rids_in_bag_order
+
+
+def test_global_shuffle_preserves_the_rid_set():
+    """Shuffling reorders elements without adding, dropping, or duplicating.
+
+    The RID list is the dataset's contents; a shuffle that loses or
+    repeats an element would silently change what the model trains on.
+    """
+    bag, rids_in_bag_order, _ = _class_grouped_bag()
+    shuffled = _emitted_rids(_build(bag, global_shuffle=True, shuffle_seed=42))
+    assert sorted(shuffled) == sorted(rids_in_bag_order)
+    assert len(shuffled) == len(set(shuffled))
+
+
+def test_global_shuffle_breaks_class_grouping():
+    """The motivating case: head-of-stream batches stop being single-class.
+
+    Un-shuffled, the first half of a class-grouped bag is entirely one
+    class — the ordering that collapsed VGG-19 training in #362. After
+    shuffling, a leading slice must contain both classes.
+    """
+    bag, rids_in_bag_order, labels_by_rid = _class_grouped_bag(n_per_class=25)
+
+    # Precondition: the un-shuffled stream really is class-grouped, so a
+    # passing assertion below reflects the shuffle and not a weak fixture.
+    unshuffled = _emitted_rids(_build(bag))
+    first_batch_unshuffled = {labels_by_rid[rid] for rid in unshuffled[:10]}
+    assert len(first_batch_unshuffled) == 1, "fixture is not class-grouped"
+
+    bag, _, _ = _class_grouped_bag(n_per_class=25)
+    shuffled = _emitted_rids(_build(bag, global_shuffle=True, shuffle_seed=42))
+    first_batch_shuffled = {labels_by_rid[rid] for rid in shuffled[:10]}
+    assert len(first_batch_shuffled) == 2, (
+        f"leading slice is still single-class after shuffling: {first_batch_shuffled}"
+    )
+
+
+def test_same_seed_reproduces_the_same_order():
+    """Identical shuffle_seed values produce identical orders."""
+    bag_a, _, _ = _class_grouped_bag()
+    bag_b, _, _ = _class_grouped_bag()
+    order_a = _emitted_rids(_build(bag_a, global_shuffle=True, shuffle_seed=1234))
+    order_b = _emitted_rids(_build(bag_b, global_shuffle=True, shuffle_seed=1234))
+    assert order_a == order_b
+
+
+def test_different_seeds_produce_different_orders():
+    """Different shuffle_seed values produce different orders."""
+    bag_a, _, _ = _class_grouped_bag(n_per_class=25)
+    bag_b, _, _ = _class_grouped_bag(n_per_class=25)
+    order_a = _emitted_rids(_build(bag_a, global_shuffle=True, shuffle_seed=1))
+    order_b = _emitted_rids(_build(bag_b, global_shuffle=True, shuffle_seed=2))
+    assert order_a != order_b
+
+
+def test_shuffle_seed_is_independent_of_the_global_rng():
+    """Seeded order does not depend on the process-wide `random` state.
+
+    The adapter must use a local `random.Random(seed)`, never the global
+    `random` module: data ordering has to be reproducible from
+    shuffle_seed alone, regardless of any other random.* call elsewhere
+    in the process (a caller seeding `random` for augmentation, say).
+    """
+    import random as _random
+
+    bag_a, _, _ = _class_grouped_bag()
+    _random.seed(0)
+    order_a = _emitted_rids(_build(bag_a, global_shuffle=True, shuffle_seed=99))
+
+    bag_b, _, _ = _class_grouped_bag()
+    _random.seed(999999)
+    _random.random()  # perturb global state further
+    order_b = _emitted_rids(_build(bag_b, global_shuffle=True, shuffle_seed=99))
+
+    assert order_a == order_b
+
+
+def test_shuffle_seed_ignored_when_global_shuffle_false():
+    """shuffle_seed has no effect unless global_shuffle is True."""
+    bag, rids_in_bag_order, _ = _class_grouped_bag()
+    emitted = _emitted_rids(_build(bag, global_shuffle=False, shuffle_seed=42))
+    assert emitted == rids_in_bag_order
+
+
+def test_global_shuffle_does_not_mutate_the_resolved_rid_list():
+    """The shuffle copies; it must not reorder the list it was handed.
+
+    build_tf_dataset receives the list resolve_element_rids returned. An
+    in-place shuffle would reorder a list the adapter does not own,
+    leaking ordering into any caller that holds the same object.
+    """
+    from deriva_ml.dataset import tf_adapter
+
+    bag, rids_in_bag_order, _ = _class_grouped_bag()
+    captured: list[list[str]] = []
+    real_resolve = tf_adapter.resolve_element_rids
+
+    def capturing_resolve(*args, **kwargs):
+        resolved = real_resolve(*args, **kwargs)
+        captured.append(resolved)
+        return resolved
+
+    tf_adapter.resolve_element_rids = capturing_resolve
+    try:
+        _emitted_rids(_build(bag, global_shuffle=True, shuffle_seed=42))
+    finally:
+        tf_adapter.resolve_element_rids = real_resolve
+
+    assert captured, "resolve_element_rids was never called"
+    assert captured[0] == rids_in_bag_order
+
+
+def test_global_shuffle_with_targets_keeps_rid_label_pairing():
+    """Labels follow their RIDs through the shuffle.
+
+    A shuffle that reordered RIDs but not the target lookup would train
+    on systematically mismatched labels — silent and catastrophic.
+    """
+    bag, _, labels_by_rid = _class_grouped_bag()
+    ds = build_tf_dataset(
+        bag,
+        "Image",
+        sample_loader=lambda p, row: tf.constant([1.0]),
+        targets=["Grade"],
+        target_transform=lambda rec: tf.constant(rec.Grade if rec is not None else ""),
+        global_shuffle=True,
+        shuffle_seed=42,
+        reachable=False,
+        output_signature=(
+            tf.TensorSpec(shape=(1,), dtype=tf.float32),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
+        ),
+    )
+    for _sample, target, rid in ds:
+        rid_str = rid.numpy().decode()
+        assert target.numpy().decode() == labels_by_rid[rid_str]
