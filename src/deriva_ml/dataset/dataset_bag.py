@@ -1477,6 +1477,8 @@ class DatasetBag:
         missing: Literal["error", "skip", "unknown"] = "error",
         output_signature: "tf.TensorSpec | tuple[tf.TensorSpec, ...] | None" = None,
         reachable: bool = True,
+        global_shuffle: bool = False,
+        shuffle_seed: int | None = None,
     ) -> "tf.data.Dataset":
         """Build a ``tf.data.Dataset`` from this bag.
 
@@ -1594,6 +1596,35 @@ class DatasetBag:
                 recurse=True)``) are used — the opt-out for callers who want
                 strictly the rows enumerated in the dataset's membership.
 
+            global_shuffle: Shuffle the RID list **once at construction**,
+                before the generator iterates it. The resulting order is the
+                **same every epoch** — chain ``.shuffle(buffer_size)`` on the
+                returned dataset for per-epoch variation.
+
+                Use this when the bag's members are grouped by class, which
+                happens for datasets assembled one class at a time. Every
+                batch drawn from the head of an un-shuffled stream is then
+                single-class, which biases each gradient step and can
+                collapse training outright (validation accuracy oscillating
+                between the class proportions, AUC ~0.5).
+
+                This is **not** ``tf.data.Dataset.shuffle``, and does not
+                replace it. That one is a bounded reservoir over *decoded*
+                samples: an element moves at most ``buffer_size`` positions,
+                so it cannot un-group a class-ordered bag unless the buffer
+                holds the entire dataset in memory. Shuffling the RID list
+                is a true global shuffle at negligible cost — it reorders
+                short strings, and samples are still decoded lazily one at a
+                time inside the generator. The two compose: this fixes the
+                global ordering, ``.shuffle()`` adds per-epoch variation.
+
+            shuffle_seed: Seed for ``global_shuffle``. ``None`` (default)
+                shuffles nondeterministically; pass an int for a reproducible
+                order. Has no effect when ``global_shuffle=False``. This
+                seeds only the construction-time RID shuffle — reproducing a
+                full pipeline that also chains ``.shuffle()`` means setting
+                that call's ``seed=`` too.
+
         Returns:
             A ``tf.data.Dataset`` whose elements are:
 
@@ -1642,6 +1673,21 @@ class DatasetBag:
             >>> for batch in ds.batch(32).prefetch(2):  # doctest: +SKIP
             ...     images, labels = batch
 
+            >>> # Class-grouped bag: shuffle the RID list globally, then
+            >>> # chain .shuffle() for per-epoch variation. Both seeds are
+            >>> # needed to reproduce the full pipeline.
+            >>> ds = bag.as_tf_dataset(  # doctest: +SKIP
+            ...     element_type="Image",
+            ...     sample_loader=lambda p, row: tf.image.decode_jpeg(
+            ...         tf.io.read_file(str(p))
+            ...     ),
+            ...     targets=["Glaucoma_Grade"],
+            ...     target_transform=lambda rec: CLASS_TO_IDX[rec.Grade],
+            ...     global_shuffle=True,
+            ...     shuffle_seed=42,
+            ... )
+            >>> ds = ds.shuffle(1000, seed=7).batch(32)  # doctest: +SKIP
+
             >>> # Pure-Python assertion — runs for real:
             >>> from deriva_ml.dataset.tf_adapter import build_tf_dataset  # doctest: +SKIP
             >>> callable(build_tf_dataset)  # doctest: +SKIP
@@ -1659,6 +1705,8 @@ class DatasetBag:
             missing=missing,
             output_signature=output_signature,
             reachable=reachable,
+            global_shuffle=global_shuffle,
+            shuffle_seed=shuffle_seed,
         )
 
     def restructure_assets(

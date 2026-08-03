@@ -573,6 +573,39 @@ ds = bag.as_tf_dataset(
 )
 ```
 
+#### Shuffling a class-grouped bag
+
+When a bag's members are grouped by class — which happens whenever a dataset was assembled one class at a time — every batch drawn from the head of the stream is single-class. That biases each gradient step and can collapse training outright: validation accuracy oscillates between the two class proportions while AUC sits at ~0.5.
+
+`as_tf_dataset` takes `global_shuffle=True` for this. It shuffles the **RID list** once, before the generator iterates it:
+
+```python
+# doctest: +SKIP
+ds = bag.as_tf_dataset(
+    "Image",
+    sample_loader=load_image,
+    targets=["Glaucoma"],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+    global_shuffle=True,
+    shuffle_seed=42,
+)
+
+ds = ds.shuffle(1000, seed=7).batch(32).prefetch(tf.data.AUTOTUNE)
+```
+
+**`global_shuffle` does not replace `tf.data.Dataset.shuffle()` — use both.** They solve different problems:
+
+| | What it does | Cost |
+|---|---|---|
+| `global_shuffle=True` | Permutes the whole RID list once at construction. Fixes class grouping globally. Same order every epoch. | Reorders short strings; samples still decode lazily. |
+| `.shuffle(buffer_size)` | Reservoir shuffle over a sliding window of **decoded** samples. Adds per-epoch variation. | Holds `buffer_size` decoded samples in memory. |
+
+`.shuffle()` alone cannot fix class grouping. An element moves at most `buffer_size` positions, so on a bag of 3000 class-A images followed by 1800 class-B, a typical `buffer_size=1000` leaves the buffer entirely class-A for the first ~3000 elements — every batch there is still single-class. A true global shuffle would need `buffer_size >= len(dataset)`, which means holding every decoded image in memory.
+
+Reproducibility takes **both** seeds: `shuffle_seed` pins the construction-time order, and `.shuffle(seed=...)` pins the per-epoch reservoir. Setting only one still leaves the pipeline nondeterministic.
+
+**Why PyTorch needs no equivalent.** `as_torch_dataset` returns a map-style dataset, so `DataLoader(shuffle=True)` permutes *indices* — a true global shuffle at negligible cost, reshuffled every epoch. `as_tf_dataset` returns a generator-backed dataset with no random access, so the shuffle has to happen before the generator does. Likewise `restructure_assets` needs nothing: its class-grouped directory layout is the contract `ImageFolder` reads labels from, and the consumer's sampler (`DataLoader(shuffle=True)`, or `image_dataset_from_directory`, which shuffles the file list by default) handles ordering.
+
 **Notes**
 
 - Install the TensorFlow extra: `pip install 'deriva-ml[tf]'`. Without it, calling `as_tf_dataset` raises `ImportError`; other methods continue to work.

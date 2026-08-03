@@ -10,6 +10,7 @@ See design spec §§3.1-3.7 for the full contract.
 
 from __future__ import annotations
 
+import random
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
@@ -46,6 +47,8 @@ def build_tf_dataset(
     missing: Literal["error", "skip", "unknown"] = "error",
     output_signature: "tf.TensorSpec | tuple | None" = None,
     reachable: bool = True,
+    global_shuffle: bool = False,
+    shuffle_seed: int | None = None,
 ) -> "tf.data.Dataset":
     """Build a tf.data.Dataset from a DatasetBag.
 
@@ -77,6 +80,22 @@ def build_tf_dataset(
             so an ``Image`` reachable only via ``Subject -> Observation ->
             Image`` is still included. ``False`` restricts to direct dataset
             members (``list_dataset_members(recurse=True)``), the opt-out.
+        global_shuffle: Shuffle the RID list **once at construction**, before
+            the generator iterates it. The resulting order is the **same
+            every epoch** — chain ``.shuffle(buffer_size)`` on the returned
+            dataset for per-epoch variation. This is not
+            ``tf.data.Dataset.shuffle``: that one is a bounded reservoir over
+            *decoded* samples, so it cannot un-group a class-ordered bag
+            without buffering the whole dataset in memory. Shuffling the RID
+            list is a true global shuffle at negligible cost (it reorders
+            short strings; samples are still decoded lazily one at a time).
+            Default ``False`` preserves the bag's natural order.
+        shuffle_seed: Seed for ``global_shuffle``. ``None`` (default) shuffles
+            nondeterministically; pass an int for a reproducible order. Has no
+            effect when ``global_shuffle=False``. This seeds only the
+            construction-time RID shuffle — ``tf.data.Dataset.shuffle`` takes
+            its own ``seed=``, so reproducing a full pipeline means setting
+            both.
 
     Returns:
         A ``tf.data.Dataset`` whose elements are:
@@ -135,6 +154,17 @@ def build_tf_dataset(
     else:
         rids = all_rids  # "error" already raised if incomplete; "unknown"
         # keeps all RIDs with None target for absent ones
+
+    if global_shuffle:
+        # Copy before shuffling: `rids` may still be the `all_rids` list the
+        # caller's resolve_element_rids returned, and mutating it in place
+        # would reorder a list we don't own.
+        #
+        # An explicit local RNG, never the global `random` module — the order
+        # must be reproducible from `shuffle_seed` alone, independent of any
+        # other random.* call elsewhere in the process.
+        rids = list(rids)
+        random.Random(shuffle_seed).shuffle(rids)
 
     # Build the row lookup so sample_loader gets the full row dict.
     row_lookup = _build_row_lookup(bag, element_type)
