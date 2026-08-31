@@ -330,3 +330,47 @@ gated by `importorskip`, *someone must actually install the extra and
 run it* — periodically, or in CI. Otherwise the gate silently converts
 "broken" into "green". Treat a fully-skipped module as an untested
 module, not a passing one.
+
+## Lineage / provenance
+
+### 2026-08-31 — Snapshot-schema lookups must be guarded as a group (issue #365, PR #366)
+
+**Bug:** `lookup_lineage()` raised `KeyError: 'Image_Execution'` and
+aborted for executions consuming a dataset whose member asset table
+postdates the consumed version's snapshot (live eye-ai `7-QCAA`,
+`5-E9WE`).
+
+**The load-bearing invariant:** a snapshot pathBuilder reflects the
+catalog schema *as of the dataset version's snaptime*. A table created
+after that snaptime is **absent from the snapshot schema**, and the
+snapshot necessarily holds **no rows** for it. So the correct answer
+for a missing table is an empty result — never an exception. Schema
+absence at a snaptime is normal catalog evolution, not an error
+condition.
+
+**Why one guard wasn't enough.** `_distinct_member_output_producers`
+made three sibling lookups (membership table, member table,
+`<member>_Execution` association) and guarded only the first. The
+existing guard's own comment already stated the invariant covering all
+three — the reasoning was right, the coverage wasn't. When several
+lookups share one precondition, guard them as a **group**; a guard on
+the first sibling reads as "handled" and hides that the rest are
+exposed.
+
+**Why the blast radius exceeded the bug.** The KeyError propagated out
+of `lookup_lineage` instead of degrading locally, so an affected
+execution contributed *nothing* to the walk — consumed datasets,
+consumed assets, and parents, not just the member-producer set the
+failing helper computed. It suppressed the provenance chain for the
+graph's most provenance-complete execution (the only one registering
+an `Asset_Role="Input"` asset). **A helper deep in a graph walk that
+raises instead of degrading converts a narrow gap into total data
+loss for the caller.** Prefer returning an empty result from
+leaf helpers whose failure mode is "this branch has nothing".
+
+**Detection note:** the callers most likely to surface this are
+long-lived catalogs where schema evolved *after* datasets were
+versioned — i.e. production, not fresh test catalogs. Offline unit
+tests can reproduce it cheaply by building a snapshot pathBuilder whose
+`schemas[...].tables` dict simply omits the table (see
+`tests/execution/test_producers_of_dataset_members.py`).
