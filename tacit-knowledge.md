@@ -659,3 +659,17 @@ OUT of deriva-ml (#381 — no producer), closure traversal proposed IN
 (capture-not-mining), binding-constitutive feature provenance IN (it
 was always in the schema). The pattern: the boundary follows the
 SCHEMA, in both directions.
+
+**Ruling 4 (same interview, Carl): there is no arc-strength ordering.**
+The deploy repo's DIRECT > DATA-FLOW > FEATURE > ANCESTOR ranking was
+an evidence-CERTAINTY gradient that only made sense while the feature
+arc was a maybe-read candidate. Under binding semantics every arc kind
+is an equally certain schema fact, so the gradient is flat; any
+residual ordering is a relevance judgment = downstream presentation.
+The closure model carries an UNORDERED typology of arc kinds
+(distinguished by attachment point: consumption edge / version
+authorship / member binding / nesting) with per-arc measurables (depth,
+evidence counts) and orthogonal gap flags — no "strongest arc"
+anywhere. Corollary: when a semantics upgrade converts candidates into
+facts, audit any ranking built on the old uncertainty — it may now be
+encoding nothing.
