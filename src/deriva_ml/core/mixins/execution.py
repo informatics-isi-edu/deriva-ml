@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from deriva_ml.execution.upload_report import UploadReport
     from deriva_ml.execution.workflow import Workflow
     from deriva_ml.experiment.experiment import Experiment
+    from deriva_ml.feature import FeatureProducerRecord
     from deriva_ml.model.catalog import DerivaModel
 
 
@@ -1662,6 +1663,118 @@ class ExecutionMixin:
         # If multiple Output associations exist (rare), the first one
         # is fine — they all point at executions that wrote this asset.
         return rows[0].get("Execution")
+
+    def find_feature_producers(self, dataset_rid: RID) -> "list[FeatureProducerRecord]":
+        """Executions that wrote feature values onto a dataset's members.
+
+        The feature arc of provenance (issue #370, closing #367 §6): a
+        contributor that only *annotated* a dataset's members — writing
+        feature values, e.g. bounding boxes or labels — is a sibling
+        consumer, not a data-flow ancestor, so no lineage walk reaches it.
+        Every feature value carries an ``Execution`` FK, so a dataset-scoped
+        server-side aggregate recovers those contributors in seconds: for
+        each member table and each feature defined on it,
+        ``Dataset_<Member>(Dataset = rid) ⋈ <FeatureTable>`` grouped by
+        ``Execution`` with a distinct-RID count.
+
+        The request URL carries only the dataset RID — never a client-side
+        member list — so this is safe for datasets with thousands of
+        members. Membership is evaluated against the dataset's **current**
+        state.
+
+        Results are provenance *candidates*: which features downstream code
+        actually read is unknowable from the catalog; the contract is a
+        bounded superset with evidence. Feature values with no producing
+        execution surface as records with ``execution_rid=None`` — a gap to
+        report, not to hide. A single feature table failing to query
+        degrades to a warning so it cannot mask the rest.
+
+        Args:
+            dataset_rid: RID of the dataset whose members' feature values
+                to inspect.
+
+        Returns:
+            :class:`~deriva_ml.feature.FeatureProducerRecord` list, one per
+            ``(execution, feature, element)`` group, sorted by
+            ``(feature_name, element_type)`` with a stable internal
+            tiebreak for a deterministic result order (the tiebreak
+            carries no RID-ordering semantics). Empty when no member has
+            feature values.
+
+        Example:
+            >>> for rec in ml.find_feature_producers(dataset.rid):  # doctest: +SKIP
+            ...     print(rec.execution_rid, rec.feature_name, rec.value_count)
+        """
+        from deriva.core import datapath
+
+        from deriva_ml.core.logging_config import get_logger
+        from deriva_ml.feature import FeatureProducerRecord
+
+        logger = get_logger(__name__)
+        dataset = self.lookup_dataset(dataset_rid)
+        pb = self.pathBuilder()
+        records: list[FeatureProducerRecord] = []
+
+        for assoc_table in dataset._dataset_table.find_associations():
+            other_fkey = assoc_table.other_fkeys.pop()
+            member_table = other_fkey.pk_table
+            membership_table = assoc_table.table
+            if member_table.name == "Dataset":
+                # Nested datasets carry no member-level features.
+                continue
+            member_link_column = other_fkey.foreign_key_columns[0].name
+            # The FK's actual referenced column — NOT always RID. Supported
+            # shapes include e.g. Dataset_file.file -> file.id, so the join
+            # must route through the member table on this column and only
+            # then reach the feature table (whose member FK does target RID,
+            # since deriva-ml creates feature associations itself).
+            member_target_column = other_fkey.referenced_columns[0].name
+
+            try:
+                features = self.find_features(member_table)
+            except Exception as exc:  # noqa: BLE001 — one member kind must not mask the rest
+                logger.warning("Feature discovery on %s failed: %s", member_table.name, exc)
+                continue
+
+            for feature in features:
+                ftable_meta = feature.feature_table
+                try:
+                    membership_path = pb.schemas[membership_table.schema.name].tables[membership_table.name]
+                    member_path = pb.schemas[member_table.schema.name].tables[member_table.name]
+                    ftable = pb.schemas[ftable_meta.schema.name].tables[ftable_meta.name]
+                    path = (
+                        membership_path.filter(membership_path.Dataset == dataset_rid)
+                        .link(
+                            member_path,
+                            on=(
+                                membership_path.columns[member_link_column] == member_path.columns[member_target_column]
+                            ),
+                        )
+                        .link(
+                            ftable,
+                            on=(member_path.RID == ftable.columns[member_table.name]),
+                        )
+                    )
+                    groups = path.groupby(ftable.Execution).attributes(datapath.CntD(ftable.RID).alias("value_count"))
+                    for row in groups.fetch():
+                        records.append(
+                            FeatureProducerRecord(
+                                execution_rid=row.get("Execution") or None,
+                                feature_name=str(feature.feature_name),
+                                element_type=member_table.name,
+                                value_count=int(row.get("value_count") or 0),
+                            )
+                        )
+                except Exception as exc:  # noqa: BLE001 — one feature must not mask the rest
+                    logger.warning(
+                        "Feature-producer scan %s on %s failed: %s",
+                        getattr(feature, "feature_name", "?"),
+                        dataset_rid,
+                        exc,
+                    )
+
+        records.sort(key=lambda r: (r.feature_name, r.element_type, r.execution_rid or ""))
+        return records
 
     def _producers_of_dataset_members(self, dataset_rid: RID, version: Any | None = None) -> set[RID]:
         """Distinct executions that produced the member assets of a dataset.

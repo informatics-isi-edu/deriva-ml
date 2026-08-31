@@ -132,6 +132,39 @@ def reduce_with_selector(
             yield chosen
 
 
+class FeatureProducerRecord(BaseModel):
+    """Evidence that an execution produced feature values on a dataset's members.
+
+    One record per ``(execution, feature, element)`` group returned by
+    :meth:`DerivaML.find_feature_producers`. These are provenance
+    *candidates*: which features downstream code actually read is not
+    recorded in the catalog, so the contract is a bounded superset with
+    per-feature evidence rather than a claimed-exact dependency set.
+
+    Attributes:
+        execution_rid: The producing execution, or None when the feature
+            values carry no ``Execution`` — itself a provenance gap worth
+            surfacing, never silently dropped.
+        feature_name: Name of the feature whose values are the evidence.
+        element_type: Member table the feature targets (e.g. ``Image``).
+        value_count: How many feature values that execution wrote on the
+            dataset's members.
+
+    Example:
+        >>> from deriva_ml.feature import FeatureProducerRecord
+        >>> rec = FeatureProducerRecord(
+        ...     execution_rid=None, feature_name="Annotation",
+        ...     element_type="Image", value_count=7)
+        >>> rec.execution_rid is None
+        True
+    """
+
+    execution_rid: Optional[str] = None
+    feature_name: str
+    element_type: str
+    value_count: int
+
+
 class FeatureRecord(BaseModel):
     """Base class for dynamically generated feature record models.
 
