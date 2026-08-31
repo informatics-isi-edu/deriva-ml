@@ -543,3 +543,15 @@ teammate needs:
   commit selection (snapshot > workflow record), env-snapshot secrets
   allowlist, bakeability, arc-ranking policy — domain policy, stays in
   the deploy repo.
+
+**Codex pre-merge P1 on find_feature_producers (2026-08-31, PR #376):**
+membership-association FKs may reference **arbitrary member keys**
+(`Dataset_file.file -> file.id` is a supported shape, handled explicitly
+in `Dataset.list_dataset_members`), while feature-association FKs always
+target the member's **RID** (deriva-ml creates those itself). Any query
+composing the two must therefore route **through the member table**
+(membership → member on `other_fkey.referenced_columns`, then
+member.RID → feature) — a direct membership→feature comparison silently
+returns no matches for non-RID shapes, and a per-feature degrade
+swallows the failure. Generalizes: never assume an association FK
+targets RID unless deriva-ml itself created the association.
