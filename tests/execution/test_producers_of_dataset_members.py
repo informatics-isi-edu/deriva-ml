@@ -192,3 +192,99 @@ def test_join_filters_by_dataset_not_member_rid_in():
     assert result == {"2-EXUP"}
     assert calls["dataset_filter"] is True, "must filter membership by Dataset==rid"
     assert calls["member_in_called"] is False, "must NOT build an .in_() over member RIDs (tk-023)"
+
+
+# ---------------------------------------------------------------------------
+# Snapshot-schema guards (issue #365)
+#
+# The snapshot pathBuilder reflects the catalog schema as of the dataset
+# version's snaptime. A table created after that snaptime is absent from the
+# snapshot schema, so `snapshot_pb.schemas[...].tables[...]` raises KeyError.
+#
+# Only the membership lookup was guarded; member_table and the
+# <member>_Execution association were not. Because the exception propagated
+# out through lookup_lineage, an affected execution lost its ENTIRE lineage
+# walk — consumed datasets, consumed assets, and parents — not merely this
+# producer set. The snapshot holds no rows for a table that did not yet exist,
+# so an empty producer set is the correct answer for all three.
+# ---------------------------------------------------------------------------
+
+
+def _mixin_for_snapshot_lookup():
+    """An ExecutionMixin wired for _distinct_member_output_producers.
+
+    Returns:
+        Tuple of ``(ml, membership_table, member_table)`` ready to call the
+        helper. The caller supplies the snapshot pathBuilder, which is what
+        each test varies.
+    """
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.model = MagicMock()
+    exec_assoc = SimpleNamespace(name="Image_Execution", schema=SimpleNamespace(name="domain"))
+    ml.model.find_association = lambda mt, target: (exec_assoc, "Image", "Execution")
+
+    membership_table = SimpleNamespace(name="Dataset_Image", schema=SimpleNamespace(name="domain"))
+    member_table = SimpleNamespace(name="Image", schema=SimpleNamespace(name="domain"))
+    return ml, membership_table, member_table
+
+
+def _snapshot_pb_with(table_names):
+    """A snapshot pathBuilder exposing only ``table_names``.
+
+    Anything absent raises KeyError on lookup, exactly as a real snapshot
+    predating that table's creation does.
+    """
+    schema = MagicMock()
+    schema.name = "domain"
+    schema.tables = {name: MagicMock() for name in table_names}
+    pb = MagicMock()
+    pb.schemas = {"domain": schema}
+    return pb
+
+
+def test_membership_table_absent_from_snapshot_returns_empty():
+    """Membership table postdating the snapshot -> empty set, no raise."""
+    ml, membership_table, member_table = _mixin_for_snapshot_lookup()
+    pb = _snapshot_pb_with(["Image", "Image_Execution"])  # no Dataset_Image
+
+    result = ml._distinct_member_output_producers(pb, membership_table, member_table, "Image", "RID", "1-DSAA")
+
+    assert result == set()
+
+
+def test_member_table_absent_from_snapshot_returns_empty():
+    """Member table postdating the snapshot -> empty set, no raise.
+
+    Previously unguarded: raised KeyError out through lookup_lineage.
+    """
+    ml, membership_table, member_table = _mixin_for_snapshot_lookup()
+    pb = _snapshot_pb_with(["Dataset_Image", "Image_Execution"])  # no Image
+
+    result = ml._distinct_member_output_producers(pb, membership_table, member_table, "Image", "RID", "1-DSAA")
+
+    assert result == set()
+
+
+def test_exec_association_absent_from_snapshot_returns_empty():
+    """<member>_Execution postdating the snapshot -> empty set, no raise.
+
+    This is the exact failure reported in #365: KeyError 'Image_Execution'
+    aborted the whole lineage walk for eye-ai executions 7-QCAA / 5-E9WE.
+    """
+    ml, membership_table, member_table = _mixin_for_snapshot_lookup()
+    pb = _snapshot_pb_with(["Dataset_Image", "Image"])  # no Image_Execution
+
+    result = ml._distinct_member_output_producers(pb, membership_table, member_table, "Image", "RID", "1-DSAA")
+
+    assert result == set()
+
+
+def test_whole_schema_absent_from_snapshot_returns_empty():
+    """A snapshot predating the domain schema itself -> empty set, no raise."""
+    ml, membership_table, member_table = _mixin_for_snapshot_lookup()
+    pb = MagicMock()
+    pb.schemas = {}  # schema lookup itself raises KeyError
+
+    result = ml._distinct_member_output_producers(pb, membership_table, member_table, "Image", "RID", "1-DSAA")
+
+    assert result == set()
