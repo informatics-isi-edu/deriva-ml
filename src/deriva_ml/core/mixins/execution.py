@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord, MultirunStatusSummary
     from deriva_ml.execution.lineage import (
+        ExecutionSummary,
         LineageNode,
         LineageResult,
         RootDescriptor,
@@ -49,6 +50,11 @@ if TYPE_CHECKING:
 
 
 __all__ = ["ExecutionMixin"]
+
+# Chunk size for batched RID-disjunction fetches. Bounds URL length (the
+# tk-023 lesson: never one unbounded .in_()/disjunction over a caller-sized
+# set) while keeping request count low for realistic author counts.
+_SUMMARY_CHUNK_SIZE = 25
 
 
 def _version_row_sort_key(row: dict[str, Any]) -> tuple:
@@ -1380,6 +1386,66 @@ class ExecutionMixin:
         version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
         rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
         return sorted(rows, key=_version_row_sort_key)
+
+    def _execution_summaries(self, rids: "Iterable[RID | None]") -> dict[RID, "ExecutionSummary"]:
+        """Resolve ExecutionSummary objects for a set of execution RIDs, batched.
+
+        Dedupes and drops None, then fetches Execution rows in chunks of
+        ``_SUMMARY_CHUNK_SIZE`` (one RID-equality disjunction per chunk), then
+        resolves the distinct Workflow names the same way — never a
+        per-execution N+1. RIDs that resolve to no row are absent from the
+        result; callers treat absence as "could not resolve".
+
+        Args:
+            rids: Execution RIDs (Nones ignored, duplicates collapsed).
+
+        Returns:
+            Mapping of execution RID to its ExecutionSummary.
+
+        Example:
+            >>> summaries = ml._execution_summaries(["2-ABC", "2-DEF"])  # doctest: +SKIP
+            >>> summaries["2-ABC"].status  # doctest: +SKIP
+            'Completed'
+        """
+        from deriva_ml.execution.lineage import ExecutionSummary, WorkflowSummary
+
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        if not distinct:
+            return {}
+
+        pb = self.pathBuilder()
+
+        def _chunked_rows(table_path: Any, wanted: list[RID]) -> list[dict[str, Any]]:
+            rows: list[dict[str, Any]] = []
+            for i in range(0, len(wanted), _SUMMARY_CHUNK_SIZE):
+                chunk = wanted[i : i + _SUMMARY_CHUNK_SIZE]
+                pred = table_path.RID == chunk[0]
+                for r in chunk[1:]:
+                    pred = pred | (table_path.RID == r)
+                rows.extend(table_path.filter(pred).entities().fetch())
+            return rows
+
+        exec_path = pb.schemas[self.ml_schema].tables["Execution"]
+        exec_rows = _chunked_rows(exec_path, distinct)
+
+        wf_rids = list(dict.fromkeys(row.get("Workflow") for row in exec_rows if row.get("Workflow")))
+        wf_names: dict[RID, str | None] = {}
+        if wf_rids:
+            wf_path = pb.schemas[self.ml_schema].tables["Workflow"]
+            for wrow in _chunked_rows(wf_path, wf_rids):
+                wf_names[wrow["RID"]] = wrow.get("Name")
+
+        out: dict[RID, ExecutionSummary] = {}
+        for row in exec_rows:
+            wf_rid = row.get("Workflow")
+            wf_summary = WorkflowSummary(rid=wf_rid, name=wf_names.get(wf_rid)) if wf_rid else None
+            out[row["RID"]] = ExecutionSummary(
+                rid=row["RID"],
+                description=row.get("Description"),
+                workflow=wf_summary,
+                status=row.get("Status") or "Unknown",
+            )
+        return out
 
     def _producer_of_dataset(self, dataset_rid: RID, version: Any | None = None) -> RID | None:
         """Return the Execution RID that produced a version of ``dataset_rid``.
