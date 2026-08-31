@@ -634,6 +634,18 @@ producing Executions for each input.
 | Just the immediate producer, no parent chain | `ml.lookup_lineage(rid, depth=0)` |
 | Two generations back, no further | `ml.lookup_lineage(rid, depth=2)` |
 
+**Shareable HTML reports.** `deriva-ml-lineage` renders a walk as one
+self-contained HTML page (inline CSS, no JavaScript, no external assets) a
+reviewer can open, share, or archive — the root artifact with its version and
+origin badge, the full version-attribution trace, and the walk tree with each
+execution's workflow name/version. `--json` also saves the
+`LineageResult.model_dump()`, which stays the audit artifact of record;
+`--input` re-renders a saved walk offline with no catalog access:
+
+```bash
+deriva-ml-lineage --rid <RID> --host example.org --catalog 42     --output lineage.html --json lineage.json
+```
+
 **Every dataset representation carries a version.** A Dataset root reports its
 current version label as `lineage.root.version` (None for non-Dataset roots),
 matching the `version` that consumed-dataset entries already carry inside the
