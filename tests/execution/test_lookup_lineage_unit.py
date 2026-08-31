@@ -908,6 +908,44 @@ def test_recorded_but_unresolvable_origin_keeps_recorded_true():
     assert walk_seed == origin_exec
 
 
+def test_sentinel_origin_producing_execution_carries_sentinel_summary():
+    """Sentinel origin is never a walk seed, but its RootDescriptor still
+    carries the sentinel's own ExecutionSummary when one is resolvable —
+    ``origin_recorded`` is what signals "not a real author", not a missing
+    ``producing_execution``."""
+    from deriva_ml.execution.lineage import ExecutionSummary
+
+    sentinel = _gen_rid(66)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", sentinel)]
+    sentinel_summary = ExecutionSummary(rid=sentinel, description="sentinel", workflow=None, status="Uploaded")
+    ml = _origin_ml(rows, sentinel_rid=sentinel, summaries={sentinel: sentinel_summary})
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None
+    assert descriptor.origin_recorded is False
+    assert descriptor.producing_execution is not None
+    assert descriptor.producing_execution.rid == sentinel
+
+
+def test_version_history_entries_carry_resolved_summaries():
+    """Each version_history entry's ``execution`` is the resolved summary for
+    that row's own ``execution_rid`` — not the origin's, not shared."""
+    from deriva_ml.execution.lineage import ExecutionSummary
+
+    author_a, author_b = _gen_rid(10), _gen_rid(11)
+    rows = [
+        _version_row("2025-01-01T00:00:00Z", "0.1.0", author_a),
+        _version_row("2026-01-01T00:00:00Z", "2.0.0", author_b),
+    ]
+    summary_a = ExecutionSummary(rid=author_a, description="first", workflow=None, status="Uploaded")
+    summary_b = ExecutionSummary(rid=author_b, description="second", workflow=None, status="Uploaded")
+    ml = _origin_ml(rows, summaries={author_a: summary_a, author_b: summary_b})
+    descriptor, _ = ml._classify_rid(_gen_rid(1))
+    assert len(descriptor.version_history) == 2
+    for entry in descriptor.version_history:
+        assert entry.execution is not None
+        assert entry.execution.rid == entry.execution_rid
+
+
 # ---------------------------------------------------------------------------
 # #367: walk seeding — sentinel exclusion, no overwrite, degradation
 # ---------------------------------------------------------------------------
@@ -970,3 +1008,18 @@ def test_normal_recorded_origin_walks_from_origin():
     ml = _walkable_ml(rows, {member}, {origin, member})
     result = ml.lookup_lineage(_gen_rid(1))
     assert result.lineage.execution.rid == origin
+
+
+def test_unexpandable_origin_in_member_set_still_degrades():
+    """Origin is ALSO a member producer, but unexpandable; a distinct member
+    producer IS expandable. The degradation retry must not be skipped just
+    because ``producer_rid in member_producers`` — it must seed from the
+    other expandable member (spec: walk seed vs. origin attribution)."""
+    origin, other_member = _gen_rid(10), _gen_rid(31)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", origin)]
+    # origin is itself one of the member producers, but not expandable.
+    ml = _walkable_ml(rows, {origin, other_member}, known_execs={other_member})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == other_member
+    assert result.root.origin_recorded is True  # origin still recorded

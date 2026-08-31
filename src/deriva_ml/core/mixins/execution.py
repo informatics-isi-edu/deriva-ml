@@ -1300,14 +1300,13 @@ class ExecutionMixin:
 
         # Degradation (spec: walk seed vs. origin attribution): a recorded
         # origin that cannot be expanded must not erase independently
-        # resolvable member lineage.
-        if (
-            lineage_root_node is None
-            and root_descriptor.type == "Dataset"
-            and member_producers
-            and producer_rid not in member_producers
-        ):
-            ordered = sorted(member_producers)
+        # resolvable member lineage. This must fire even when the
+        # unexpandable origin is itself one of the member producers — the
+        # retry seeds from the *other* member producers, not from the
+        # origin again.
+        remaining_member_producers = member_producers - {producer_rid}
+        if lineage_root_node is None and root_descriptor.type == "Dataset" and remaining_member_producers:
+            ordered = sorted(remaining_member_producers)
             lineage_root_node = self._walk_node(
                 execution_rid=ordered[0],
                 depth_remaining=depth,
@@ -1379,7 +1378,7 @@ class ExecutionMixin:
             row = self._retrieve_rid(rid)
             version_rows = self._dataset_version_rows(rid)
             origin_rid = version_rows[0].get("Execution") if version_rows else None
-            sentinel_rid = self._sentinel_execution_rid_or_none()
+            sentinel_rid = self._sentinel_execution_rid_or_none() if origin_rid is not None else None
             origin_is_sentinel = origin_rid is not None and origin_rid == sentinel_rid
             author_summaries = self._execution_summaries(r.get("Execution") for r in version_rows)
             history = [
@@ -1545,13 +1544,10 @@ class ExecutionMixin:
             >>> ml._producer_of_dataset("1-DSAA", version="1.0.0")  # doctest: +SKIP
             '2-EXV1'
         """
-        pb = self.pathBuilder()
-        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
-        rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
-        if not rows:
-            return None
-
         if version is not None:
+            pb = self.pathBuilder()
+            version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+            rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
             want = str(version)
             for row in rows:
                 if (row.get("Version") or "") == want:
@@ -1561,9 +1557,10 @@ class ExecutionMixin:
         # Unversioned: the ORIGIN — the first-recorded row's author (issue
         # #367). Last-writer-wins was the old behavior and reported whatever
         # touched the dataset most recently (e.g. a data migration) as "the
-        # producer".
-        ordered = sorted(rows, key=_version_row_sort_key)
-        return ordered[0].get("Execution")
+        # producer". Delegate to _dataset_version_rows, which already
+        # fetches and sorts (RCT-primary total order) for this exact use.
+        rows = self._dataset_version_rows(dataset_rid)
+        return rows[0].get("Execution") if rows else None
 
     def _version_rid(self, dataset_rid: RID, version: Any) -> RID | None:
         """RID of the ``Dataset_Version`` row for (``dataset_rid``, ``version``), or None.
