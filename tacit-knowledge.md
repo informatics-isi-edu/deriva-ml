@@ -574,3 +574,23 @@ escaped; workflow URLs link only when http(s). Rule of thumb this
 extends: when downstream proves a *presentation* pattern, upstream the
 pattern bound to upstream's own model — never the artifact bound to
 downstream's policy schema.
+
+### 2026-08-31 — Live validation of the 1.57–1.59 lineage stack (eye-ai, 7-ZW3P)
+
+First real-catalog run, against the deploy repo's documented ground
+truth (`deriva-ml-model-deploy/docs/design/provenance-resolution.md`):
+
+- `deriva-ml-lineage --rid 7-ZW3P` walk matches §3.1/§8 exactly:
+  7-ZW3P → 6-MWQE, visited=2, complete; datasets 5-WEBG/5-ZHRE/5-ZMGJ
+  all @ v0.6.0 (consumed pins, not current). Execution root correctly
+  shows origin fields as not-applicable (tri-state None).
+- **`find_feature_producers("5-WEBG")` recovers by traversal exactly
+  what #367 §6 said was unreachable**: the cropper `7-VZQY` and the
+  detector `7-QCAA` (9,511 Annotation values each), plus five earlier
+  annotation runs and four Image_Diagnosis graders — the bounded
+  candidate set with evidence, live in seconds.
+- Observation, not a defect: the rendered workflow badge shows the
+  workflow-record version (`0.3.5.dev31+g893b98a55`) — the KNOWN-stale
+  value for 7-ZW3P per #373 (run actually used g6d5865a82). The page
+  reports the recorded value honestly; a future nicety could footnote
+  the staleness caveat on the page itself.
