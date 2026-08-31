@@ -634,7 +634,15 @@ def test_root_dataset_surfaces_member_producer_when_both_exist():
 
 def test_root_dataset_no_version_producer_walks_from_member_producers():
     """A dataset with NO version producer but WITH member producers yields a
-    non-empty walk (previously this returned an empty LineageResult)."""
+    non-empty walk (previously this returned an empty LineageResult).
+
+    #367: the walk root is seeded from the member producer, but with no
+    recorded origin the root's ``producing_execution`` stays unset — origin
+    attribution and walk seeding are separate concerns (tk-018/#367). This
+    assertion used to expect the walk root to overwrite
+    ``producing_execution`` (the old last-writer contract); that overwrite
+    no longer applies to Dataset roots.
+    """
     ml = _FakeML()
     ml.add_dataset("1-DSSR", producer=None)
     ml.add_execution("2-EXUP", input_datasets=[_StubDataset("1-DSSR")])
@@ -646,8 +654,8 @@ def test_root_dataset_no_version_producer_walks_from_member_producers():
     assert result.lineage is not None
     assert result.lineage.execution.rid == "2-EXUP"  # representative root
     assert {d.rid for d in result.lineage.consumed_datasets} == {"1-DSSR"}
-    assert result.root.producing_execution is not None
-    assert result.root.producing_execution.rid == "2-EXUP"
+    assert result.root.producing_execution is None  # no recorded origin (#367)
+    assert result.root.origin_recorded is False
 
 
 def test_root_dataset_member_producer_equals_version_producer_no_dup():
@@ -898,3 +906,67 @@ def test_recorded_but_unresolvable_origin_keeps_recorded_true():
     assert descriptor.producing_execution is None
     assert descriptor.version_history[0].execution_rid == origin_exec
     assert walk_seed == origin_exec
+
+
+# ---------------------------------------------------------------------------
+# #367: walk seeding — sentinel exclusion, no overwrite, degradation
+# ---------------------------------------------------------------------------
+
+
+def _walkable_ml(version_rows, member_producers, known_execs, sentinel_rid=None, summaries=None):
+    """Full lookup_lineage stub: dataset root + walkable executions."""
+    ml = _origin_ml(version_rows, sentinel_rid=sentinel_rid, summaries=summaries)
+    ml._producers_of_dataset_members = lambda rid, version=None: set(member_producers)
+    ml._input_dataset_pairs = lambda rid: []
+
+    def fake_lookup_execution(rid):
+        if rid not in known_execs:
+            raise DerivaMLException(f"no execution {rid}")
+        rec = MagicMock()
+        rec.description = f"exec {rid}"
+        rec.workflow = None
+        rec.status = ExecutionStatus.Uploaded
+        rec.list_assets = lambda **kw: []  # consumed-asset iteration is on the record
+        return rec
+
+    ml.lookup_execution = fake_lookup_execution
+    return ml
+
+
+def test_member_fallback_seeds_walk_but_is_not_origin():
+    member = _gen_rid(30)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", None)]  # no origin
+    ml = _walkable_ml(rows, {member}, {member})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member  # walk seeded
+    assert result.root.producing_execution is None  # origin NOT overwritten
+    assert result.root.origin_recorded is False
+
+
+def test_sentinel_origin_walk_seeds_from_member_producers():
+    sentinel, member = _gen_rid(66), _gen_rid(30)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", sentinel)]
+    ml = _walkable_ml(rows, {member}, {member}, sentinel_rid=sentinel)
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member  # not the sentinel
+    assert result.root.origin_recorded is False
+
+
+def test_unexpandable_origin_degrades_to_member_seeding():
+    origin, member = _gen_rid(10), _gen_rid(30)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", origin)]
+    ml = _walkable_ml(rows, {member}, known_execs={member})  # origin not expandable
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member
+    assert result.root.origin_recorded is True  # origin still recorded
+
+
+def test_normal_recorded_origin_walks_from_origin():
+    origin, member = _gen_rid(10), _gen_rid(30)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", origin)]
+    ml = _walkable_ml(rows, {member}, {origin, member})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage.execution.rid == origin

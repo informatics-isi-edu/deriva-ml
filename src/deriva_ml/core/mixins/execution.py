@@ -1252,31 +1252,23 @@ class ExecutionMixin:
         # 1. Classify the root RID with a single resolve_rid call.
         root_descriptor, producer_rid = self._classify_rid(rid)
 
-        # For a Dataset root, the members may have been produced by execution(s)
-        # other than the one that assembled/versioned the dataset. Those
-        # member-producers are data-flow parents and must be seeded into the
-        # walk so e.g. lookup_lineage(image_dataset) reaches the source the
-        # images were uploaded from. (See the lineage member-asset-traversal
-        # design spec; tk-018.)
+        # Member-producer discovery (tk-018): executions that produced member
+        # assets are data-flow parents even when the dataset itself has no
+        # usable walk seed.
+        member_producers: set[RID] = set()
         extra_parent_rids: set[RID] = set()
         if root_descriptor.type == "Dataset":
             member_producers = self._producers_of_dataset_members(rid)
             if producer_rid is not None:
-                # Subtract the version-producer so it is not listed as its own
-                # parent in the common case where it also produced some members.
                 extra_parent_rids = member_producers - {producer_rid}
             elif member_producers:
-                # No version-producer, but the members have producers: walk from
-                # a deterministic representative; the rest become its parents.
                 ordered = sorted(member_producers)
                 producer_rid = ordered[0]
                 extra_parent_rids = set(ordered[1:])
 
         if producer_rid is None:
-            # No producer of any kind — return a valid result with an empty walk.
             return LineageResult(root=root_descriptor)
 
-        # 2. Walk iteratively from the producing execution.
         visited_global: set[RID] = set()
         in_progress: set[RID] = set()
         flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
@@ -1291,9 +1283,31 @@ class ExecutionMixin:
             extra_parent_rids=extra_parent_rids or None,
         )
 
-        # The producing-execution summary on the root descriptor matches
-        # the top-most execution node we just expanded.
-        if lineage_root_node is not None:
+        # Degradation (spec: walk seed vs. origin attribution): a recorded
+        # origin that cannot be expanded must not erase independently
+        # resolvable member lineage.
+        if (
+            lineage_root_node is None
+            and root_descriptor.type == "Dataset"
+            and member_producers
+            and producer_rid not in member_producers
+        ):
+            ordered = sorted(member_producers)
+            lineage_root_node = self._walk_node(
+                execution_rid=ordered[0],
+                depth_remaining=depth,
+                max_executions=max_executions,
+                visited_global=visited_global,
+                in_progress=in_progress,
+                flags=flags,
+                extra_parent_rids=set(ordered[1:]) or None,
+            )
+
+        # Non-Dataset roots keep the historical behavior: the root's
+        # producing_execution is the walk-root summary. Dataset roots carry
+        # origin attribution from _classify_rid and are never overwritten —
+        # the walk root may legitimately differ (member-producer seeding).
+        if lineage_root_node is not None and root_descriptor.type != "Dataset":
             root_descriptor = root_descriptor.model_copy(update={"producing_execution": lineage_root_node.execution})
 
         return LineageResult(
