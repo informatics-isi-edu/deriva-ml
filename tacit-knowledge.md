@@ -673,3 +673,16 @@ evidence counts) and orthogonal gap flags — no "strongest arc"
 anywhere. Corollary: when a semantics upgrade converts candidates into
 facts, audit any ranking built on the old uncertainty — it may now be
 encoding nothing.
+
+**Ruling 5 amended (Carl): shared traversal core from day one.** The
+duplicate-code concern beats the refactor-risk concern because (a) the
+walk core (inputs, producers, sentinel, cycle/cap) is identical between
+lineage and closure — only arc selection and the accumulator differ,
+and (b) the ~40 behavior-pinning lineage tests make the extraction safe
+NOW; deferring means extracting later from two divergent walkers. One
+arc-gated engine, two frontends; neither routine calls the other; no
+cost inversion (engine walks only requested arcs); lookup_lineage's
+contract byte-identical under refactored internals. Session evidence
+for the drift risk: the _producer_of_dataset DRY finding and the
+ordering-logic duplication both caught by review within hours of
+creation.
