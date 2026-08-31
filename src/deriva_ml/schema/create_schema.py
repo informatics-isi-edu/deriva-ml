@@ -287,9 +287,12 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None) 
                 "Execution",
                 BuiltinType.text,
                 comment=(
-                    "RID of the execution that produced this version (NULL "
-                    "for the initial release row, which has no producing "
-                    "execution)."
+                    "RID of the execution that authored this version. On the "
+                    "initial release row this is the execution that created "
+                    "the dataset (its origin); on later rows, whatever "
+                    "execution triggered the version bump. NULL when no "
+                    "authoring execution was recorded (pre-contract rows are "
+                    "backfilled to the unknown-provenance sentinel)."
                 ),
             ),
             ColumnDef("Minid", BuiltinType.text, comment="URL to MINID for dataset"),
