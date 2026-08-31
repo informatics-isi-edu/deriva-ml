@@ -423,3 +423,23 @@ version pin (can't say which of a parent's 85 versions a child derived
 from) — separate schema decision, own issue.
 
 Spec: `docs/superpowers/specs/2026-08-31-dataset-origin-lineage-design.md`.
+
+**Codex-review revision (same day):** an independent Codex review of
+the spec forced one behavioral design change and one ordering pivot,
+both verified against the code before accepting:
+1. **Walk seed ≠ origin.** `lookup_lineage` seeds the walk from a
+   member producer when no version-producer exists (tk-018), then
+   overwrites `root.producing_execution` with that walk root
+   (`execution.py:1226`) — under the new semantics that would claim a
+   member producer as origin while `origin_recorded=False`. Fixed in
+   design: walk seeding unchanged; `producing_execution` is built from
+   origin resolution only and never overwritten from the walk.
+2. **Order by RCT, not PEP 440 label.** `create_dataset` accepts an
+   arbitrary initial `version=`, so the label is not creation order;
+   RCT is total, parse-free chronology (label only as RCT tiebreak).
+   Also corrected: the "zero added round-trips" claim (ExecutionSummary
+   needs a batched Execution fetch — version rows hold RIDs, not
+   summaries) and `origin_recorded` became tri-state (`None` = not a
+   dataset root). Lesson repeated from #361: independent review of a
+   *design* pays the same way it does for code — both real catches were
+   in interactions with existing behavior, not in the new code itself.
