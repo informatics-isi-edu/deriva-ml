@@ -609,3 +609,89 @@ it.) The Workflow.version staleness caveat — #377's other half —
 stands. Note: v1.59.0/v1.60.0 installs still seed the term on catalog
 init until the revert is released; catalogs initialized in that window
 may carry a harmless orphan term.
+
+## Provenance semantics
+
+### 2026-08-31 — The boundary interview: capture-not-mining, and features as bindings (issues #383/#385, PR #384)
+
+Settled with Carl in a structured boundary interview after the
+lookup_provenance closure proposal (#383). Three load-bearing rulings:
+
+1. **Capture, never mining.** deriva-ml owns facts derivable from its
+   schema. When provenance needs a fact that isn't derivable, the fix
+   is to extend CAPTURE so it becomes schema-recorded — never to teach
+   readers to mine conventions (Hydra `key=RID` parsing rejected as a
+   closure arc on this ground; it survives only as a downstream audit
+   finding on legacy runs).
+
+2. **Legacy is history, not requirements.** eye-ai's provenance holes
+   (unrecorded splits, config-only cropper assertions) came from
+   pre-contract deriva-ml. Going forward only contract-era records are
+   assumed usable; closure completeness is defined against them, and
+   legacy gaps are reported honestly (origin_recorded=False, sentinel
+   terminations) — never compensated for.
+
+3. **A feature value is the binding (member, value, execution).** Not
+   an interpretation — the `is_feature` predicate structurally
+   requires the Execution FK, so the execution is part of the
+   binding's IDENTITY. This dissolved the feature-arc epistemics: the
+   closure question was "did the consumer READ these features?"
+   (unknowable, tk-023 → forced candidates-not-claims); Carl's
+   reframing moves the attachment point — a dataset as consumed is
+   members PLUS bindings, the bindings of D@vN are those at vN's
+   snapshot, so their executions are provenance BY CONSTRUCTION.
+   Uncertainty dissolved, not resolved. Corollaries: member scope is
+   FK-reachable ("or referenced by an object in the dataset");
+   construction vs content arcs stay distinct by attachment point
+   (version row vs member bindings); null-execution bindings are
+   MALFORMED (incomplete triples), reported never repaired. Canonical
+   text now in provenance-contract.md Definitions (PR #384).
+
+**Defect this surfaced:** find_feature_producers (#370) is
+membership-only and live-state-only — the recurring
+membership-vs-FK-reachable blind spot (#316/#318) reintroduced, plus
+no version-snapshot scoping. Filed as #385; the closure (#383) depends
+on it.
+
+**Boundary sequence today, for the record:** Inference_Contract term
+OUT of deriva-ml (#381 — no producer), closure traversal proposed IN
+(#383 — all primitives native), config-mining kept OUT
+(capture-not-mining), binding-constitutive feature provenance IN (it
+was always in the schema). The pattern: the boundary follows the
+SCHEMA, in both directions.
+
+**Ruling 4 (same interview, Carl): there is no arc-strength ordering.**
+The deploy repo's DIRECT > DATA-FLOW > FEATURE > ANCESTOR ranking was
+an evidence-CERTAINTY gradient that only made sense while the feature
+arc was a maybe-read candidate. Under binding semantics every arc kind
+is an equally certain schema fact, so the gradient is flat; any
+residual ordering is a relevance judgment = downstream presentation.
+The closure model carries an UNORDERED typology of arc kinds
+(distinguished by attachment point: consumption edge / version
+authorship / member binding / nesting) with per-arc measurables (depth,
+evidence counts) and orthogonal gap flags — no "strongest arc"
+anywhere. Corollary: when a semantics upgrade converts candidates into
+facts, audit any ranking built on the old uncertainty — it may now be
+encoding nothing.
+
+**Ruling 5 amended (Carl): shared traversal core from day one.** The
+duplicate-code concern beats the refactor-risk concern because (a) the
+walk core (inputs, producers, sentinel, cycle/cap) is identical between
+lineage and closure — only arc selection and the accumulator differ,
+and (b) the ~40 behavior-pinning lineage tests make the extraction safe
+NOW; deferring means extracting later from two divergent walkers. One
+arc-gated engine, two frontends; neither routine calls the other; no
+cost inversion (engine walks only requested arcs); lookup_lineage's
+contract byte-identical under refactored internals. Session evidence
+for the drift risk: the _producer_of_dataset DRY finding and the
+ordering-logic duplication both caught by review within hours of
+creation.
+
+**Ruling 6 (Carl, final): ancestry hops resolve at snapshots,
+unbounded to source.** Each Dataset_Dataset hop reads the parent at the
+child version's snaptime (chained points-in-time down the ancestry);
+live-state hops rejected as the same causal error as live-state
+feature scans. Snapshot-chain breaks (dev rows, pre-snapshot legacy) =
+reported gaps, never live-state guesses. Depth: to SOURCE under the
+global cap; a dedicated depth knob is YAGNI. This completed the
+boundary interview — six rulings, all recorded on #383.

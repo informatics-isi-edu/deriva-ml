@@ -241,6 +241,41 @@ defined in that section.
 
 ### Definitions
 
+- **Feature value = a binding.** A feature value is the **binding of a
+  value and an execution to a member object** — the triple
+  *(member, value, execution)*. This is not an interpretation layered on
+  the schema; it is the schema: a feature is recognized (`is_feature`,
+  `model/catalog.py`) as an association table carrying the
+  `Feature_Name` and **`Execution`** columns as *required markers*
+  alongside the target-object FK — with any number of additional value
+  FKs (vocabulary terms, assets, key-qualifiers such as eye-ai's
+  `Image_Side`; discovery is deliberately `max_arity=None`). The
+  "value" of the binding may therefore span several columns; what makes
+  the triple is that the execution marker is a component of the
+  binding's *identity*, not provenance metadata about it. Two gradings of the same member are two
+  distinct bindings distinguished by their executions — which is why
+  multi-annotator selection (`FeatureRecord.select_newest`, …) is
+  selection among bindings, never deduplication of one value.
+
+  Three consequences the rest of this contract relies on:
+
+  1. **Dataset content includes its bindings.** A dataset *as consumed*
+     is its members **plus** the feature values bound to them — for ML
+     use the labels are content, not annotation. The members in scope
+     are the dataset's elements under FK-reachability (a feature bound
+     to an object *referenced by* a member counts, exactly as
+     `restructure_assets` / element enumeration define reachability).
+  2. **Feature provenance is version-scoped and fully defined.** The
+     bindings belonging to `D@vN` are those existing at vN's catalog
+     snapshot. Their executions are therefore part of `D@vN`'s
+     provenance **by construction** — readable off the artifact, no
+     "did the consumer read them?" epistemics required. Bindings
+     written after vN's snaptime belong to later versions only.
+  3. **A binding without an execution is malformed**, not merely
+     under-documented — an incomplete triple. Contract-era writes carry
+     the execution by construction; legacy null-execution rows are
+     reported as gaps and never repaired by guessing.
+
 - **Driven execution** — an execution that left `Created` for `Running`;
   i.e. its lifecycle was actually started (`__enter__` / `execution_start()`
   ran). An execution that was created but never started (still `Created`) is
