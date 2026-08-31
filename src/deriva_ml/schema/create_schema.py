@@ -640,7 +640,12 @@ def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] 
                         "`1.2.0`). Independent from `Checksum`; used for "
                         "human-readable release tracking when the "
                         "workflow code is itself published as a "
-                        "versioned package."
+                        "versioned package. CAVEAT: Workflow rows are "
+                        "deduplicated per definition, so this records the "
+                        "version when the row was FIRST registered — not "
+                        "necessarily the code version any particular "
+                        "execution ran. Per-run code identity comes from "
+                        "the execution's captured environment snapshot."
                     ),
                 ),
             ],
@@ -916,6 +921,16 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
             {"Name": "Input_File", "Description": "A file input to an execution."},
             {"Name": "Output_File", "Description": "A file output from an execution."},
             {"Name": "Model_File", "Description": "The ML model."},
+            {
+                "Name": "Inference_Contract",
+                "Description": (
+                    "The model's inference contract: the machine-readable "
+                    "description of inputs, preprocessing identity, and "
+                    "output semantics a deployment needs to run the model "
+                    "(e.g. run_config.json). A dedicated type so deployment "
+                    "tooling discovers the contract by type, not filename."
+                ),
+            },
             {
                 "Name": "Notebook_Output",
                 "Description": "A Jupyter notebook with output cells filled from an execution.",

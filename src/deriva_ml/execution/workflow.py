@@ -61,6 +61,10 @@ class Workflow(BaseModel):
             will update the catalog record. The new values must be valid terms from
             the Workflow_Type vocabulary.
         version (str | None): Version identifier (semantic versioning).
+            Caveat: workflows are deduplicated per definition, so a looked-up
+            row's version reflects when the row was FIRST registered — not
+            necessarily the code version a particular execution ran; per-run
+            code identity comes from that execution's environment snapshot.
         description (str | None): Description of workflow purpose and behavior.
             When the workflow is bound to a writable catalog, setting this property
             will update the catalog record.

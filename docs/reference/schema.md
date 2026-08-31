@@ -238,6 +238,7 @@ terms:
 - name: Input_File
 - name: Output_File
 - name: Model_File
+- name: Inference_Contract
 - name: Notebook_Output
 ```
 
