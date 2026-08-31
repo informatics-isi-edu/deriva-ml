@@ -211,13 +211,160 @@ def _history_html(history: list[dict]) -> str:
     )
 
 
-def lineage_result_to_html(result: Any, *, generated_note: str | None = None) -> str:
+def _features_html(feature_producers: dict[str, list[dict]] | None) -> str:
+    """Render the feature-producer candidates, grouped by dataset."""
+    if not feature_producers:
+        return ""
+    blocks = []
+    for dataset_rid, records in feature_producers.items():
+        rows = []
+        for rec in records:
+            ex = rec.get("execution_rid")
+            who = (
+                f'<span class="rid">{_esc(ex)}</span>'
+                if ex
+                else '<span class="badge bad">no producing execution</span>'
+            )
+            rows.append(
+                f"<tr><td>{who}</td><td>{_esc(rec.get('feature_name'))}</td>"
+                f"<td>{_esc(rec.get('element_type'))}</td>"
+                f"<td>{int(rec.get('value_count') or 0)}</td></tr>"
+            )
+        blocks.append(
+            f'<h3>on dataset <span class="rid">{_esc(dataset_rid)}</span></h3>'
+            "<table><thead><tr><th>Execution</th><th>Feature</th><th>Element</th>"
+            f"<th>Values</th></tr></thead><tbody>{''.join(rows)}</tbody></table>"
+        )
+    return (
+        "<h2>Feature producers &middot; candidates</h2>"
+        '<p class="note">Executions that wrote feature values onto a walked dataset\'s '
+        "members. These are <strong>candidates, not lineage edges</strong>: the catalog "
+        "cannot record which features downstream code actually read, so this is the "
+        "bounded superset with evidence &mdash; a complete candidate set, never a claim "
+        "of use. A row with no producing execution is itself a provenance gap.</p>" + "".join(blocks)
+    )
+
+
+def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> str:
+    """Draw the walk as a layered inline SVG.
+
+    Honesty constraint: ``LineageNode.parents`` is a flat list — the model
+    does not record which parent produced which consumed dataset — so the
+    figure draws only edges the data supports: execution boxes chained by
+    depth, consumed-dataset pills under their consuming execution, and
+    dashed feature-producer boxes attached to the dataset they annotated.
+    """
+    root = data.get("lineage")
+    if not root:
+        return ""
+
+    # Flatten by depth, iteratively (deep chains — same reason as _walk_html).
+    columns: list[list[dict]] = []
+    stack: list[tuple[dict, int]] = [(root, 0)]
+    while stack:
+        node, depth = stack.pop()
+        while len(columns) <= depth:
+            columns.append([])
+        columns[depth].append(node)
+        for parent in node.get("parents") or []:
+            stack.append((parent, depth + 1))
+
+    box_w, box_h, ds_h, gap_x, gap_y, pad = 180, 46, 22, 70, 18, 20
+    feat_counts = {rid: len(recs) for rid, recs in (feature_producers or {}).items()}
+
+    def node_height(n: dict) -> int:
+        n_ds = len(n.get("consumed_datasets") or [])
+        n_feat = sum(1 for d in (n.get("consumed_datasets") or []) if (d.get("rid") in feat_counts))
+        return box_h + (n_ds + n_feat) * (ds_h + 4)
+
+    col_heights = [sum(node_height(n) for n in col) + gap_y * max(len(col) - 1, 0) for col in columns]
+    height = max(col_heights or [box_h]) + 2 * pad
+    width = len(columns) * (box_w + gap_x) - gap_x + 2 * pad
+
+    parts = [
+        f'<svg viewBox="0 0 {width} {height}" role="img" '
+        f'aria-label="Lineage walk figure" '
+        f'style="max-width:100%;height:auto;background:#fff;'
+        f'border:1px solid #dde3ea;border-radius:8px">'
+    ]
+    centers: dict[int, tuple[float, float]] = {}
+    for depth, col in enumerate(columns):
+        x = pad + depth * (box_w + gap_x)
+        y = pad
+        for n in col:
+            ex = n.get("execution") or {}
+            rid = ex.get("rid") or ""
+            wf = (ex.get("workflow") or {}).get("name") or ""
+            parts.append(
+                f'<rect x="{x}" y="{y}" width="{box_w}" height="{box_h}" rx="8" '
+                f'fill="#eef2f6" stroke="#1c4f8a"/>'
+                f'<text x="{x + 10}" y="{y + 19}" font-size="12" '
+                f'font-family="ui-monospace,monospace">{_esc(rid)}</text>'
+                f'<text x="{x + 10}" y="{y + 36}" font-size="10" fill="#6b7686">'
+                f"{_esc(wf[:28])}</text>"
+            )
+            centers[id(n)] = (x, y + box_h / 2)
+            dy = y + box_h + 4
+            for d in n.get("consumed_datasets") or []:
+                label = _esc(d.get("rid"))
+                if d.get("version"):
+                    label += f" @ {_esc(d['version'])}"
+                parts.append(
+                    f'<rect x="{x + 14}" y="{dy}" width="{box_w - 28}" height="{ds_h}" '
+                    f'rx="11" fill="#e8eef7" stroke="#9db4d3"/>'
+                    f'<text x="{x + 24}" y="{dy + 15}" font-size="10" '
+                    f'font-family="ui-monospace,monospace">{label}</text>'
+                )
+                dy += ds_h + 4
+                n_feat = feat_counts.get(d.get("rid"))
+                if n_feat:
+                    parts.append(
+                        f'<rect x="{x + 28}" y="{dy}" width="{box_w - 42}" height="{ds_h}" '
+                        f'rx="4" fill="none" stroke="#a15c00" stroke-dasharray="4 3"/>'
+                        f'<text x="{x + 36}" y="{dy + 15}" font-size="10" fill="#a15c00">'
+                        f"{n_feat} feature producer(s)</text>"
+                    )
+                    dy += ds_h + 4
+            y += node_height(n) + gap_y
+        # Arrows child ← parent: draw from this column's nodes to their parents.
+    for depth, col in enumerate(columns):
+        for n in col:
+            cx, cy = centers[id(n)]
+            for parent in n.get("parents") or []:
+                px, py = centers[id(parent)]
+                parts.append(
+                    f'<line x1="{px}" y1="{py}" x2="{cx + box_w}" y2="{cy}" '
+                    f'stroke="#6b7686" stroke-width="1.5"/>'
+                    f'<polygon points="{cx + box_w + 6},{cy} {cx + box_w + 14},{cy - 4} '
+                    f'{cx + box_w + 14},{cy + 4}" fill="#6b7686"/>'
+                )
+    parts.append("</svg>")
+    return (
+        "<h2>Walk figure</h2>"
+        '<p class="note">Executions by depth (root leftmost; arrows point from producer '
+        "to consumer), consumed datasets under their consuming execution, dashed marks "
+        "where feature-producer candidates exist. The model records parents as a set, "
+        "so dataset&rarr;producer pairings are deliberately not drawn.</p>" + "".join(parts)
+    )
+
+
+def lineage_result_to_html(
+    result: Any,
+    *,
+    feature_producers: dict[str, list[dict]] | None = None,
+    generated_note: str | None = None,
+) -> str:
     """Render a ``LineageResult`` (or its ``model_dump()`` dict) to HTML.
 
     Args:
         result: A :class:`~deriva_ml.execution.lineage.LineageResult` or the
             dict produced by its ``model_dump()``. Rendering never touches a
             catalog.
+        feature_producers: Optional companion data — mapping of dataset RID
+            to :meth:`DerivaML.find_feature_producers` records (as dicts).
+            Rendered as a clearly-framed CANDIDATES section and marked in
+            the figure; deliberately not part of ``LineageResult`` (the walk
+            is data-flow only, per ADR-0001).
         generated_note: One-line provenance of the report itself; defaults to
             a UTC date stamp.
 
@@ -281,17 +428,52 @@ def lineage_result_to_html(result: Any, *, generated_note: str | None = None) ->
     {origin_html}
   </section>
   {_history_html(root.get("version_history") or [])}
+  {_graph_svg(data, feature_producers)}
   <h2>Data-flow walk</h2>
   <p class="note">Producing executions of the artifact and of every consumed input,
   walked to the natural root of each branch. Consumed datasets show the version
   actually consumed.</p>
   {_walk_html(data.get("lineage"))}
+  {_features_html(feature_producers)}
   <footer>Rendered by deriva-ml <code>lineage_result_to_html</code> &mdash; the source
   JSON (<code>LineageResult.model_dump()</code>) is the audit artifact of record.</footer>
 </main>
 </body>
 </html>
 """
+
+
+def _gather_feature_producers(ml: Any, data: dict) -> dict[str, list[dict]] | None:
+    """Collect feature-producer candidates for every dataset in a walk.
+
+    Datasets are the root (when it is one) plus every consumed dataset
+    across the walk tree, deduplicated. Each is scanned with
+    :meth:`DerivaML.find_feature_producers`; a dataset whose scan fails
+    degrades with a warning on stderr rather than losing the page.
+    """
+    rids: list[str] = []
+    root = data.get("root") or {}
+    if root.get("type") == "Dataset" and root.get("rid"):
+        rids.append(root["rid"])
+    stack = [data.get("lineage")]
+    while stack:
+        node = stack.pop()
+        if not node:
+            continue
+        for d in node.get("consumed_datasets") or []:
+            if d.get("rid"):
+                rids.append(d["rid"])
+        stack.extend(node.get("parents") or [])
+    out: dict[str, list[dict]] = {}
+    for rid in dict.fromkeys(rids):
+        try:
+            records = ml.find_feature_producers(rid)
+        except Exception as exc:  # noqa: BLE001 — one dataset must not lose the page
+            print(f"warning: feature scan failed for {rid}: {exc}", file=sys.stderr)
+            continue
+        if records:
+            out[rid] = [r.model_dump() for r in records]
+    return out or None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -321,11 +503,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", help="Catalog hostname (walk mode).")
     parser.add_argument("--catalog", help="Catalog ID (walk mode).")
     parser.add_argument("--output", required=True, help="HTML file to write.")
+    parser.add_argument(
+        "--no-features",
+        action="store_true",
+        help="Walk mode: skip the find_feature_producers candidate scan.",
+    )
     parser.add_argument("--json", dest="json_out", help="Also write the walk's model_dump() JSON here.")
     args = parser.parse_args(argv)
 
+    feature_producers: dict[str, list[dict]] | None = None
     if args.input:
-        data: Any = json.loads(Path(args.input).read_text(encoding="utf-8"))
+        loaded: Any = json.loads(Path(args.input).read_text(encoding="utf-8"))
+        # Envelope {lineage, feature_producers} or a bare model_dump().
+        if isinstance(loaded, dict) and "lineage" in loaded and "root" not in loaded:
+            data: Any = loaded["lineage"]
+            feature_producers = loaded.get("feature_producers") or None
+        else:
+            data = loaded
         note = f"Re-rendered from {Path(args.input).name} on {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}"
     else:
         if not (args.host and args.catalog):
@@ -335,11 +529,17 @@ def main(argv: list[str] | None = None) -> int:
         ml = DerivaML(hostname=args.host, catalog_id=args.catalog)
         result = ml.lookup_lineage(args.rid)
         data = result.model_dump()
+        if not args.no_features:
+            feature_producers = _gather_feature_producers(ml, data)
         note = f"Walked {args.rid} on {args.host}/{args.catalog} at {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}"
 
     if args.json_out:
-        Path(args.json_out).write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
-    Path(args.output).write_text(lineage_result_to_html(data, generated_note=note), encoding="utf-8")
+        envelope = {"lineage": data, "feature_producers": feature_producers}
+        Path(args.json_out).write_text(json.dumps(envelope, indent=2, default=str), encoding="utf-8")
+    Path(args.output).write_text(
+        lineage_result_to_html(data, feature_producers=feature_producers, generated_note=note),
+        encoding="utf-8",
+    )
     print(f"wrote {args.output}", file=sys.stderr)
     return 0
 

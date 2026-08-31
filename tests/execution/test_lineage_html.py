@@ -176,3 +176,64 @@ def test_cli_round_trips_non_latin_text(tmp_path):
     src.write_text(json.dumps(result.model_dump()), encoding="utf-8")
     assert main(["--input", str(src), "--output", str(out)]) == 0
     assert "眼底画像" in out.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Feature-producer candidates section + SVG figure (follow-up to #378)
+# ---------------------------------------------------------------------------
+
+
+def _producers():
+    return {
+        _rid(30): [
+            {"execution_rid": _rid(40), "feature_name": "Annotation", "element_type": "Image", "value_count": 9511},
+            {"execution_rid": None, "feature_name": "Annotation", "element_type": "Image", "value_count": 7},
+        ]
+    }
+
+
+def test_feature_candidates_section_renders_with_framing():
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    assert "Feature producers" in page
+    assert "candidate" in page.lower()  # candidates-not-claims framing on the page
+    assert "9511" in page and "Annotation" in page
+    assert _rid(40) in page
+
+
+def test_null_feature_execution_rendered_as_gap_not_dropped():
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    assert "no producing execution" in page.lower()
+
+
+def test_no_feature_data_means_no_section():
+    page = lineage_result_to_html(_dataset_result())
+    assert "Feature producers" not in page
+
+
+def test_svg_figure_present_and_honest():
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    assert "<svg" in page and "</svg>" in page
+    assert _rid(10) in page  # root execution node
+    assert "stroke-dasharray" in page  # feature producers drawn dashed
+    # Self-containment still holds with the figure in place.
+    assert "<script" not in page and "src=" not in page
+
+
+def test_envelope_json_round_trip(tmp_path):
+    """--json writes {lineage, feature_producers}; --input re-renders it."""
+    envelope = {"lineage": _dataset_result().model_dump(), "feature_producers": _producers()}
+    src = tmp_path / "envelope.json"
+    out = tmp_path / "page.html"
+    src.write_text(json.dumps(envelope), encoding="utf-8")
+    assert main(["--input", str(src), "--output", str(out)]) == 0
+    text = out.read_text(encoding="utf-8")
+    assert "Feature producers" in text and "<svg" in text
+
+
+def test_bare_model_dump_input_still_works(tmp_path):
+    """Pre-envelope JSON (a bare LineageResult dump) keeps rendering."""
+    src = tmp_path / "bare.json"
+    out = tmp_path / "page.html"
+    src.write_text(json.dumps(_dataset_result().model_dump()), encoding="utf-8")
+    assert main(["--input", str(src), "--output", str(out)]) == 0
+    assert _rid(1) in out.read_text(encoding="utf-8")
