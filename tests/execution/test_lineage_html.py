@@ -176,3 +176,123 @@ def test_cli_round_trips_non_latin_text(tmp_path):
     src.write_text(json.dumps(result.model_dump()), encoding="utf-8")
     assert main(["--input", str(src), "--output", str(out)]) == 0
     assert "眼底画像" in out.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Feature-producer candidates section + SVG figure (follow-up to #378)
+# ---------------------------------------------------------------------------
+
+
+def _producers():
+    return {
+        _rid(30): [
+            {"execution_rid": _rid(40), "feature_name": "Annotation", "element_type": "Image", "value_count": 9511},
+            {"execution_rid": None, "feature_name": "Annotation", "element_type": "Image", "value_count": 7},
+        ]
+    }
+
+
+def test_feature_candidates_section_renders_with_framing():
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    assert "Feature producers" in page
+    assert "candidate" in page.lower()  # candidates-not-claims framing on the page
+    assert "9511" in page and "Annotation" in page
+    assert _rid(40) in page
+
+
+def test_null_feature_execution_rendered_as_gap_not_dropped():
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    assert "no producing execution" in page.lower()
+
+
+def test_no_feature_data_means_no_section():
+    page = lineage_result_to_html(_dataset_result())
+    assert "Feature producers" not in page
+
+
+def test_svg_figure_present_and_honest():
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    assert "<svg" in page and "</svg>" in page
+    assert _rid(10) in page  # root execution node
+    assert "stroke-dasharray" in page  # feature producers drawn dashed
+    # Self-containment still holds with the figure in place.
+    assert "<script" not in page and "src=" not in page
+
+
+def test_envelope_json_round_trip(tmp_path):
+    """--json writes {lineage, feature_producers}; --input re-renders it."""
+    envelope = {"lineage": _dataset_result().model_dump(), "feature_producers": _producers()}
+    src = tmp_path / "envelope.json"
+    out = tmp_path / "page.html"
+    src.write_text(json.dumps(envelope), encoding="utf-8")
+    assert main(["--input", str(src), "--output", str(out)]) == 0
+    text = out.read_text(encoding="utf-8")
+    assert "Feature producers" in text and "<svg" in text
+
+
+def test_bare_model_dump_input_still_works(tmp_path):
+    """Pre-envelope JSON (a bare LineageResult dump) keeps rendering."""
+    src = tmp_path / "bare.json"
+    out = tmp_path / "page.html"
+    src.write_text(json.dumps(_dataset_result().model_dump()), encoding="utf-8")
+    assert main(["--input", str(src), "--output", str(out)]) == 0
+    assert _rid(1) in out.read_text(encoding="utf-8")
+
+
+def test_svg_nodes_carry_native_tooltips():
+    """Execution boxes, dataset pills, feature marks, and arrows carry
+    SVG <title> hover tooltips (parity with the deploy visualizer)."""
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert svg.count("<title>") >= 4  # exec node, dataset pill, feature mark, arrow
+    assert "Completed" in svg  # execution tooltip carries status
+    assert "cohort" in svg  # dataset tooltip carries the description
+    assert _rid(40) in svg  # feature tooltip names the producing execution
+    assert "upstream producer" in svg  # arrow tooltip states the honest relation
+
+
+def test_svg_tooltip_text_is_escaped():
+    hostile = LineageResult(
+        root=RootDescriptor(rid=_rid(9), type="Execution", description=None),
+        lineage=LineageNode(
+            execution=ExecutionSummary(
+                rid=_rid(60), description='<img src=x onerror=alert(1)>', workflow=None, status="Failed"
+            )
+        ),
+    )
+    page = lineage_result_to_html(hostile)
+    assert "<img src=x" not in page
+    assert "&lt;img" in page
+
+
+def test_svg_draws_consumed_assets():
+    """Consumed assets appear in the FIGURE, not only the walk list.
+
+    Pins the live 7-QCAA gap: 5 dataset pills drawn, the consumed
+    detector-weights asset absent from the figure entirely.
+    """
+    from deriva_ml.execution.lineage import AssetSummary
+
+    walk = LineageNode(
+        execution=_exec_summary(50),
+        consumed_assets=[AssetSummary(rid=_rid(51), filename="weights.keras", asset_table="Execution_Asset")],
+    )
+    result = LineageResult(
+        root=RootDescriptor(rid=_rid(52), type="Execution", description=None), lineage=walk
+    )
+    page = lineage_result_to_html(result)
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert "weights.keras" in svg
+    assert _rid(51) in svg
+    assert "Execution_Asset" in svg  # tooltip carries the table
+
+
+def test_svg_marks_already_shown_nodes():
+    shown_twice = LineageNode(execution=_exec_summary(55), already_shown=True)
+    walk = LineageNode(execution=_exec_summary(54), parents=[shown_twice])
+    result = LineageResult(
+        root=RootDescriptor(rid=_rid(53), type="Execution", description=None), lineage=walk
+    )
+    page = lineage_result_to_html(result)
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert "already shown" in svg  # tooltip notes the collapse
