@@ -45,7 +45,9 @@ def _ml_with_metadata_rows(rows: list[dict], lookup_failures: set[str] = frozens
 
     def fake_lookup_asset(rid):
         if rid in lookup_failures:
-            raise RuntimeError(f"asset {rid} unreadable")
+            from deriva_ml.core.exceptions import DerivaMLException
+
+            raise DerivaMLException(f"asset {rid} unreadable")
         asset = MagicMock()
         asset.asset_rid = rid
         return asset
@@ -92,3 +94,14 @@ def test_execution_record_surface():
     record._ml_instance = ml
     out = record.list_metadata()
     assert [a.asset_rid for a in out] == [_rid(1)]
+
+
+def test_per_row_transport_failure_propagates():
+    """Only DerivaMLException degrades per-row; a transport error on
+    lookup_asset propagates (codex P2: an outage hitting every lookup must
+    not return [] and misreport metadata as 'not recorded')."""
+    rows = [{"RID": _rid(1)}]
+    ml, _ = _ml_with_metadata_rows(rows)
+    ml.lookup_asset.side_effect = ConnectionError("catalog unreachable")
+    with pytest.raises(ConnectionError):
+        list_execution_metadata(ml_instance=ml, execution_rid=_rid(500))

@@ -470,7 +470,13 @@ def list_execution_metadata(
             continue
         try:
             assets.append(ml_instance.lookup_asset(rid))
-        except Exception as e:  # noqa: BLE001 — per-row degrade only
+        except DerivaMLException as e:
+            # Per-row degrade for expected data errors only (a deleted or
+            # malformed row must not hide the rest). Transport/auth/
+            # programming failures propagate — if every lookup hit the
+            # same outage, swallowing them would return [] and misreport
+            # existing metadata as "not recorded", defeating the
+            # absence-vs-failure distinguishability this API exists for.
             logger.debug("Could not look up metadata asset %s: %s", rid, e)
     return assets
 
