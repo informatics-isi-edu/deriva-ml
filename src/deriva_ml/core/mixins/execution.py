@@ -1696,8 +1696,10 @@ class ExecutionMixin:
         Returns:
             :class:`~deriva_ml.feature.FeatureProducerRecord` list, one per
             ``(execution, feature, element)`` group, sorted by
-            ``(feature_name, element_type, execution_rid)``. Empty when no
-            member has feature values.
+            ``(feature_name, element_type)`` with a stable internal
+            tiebreak for a deterministic result order (the tiebreak
+            carries no RID-ordering semantics). Empty when no member has
+            feature values.
 
         Example:
             >>> for rec in ml.find_feature_producers(dataset.rid):  # doctest: +SKIP
@@ -1721,6 +1723,12 @@ class ExecutionMixin:
                 # Nested datasets carry no member-level features.
                 continue
             member_link_column = other_fkey.foreign_key_columns[0].name
+            # The FK's actual referenced column — NOT always RID. Supported
+            # shapes include e.g. Dataset_file.file -> file.id, so the join
+            # must route through the member table on this column and only
+            # then reach the feature table (whose member FK does target RID,
+            # since deriva-ml creates feature associations itself).
+            member_target_column = other_fkey.referenced_columns[0].name
 
             try:
                 features = self.find_features(member_table)
@@ -1732,10 +1740,20 @@ class ExecutionMixin:
                 ftable_meta = feature.feature_table
                 try:
                     membership_path = pb.schemas[membership_table.schema.name].tables[membership_table.name]
+                    member_path = pb.schemas[member_table.schema.name].tables[member_table.name]
                     ftable = pb.schemas[ftable_meta.schema.name].tables[ftable_meta.name]
-                    path = membership_path.filter(membership_path.Dataset == dataset_rid).link(
-                        ftable,
-                        on=(membership_path.columns[member_link_column] == ftable.columns[member_table.name]),
+                    path = (
+                        membership_path.filter(membership_path.Dataset == dataset_rid)
+                        .link(
+                            member_path,
+                            on=(
+                                membership_path.columns[member_link_column] == member_path.columns[member_target_column]
+                            ),
+                        )
+                        .link(
+                            ftable,
+                            on=(member_path.RID == ftable.columns[member_table.name]),
+                        )
                     )
                     groups = path.groupby(ftable.Execution).attributes(datapath.CntD(ftable.RID).alias("value_count"))
                     for row in groups.fetch():

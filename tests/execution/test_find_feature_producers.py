@@ -101,41 +101,71 @@ def _mixin(associations, features_by_table, grouped_rows_by_feature, fail_featur
 
     membership_paths = {}
 
+    class _KeyRecorder:
+        """columns mock that records which column names were accessed."""
+
+        def __init__(self):
+            self.accessed = []
+
+        def __getitem__(self, key):
+            self.accessed.append(key)
+            return MagicMock()
+
     class _MembershipTable:
         def __init__(self, name):
             self.name = name
             self.filter_calls = 0
+            self.link_targets = []
             self.Dataset = MagicMock()
-            self.columns = MagicMock()
+            self.columns = _KeyRecorder()
 
         def filter(self, pred):
             self.filter_calls += 1
+            outer = self
 
-            class _Path:
+            class _MemberHop:
+                """Path after linking the member table; next hop is the feature table."""
+
                 def link(self, ftable, on=None):
-                    p = MagicMock()
+                    outer.link_targets.append(ftable)
                     fname = ftable._fname
                     if fname in fail_features:
                         raise RuntimeError("feature table unreadable")
+                    p = MagicMock()
                     p.groupby.return_value.attributes.return_value.fetch.return_value = list(
                         grouped_rows_by_feature.get(fname, [])
                     )
                     return p
 
+            class _Path:
+                def link(self, member_tbl, on=None):
+                    outer.link_targets.append(member_tbl)
+                    return _MemberHop()
+
             return _Path()
+
+    class _MemberTable:
+        def __init__(self, name):
+            self.name = name
+            self.RID = MagicMock()
+            self.columns = _KeyRecorder()
 
     class _FeatureTable:
         def __init__(self, name):
             self._fname = name
             self.Execution = MagicMock()
             self.RID = MagicMock()
-            self.columns = MagicMock()
+            self.columns = _KeyRecorder()
 
     all_tables = {}
-    for membership_name, _m, _c in associations:
+    member_table_mocks = {}
+    for membership_name, member_name, _c in associations:
         mt = _MembershipTable(membership_name)
         membership_paths[membership_name] = mt
         all_tables[membership_name] = mt
+        if member_name not in member_table_mocks:
+            member_table_mocks[member_name] = _MemberTable(member_name)
+            all_tables[member_name] = member_table_mocks[member_name]
     for member_name, fns in features_by_table.items():
         for fn in fns:
             fname = f"Feature_{member_name}_{fn}"
@@ -145,12 +175,12 @@ def _mixin(associations, features_by_table, grouped_rows_by_feature, fail_featur
     pb = MagicMock()
     pb.schemas = {"domain": schema, "deriva-ml": schema}
     ml.pathBuilder = lambda: pb
-    return ml, membership_paths
+    return ml, membership_paths, member_table_mocks
 
 
 def test_aggregates_per_execution_feature_element():
     e1, e2 = _rid(10), _rid(11)
-    ml, paths = _mixin(
+    ml, paths, _members = _mixin(
         associations=[("Dataset_Image", "Image", "Image")],
         features_by_table={"Image": ["Annotation"]},
         grouped_rows_by_feature={
@@ -170,7 +200,7 @@ def test_aggregates_per_execution_feature_element():
 
 
 def test_null_execution_is_first_class_result():
-    ml, _ = _mixin(
+    ml, _, _members = _mixin(
         associations=[("Dataset_Image", "Image", "Image")],
         features_by_table={"Image": ["Annotation"]},
         grouped_rows_by_feature={"Feature_Image_Annotation": [{"Execution": None, "value_count": 7}]},
@@ -183,7 +213,7 @@ def test_null_execution_is_first_class_result():
 
 def test_per_feature_failure_degrades_keeping_others():
     e1 = _rid(10)
-    ml, _ = _mixin(
+    ml, _, _members = _mixin(
         associations=[("Dataset_Image", "Image", "Image")],
         features_by_table={"Image": ["Broken", "Annotation"]},
         grouped_rows_by_feature={"Feature_Image_Annotation": [{"Execution": e1, "value_count": 2}]},
@@ -195,7 +225,7 @@ def test_per_feature_failure_degrades_keeping_others():
 
 def test_multiple_member_tables_and_deterministic_order():
     e1 = _rid(10)
-    ml, _ = _mixin(
+    ml, _, _members = _mixin(
         associations=[
             ("Dataset_Subject", "Subject", "Subject"),
             ("Dataset_Image", "Image", "Image"),
@@ -215,7 +245,7 @@ def test_multiple_member_tables_and_deterministic_order():
 
 
 def test_nested_dataset_members_skipped_and_no_features_empty():
-    ml, _ = _mixin(
+    ml, _, _members = _mixin(
         associations=[
             ("Dataset_Dataset", "Dataset", "Nested_Dataset"),
             ("Dataset_Image", "Image", "Image"),
@@ -224,3 +254,32 @@ def test_nested_dataset_members_skipped_and_no_features_empty():
         grouped_rows_by_feature={},
     )
     assert ml.find_feature_producers(_rid(500)) == []
+
+
+def test_non_rid_member_key_routes_join_through_member_table():
+    """A membership FK targeting a non-RID key (e.g. file.id) must join
+    membership -> member on that column, then member.RID -> feature table.
+
+    Pins the codex-review P1: comparing the membership FK value directly
+    against the feature table's RID-based FK silently returns no matches
+    for this supported schema shape.
+    """
+    e1 = _rid(10)
+    ml, paths, members = _mixin(
+        associations=[("Dataset_file", "file", "file")],
+        features_by_table={"file": ["Checksum"]},
+        grouped_rows_by_feature={"Feature_file_Checksum": [{"Execution": e1, "value_count": 2}]},
+    )
+    # Simulate the FK referencing file.id rather than file.RID.
+    assocs = ml.lookup_dataset(_rid(500))._dataset_table.find_associations()
+    assocs[0].other_fkeys[0].referenced_columns[0].name = "id"
+
+    out = ml.find_feature_producers(_rid(500))
+
+    assert [(r.execution_rid, r.value_count) for r in out] == [(e1, 2)]
+    membership = paths["Dataset_file"]
+    # First hop links the MEMBER table, second the feature table.
+    assert membership.link_targets[0] is members["file"]
+    assert getattr(membership.link_targets[1], "_fname", None) == "Feature_file_Checksum"
+    # The member side of the first hop used the FK's referenced column.
+    assert "id" in members["file"].columns.accessed
