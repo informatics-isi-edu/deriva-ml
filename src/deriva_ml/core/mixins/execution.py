@@ -118,6 +118,35 @@ class ExecutionMixin:
     _retrieve_rid: Callable[[RID], dict[str, Any]]
     _execution: "Execution"
 
+    def _sentinel_execution_rid_or_none(self) -> RID | None:
+        """RID of the unknown-provenance Execution sentinel, or None if absent.
+
+        Non-raising variant used by lineage classification: absence (a catalog
+        that never adopted the provenance contract) is a normal answer, not an
+        error, so it returns None rather than raising — transport and auth
+        failures still propagate. The positive result is cached on the instance
+        (``self._sentinel_exec_rid``); absence is never cached, because contract
+        adoption can happen during the instance lifetime.
+
+        Returns:
+            The sentinel Execution's RID, or None when no sentinel row exists.
+
+        Example:
+            >>> rid = ml._sentinel_execution_rid_or_none()  # doctest: +SKIP
+        """
+        cached = getattr(self, "_sentinel_exec_rid", None)
+        if cached is not None:
+            return cached
+        from deriva_ml.core.constants import SENTINEL_EXECUTION_DESCRIPTION
+
+        pb = self.pathBuilder()
+        exe = pb.schemas[self.ml_schema].Execution
+        rows = list(exe.filter(exe.Description == SENTINEL_EXECUTION_DESCRIPTION).entities())
+        if not rows:
+            return None
+        self._sentinel_exec_rid = rows[0]["RID"]
+        return self._sentinel_exec_rid
+
     def unknown_provenance_execution_rid(self) -> RID:
         """RID of the seeded unknown-provenance Execution sentinel.
 
@@ -135,17 +164,13 @@ class ExecutionMixin:
         Example:
             >>> rid = ml.unknown_provenance_execution_rid()  # doctest: +SKIP
         """
-        from deriva_ml.core.constants import SENTINEL_EXECUTION_DESCRIPTION
-
-        pb = self.pathBuilder()
-        exe = pb.schemas[self.ml_schema].Execution
-        rows = list(exe.filter(exe.Description == SENTINEL_EXECUTION_DESCRIPTION).entities())
-        if not rows:
+        rid = self._sentinel_execution_rid_or_none()
+        if rid is None:
             raise DerivaMLException(
                 "Unknown-provenance Execution sentinel not found; catalog was not "
                 "initialized with provenance-contract sentinels."
             )
-        return rows[0]["RID"]
+        return rid
 
     def unknown_provenance_file_rid(self) -> RID:
         """RID of the seeded unknown-provenance File sentinel.
