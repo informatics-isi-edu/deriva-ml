@@ -39,12 +39,21 @@ class WorkflowSummary(BaseModel):
         rid: Workflow RID.
         name: Human-readable workflow name (None if the row has no
             name set).
+        url: URI of the workflow's source code (typically a GitHub URL);
+            None if unrecorded.
+        version: Version label recorded on the Workflow row. Caveat: a
+            Workflow row is deduplicated per definition, so this reflects
+            when the row was FIRST registered — not necessarily the code
+            version any particular execution ran (see issue #373); per-run
+            code identity comes from the execution's environment snapshot.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     rid: RID
     name: str | None = None
+    url: str | None = None
+    version: str | None = None
 
 
 class ExecutionSummary(BaseModel):

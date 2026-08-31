@@ -119,6 +119,26 @@ class ExecutionMixin:
     _retrieve_rid: Callable[[RID], dict[str, Any]]
     _execution: "Execution"
 
+    def unknown_provenance_execution_rid_or_none(self) -> RID | None:
+        """RID of the unknown-provenance Execution sentinel, or None if absent.
+
+        Public non-raising counterpart of
+        :meth:`unknown_provenance_execution_rid`, for callers that merely
+        classify ("is this RID the sentinel?") — on a catalog that never
+        adopted the provenance contract, absence is a normal answer, not an
+        error. Transport and auth failures still propagate. The positive
+        result is cached on the instance; absence is never cached.
+
+        Returns:
+            The sentinel Execution's RID, or None when no sentinel row exists.
+
+        Example:
+            >>> ml_instance = DerivaML(hostname="example.org", catalog_id="1")  # doctest: +SKIP
+            >>> sentinel = ml_instance.unknown_provenance_execution_rid_or_none()  # doctest: +SKIP
+            >>> is_sentinel = some_rid == sentinel if sentinel else False  # doctest: +SKIP
+        """
+        return self._sentinel_execution_rid_or_none()
+
     def _sentinel_execution_rid_or_none(self) -> RID | None:
         """RID of the unknown-provenance Execution sentinel, or None if absent.
 
@@ -1530,16 +1550,24 @@ class ExecutionMixin:
         exec_rows = _chunked_rows(exec_path, distinct)
 
         wf_rids = list(dict.fromkeys(row.get("Workflow") for row in exec_rows if row.get("Workflow")))
-        wf_names: dict[RID, str | None] = {}
+        wf_rows: dict[RID, dict[str, Any]] = {}
         if wf_rids:
             wf_path = pb.schemas[self.ml_schema].tables["Workflow"]
             for wrow in _chunked_rows(wf_path, wf_rids):
-                wf_names[wrow["RID"]] = wrow.get("Name")
+                wf_rows[wrow["RID"]] = wrow
 
         out: dict[RID, ExecutionSummary] = {}
         for row in exec_rows:
             wf_rid = row.get("Workflow")
-            wf_summary = WorkflowSummary(rid=wf_rid, name=wf_names.get(wf_rid)) if wf_rid else None
+            wf_summary = None
+            if wf_rid:
+                wrow = wf_rows.get(wf_rid, {})
+                wf_summary = WorkflowSummary(
+                    rid=wf_rid,
+                    name=wrow.get("Name"),
+                    url=wrow.get("URL"),
+                    version=wrow.get("Version"),
+                )
             out[row["RID"]] = ExecutionSummary(
                 rid=row["RID"],
                 description=row.get("Description"),
@@ -1858,6 +1886,8 @@ class ExecutionMixin:
                 wf_summary = WorkflowSummary(
                     rid=record.workflow.workflow_rid,
                     name=record.workflow.name,
+                    url=getattr(record.workflow, "url", None),
+                    version=getattr(record.workflow, "version", None),
                 )
 
             execution_summary = ExecutionSummary(

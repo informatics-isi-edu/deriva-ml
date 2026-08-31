@@ -53,6 +53,8 @@ class _StubResolved:
 class _StubWorkflow:
     workflow_rid: str
     name: str
+    url: str | None = None
+    version: str | None = None
 
 
 @dataclass
@@ -1129,3 +1131,25 @@ def test_asset_root_shape_carries_no_dataset_fields():
     assert result.lineage is not None
     assert result.lineage.execution.rid == producer
     assert result.root.producing_execution.rid == producer  # non-Dataset overwrite kept
+def test_walk_node_workflow_summary_carries_url_and_version():
+    """Lineage nodes expose workflow code identity with no extra lookups (#372)."""
+    producer = _gen_rid(80)
+    ml = _FakeML()
+    ml.add_dataset(_gen_rid(81), producer=None)
+    ml.add_execution(
+        producer,
+        input_datasets=[],
+        workflow=_StubWorkflow(
+            workflow_rid=_gen_rid(82),
+            name="trainer",
+            url="https://github.com/org/model-repo",
+            version="0.3.4",
+        ),
+    )
+    ml.add_asset(_gen_rid(83), asset_table="Image", filename="m.keras", producer=producer)
+
+    result = ml.lookup_lineage(_gen_rid(83))
+
+    wf = result.lineage.execution.workflow
+    assert wf.url == "https://github.com/org/model-repo"
+    assert wf.version == "0.3.4"
