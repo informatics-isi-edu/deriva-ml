@@ -79,8 +79,9 @@ def _version_row_sort_key(row: dict[str, Any]) -> tuple:
         A tuple comparable against any other row's key.
 
     Example:
-        >>> _version_row_sort_key({"RCT": "2025-01-01T00:00:00Z", "Version": "1.0.0"}) < \
-        ...     _version_row_sort_key({"RCT": "2026-01-01T00:00:00Z", "Version": "0.1.0"})
+        >>> earlier = _version_row_sort_key({"RCT": "2025-01-01T00:00:00Z", "Version": "1.0.0"})
+        >>> later = _version_row_sort_key({"RCT": "2026-01-01T00:00:00Z", "Version": "0.1.0"})
+        >>> earlier < later
         True
     """
     rct = row.get("RCT") or ""
@@ -1198,8 +1199,9 @@ class ExecutionMixin:
         ``docs/adr/0001-lineage-walks-data-flow-not-orchestration.md``
         for the rationale.
 
-        For Dataset roots, the producer is taken from the **current**
-        version's ``Dataset_Version.Execution`` row. Walking a
+        For Dataset roots, ``root.producing_execution`` reports the
+        **origin** — the author of the first-recorded
+        ``Dataset_Version`` row — never the latest writer. Walking a
         historical version is a future enhancement.
 
         Args:
@@ -1220,6 +1222,19 @@ class ExecutionMixin:
             with the producing-execution tree plus transparency
             flags (``walked_complete``, ``cycle_detected``,
             ``depth_capped``, ``executions_visited``).
+
+            For a Dataset root, ``root.producing_execution`` is the ORIGIN —
+            the author of the first-recorded ``Dataset_Version`` row — not
+            the latest writer. ``root.origin_recorded`` says whether that
+            origin is a real recorded execution (False when it is the
+            unknown-provenance sentinel or absent), and
+            ``root.version_history`` lists every version's author, earliest
+            first, so migrations and backfills appear as touchers rather
+            than as "the producer". The walk (``result.lineage``) seeds from
+            the origin when it is real and expandable, otherwise from member
+            producers; the unknown-provenance sentinel never seeds the walk.
+            ``depth=0`` bounds recursion but still resolves the root node
+            and member producers — cheap, not free.
 
         Raises:
             DerivaMLException: If ``rid`` does not exist, points at a
@@ -1515,8 +1530,9 @@ class ExecutionMixin:
             version: When given, return the ``Execution`` recorded on that
                 specific version's ``Dataset_Version`` row (the execution that
                 produced the consumed version). When ``None`` (default), return
-                the producer of the **latest** version — the historical
-                behavior, unchanged for existing callers and the root path.
+                the **origin** — the author of the first-recorded
+                ``Dataset_Version`` row (RCT-primary order), not the latest
+                writer. See issue #367.
 
         Returns:
             The producing-execution RID, or ``None`` if the dataset has no
@@ -1525,7 +1541,7 @@ class ExecutionMixin:
 
         Example:
             >>> ml._producer_of_dataset("1-DSAA")  # doctest: +SKIP
-            '2-EXV2'
+            '2-EXV1'
             >>> ml._producer_of_dataset("1-DSAA", version="1.0.0")  # doctest: +SKIP
             '2-EXV1'
         """
