@@ -245,10 +245,14 @@ defined in that section.
   value and an execution to a member object** — the triple
   *(member, value, execution)*. This is not an interpretation layered on
   the schema; it is the schema: a feature is recognized (`is_feature`,
-  `model/catalog.py`) as an association table carrying exactly the
-  `Feature_Name` FK, the **`Execution` FK**, and the target-object FK,
-  so the execution is a component of the binding's *identity*, not
-  provenance metadata about it. Two gradings of the same member are two
+  `model/catalog.py`) as an association table carrying the
+  `Feature_Name` and **`Execution`** columns as *required markers*
+  alongside the target-object FK — with any number of additional value
+  FKs (vocabulary terms, assets, key-qualifiers such as eye-ai's
+  `Image_Side`; discovery is deliberately `max_arity=None`). The
+  "value" of the binding may therefore span several columns; what makes
+  the triple is that the execution marker is a component of the
+  binding's *identity*, not provenance metadata about it. Two gradings of the same member are two
   distinct bindings distinguished by their executions — which is why
   multi-annotator selection (`FeatureRecord.select_newest`, …) is
   selection among bindings, never deduplication of one value.
