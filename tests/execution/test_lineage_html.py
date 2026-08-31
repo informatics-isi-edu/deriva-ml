@@ -237,3 +237,29 @@ def test_bare_model_dump_input_still_works(tmp_path):
     src.write_text(json.dumps(_dataset_result().model_dump()), encoding="utf-8")
     assert main(["--input", str(src), "--output", str(out)]) == 0
     assert _rid(1) in out.read_text(encoding="utf-8")
+
+
+def test_svg_nodes_carry_native_tooltips():
+    """Execution boxes, dataset pills, feature marks, and arrows carry
+    SVG <title> hover tooltips (parity with the deploy visualizer)."""
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert svg.count("<title>") >= 4  # exec node, dataset pill, feature mark, arrow
+    assert "Completed" in svg  # execution tooltip carries status
+    assert "cohort" in svg  # dataset tooltip carries the description
+    assert _rid(40) in svg  # feature tooltip names the producing execution
+    assert "upstream producer" in svg  # arrow tooltip states the honest relation
+
+
+def test_svg_tooltip_text_is_escaped():
+    hostile = LineageResult(
+        root=RootDescriptor(rid=_rid(9), type="Execution", description=None),
+        lineage=LineageNode(
+            execution=ExecutionSummary(
+                rid=_rid(60), description='<img src=x onerror=alert(1)>', workflow=None, status="Failed"
+            )
+        ),
+    )
+    page = lineage_result_to_html(hostile)
+    assert "<img src=x" not in page
+    assert "&lt;img" in page

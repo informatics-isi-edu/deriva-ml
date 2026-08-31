@@ -294,14 +294,23 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
         for n in col:
             ex = n.get("execution") or {}
             rid = ex.get("rid") or ""
-            wf = (ex.get("workflow") or {}).get("name") or ""
+            wf_rec = ex.get("workflow") or {}
+            wf = wf_rec.get("name") or ""
+            tip_lines = [
+                f"{rid} [{ex.get('status') or 'Unknown'}]",
+                ex.get("description") or "",
+                f"workflow: {wf}" + (f" v{wf_rec['version']}" if wf_rec.get("version") else ""),
+                wf_rec.get("url") or "",
+            ]
+            tip = _esc(chr(10).join(x for x in tip_lines if x))
             parts.append(
+                f"<g><title>{tip}</title>"
                 f'<rect x="{x}" y="{y}" width="{box_w}" height="{box_h}" rx="8" '
                 f'fill="#eef2f6" stroke="#1c4f8a"/>'
                 f'<text x="{x + 10}" y="{y + 19}" font-size="12" '
                 f'font-family="ui-monospace,monospace">{_esc(rid)}</text>'
                 f'<text x="{x + 10}" y="{y + 36}" font-size="10" fill="#6b7686">'
-                f"{_esc(wf[:28])}</text>"
+                f"{_esc(wf[:28])}</text></g>"
             )
             centers[id(n)] = (x, y + box_h / 2)
             dy = y + box_h + 4
@@ -309,20 +318,34 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                 label = _esc(d.get("rid"))
                 if d.get("version"):
                     label += f" @ {_esc(d['version'])}"
+                ds_tip_lines = [
+                    f"{d.get('rid')}" + (f" @ v{d['version']}" if d.get("version") else ""),
+                    d.get("description") or "",
+                    f"consumed by {rid}",
+                ]
+                ds_tip = _esc(chr(10).join(x for x in ds_tip_lines if x))
                 parts.append(
+                    f"<g><title>{ds_tip}</title>"
                     f'<rect x="{x + 14}" y="{dy}" width="{box_w - 28}" height="{ds_h}" '
                     f'rx="11" fill="#e8eef7" stroke="#9db4d3"/>'
                     f'<text x="{x + 24}" y="{dy + 15}" font-size="10" '
-                    f'font-family="ui-monospace,monospace">{label}</text>'
+                    f'font-family="ui-monospace,monospace">{label}</text></g>'
                 )
                 dy += ds_h + 4
                 n_feat = feat_counts.get(d.get("rid"))
                 if n_feat:
+                    feat_tip_lines = ["feature-producer candidates (not lineage edges):"] + [
+                        f"{r.get('execution_rid') or '(no producing execution)'}: "
+                        f"{r.get('feature_name')} x{r.get('value_count')} on {r.get('element_type')}"
+                        for r in (feature_producers or {}).get(d.get("rid"), [])
+                    ]
+                    feat_tip = _esc(chr(10).join(feat_tip_lines))
                     parts.append(
+                        f"<g><title>{feat_tip}</title>"
                         f'<rect x="{x + 28}" y="{dy}" width="{box_w - 42}" height="{ds_h}" '
                         f'rx="4" fill="none" stroke="#a15c00" stroke-dasharray="4 3"/>'
                         f'<text x="{x + 36}" y="{dy + 15}" font-size="10" fill="#a15c00">'
-                        f"{n_feat} feature producer(s)</text>"
+                        f"{n_feat} feature producer(s)</text></g>"
                     )
                     dy += ds_h + 4
             y += node_height(n) + gap_y
@@ -332,11 +355,15 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
             cx, cy = centers[id(n)]
             for parent in n.get("parents") or []:
                 px, py = centers[id(parent)]
+                p_rid = (parent.get("execution") or {}).get("rid") or "?"
+                c_rid = (n.get("execution") or {}).get("rid") or "?"
+                arrow_tip = _esc(f"{p_rid} is an upstream producer of inputs consumed by {c_rid}")
                 parts.append(
+                    f"<g><title>{arrow_tip}</title>"
                     f'<line x1="{px}" y1="{py}" x2="{cx + box_w}" y2="{cy}" '
                     f'stroke="#6b7686" stroke-width="1.5"/>'
                     f'<polygon points="{cx + box_w + 6},{cy} {cx + box_w + 14},{cy - 4} '
-                    f'{cx + box_w + 14},{cy + 4}" fill="#6b7686"/>'
+                    f'{cx + box_w + 14},{cy + 4}" fill="#6b7686"/></g>'
                 )
     parts.append("</svg>")
     return (
