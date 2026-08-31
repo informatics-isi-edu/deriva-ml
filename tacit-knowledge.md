@@ -470,3 +470,40 @@ lineage silently lost). Lesson: an invariant stated as "X never happens
 via path P" should be re-checked against every OTHER path that supplies
 the same value — the backfill made the sentinel an ordinary member of a
 set the design treated as sentinel-free.
+
+### 2026-08-31 — Dataset_Dataset version pinning: implicit-not-absent (refines the #367 split-out)
+
+**Correction to the recorded framing.** The #367 entry (and the issue)
+said Dataset_Dataset "has no version pin — can't say which of a
+parent's 85 versions a child derived from." Too strong. Carl's
+question "why is Dataset_Dataset different from any other dataset
+construction?" surfaced the real structure:
+
+- **Mechanically it is NOT different**: every membership association
+  (Dataset_Image, Dataset_Subject, Dataset_Dataset) is version-blind
+  row-wise and versioned by **catalog snapshot** — each
+  Dataset_Version row pins a Snapshot; membership-at-version = read
+  the association at that snapshot.
+- **The one real difference**: it is the only membership edge whose
+  TARGET is itself versioned, so "which version of the member?" is
+  askable — and answered *implicitly*: at the parent version's
+  snapshot, the child's Dataset.Version pointer is readable. Version
+  propagation (topological, children-before-parents,
+  dataset.py:~1051) keeps this coherent: child changes force parent
+  bumps whose snapshots see the new child state.
+- **Residual gap (the honest version)**: the implicit answer is
+  always "current at snaptime". It cannot express INTENT (a
+  collection deliberately containing child @ an older version — the
+  nesting analog of DatasetSpec's version pin on consumption), cannot
+  distinguish "derived from vX" from "vX happened to be current", and
+  fails where snapshots are missing (dev rows Snapshot=NULL,
+  pre-snapshot-era versions — the same population lacking origin
+  executions).
+
+**Consequence for the prospective issue:** an explicit
+Dataset_Version FK on Dataset_Dataset is a semantic EXTENSION
+(pinnable containment, mirroring Dataset_Execution), not recovery of
+lost data. File it, if at all, on the intent-pinning motivation —
+and it may not clear YAGNI until someone actually needs old-version
+containment. Do not re-file it as "derivation is unrecoverable";
+snapshot reads recover it wherever snapshots exist.
