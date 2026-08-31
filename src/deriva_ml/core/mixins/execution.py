@@ -1500,16 +1500,23 @@ class ExecutionMixin:
             return set()
 
         # The snapshot pathBuilder reflects the catalog schema at the time the
-        # dataset version was captured.  If the membership table (e.g.
-        # ``Dataset_Image``) was added *after* that snapshot, it won't appear
-        # in the snapshot's schema — which also means the snapshot contains no
-        # rows for it, so the correct answer is an empty producer set.
+        # dataset version was captured.  If any of these tables (the membership
+        # table e.g. ``Dataset_Image``, the member table, or the
+        # ``<member>_Execution`` association) was added *after* that snapshot,
+        # it won't appear in the snapshot's schema — which also means the
+        # snapshot contains no rows for it, so the correct answer is an empty
+        # producer set.
+        #
+        # All three must be guarded together: an unguarded lookup here raises
+        # KeyError out through lookup_lineage, so the caller loses the whole
+        # lineage walk (consumed datasets, consumed assets, parents) rather
+        # than just this producer set.  See issue #365.
         try:
             membership_path = snapshot_pb.schemas[membership_table.schema.name].tables[membership_table.name]
+            member_path = snapshot_pb.schemas[member_table.schema.name].tables[member_table.name]
+            exec_path = snapshot_pb.schemas[exec_assoc.schema.name].tables[exec_assoc.name]
         except KeyError:
             return set()
-        member_path = snapshot_pb.schemas[member_table.schema.name].tables[member_table.name]
-        exec_path = snapshot_pb.schemas[exec_assoc.schema.name].tables[exec_assoc.name]
 
         path = (
             membership_path.filter(membership_path.Dataset == dataset_rid)
