@@ -106,6 +106,33 @@ class AssetSummary(BaseModel):
     asset_table: str
 
 
+class VersionAttribution(BaseModel):
+    """One entry in a dataset root's version-attribution trace.
+
+    The trace lists every ``Dataset_Version`` row for the dataset,
+    earliest recorded first, so a consumer can see who authored each
+    version — distinguishing the origin (first entry) from later
+    touchers such as migrations or backfills.
+
+    Attributes:
+        version: The version label as stored (e.g. ``"4.13.0"``).
+        execution_rid: Raw ``Execution`` column value — the recorded
+            author RID, or None if the row carries no author. Kept
+            separate from ``execution`` so "no author recorded" and
+            "author could not be resolved" are distinguishable.
+        execution: Resolved summary of the author, or None when
+            ``execution_rid`` is None or the lookup could not resolve it.
+        description: The version's release notes.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: str
+    execution_rid: RID | None = None
+    execution: ExecutionSummary | None = None
+    description: str | None = None
+
+
 class LineageNode(BaseModel):
     """One execution node in the lineage tree.
 
@@ -137,21 +164,29 @@ class LineageNode(BaseModel):
 
 
 class RootDescriptor(BaseModel):
-    """Describes the artifact the lineage walk started from.
+    """The artifact lineage was requested for.
 
     Attributes:
-        rid: RID of the root artifact passed to ``lookup_lineage``.
-        type: One of ``"Dataset"``, ``"Asset"``, ``"Feature"``, or
-            ``"Execution"``. Determines how
-            ``producing_execution`` was resolved.
-        description: Description of the root, when available
-            (Dataset.description, Asset.description,
-            Execution.description). None for Feature values, which
-            don't have a free-text description column at this layer.
-        producing_execution: The execution that produced this
-            artifact, or None if the artifact has no recorded
-            producer (manually inserted data, etc.). For an
-            Execution root, this is the execution itself.
+        rid: The root artifact's RID.
+        type: Artifact kind — Dataset, Asset, Feature, or Execution.
+        description: The artifact's description, if any.
+        producing_execution: For datasets, the ORIGIN — the author of the
+            first-recorded ``Dataset_Version`` row (the unknown-provenance
+            sentinel included, when that is what the row records). For other
+            types, the immediate producing execution. May be None when no
+            producer is recorded or the recorded RID cannot be resolved; for
+            datasets the raw recorded RID then remains available at
+            ``version_history[0].execution_rid``. This is origin
+            *attribution* and no longer necessarily equals the walk root
+            ``LineageResult.lineage.execution`` (see that model's docstring).
+        origin_recorded: Datasets only — True when a real (non-sentinel)
+            origin execution is recorded (even if its summary could not be
+            resolved); False when the origin is the unknown-provenance
+            sentinel, the first version row carries no execution, or the
+            dataset has no version rows; None for non-Dataset roots (not
+            applicable).
+        version_history: Datasets only — the full version-attribution trace,
+            earliest recorded first. Empty for non-Dataset roots.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -160,6 +195,8 @@ class RootDescriptor(BaseModel):
     type: Literal["Dataset", "Asset", "Feature", "Execution"]
     description: str | None = None
     producing_execution: ExecutionSummary | None = None
+    origin_recorded: bool | None = None
+    version_history: list[VersionAttribution] = Field(default_factory=list)
 
 
 class LineageResult(BaseModel):
@@ -172,9 +209,12 @@ class LineageResult(BaseModel):
 
     Attributes:
         root: Descriptor of the artifact the walk started from.
-        lineage: Tree of producing executions, rooted at the
-            immediate producer of ``root``. None when the root has
-            no recorded producer.
+        lineage: The walked graph. Its root node is the walk seed — for
+            datasets this is the origin execution when it is real and
+            expandable, otherwise a member-producer representative (the
+            unknown-provenance sentinel never seeds the walk). It therefore
+            does not necessarily equal ``root.producing_execution``, which is
+            origin attribution. None when the root has no recorded producer.
         executions_visited: Number of distinct executions the walk
             expanded. Includes the root execution when present.
         walked_complete: True if the walk ran to the natural root of

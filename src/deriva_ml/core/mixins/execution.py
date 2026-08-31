@@ -11,6 +11,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
+from packaging.version import InvalidVersion
+from packaging.version import Version as _PEP440Version
+
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
@@ -32,6 +35,7 @@ if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord, MultirunStatusSummary
     from deriva_ml.execution.lineage import (
+        ExecutionSummary,
         LineageNode,
         LineageResult,
         RootDescriptor,
@@ -46,6 +50,49 @@ if TYPE_CHECKING:
 
 
 __all__ = ["ExecutionMixin"]
+
+# Chunk size for batched RID-disjunction fetches. Bounds URL length (the
+# tk-023 lesson: never one unbounded .in_()/disjunction over a caller-sized
+# set) while keeping request count low for realistic author counts.
+_SUMMARY_CHUNK_SIZE = 25
+
+
+def _version_row_sort_key(row: dict[str, Any]) -> tuple:
+    """Total sort key for a ``Dataset_Version`` row (spec: issue #367).
+
+    Ordering is ``(RCT, parseable-flag, parsed PEP 440 version, raw label)``:
+
+    - ``RCT`` primary: chronology of *recording*, which is the question the
+      origin resolution asks. ERMrest emits RCT as ISO-8601 UTC text, so
+      lexicographic comparison is chronological; a missing RCT sorts first
+      (epoch-minimum) and defers to the tiebreaks.
+    - Parseable labels sort before unparseable ones within an RCT tie; among
+      parseable ones PEP 440 order applies (``0.2.0`` < ``0.10.0``).
+    - The raw label string is the final tiebreak, making the order total even
+      for two unparseable labels or labels that normalize equal
+      (``1.0`` vs ``1.0.0``).
+
+    Args:
+        row: A ``Dataset_Version`` row dict (``RCT``, ``Version`` keys used).
+
+    Returns:
+        A tuple comparable against any other row's key.
+
+    Example:
+        >>> earlier = _version_row_sort_key({"RCT": "2025-01-01T00:00:00Z", "Version": "1.0.0"})
+        >>> later = _version_row_sort_key({"RCT": "2026-01-01T00:00:00Z", "Version": "0.1.0"})
+        >>> earlier < later
+        True
+    """
+    rct = row.get("RCT") or ""
+    label = row.get("Version") or ""
+    try:
+        return (rct, 0, _PEP440Version(label), label)
+    except InvalidVersion:
+        # Constant Version("0") in slot 3: never compared against a parseable
+        # row's key (flag differs), and equal among unparseable rows so the
+        # raw label decides.
+        return (rct, 1, _PEP440Version("0"), label)
 
 
 class ExecutionMixin:
@@ -72,6 +119,35 @@ class ExecutionMixin:
     _retrieve_rid: Callable[[RID], dict[str, Any]]
     _execution: "Execution"
 
+    def _sentinel_execution_rid_or_none(self) -> RID | None:
+        """RID of the unknown-provenance Execution sentinel, or None if absent.
+
+        Non-raising variant used by lineage classification: absence (a catalog
+        that never adopted the provenance contract) is a normal answer, not an
+        error, so it returns None rather than raising — transport and auth
+        failures still propagate. The positive result is cached on the instance
+        (``self._sentinel_exec_rid``); absence is never cached, because contract
+        adoption can happen during the instance lifetime.
+
+        Returns:
+            The sentinel Execution's RID, or None when no sentinel row exists.
+
+        Example:
+            >>> rid = ml._sentinel_execution_rid_or_none()  # doctest: +SKIP
+        """
+        cached = getattr(self, "_sentinel_exec_rid", None)
+        if cached is not None:
+            return cached
+        from deriva_ml.core.constants import SENTINEL_EXECUTION_DESCRIPTION
+
+        pb = self.pathBuilder()
+        exe = pb.schemas[self.ml_schema].Execution
+        rows = list(exe.filter(exe.Description == SENTINEL_EXECUTION_DESCRIPTION).entities())
+        if not rows:
+            return None
+        self._sentinel_exec_rid = rows[0]["RID"]
+        return self._sentinel_exec_rid
+
     def unknown_provenance_execution_rid(self) -> RID:
         """RID of the seeded unknown-provenance Execution sentinel.
 
@@ -89,17 +165,13 @@ class ExecutionMixin:
         Example:
             >>> rid = ml.unknown_provenance_execution_rid()  # doctest: +SKIP
         """
-        from deriva_ml.core.constants import SENTINEL_EXECUTION_DESCRIPTION
-
-        pb = self.pathBuilder()
-        exe = pb.schemas[self.ml_schema].Execution
-        rows = list(exe.filter(exe.Description == SENTINEL_EXECUTION_DESCRIPTION).entities())
-        if not rows:
+        rid = self._sentinel_execution_rid_or_none()
+        if rid is None:
             raise DerivaMLException(
                 "Unknown-provenance Execution sentinel not found; catalog was not "
                 "initialized with provenance-contract sentinels."
             )
-        return rows[0]["RID"]
+        return rid
 
     def unknown_provenance_file_rid(self) -> RID:
         """RID of the seeded unknown-provenance File sentinel.
@@ -1127,8 +1199,9 @@ class ExecutionMixin:
         ``docs/adr/0001-lineage-walks-data-flow-not-orchestration.md``
         for the rationale.
 
-        For Dataset roots, the producer is taken from the **current**
-        version's ``Dataset_Version.Execution`` row. Walking a
+        For Dataset roots, ``root.producing_execution`` reports the
+        **origin** — the author of the first-recorded
+        ``Dataset_Version`` row — never the latest writer. Walking a
         historical version is a future enhancement.
 
         Args:
@@ -1149,6 +1222,19 @@ class ExecutionMixin:
             with the producing-execution tree plus transparency
             flags (``walked_complete``, ``cycle_detected``,
             ``depth_capped``, ``executions_visited``).
+
+            For a Dataset root, ``root.producing_execution`` is the ORIGIN —
+            the author of the first-recorded ``Dataset_Version`` row — not
+            the latest writer. ``root.origin_recorded`` says whether that
+            origin is a real recorded execution (False when it is the
+            unknown-provenance sentinel or absent), and
+            ``root.version_history`` lists every version's author, earliest
+            first, so migrations and backfills appear as touchers rather
+            than as "the producer". The walk (``result.lineage``) seeds from
+            the origin when it is real and expandable, otherwise from member
+            producers; the unknown-provenance sentinel never seeds the walk.
+            ``depth=0`` bounds recursion but still resolves the root node
+            and member producers — cheap, not free.
 
         Raises:
             DerivaMLException: If ``rid`` does not exist, points at a
@@ -1181,48 +1267,76 @@ class ExecutionMixin:
         # 1. Classify the root RID with a single resolve_rid call.
         root_descriptor, producer_rid = self._classify_rid(rid)
 
-        # For a Dataset root, the members may have been produced by execution(s)
-        # other than the one that assembled/versioned the dataset. Those
-        # member-producers are data-flow parents and must be seeded into the
-        # walk so e.g. lookup_lineage(image_dataset) reaches the source the
-        # images were uploaded from. (See the lineage member-asset-traversal
-        # design spec; tk-018.)
-        extra_parent_rids: set[RID] = set()
+        # Member-producer discovery (tk-018): executions that produced member
+        # assets are data-flow parents even when the dataset itself has no
+        # usable walk seed.
+        member_producers: set[RID] = set()
         if root_descriptor.type == "Dataset":
             member_producers = self._producers_of_dataset_members(rid)
-            if producer_rid is not None:
-                # Subtract the version-producer so it is not listed as its own
-                # parent in the common case where it also produced some members.
-                extra_parent_rids = member_producers - {producer_rid}
-            elif member_producers:
-                # No version-producer, but the members have producers: walk from
-                # a deterministic representative; the rest become its parents.
-                ordered = sorted(member_producers)
-                producer_rid = ordered[0]
-                extra_parent_rids = set(ordered[1:])
+            # The unknown-provenance sentinel never seeds the walk and never
+            # becomes an extra parent — the provenance backfill attributes
+            # producerless member assets to it via Output edges, so it can
+            # legitimately show up in member_producers, but lineage
+            # terminates at the sentinel (design rule). _classify_rid already
+            # resolved (and cached) the sentinel RID for a Dataset root with a
+            # recorded origin, so this call is cheap; never made for
+            # non-Dataset roots.
+            sentinel_rid = self._sentinel_execution_rid_or_none()
+            if sentinel_rid is not None:
+                member_producers -= {sentinel_rid}
 
-        if producer_rid is None:
-            # No producer of any kind — return a valid result with an empty walk.
+        if producer_rid is None and not member_producers:
             return LineageResult(root=root_descriptor)
 
-        # 2. Walk iteratively from the producing execution.
         visited_global: set[RID] = set()
         in_progress: set[RID] = set()
         flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
 
-        lineage_root_node = self._walk_node(
-            execution_rid=producer_rid,
-            depth_remaining=depth,
-            max_executions=max_executions,
-            visited_global=visited_global,
-            in_progress=in_progress,
-            flags=flags,
-            extra_parent_rids=extra_parent_rids or None,
-        )
+        lineage_root_node: "LineageNode | None" = None
+        if root_descriptor.type == "Dataset":
+            # Candidate iteration (spec: walk seed vs. origin attribution): try
+            # candidates in order until one expands, rather than seeding once
+            # and retrying a single time. Origin first (when real and
+            # non-sentinel), then each remaining member producer in sorted
+            # order. Each attempt's extra_parent_rids is every OTHER
+            # discovered candidate (already-tried/failed seeds and the
+            # current seed excluded) so a later expansion still surfaces
+            # sibling producers as parents.
+            candidates: list[RID] = []
+            if producer_rid is not None:
+                candidates.append(producer_rid)
+            candidates.extend(r for r in sorted(member_producers) if r != producer_rid)
 
-        # The producing-execution summary on the root descriptor matches
-        # the top-most execution node we just expanded.
-        if lineage_root_node is not None:
+            all_candidates = set(candidates)
+            tried: set[RID] = set()
+            for seed in candidates:
+                tried.add(seed)
+                lineage_root_node = self._walk_node(
+                    execution_rid=seed,
+                    depth_remaining=depth,
+                    max_executions=max_executions,
+                    visited_global=visited_global,
+                    in_progress=in_progress,
+                    flags=flags,
+                    extra_parent_rids=(all_candidates - tried) or None,
+                )
+                if lineage_root_node is not None:
+                    break
+        else:
+            lineage_root_node = self._walk_node(
+                execution_rid=producer_rid,
+                depth_remaining=depth,
+                max_executions=max_executions,
+                visited_global=visited_global,
+                in_progress=in_progress,
+                flags=flags,
+            )
+
+        # Non-Dataset roots keep the historical behavior: the root's
+        # producing_execution is the walk-root summary. Dataset roots carry
+        # origin attribution from _classify_rid and are never overwritten —
+        # the walk root may legitimately differ (member-producer seeding).
+        if lineage_root_node is not None and root_descriptor.type != "Dataset":
             root_descriptor = root_descriptor.model_copy(update={"producing_execution": lineage_root_node.execution})
 
         return LineageResult(
@@ -1274,16 +1388,37 @@ class ExecutionMixin:
             )
 
         if table_name == "Dataset":
+            from deriva_ml.execution.lineage import VersionAttribution
+
             row = self._retrieve_rid(rid)
-            producer_rid = self._producer_of_dataset(rid)
-            return (
-                RootDescriptor(
-                    rid=rid,
-                    type="Dataset",
-                    description=row.get("Description"),
-                ),
-                producer_rid,
+            version_rows = self._dataset_version_rows(rid)
+            origin_rid = version_rows[0].get("Execution") if version_rows else None
+            sentinel_rid = self._sentinel_execution_rid_or_none() if origin_rid is not None else None
+            origin_is_sentinel = origin_rid is not None and origin_rid == sentinel_rid
+            author_summaries = self._execution_summaries(r.get("Execution") for r in version_rows)
+            history = [
+                VersionAttribution(
+                    version=r.get("Version") or "",
+                    execution_rid=r.get("Execution"),
+                    execution=author_summaries.get(r.get("Execution")),
+                    description=r.get("Description"),
+                )
+                for r in version_rows
+            ]
+            descriptor = RootDescriptor(
+                rid=rid,
+                type="Dataset",
+                description=row.get("Description"),
+                producing_execution=author_summaries.get(origin_rid) if origin_rid else None,
+                origin_recorded=bool(origin_rid) and not origin_is_sentinel,
+                version_history=history,
             )
+            # Walk seed: the origin only when real and non-sentinel. The
+            # sentinel never seeds the walk — lineage terminates at it, and
+            # seeding from it would fabricate edges claiming it consumed the
+            # member producers (spec: walk seed vs. origin attribution).
+            walk_seed = origin_rid if (origin_rid and not origin_is_sentinel) else None
+            return (descriptor, walk_seed)
 
         if self.model.is_asset(table):
             row = self._retrieve_rid(rid)
@@ -1318,6 +1453,92 @@ class ExecutionMixin:
             f"Feature-value, or Execution RIDs."
         )
 
+    def _dataset_version_rows(self, dataset_rid: RID) -> list[dict[str, Any]]:
+        """All ``Dataset_Version`` rows for ``dataset_rid``, earliest first.
+
+        Single catalog fetch; sorted by :func:`_version_row_sort_key` (RCT-primary
+        total order). The first row's ``Execution`` is the dataset's origin
+        attribution; the full list becomes the lineage root's version history.
+
+        Args:
+            dataset_rid: Dataset whose version history to fetch.
+
+        Returns:
+            Row dicts (system columns included), sorted earliest → latest.
+            Empty list if the dataset has no version rows.
+
+        Example:
+            >>> ds = ml.find_datasets()[0]  # doctest: +SKIP
+            >>> rows = ml._dataset_version_rows(ds.rid)  # doctest: +SKIP
+            >>> origin_rid = rows[0]["Execution"] if rows else None  # doctest: +SKIP
+        """
+        pb = self.pathBuilder()
+        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
+        return sorted(rows, key=_version_row_sort_key)
+
+    def _execution_summaries(self, rids: "Iterable[RID | None]") -> dict[RID, "ExecutionSummary"]:
+        """Resolve ExecutionSummary objects for a set of execution RIDs, batched.
+
+        Dedupes and drops None, then fetches Execution rows in chunks of
+        ``_SUMMARY_CHUNK_SIZE`` (one RID-equality disjunction per chunk), then
+        resolves the distinct Workflow names the same way — never a
+        per-execution N+1. RIDs that resolve to no row are absent from the
+        result; callers treat absence as "could not resolve".
+
+        Args:
+            rids: Execution RIDs (Nones ignored, duplicates collapsed).
+
+        Returns:
+            Mapping of execution RID to its ExecutionSummary.
+
+        Example:
+            >>> execs = ml.find_executions()[:2]  # doctest: +SKIP
+            >>> rids = [e.rid for e in execs]  # doctest: +SKIP
+            >>> summaries = ml._execution_summaries(rids)  # doctest: +SKIP
+            >>> summaries[rids[0]].status  # doctest: +SKIP
+            'Completed'
+        """
+        from deriva_ml.execution.lineage import ExecutionSummary, WorkflowSummary
+
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        if not distinct:
+            return {}
+
+        pb = self.pathBuilder()
+
+        def _chunked_rows(table_path: Any, wanted: list[RID]) -> list[dict[str, Any]]:
+            rows: list[dict[str, Any]] = []
+            for i in range(0, len(wanted), _SUMMARY_CHUNK_SIZE):
+                chunk = wanted[i : i + _SUMMARY_CHUNK_SIZE]
+                pred = table_path.RID == chunk[0]
+                for r in chunk[1:]:
+                    pred = pred | (table_path.RID == r)
+                rows.extend(table_path.filter(pred).entities().fetch())
+            return rows
+
+        exec_path = pb.schemas[self.ml_schema].tables["Execution"]
+        exec_rows = _chunked_rows(exec_path, distinct)
+
+        wf_rids = list(dict.fromkeys(row.get("Workflow") for row in exec_rows if row.get("Workflow")))
+        wf_names: dict[RID, str | None] = {}
+        if wf_rids:
+            wf_path = pb.schemas[self.ml_schema].tables["Workflow"]
+            for wrow in _chunked_rows(wf_path, wf_rids):
+                wf_names[wrow["RID"]] = wrow.get("Name")
+
+        out: dict[RID, ExecutionSummary] = {}
+        for row in exec_rows:
+            wf_rid = row.get("Workflow")
+            wf_summary = WorkflowSummary(rid=wf_rid, name=wf_names.get(wf_rid)) if wf_rid else None
+            out[row["RID"]] = ExecutionSummary(
+                rid=row["RID"],
+                description=row.get("Description"),
+                workflow=wf_summary,
+                status=row.get("Status") or "Unknown",
+            )
+        return out
+
     def _producer_of_dataset(self, dataset_rid: RID, version: Any | None = None) -> RID | None:
         """Return the Execution RID that produced a version of ``dataset_rid``.
 
@@ -1326,8 +1547,9 @@ class ExecutionMixin:
             version: When given, return the ``Execution`` recorded on that
                 specific version's ``Dataset_Version`` row (the execution that
                 produced the consumed version). When ``None`` (default), return
-                the producer of the **latest** version — the historical
-                behavior, unchanged for existing callers and the root path.
+                the **origin** — the author of the first-recorded
+                ``Dataset_Version`` row (RCT-primary order), not the latest
+                writer. See issue #367.
 
         Returns:
             The producing-execution RID, or ``None`` if the dataset has no
@@ -1335,36 +1557,29 @@ class ExecutionMixin:
             the matched row carries no ``Execution`` link.
 
         Example:
-            >>> ml._producer_of_dataset("1-DSAA")  # doctest: +SKIP
-            '2-EXV2'
-            >>> ml._producer_of_dataset("1-DSAA", version="1.0.0")  # doctest: +SKIP
+            >>> ds = ml.find_datasets()[0]  # doctest: +SKIP
+            >>> ml._producer_of_dataset(ds.rid)  # doctest: +SKIP
+            '2-EXV1'
+            >>> ml._producer_of_dataset(ds.rid, version=ds.current_version)  # doctest: +SKIP
             '2-EXV1'
         """
-        pb = self.pathBuilder()
-        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
-        rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
-        if not rows:
-            return None
-
         if version is not None:
+            pb = self.pathBuilder()
+            version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+            rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
             want = str(version)
             for row in rows:
                 if (row.get("Version") or "") == want:
                     return row.get("Execution")
             return None
 
-        # Pick the row with the highest semver-style Version. The catalog
-        # stores Version as text (e.g. "0.1.0"); sort lexically as a
-        # tuple of ints so "1.10.0" beats "1.2.0".
-        def _key(row: dict[str, Any]) -> tuple[int, ...]:
-            v = row.get("Version") or "0.0.0"
-            try:
-                return tuple(int(p) for p in v.split("."))
-            except ValueError:
-                return (0,)
-
-        latest = max(rows, key=_key)
-        return latest.get("Execution")
+        # Unversioned: the ORIGIN — the first-recorded row's author (issue
+        # #367). Last-writer-wins was the old behavior and reported whatever
+        # touched the dataset most recently (e.g. a data migration) as "the
+        # producer". Delegate to _dataset_version_rows, which already
+        # fetches and sorts (RCT-primary total order) for this exact use.
+        rows = self._dataset_version_rows(dataset_rid)
+        return rows[0].get("Execution") if rows else None
 
     def _version_rid(self, dataset_rid: RID, version: Any) -> RID | None:
         """RID of the ``Dataset_Version`` row for (``dataset_rid``, ``version``), or None.

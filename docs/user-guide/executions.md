@@ -634,6 +634,36 @@ producing Executions for each input.
 | Just the immediate producer, no parent chain | `ml.lookup_lineage(rid, depth=0)` |
 | Two generations back, no further | `ml.lookup_lineage(rid, depth=2)` |
 
+**Dataset producer = origin, not latest writer.** For a Dataset root,
+`lineage.root.producing_execution` is the **origin** — the author of the
+first-recorded `Dataset_Version` row — never the execution that last touched the
+dataset. This matters because datasets accumulate versions over their lifetime
+(splits, migrations, backfills), and only the first one answers "how did this
+dataset come to exist?". `lineage.root.origin_recorded` is a tri-state flag:
+
+- `True` — a real, non-sentinel execution is recorded as the origin (even if
+  its summary couldn't be resolved, e.g. the execution row was later deleted).
+- `False` — the first version's author is the unknown-provenance sentinel, the
+  first version row carries no execution at all, or the dataset has no version
+  rows.
+- `None` — the root isn't a Dataset, so origin tracking doesn't apply.
+
+`lineage.root.version_history` lists every `Dataset_Version` row's author,
+earliest first, as a `VersionAttribution` (version label, raw execution RID,
+resolved execution summary, description). This is how a later toucher stays
+visible without being mistaken for the producer: a data migration that bumps
+the dataset from v4.12.0 to v4.13.0 shows up as the v4.13.0 entry in
+`version_history`, not as `root.producing_execution` — the origin stays
+whichever execution created v1 (or the first version actually recorded).
+
+The walk itself (`lineage.lineage`) seeds from the origin when it is real and
+expandable; if the origin is the unknown-provenance sentinel, absent, or
+otherwise unexpandable, the walk seeds from the dataset's **member
+producers** instead — the executions that produced the dataset's member
+assets — so lineage still surfaces something useful. The unknown-provenance
+sentinel itself never seeds the walk. `depth=0` still resolves the root node
+and its member producers before stopping — cheap, but not free.
+
 **Bounds and safety.** The walk is unbounded by default — provenance traversal is an
 infrequent, deliberate request, not a hot path. Cycle detection is mandatory: if the
 catalog is corrupted with a true execution-chain cycle, the response sets
@@ -655,6 +685,16 @@ kept separate by design (see ADR-0001 in `docs/adr/`).
 data, or data loaded outside an execution), the call still succeeds:
 `lineage.root.producing_execution` is `None` and `lineage.lineage` is `None`. "It has
 no recorded producer" is a valid answer to "how did this come to exist?".
+
+For Dataset roots specifically, a sentinel origin reads as "origin unrecorded"
+rather than "no producer": `lineage.root.origin_recorded` is `False`, and
+`lineage.root.producing_execution` may still resolve to the sentinel's summary
+(it's a real row, just not a useful one) or be `None` if the summary can't be
+resolved — check `origin_recorded` rather than `producing_execution is None` to
+tell "unknown provenance" apart from a genuinely missing link. Either way, the
+sentinel never seeds `lineage.lineage`; the walk falls back to member producers
+so the response still surfaces something to trace, or `None` if there's nothing
+to fall back to.
 
 For the full method signature and the Pydantic model definitions, see
 [API Reference — Lineage](../api-reference/lineage.md).

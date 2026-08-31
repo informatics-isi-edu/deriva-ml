@@ -237,6 +237,61 @@ class _FakeML(ExecutionMixin):
             return self._versioned_dataset_producers.get((dataset_rid, str(version)))
         return self._dataset_producers.get(dataset_rid)
 
+    def _dataset_version_rows(self, dataset_rid: str) -> list[dict[str, Any]]:  # type: ignore[override]
+        """Synthesize a single-row version history from the scripted producer.
+
+        ``_classify_rid``'s Dataset branch reads the origin from
+        ``_dataset_version_rows()[0]`` rather than calling
+        ``_producer_of_dataset`` directly (#367). Tests here only script one
+        producer per dataset (via ``add_dataset(..., producer=...)``), so one
+        synthetic row — first-recorded, and therefore also the origin — fully
+        captures that intent.
+        """
+        if dataset_rid not in self._dataset_producers:
+            return []
+        return [
+            {
+                "RID": f"{dataset_rid}-VER",
+                "RCT": "2025-01-01T00:00:00Z",
+                "Version": "0.1.0",
+                "Execution": self._dataset_producers[dataset_rid],
+                "Description": None,
+            }
+        ]
+
+    def _sentinel_execution_rid_or_none(self) -> str | None:  # type: ignore[override]
+        return None
+
+    def _execution_summaries(self, rids: Any) -> dict[str, Any]:  # type: ignore[override]
+        """Resolve scripted execution RIDs to ExecutionSummary via lookup_execution.
+
+        Only used by ``_classify_rid`` to populate ``RootDescriptor.producing_execution``
+        and ``version_history[].execution``; the walk itself (and the
+        ``result.root.producing_execution`` assertions in these tests) is driven by
+        ``_walk_node``/``lookup_execution``, which overwrites this value once a walk
+        happens (see ``lookup_lineage``). Reuses the scripted ``_StubExecutionRecord``
+        to build a minimal ``ExecutionSummary`` for RIDs that resolve.
+        """
+        from deriva_ml.execution.lineage import ExecutionSummary, WorkflowSummary
+
+        out: dict[str, ExecutionSummary] = {}
+        for rid in rids:
+            if rid is None:
+                continue
+            rec = self._executions.get(rid)
+            if rec is None:
+                continue
+            wf_summary = (
+                WorkflowSummary(rid=rec.workflow.workflow_rid, name=rec.workflow.name) if rec.workflow else None
+            )
+            out[rid] = ExecutionSummary(
+                rid=rec.execution_rid,
+                description=rec.description,
+                workflow=wf_summary,
+                status=rec.status.value if hasattr(rec.status, "value") else str(rec.status),
+            )
+        return out
+
     def _producer_of_asset(self, asset_rid: str, asset_table: Any) -> str | None:  # type: ignore[override]
         return self._asset_producers.get(asset_rid)
 
@@ -579,7 +634,15 @@ def test_root_dataset_surfaces_member_producer_when_both_exist():
 
 def test_root_dataset_no_version_producer_walks_from_member_producers():
     """A dataset with NO version producer but WITH member producers yields a
-    non-empty walk (previously this returned an empty LineageResult)."""
+    non-empty walk (previously this returned an empty LineageResult).
+
+    #367: the walk root is seeded from the member producer, but with no
+    recorded origin the root's ``producing_execution`` stays unset — origin
+    attribution and walk seeding are separate concerns (tk-018/#367). This
+    assertion used to expect the walk root to overwrite
+    ``producing_execution`` (the old last-writer contract); that overwrite
+    no longer applies to Dataset roots.
+    """
     ml = _FakeML()
     ml.add_dataset("1-DSSR", producer=None)
     ml.add_execution("2-EXUP", input_datasets=[_StubDataset("1-DSSR")])
@@ -591,8 +654,8 @@ def test_root_dataset_no_version_producer_walks_from_member_producers():
     assert result.lineage is not None
     assert result.lineage.execution.rid == "2-EXUP"  # representative root
     assert {d.rid for d in result.lineage.consumed_datasets} == {"1-DSSR"}
-    assert result.root.producing_execution is not None
-    assert result.root.producing_execution.rid == "2-EXUP"
+    assert result.root.producing_execution is None  # no recorded origin (#367)
+    assert result.root.origin_recorded is False
 
 
 def test_root_dataset_member_producer_equals_version_producer_no_dup():
@@ -757,3 +820,253 @@ def test_multiple_consumed_datasets_different_versions():
     summary_versions = {s.rid: s.version for s in result.lineage.consumed_datasets}
     assert summary_versions["1-DD01"] == "1.0.0"
     assert summary_versions["1-DD02"] == "2.0.0"
+
+
+# ---------------------------------------------------------------------------
+# #367: origin resolution (first-recorded, not last-writer)
+# ---------------------------------------------------------------------------
+
+
+def _gen_rid(n: int) -> str:
+    return f"1-{n:04X}"
+
+
+_version_row_ids = iter(range(0x100, 0xFFF))
+
+
+def _version_row(rct: str, version: str, exec_rid: str | None) -> dict:
+    return {
+        "RID": _gen_rid(next(_version_row_ids)),
+        "RCT": rct,
+        "Version": version,
+        "Execution": exec_rid,
+        "Description": None,
+    }
+
+
+def _origin_ml(version_rows, sentinel_rid=None, summaries=None):
+    """ExecutionMixin stub wired for the dataset branch of _classify_rid."""
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.ml_schema = "deriva-ml"
+    ml.resolve_rid = lambda rid: _StubResolved(table=_StubTable(name="Dataset", columns=[]))
+    ml._retrieve_rid = lambda rid: {"RID": rid, "Description": "a dataset"}
+    ml._dataset_version_rows = lambda rid: list(version_rows)
+    ml._sentinel_execution_rid_or_none = lambda: sentinel_rid
+    ml._execution_summaries = lambda rids: dict(summaries or {})
+    return ml
+
+
+def test_unversioned_producer_is_first_recorded_not_latest():
+    origin_exec, migration_exec = _gen_rid(10), _gen_rid(11)
+    rows = [
+        _version_row("2025-01-01T00:00:00Z", "0.1.0", origin_exec),
+        _version_row("2026-01-01T00:00:00Z", "4.13.0", migration_exec),
+    ]
+    ml = _origin_ml(rows)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed == origin_exec
+    assert descriptor.origin_recorded is True
+    assert descriptor.version_history[0].execution_rid == origin_exec
+    assert descriptor.version_history[-1].execution_rid == migration_exec
+
+
+def test_sentinel_origin_reported_but_never_walk_seed():
+    sentinel = _gen_rid(66)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", sentinel)]
+    ml = _origin_ml(rows, sentinel_rid=sentinel)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None  # sentinel never seeds the walk
+    assert descriptor.origin_recorded is False
+
+
+def test_no_execution_on_first_row():
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", None)]
+    ml = _origin_ml(rows)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None
+    assert descriptor.origin_recorded is False
+    assert descriptor.producing_execution is None
+    assert descriptor.version_history[0].execution_rid is None
+
+
+def test_no_version_rows():
+    ml = _origin_ml([])
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None
+    assert descriptor.origin_recorded is False
+    assert descriptor.version_history == []
+
+
+def test_recorded_but_unresolvable_origin_keeps_recorded_true():
+    origin_exec = _gen_rid(10)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", origin_exec)]
+    ml = _origin_ml(rows, summaries={})  # summary resolution came back empty
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert descriptor.origin_recorded is True
+    assert descriptor.producing_execution is None
+    assert descriptor.version_history[0].execution_rid == origin_exec
+    assert walk_seed == origin_exec
+
+
+def test_sentinel_origin_producing_execution_carries_sentinel_summary():
+    """Sentinel origin is never a walk seed, but its RootDescriptor still
+    carries the sentinel's own ExecutionSummary when one is resolvable —
+    ``origin_recorded`` is what signals "not a real author", not a missing
+    ``producing_execution``."""
+    from deriva_ml.execution.lineage import ExecutionSummary
+
+    sentinel = _gen_rid(66)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", sentinel)]
+    sentinel_summary = ExecutionSummary(rid=sentinel, description="sentinel", workflow=None, status="Uploaded")
+    ml = _origin_ml(rows, sentinel_rid=sentinel, summaries={sentinel: sentinel_summary})
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None
+    assert descriptor.origin_recorded is False
+    assert descriptor.producing_execution is not None
+    assert descriptor.producing_execution.rid == sentinel
+
+
+def test_version_history_entries_carry_resolved_summaries():
+    """Each version_history entry's ``execution`` is the resolved summary for
+    that row's own ``execution_rid`` — not the origin's, not shared."""
+    from deriva_ml.execution.lineage import ExecutionSummary
+
+    author_a, author_b = _gen_rid(10), _gen_rid(11)
+    rows = [
+        _version_row("2025-01-01T00:00:00Z", "0.1.0", author_a),
+        _version_row("2026-01-01T00:00:00Z", "2.0.0", author_b),
+    ]
+    summary_a = ExecutionSummary(rid=author_a, description="first", workflow=None, status="Uploaded")
+    summary_b = ExecutionSummary(rid=author_b, description="second", workflow=None, status="Uploaded")
+    ml = _origin_ml(rows, summaries={author_a: summary_a, author_b: summary_b})
+    descriptor, _ = ml._classify_rid(_gen_rid(1))
+    assert len(descriptor.version_history) == 2
+    for entry in descriptor.version_history:
+        assert entry.execution is not None
+        assert entry.execution.rid == entry.execution_rid
+
+
+# ---------------------------------------------------------------------------
+# #367: walk seeding — sentinel exclusion, no overwrite, degradation
+# ---------------------------------------------------------------------------
+
+
+def _walkable_ml(version_rows, member_producers, known_execs, sentinel_rid=None, summaries=None):
+    """Full lookup_lineage stub: dataset root + walkable executions."""
+    ml = _origin_ml(version_rows, sentinel_rid=sentinel_rid, summaries=summaries)
+    ml._producers_of_dataset_members = lambda rid, version=None: set(member_producers)
+    ml._input_dataset_pairs = lambda rid: []
+
+    def fake_lookup_execution(rid):
+        if rid not in known_execs:
+            raise DerivaMLException(f"no execution {rid}")
+        rec = MagicMock()
+        rec.description = f"exec {rid}"
+        rec.workflow = None
+        rec.status = ExecutionStatus.Uploaded
+        rec.list_assets = lambda **kw: []  # consumed-asset iteration is on the record
+        return rec
+
+    ml.lookup_execution = fake_lookup_execution
+    return ml
+
+
+def test_member_fallback_seeds_walk_but_is_not_origin():
+    member = _gen_rid(30)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", None)]  # no origin
+    ml = _walkable_ml(rows, {member}, {member})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member  # walk seeded
+    assert result.root.producing_execution is None  # origin NOT overwritten
+    assert result.root.origin_recorded is False
+
+
+def test_sentinel_origin_walk_seeds_from_member_producers():
+    sentinel, member = _gen_rid(66), _gen_rid(30)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", sentinel)]
+    ml = _walkable_ml(rows, {member}, {member}, sentinel_rid=sentinel)
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member  # not the sentinel
+    assert result.root.origin_recorded is False
+
+
+def test_unexpandable_origin_degrades_to_member_seeding():
+    origin, member = _gen_rid(10), _gen_rid(30)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", origin)]
+    ml = _walkable_ml(rows, {member}, known_execs={member})  # origin not expandable
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member
+    assert result.root.origin_recorded is True  # origin still recorded
+
+
+def test_normal_recorded_origin_walks_from_origin():
+    origin, member = _gen_rid(10), _gen_rid(30)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", origin)]
+    ml = _walkable_ml(rows, {member}, {origin, member})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage.execution.rid == origin
+
+
+def test_unexpandable_origin_in_member_set_still_degrades():
+    """Origin is ALSO a member producer, but unexpandable; a distinct member
+    producer IS expandable. The degradation retry must not be skipped just
+    because ``producer_rid in member_producers`` — it must seed from the
+    other expandable member (spec: walk seed vs. origin attribution)."""
+    origin, other_member = _gen_rid(10), _gen_rid(31)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", origin)]
+    # origin is itself one of the member producers, but not expandable.
+    ml = _walkable_ml(rows, {origin, other_member}, known_execs={other_member})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == other_member
+    assert result.root.origin_recorded is True  # origin still recorded
+
+
+def _collect_execution_rids(node) -> set[str]:
+    """All execution RIDs anywhere in a LineageNode tree (self + parents, recursive)."""
+    if node is None:
+        return set()
+    rids = {node.execution.rid}
+    for parent in node.parents:
+        rids |= _collect_execution_rids(parent)
+    return rids
+
+
+def test_sentinel_member_producer_never_seeds_or_parents():
+    """The sentinel can show up in member_producers (provenance backfill
+    attributes producerless member assets to it via Output edges), but it
+    must NEVER become the walk root or an extra parent — lineage terminates
+    at the sentinel (design rule). Both the sentinel and the real producer
+    are resolvable here, and the sentinel RID is chosen to sort BEFORE the
+    real producer's, so ``sorted(member_producers)[0]`` would pick the
+    sentinel absent the fix — proving exclusion by filtering, not by the
+    sentinel failing to expand."""
+    sentinel, real_producer = _gen_rid(20), _gen_rid(30)
+    assert sentinel < real_producer  # sentinel must sort first
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", None)]  # no origin
+    ml = _walkable_ml(
+        rows,
+        {sentinel, real_producer},
+        known_execs={sentinel, real_producer},
+        sentinel_rid=sentinel,
+    )
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == real_producer
+    assert sentinel not in _collect_execution_rids(result.lineage)
+
+
+def test_all_stale_but_last_member_producer_still_walks():
+    """Three member producers, no origin; only the LAST in sorted order is
+    resolvable. The walk must iterate through candidates until one expands,
+    not give up after a single retry."""
+    p1, p2, p3 = _gen_rid(40), _gen_rid(41), _gen_rid(42)
+    assert sorted([p1, p2, p3]) == [p1, p2, p3]
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", None)]  # no origin
+    ml = _walkable_ml(rows, {p1, p2, p3}, known_execs={p3})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == p3
