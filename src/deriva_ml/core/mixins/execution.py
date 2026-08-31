@@ -1345,16 +1345,37 @@ class ExecutionMixin:
             )
 
         if table_name == "Dataset":
+            from deriva_ml.execution.lineage import VersionAttribution
+
             row = self._retrieve_rid(rid)
-            producer_rid = self._producer_of_dataset(rid)
-            return (
-                RootDescriptor(
-                    rid=rid,
-                    type="Dataset",
-                    description=row.get("Description"),
-                ),
-                producer_rid,
+            version_rows = self._dataset_version_rows(rid)
+            origin_rid = version_rows[0].get("Execution") if version_rows else None
+            sentinel_rid = self._sentinel_execution_rid_or_none()
+            origin_is_sentinel = origin_rid is not None and origin_rid == sentinel_rid
+            author_summaries = self._execution_summaries(r.get("Execution") for r in version_rows)
+            history = [
+                VersionAttribution(
+                    version=r.get("Version") or "",
+                    execution_rid=r.get("Execution"),
+                    execution=author_summaries.get(r.get("Execution")),
+                    description=r.get("Description"),
+                )
+                for r in version_rows
+            ]
+            descriptor = RootDescriptor(
+                rid=rid,
+                type="Dataset",
+                description=row.get("Description"),
+                producing_execution=author_summaries.get(origin_rid) if origin_rid else None,
+                origin_recorded=bool(origin_rid) and not origin_is_sentinel,
+                version_history=history,
             )
+            # Walk seed: the origin only when real and non-sentinel. The
+            # sentinel never seeds the walk — lineage terminates at it, and
+            # seeding from it would fabricate edges claiming it consumed the
+            # member producers (spec: walk seed vs. origin attribution).
+            walk_seed = origin_rid if (origin_rid and not origin_is_sentinel) else None
+            return (descriptor, walk_seed)
 
         if self.model.is_asset(table):
             row = self._retrieve_rid(rid)
@@ -1507,18 +1528,12 @@ class ExecutionMixin:
                     return row.get("Execution")
             return None
 
-        # Pick the row with the highest semver-style Version. The catalog
-        # stores Version as text (e.g. "0.1.0"); sort lexically as a
-        # tuple of ints so "1.10.0" beats "1.2.0".
-        def _key(row: dict[str, Any]) -> tuple[int, ...]:
-            v = row.get("Version") or "0.0.0"
-            try:
-                return tuple(int(p) for p in v.split("."))
-            except ValueError:
-                return (0,)
-
-        latest = max(rows, key=_key)
-        return latest.get("Execution")
+        # Unversioned: the ORIGIN — the first-recorded row's author (issue
+        # #367). Last-writer-wins was the old behavior and reported whatever
+        # touched the dataset most recently (e.g. a data migration) as "the
+        # producer".
+        ordered = sorted(rows, key=_version_row_sort_key)
+        return ordered[0].get("Execution")
 
     def _version_rid(self, dataset_rid: RID, version: Any) -> RID | None:
         """RID of the ``Dataset_Version`` row for (``dataset_rid``, ``version``), or None.

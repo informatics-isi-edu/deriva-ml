@@ -237,6 +237,61 @@ class _FakeML(ExecutionMixin):
             return self._versioned_dataset_producers.get((dataset_rid, str(version)))
         return self._dataset_producers.get(dataset_rid)
 
+    def _dataset_version_rows(self, dataset_rid: str) -> list[dict[str, Any]]:  # type: ignore[override]
+        """Synthesize a single-row version history from the scripted producer.
+
+        ``_classify_rid``'s Dataset branch reads the origin from
+        ``_dataset_version_rows()[0]`` rather than calling
+        ``_producer_of_dataset`` directly (#367). Tests here only script one
+        producer per dataset (via ``add_dataset(..., producer=...)``), so one
+        synthetic row — first-recorded, and therefore also the origin — fully
+        captures that intent.
+        """
+        if dataset_rid not in self._dataset_producers:
+            return []
+        return [
+            {
+                "RID": f"{dataset_rid}-VER",
+                "RCT": "2025-01-01T00:00:00Z",
+                "Version": "0.1.0",
+                "Execution": self._dataset_producers[dataset_rid],
+                "Description": None,
+            }
+        ]
+
+    def _sentinel_execution_rid_or_none(self) -> str | None:  # type: ignore[override]
+        return None
+
+    def _execution_summaries(self, rids: Any) -> dict[str, Any]:  # type: ignore[override]
+        """Resolve scripted execution RIDs to ExecutionSummary via lookup_execution.
+
+        Only used by ``_classify_rid`` to populate ``RootDescriptor.producing_execution``
+        and ``version_history[].execution``; the walk itself (and the
+        ``result.root.producing_execution`` assertions in these tests) is driven by
+        ``_walk_node``/``lookup_execution``, which overwrites this value once a walk
+        happens (see ``lookup_lineage``). Reuses the scripted ``_StubExecutionRecord``
+        to build a minimal ``ExecutionSummary`` for RIDs that resolve.
+        """
+        from deriva_ml.execution.lineage import ExecutionSummary, WorkflowSummary
+
+        out: dict[str, ExecutionSummary] = {}
+        for rid in rids:
+            if rid is None:
+                continue
+            rec = self._executions.get(rid)
+            if rec is None:
+                continue
+            wf_summary = (
+                WorkflowSummary(rid=rec.workflow.workflow_rid, name=rec.workflow.name) if rec.workflow else None
+            )
+            out[rid] = ExecutionSummary(
+                rid=rec.execution_rid,
+                description=rec.description,
+                workflow=wf_summary,
+                status=rec.status.value if hasattr(rec.status, "value") else str(rec.status),
+            )
+        return out
+
     def _producer_of_asset(self, asset_rid: str, asset_table: Any) -> str | None:  # type: ignore[override]
         return self._asset_producers.get(asset_rid)
 
@@ -757,3 +812,89 @@ def test_multiple_consumed_datasets_different_versions():
     summary_versions = {s.rid: s.version for s in result.lineage.consumed_datasets}
     assert summary_versions["1-DD01"] == "1.0.0"
     assert summary_versions["1-DD02"] == "2.0.0"
+
+
+# ---------------------------------------------------------------------------
+# #367: origin resolution (first-recorded, not last-writer)
+# ---------------------------------------------------------------------------
+
+
+def _gen_rid(n: int) -> str:
+    return f"1-{n:04X}"
+
+
+_version_row_ids = iter(range(0x100, 0xFFF))
+
+
+def _version_row(rct: str, version: str, exec_rid: str | None) -> dict:
+    return {
+        "RID": _gen_rid(next(_version_row_ids)),
+        "RCT": rct,
+        "Version": version,
+        "Execution": exec_rid,
+        "Description": None,
+    }
+
+
+def _origin_ml(version_rows, sentinel_rid=None, summaries=None):
+    """ExecutionMixin stub wired for the dataset branch of _classify_rid."""
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.ml_schema = "deriva-ml"
+    ml.resolve_rid = lambda rid: _StubResolved(table=_StubTable(name="Dataset", columns=[]))
+    ml._retrieve_rid = lambda rid: {"RID": rid, "Description": "a dataset"}
+    ml._dataset_version_rows = lambda rid: list(version_rows)
+    ml._sentinel_execution_rid_or_none = lambda: sentinel_rid
+    ml._execution_summaries = lambda rids: dict(summaries or {})
+    return ml
+
+
+def test_unversioned_producer_is_first_recorded_not_latest():
+    origin_exec, migration_exec = _gen_rid(10), _gen_rid(11)
+    rows = [
+        _version_row("2025-01-01T00:00:00Z", "0.1.0", origin_exec),
+        _version_row("2026-01-01T00:00:00Z", "4.13.0", migration_exec),
+    ]
+    ml = _origin_ml(rows)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed == origin_exec
+    assert descriptor.origin_recorded is True
+    assert descriptor.version_history[0].execution_rid == origin_exec
+    assert descriptor.version_history[-1].execution_rid == migration_exec
+
+
+def test_sentinel_origin_reported_but_never_walk_seed():
+    sentinel = _gen_rid(66)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", sentinel)]
+    ml = _origin_ml(rows, sentinel_rid=sentinel)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None  # sentinel never seeds the walk
+    assert descriptor.origin_recorded is False
+
+
+def test_no_execution_on_first_row():
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", None)]
+    ml = _origin_ml(rows)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None
+    assert descriptor.origin_recorded is False
+    assert descriptor.producing_execution is None
+    assert descriptor.version_history[0].execution_rid is None
+
+
+def test_no_version_rows():
+    ml = _origin_ml([])
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None
+    assert descriptor.origin_recorded is False
+    assert descriptor.version_history == []
+
+
+def test_recorded_but_unresolvable_origin_keeps_recorded_true():
+    origin_exec = _gen_rid(10)
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", origin_exec)]
+    ml = _origin_ml(rows, summaries={})  # summary resolution came back empty
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert descriptor.origin_recorded is True
+    assert descriptor.producing_execution is None
+    assert descriptor.version_history[0].execution_rid == origin_exec
+    assert walk_seed == origin_exec

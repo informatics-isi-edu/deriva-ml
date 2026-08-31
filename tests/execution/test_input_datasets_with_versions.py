@@ -207,14 +207,20 @@ def _ml_with_versions(version_rows):
     return ml
 
 
-def test_producer_of_dataset_latest_when_version_none():
+def test_producer_of_dataset_first_recorded_when_version_none():
+    """Unversioned lookup returns the origin (first-recorded row), not the
+    latest version's author (issue #367) — last-writer-wins was the old
+    behavior and could surface an unrelated migration as "the producer".
+    Both rows tie on RCT here (neither sets one), so the sort falls back to
+    the PEP 440 tiebreak: "1.0.0" sorts first.
+    """
     ml = _ml_with_versions(
         [
             {"Version": "1.0.0", "Execution": "2-EXV1", "Dataset": "1-DSAA"},
             {"Version": "1.2.0", "Execution": "2-EXV2", "Dataset": "1-DSAA"},
         ]
     )
-    assert ml._producer_of_dataset("1-DSAA") == "2-EXV2"  # latest
+    assert ml._producer_of_dataset("1-DSAA") == "2-EXV1"  # first-recorded (origin)
 
 
 def test_producer_of_dataset_specific_version():
