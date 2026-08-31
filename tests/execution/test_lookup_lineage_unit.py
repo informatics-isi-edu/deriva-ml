@@ -1023,3 +1023,50 @@ def test_unexpandable_origin_in_member_set_still_degrades():
     assert result.lineage is not None
     assert result.lineage.execution.rid == other_member
     assert result.root.origin_recorded is True  # origin still recorded
+
+
+def _collect_execution_rids(node) -> set[str]:
+    """All execution RIDs anywhere in a LineageNode tree (self + parents, recursive)."""
+    if node is None:
+        return set()
+    rids = {node.execution.rid}
+    for parent in node.parents:
+        rids |= _collect_execution_rids(parent)
+    return rids
+
+
+def test_sentinel_member_producer_never_seeds_or_parents():
+    """The sentinel can show up in member_producers (provenance backfill
+    attributes producerless member assets to it via Output edges), but it
+    must NEVER become the walk root or an extra parent — lineage terminates
+    at the sentinel (design rule). Both the sentinel and the real producer
+    are resolvable here, and the sentinel RID is chosen to sort BEFORE the
+    real producer's, so ``sorted(member_producers)[0]`` would pick the
+    sentinel absent the fix — proving exclusion by filtering, not by the
+    sentinel failing to expand."""
+    sentinel, real_producer = _gen_rid(20), _gen_rid(30)
+    assert sentinel < real_producer  # sentinel must sort first
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", None)]  # no origin
+    ml = _walkable_ml(
+        rows,
+        {sentinel, real_producer},
+        known_execs={sentinel, real_producer},
+        sentinel_rid=sentinel,
+    )
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == real_producer
+    assert sentinel not in _collect_execution_rids(result.lineage)
+
+
+def test_all_stale_but_last_member_producer_still_walks():
+    """Three member producers, no origin; only the LAST in sorted order is
+    resolvable. The walk must iterate through candidates until one expands,
+    not give up after a single retry."""
+    p1, p2, p3 = _gen_rid(40), _gen_rid(41), _gen_rid(42)
+    assert sorted([p1, p2, p3]) == [p1, p2, p3]
+    rows = [_version_row("2025-01-01T00:00:00Z", "0.1.0", None)]  # no origin
+    ml = _walkable_ml(rows, {p1, p2, p3}, known_execs={p3})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == p3

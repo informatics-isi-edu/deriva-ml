@@ -1271,50 +1271,65 @@ class ExecutionMixin:
         # assets are data-flow parents even when the dataset itself has no
         # usable walk seed.
         member_producers: set[RID] = set()
-        extra_parent_rids: set[RID] = set()
         if root_descriptor.type == "Dataset":
             member_producers = self._producers_of_dataset_members(rid)
-            if producer_rid is not None:
-                extra_parent_rids = member_producers - {producer_rid}
-            elif member_producers:
-                ordered = sorted(member_producers)
-                producer_rid = ordered[0]
-                extra_parent_rids = set(ordered[1:])
+            # The unknown-provenance sentinel never seeds the walk and never
+            # becomes an extra parent — the provenance backfill attributes
+            # producerless member assets to it via Output edges, so it can
+            # legitimately show up in member_producers, but lineage
+            # terminates at the sentinel (design rule). _classify_rid already
+            # resolved (and cached) the sentinel RID for a Dataset root with a
+            # recorded origin, so this call is cheap; never made for
+            # non-Dataset roots.
+            sentinel_rid = self._sentinel_execution_rid_or_none()
+            if sentinel_rid is not None:
+                member_producers -= {sentinel_rid}
 
-        if producer_rid is None:
+        if producer_rid is None and not member_producers:
             return LineageResult(root=root_descriptor)
 
         visited_global: set[RID] = set()
         in_progress: set[RID] = set()
         flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
 
-        lineage_root_node = self._walk_node(
-            execution_rid=producer_rid,
-            depth_remaining=depth,
-            max_executions=max_executions,
-            visited_global=visited_global,
-            in_progress=in_progress,
-            flags=flags,
-            extra_parent_rids=extra_parent_rids or None,
-        )
+        lineage_root_node: "LineageNode | None" = None
+        if root_descriptor.type == "Dataset":
+            # Candidate iteration (spec: walk seed vs. origin attribution): try
+            # candidates in order until one expands, rather than seeding once
+            # and retrying a single time. Origin first (when real and
+            # non-sentinel), then each remaining member producer in sorted
+            # order. Each attempt's extra_parent_rids is every OTHER
+            # discovered candidate (already-tried/failed seeds and the
+            # current seed excluded) so a later expansion still surfaces
+            # sibling producers as parents.
+            candidates: list[RID] = []
+            if producer_rid is not None:
+                candidates.append(producer_rid)
+            candidates.extend(r for r in sorted(member_producers) if r != producer_rid)
 
-        # Degradation (spec: walk seed vs. origin attribution): a recorded
-        # origin that cannot be expanded must not erase independently
-        # resolvable member lineage. This must fire even when the
-        # unexpandable origin is itself one of the member producers — the
-        # retry seeds from the *other* member producers, not from the
-        # origin again.
-        remaining_member_producers = member_producers - {producer_rid}
-        if lineage_root_node is None and root_descriptor.type == "Dataset" and remaining_member_producers:
-            ordered = sorted(remaining_member_producers)
+            all_candidates = set(candidates)
+            tried: set[RID] = set()
+            for seed in candidates:
+                tried.add(seed)
+                lineage_root_node = self._walk_node(
+                    execution_rid=seed,
+                    depth_remaining=depth,
+                    max_executions=max_executions,
+                    visited_global=visited_global,
+                    in_progress=in_progress,
+                    flags=flags,
+                    extra_parent_rids=(all_candidates - tried) or None,
+                )
+                if lineage_root_node is not None:
+                    break
+        else:
             lineage_root_node = self._walk_node(
-                execution_rid=ordered[0],
+                execution_rid=producer_rid,
                 depth_remaining=depth,
                 max_executions=max_executions,
                 visited_global=visited_global,
                 in_progress=in_progress,
                 flags=flags,
-                extra_parent_rids=set(ordered[1:]) or None,
             )
 
         # Non-Dataset roots keep the historical behavior: the root's
@@ -1453,7 +1468,8 @@ class ExecutionMixin:
             Empty list if the dataset has no version rows.
 
         Example:
-            >>> rows = ml._dataset_version_rows("1-DSAA")  # doctest: +SKIP
+            >>> ds = ml.find_datasets()[0]  # doctest: +SKIP
+            >>> rows = ml._dataset_version_rows(ds.rid)  # doctest: +SKIP
             >>> origin_rid = rows[0]["Execution"] if rows else None  # doctest: +SKIP
         """
         pb = self.pathBuilder()
@@ -1477,8 +1493,10 @@ class ExecutionMixin:
             Mapping of execution RID to its ExecutionSummary.
 
         Example:
-            >>> summaries = ml._execution_summaries(["2-ABC", "2-DEF"])  # doctest: +SKIP
-            >>> summaries["2-ABC"].status  # doctest: +SKIP
+            >>> execs = ml.find_executions()[:2]  # doctest: +SKIP
+            >>> rids = [e.rid for e in execs]  # doctest: +SKIP
+            >>> summaries = ml._execution_summaries(rids)  # doctest: +SKIP
+            >>> summaries[rids[0]].status  # doctest: +SKIP
             'Completed'
         """
         from deriva_ml.execution.lineage import ExecutionSummary, WorkflowSummary
@@ -1539,9 +1557,10 @@ class ExecutionMixin:
             the matched row carries no ``Execution`` link.
 
         Example:
-            >>> ml._producer_of_dataset("1-DSAA")  # doctest: +SKIP
+            >>> ds = ml.find_datasets()[0]  # doctest: +SKIP
+            >>> ml._producer_of_dataset(ds.rid)  # doctest: +SKIP
             '2-EXV1'
-            >>> ml._producer_of_dataset("1-DSAA", version="1.0.0")  # doctest: +SKIP
+            >>> ml._producer_of_dataset(ds.rid, version=ds.current_version)  # doctest: +SKIP
             '2-EXV1'
         """
         if version is not None:
