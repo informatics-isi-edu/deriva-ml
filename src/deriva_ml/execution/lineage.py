@@ -44,8 +44,12 @@ class WorkflowSummary(BaseModel):
         version: Version label recorded on the Workflow row. Caveat: a
             Workflow row is deduplicated per definition, so this reflects
             when the row was FIRST registered — not necessarily the code
-            version any particular execution ran (see issue #373); per-run
-            code identity comes from the execution's environment snapshot.
+            version any particular execution ran (see issue #373). Per-run
+            code identity is recorded in the execution's run metadata:
+            ``configuration.json`` (Deriva_Config) serializes the workflow
+            URL/version/checksum at run time, and the environment
+            snapshot's installed-package versions corroborate the running
+            commit.
     """
 
     model_config = ConfigDict(extra="forbid")
