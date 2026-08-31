@@ -555,3 +555,22 @@ member.RID → feature) — a direct membership→feature comparison silently
 returns no matches for non-RID shapes, and a per-feature degrade
 swallows the failure. Generalizes: never assume an association FK
 targets RID unless deriva-ml itself created the association.
+
+### 2026-08-31 — Lineage HTML: adopt the pattern, not the script (issue #378, PR #379)
+
+**Decision (with Carl):** the deploy repo's `visualize.py` HTML ledger
+stays there — it renders the **WorkflowInventory** schema, i.e. the
+deploy-side arc-ranking policy (DIRECT > DATA-FLOW > FEATURE-candidates
+> ANCESTOR, gap labels) that two prior rulings kept out of deriva-ml.
+Moving the renderer would have meant importing that policy's schema.
+What deriva-ml adopted instead is the renderer's three PROVEN design
+properties, applied to its own model: `lineage_result_to_html()` +
+`deriva-ml-lineage` render a `LineageResult` — (1) **JSON-decoupled**
+(rendering never touches the catalog; `model_dump()` is the audit
+artifact of record, re-renderable/diffable forever), (2)
+**self-contained single-file HTML** (inline CSS, no JS, no external
+assets), (3) **stdlib-only**. Catalog text is untrusted → everything
+escaped; workflow URLs link only when http(s). Rule of thumb this
+extends: when downstream proves a *presentation* pattern, upstream the
+pattern bound to upstream's own model — never the artifact bound to
+downstream's policy schema.
