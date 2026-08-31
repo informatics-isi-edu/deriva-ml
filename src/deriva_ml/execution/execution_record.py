@@ -588,6 +588,41 @@ class ExecutionRecord(BaseModel):
             execution_rid=self.execution_rid,
         )
 
+    def list_metadata(self) -> list["Asset"]:
+        """List the run-metadata assets recorded for this execution.
+
+        Run metadata — environment snapshots, ``uv.lock``, Hydra
+        overrides, ``configuration.json`` — lives in the
+        ``Execution_Metadata`` table joined through
+        ``Execution_Metadata_Execution``, not among the execution's
+        output assets. Use this instead of :meth:`list_assets` to read
+        it: the direct join returns the handful of metadata rows in
+        seconds regardless of how many output assets the execution
+        produced, and an execution that captured no metadata returns an
+        empty list rather than being indistinguishable from a slow
+        stream.
+
+        Returns:
+            List of Asset objects for the metadata rows; empty when no
+            metadata was recorded.
+
+        Raises:
+            DerivaMLException: If not bound to a catalog.
+
+        Example:
+            >>> for asset in record.list_metadata():  # doctest: +SKIP
+            ...     print(asset.filename)
+        """
+        if self._ml_instance is None:
+            raise DerivaMLException("ExecutionRecord is not bound to a catalog")
+
+        from deriva_ml.execution._helpers import list_execution_metadata
+
+        return list_execution_metadata(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+        )
+
     def list_assets(self, asset_role: str | None = None) -> list["Asset"]:
         """List assets associated with this execution.
 
