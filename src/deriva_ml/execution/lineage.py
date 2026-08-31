@@ -170,6 +170,13 @@ class RootDescriptor(BaseModel):
         rid: The root artifact's RID.
         type: Artifact kind — Dataset, Asset, Feature, or Execution.
         description: The artifact's description, if any.
+        version: Datasets only — the dataset's current version label at
+            walk time (the row the ``Dataset.Version`` FK points at;
+            falls back to the latest recorded row when the FK is
+            unresolvable). None for non-Dataset roots and for datasets
+            with no version rows. Mirrors ``DatasetSummary.version`` so
+            every dataset representation in a lineage result carries a
+            version.
         producing_execution: For datasets, the ORIGIN — the author of the
             first-recorded ``Dataset_Version`` row (the unknown-provenance
             sentinel included, when that is what the row records). For other
@@ -194,6 +201,7 @@ class RootDescriptor(BaseModel):
     rid: RID
     type: Literal["Dataset", "Asset", "Feature", "Execution"]
     description: str | None = None
+    version: str | None = None
     producing_execution: ExecutionSummary | None = None
     origin_recorded: bool | None = None
     version_history: list[VersionAttribution] = Field(default_factory=list)

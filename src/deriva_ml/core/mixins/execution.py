@@ -1405,10 +1405,19 @@ class ExecutionMixin:
                 )
                 for r in version_rows
             ]
+            # Current version label: the row the Dataset.Version FK points
+            # at; fall back to the latest recorded row when the FK is absent
+            # or unmatched (legacy rows). None when there is no history.
+            current_version_rid = row.get("Version")
+            current_version = next(
+                (r.get("Version") for r in version_rows if r.get("RID") == current_version_rid),
+                version_rows[-1].get("Version") if version_rows else None,
+            )
             descriptor = RootDescriptor(
                 rid=rid,
                 type="Dataset",
                 description=row.get("Description"),
+                version=current_version,
                 producing_execution=author_summaries.get(origin_rid) if origin_rid else None,
                 origin_recorded=bool(origin_rid) and not origin_is_sentinel,
                 version_history=history,
