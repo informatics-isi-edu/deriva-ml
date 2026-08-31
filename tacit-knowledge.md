@@ -686,3 +686,12 @@ contract byte-identical under refactored internals. Session evidence
 for the drift risk: the _producer_of_dataset DRY finding and the
 ordering-logic duplication both caught by review within hours of
 creation.
+
+**Ruling 6 (Carl, final): ancestry hops resolve at snapshots,
+unbounded to source.** Each Dataset_Dataset hop reads the parent at the
+child version's snaptime (chained points-in-time down the ancestry);
+live-state hops rejected as the same causal error as live-state
+feature scans. Snapshot-chain breaks (dev rows, pre-snapshot legacy) =
+reported gaps, never live-state guesses. Depth: to SOURCE under the
+global cap; a dedicated depth knob is YAGNI. This completed the
+boundary interview — six rulings, all recorded on #383.
