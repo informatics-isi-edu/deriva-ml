@@ -41,6 +41,7 @@ from deriva_ml.execution.lineage import (
     LineageNode,
     LineageResult,
     RootDescriptor,
+    VersionAttribution,
     WorkflowSummary,
 )
 from deriva_ml.execution.model_protocol import DerivaMLModel
@@ -105,5 +106,6 @@ __all__ = [
     "LineageNode",
     "LineageResult",
     "RootDescriptor",
+    "VersionAttribution",
     "WorkflowSummary",
 ]
