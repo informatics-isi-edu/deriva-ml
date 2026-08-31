@@ -634,6 +634,12 @@ producing Executions for each input.
 | Just the immediate producer, no parent chain | `ml.lookup_lineage(rid, depth=0)` |
 | Two generations back, no further | `ml.lookup_lineage(rid, depth=2)` |
 
+**Every dataset representation carries a version.** A Dataset root reports its
+current version label as `lineage.root.version` (None for non-Dataset roots),
+matching the `version` that consumed-dataset entries already carry inside the
+walk — so wherever a dataset appears in a lineage result, its version appears
+beside it.
+
 **Dataset producer = origin, not latest writer.** For a Dataset root,
 `lineage.root.producing_execution` is the **origin** — the author of the
 first-recorded `Dataset_Version` row — never the execution that last touched the

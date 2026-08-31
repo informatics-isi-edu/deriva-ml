@@ -1070,3 +1070,62 @@ def test_all_stale_but_last_member_producer_still_walks():
     result = ml.lookup_lineage(_gen_rid(1))
     assert result.lineage is not None
     assert result.lineage.execution.rid == p3
+
+
+# ---------------------------------------------------------------------------
+# Root version + asset-root shape (post-#367 follow-up)
+# ---------------------------------------------------------------------------
+
+
+def test_dataset_root_carries_current_version():
+    """root.version = the label of the row the Dataset.Version FK points at.
+
+    The FK targets the MIDDLE row here, so a pass proves FK-resolution,
+    not a newest-row shortcut.
+    """
+    rows = [
+        _version_row("2025-01-01T00:00:00Z", "0.1.0", None),
+        _version_row("2025-06-01T00:00:00Z", "0.2.0", None),
+        _version_row("2026-01-01T00:00:00Z", "0.3.0", None),
+    ]
+    ml = _origin_ml(rows)
+    current_rid = rows[1]["RID"]
+    ml._retrieve_rid = lambda rid: {"RID": rid, "Description": "d", "Version": current_rid}
+    descriptor, _ = ml._classify_rid(_gen_rid(1))
+    assert descriptor.version == "0.2.0"
+
+
+def test_dataset_root_version_falls_back_to_latest_ordered():
+    """No resolvable Version FK -> latest ordered row's label."""
+    rows = [
+        _version_row("2025-01-01T00:00:00Z", "0.1.0", None),
+        _version_row("2026-01-01T00:00:00Z", "0.2.0", None),
+    ]
+    ml = _origin_ml(rows)  # _origin_ml's _retrieve_rid has no Version key
+    descriptor, _ = ml._classify_rid(_gen_rid(1))
+    assert descriptor.version == "0.2.0"
+
+
+def test_dataset_root_version_none_when_no_rows():
+    ml = _origin_ml([])
+    descriptor, _ = ml._classify_rid(_gen_rid(1))
+    assert descriptor.version is None
+
+
+def test_asset_root_shape_carries_no_dataset_fields():
+    """Asset-RID lineage end-to-end: walk works and the dataset-only
+    fields stay in their not-applicable states."""
+    producer = _gen_rid(70)
+    ml = _FakeML()
+    ml.add_execution(producer, input_datasets=[])
+    ml.add_asset(_gen_rid(71), asset_table="Image", filename="x.png", producer=producer)
+
+    result = ml.lookup_lineage(_gen_rid(71))
+
+    assert result.root.type == "Asset"
+    assert result.root.version is None
+    assert result.root.origin_recorded is None
+    assert result.root.version_history == []
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == producer
+    assert result.root.producing_execution.rid == producer  # non-Dataset overwrite kept
