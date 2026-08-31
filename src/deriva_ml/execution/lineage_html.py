@@ -117,11 +117,17 @@ def _execution_html(ex: dict | None) -> str:
 
 
 def _walk_html(node: dict | None) -> str:
-    """Render the walk tree recursively as nested lists."""
+    """Render the walk tree as nested lists, iteratively.
+
+    Iterative on purpose: a valid walk can approach the 500-execution cap
+    as one deep chain, and recursive rendering (a frame plus a generator
+    frame per level) can exceed Python's recursion limit after the walk
+    itself succeeded. An explicit stack has no depth ceiling.
+    """
     if not node:
         return '<p class="dim">No walk &mdash; the artifact has no expandable producer.</p>'
 
-    def render_node(n: dict) -> str:
+    def node_open(n: dict) -> str:
         parts = [f'<li><div class="exec">{_execution_html(n.get("execution"))}']
         if n.get("already_shown"):
             parts.append('<div class="io dim">already shown elsewhere in this tree</div>')
@@ -141,13 +147,27 @@ def _walk_html(node: dict | None) -> str:
             )
             parts.append(f'<div class="io">consumed assets: {items}</div>')
         parts.append("</div>")
-        parents = n.get("parents") or []
-        if parents:
-            parts.append("<ul>" + "".join(render_node(p) for p in parents) + "</ul>")
-        parts.append("</li>")
         return "".join(parts)
 
-    return f'<ul class="walk">{render_node(node)}</ul>'
+    out: list[str] = ['<ul class="walk">']
+    # Stack of (node, None) to open, or (None, literal) to emit closers.
+    stack: list[tuple[dict | None, str | None]] = [(node, None)]
+    while stack:
+        current, literal = stack.pop()
+        if literal is not None:
+            out.append(literal)
+            continue
+        assert current is not None
+        out.append(node_open(current))
+        parents = current.get("parents") or []
+        stack.append((None, "</li>"))
+        if parents:
+            stack.append((None, "</ul>"))
+            for p in reversed(parents):
+                stack.append((p, None))
+            stack.append((None, "<ul>"))
+    out.append("</ul>")
+    return "".join(out)
 
 
 def _origin_badge(root: dict) -> str:
@@ -305,7 +325,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.input:
-        data: Any = json.loads(Path(args.input).read_text())
+        data: Any = json.loads(Path(args.input).read_text(encoding="utf-8"))
         note = f"Re-rendered from {Path(args.input).name} on {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}"
     else:
         if not (args.host and args.catalog):
@@ -318,8 +338,8 @@ def main(argv: list[str] | None = None) -> int:
         note = f"Walked {args.rid} on {args.host}/{args.catalog} at {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}"
 
     if args.json_out:
-        Path(args.json_out).write_text(json.dumps(data, indent=2, default=str))
-    Path(args.output).write_text(lineage_result_to_html(data, generated_note=note))
+        Path(args.json_out).write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+    Path(args.output).write_text(lineage_result_to_html(data, generated_note=note), encoding="utf-8")
     print(f"wrote {args.output}", file=sys.stderr)
     return 0
 

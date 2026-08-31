@@ -140,3 +140,39 @@ def test_cli_offline_render(tmp_path):
     assert rc == 0
     text = out.read_text()
     assert _rid(1) in text and text.lstrip().startswith("<!DOCTYPE html>")
+
+
+def test_deep_chain_renders_without_recursion_error():
+    """A walk near the 500-execution cap as one deep chain must render.
+
+    Pins the codex P2: recursive rendering (frame + generator frame per
+    level) exceeded Python's recursion limit on walks lookup_lineage
+    itself completed successfully.
+    """
+    # Built as dicts: pydantic's own model_dump() has a serializer depth
+    # ceiling on chains this deep (a separate, pre-existing limitation of
+    # the models — the renderer's documented dict input is the path a
+    # deep saved walk actually takes).
+    node: dict = {"execution": _exec_summary(9000).model_dump(), "parents": []}
+    for i in range(2999):
+        node = {"execution": _exec_summary(8000 + i).model_dump(), "parents": [node]}
+    data = {
+        "root": RootDescriptor(rid=_rid(7), type="Execution", description=None).model_dump(),
+        "lineage": node,
+        "executions_visited": 3000,
+        "walked_complete": True,
+        "cycle_detected": False,
+        "depth_capped": False,
+    }
+    page = lineage_result_to_html(data)
+    assert page.count('<div class="exec">') == 3000
+
+
+def test_cli_round_trips_non_latin_text(tmp_path):
+    """Unicode catalog text survives write/read regardless of locale (codex P2)."""
+    result = LineageResult(root=RootDescriptor(rid=_rid(8), type="Dataset", description="眼底画像 �команда ✓"))
+    src = tmp_path / "l.json"
+    out = tmp_path / "l.html"
+    src.write_text(json.dumps(result.model_dump()), encoding="utf-8")
+    assert main(["--input", str(src), "--output", str(out)]) == 0
+    assert "眼底画像" in out.read_text(encoding="utf-8")
