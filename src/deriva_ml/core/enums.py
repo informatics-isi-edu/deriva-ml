@@ -174,9 +174,13 @@ class ExecAssetType(StrEnum):
         output_file (str): Output file produced by the execution.
         notebook_output (str): Jupyter notebook output from the execution.
         model_file (str): Machine learning model file (e.g., .pkl, .h5, .pt).
+        inference_contract (str): The model's inference contract — the
+            machine-readable description of inputs, preprocessing identity,
+            and output semantics a deployment needs (e.g. run_config.json).
     """
 
     input_file = "Input_File"
     output_file = "Output_File"
     notebook_output = "Notebook_Output"
+    inference_contract = "Inference_Contract"
     model_file = "Model_File"

@@ -507,3 +507,39 @@ lost data. File it, if at all, on the intent-pinning motivation —
 and it may not clear YAGNI until someone actually needs old-version
 containment. Do not re-file it as "derivation is unrecoverable";
 snapshot reads recover it wherever snapshots exist.
+
+### 2026-08-31 — Deploy-repo analysis → four provenance APIs (issues #370–#373)
+
+**What happened:** analyzed deriva-ml-model-deploy's lineage scripts +
+requirements against deriva-ml 1.57. Filed 6 issues (4 here, 2 there),
+implemented the deriva-ml four as PRs #374–#377. Decisions a future
+teammate needs:
+
+- **find_feature_producers (#370/PR #376) contract = CANDIDATES, not
+  dependencies.** Which features training code actually *read* is
+  unknowable from the catalog, so the API promises a bounded superset
+  with evidence (feature, element, count) — and **null-execution
+  feature values are first-class results** (execution_rid=None), never
+  dropped: they are the provenance gap the caller must see. Ported
+  from the deploy repo's proven implementation rather than redesigned;
+  membership discovery mirrors _producers_of_dataset_members (FK-derived
+  link columns), NOT name-convention f"Dataset_{element}" lookup.
+- **Metadata read API (#371/PR #375) split of failure modes is the
+  point:** join failures PROPAGATE (a catalog problem must never read
+  as "not recorded" — the absence-vs-timeout distinguishability is the
+  API's reason to exist), per-row lookup failures degrade keeping the
+  rest. Join first, then bounded per-row lookup_asset — the perf win is
+  not streaming thousands of OUTPUT assets, not avoiding 5 lookups.
+- **WorkflowSummary.version (#372/PR #374) ships WITH the #373 caveat
+  in its docstring** — dedup means first-registration version, not
+  per-run identity (observed 6 months stale on eye-ai 7-ZW3P). Never
+  present Workflow.version as "the code this execution ran"; that
+  truth lives in the environment snapshot.
+- **Inference_Contract (#373/PR #377):** vocab term + enum only; the
+  schema.md ↔ create_schema.py term agreement is enforced by the CI
+  validator (it DOES check vocabulary terms — VOCAB_TERMS_MISMATCH),
+  so seed-list changes always need both files.
+- **Deliberately NOT moved upstream:** replay-vs-artifact declaration,
+  commit selection (snapshot > workflow record), env-snapshot secrets
+  allowlist, bakeability, arc-ranking policy — domain policy, stays in
+  the deploy repo.
