@@ -443,3 +443,12 @@ both verified against the code before accepting:
    dataset root). Lesson repeated from #361: independent review of a
    *design* pays the same way it does for code — both real catches were
    in interactions with existing behavior, not in the new code itself.
+3. **Round 2 added: the sentinel is never a walk root.** Seeding the
+   walk from the unknown-provenance sentinel with member producers as
+   its parents fabricates edges claiming the sentinel *consumed* those
+   producers. The contract says lineage *terminates* at the sentinel —
+   so a sentinel origin seeds the walk from member producers directly,
+   like the no-origin branch. Also caught in round 2: the
+   `create_schema.py` Dataset_Version.Execution comment still said the
+   initial row "has no producing execution" — contradicting the
+   contract it predates; comments are contract surface too.
