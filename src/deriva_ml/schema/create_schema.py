@@ -926,16 +926,6 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
             {"Name": "Output_File", "Description": "A file output from an execution."},
             {"Name": "Model_File", "Description": "The ML model."},
             {
-                "Name": "Inference_Contract",
-                "Description": (
-                    "The model's inference contract: the machine-readable "
-                    "description of inputs, preprocessing identity, and "
-                    "output semantics a deployment needs to run the model "
-                    "(e.g. run_config.json). A dedicated type so deployment "
-                    "tooling discovers the contract by type, not filename."
-                ),
-            },
-            {
                 "Name": "Notebook_Output",
                 "Description": "A Jupyter notebook with output cells filled from an execution.",
             },
