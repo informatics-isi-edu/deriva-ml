@@ -594,3 +594,18 @@ truth (`deriva-ml-model-deploy/docs/design/provenance-resolution.md`):
   value for 7-ZW3P per #373 (run actually used g6d5865a82). The page
   reports the recorded value honestly; a future nicety could footnote
   the staleness caveat on the page itself.
+
+**REVERSED (Carl, 2026-08-31, PR #381):** the Inference_Contract term
+was dropped the same day it shipped — "never set, no producer
+specified." The principle this establishes for future Asset_Type (and
+other seeded-vocabulary) requests: **deriva-ml seeds only terms some
+deriva-ml writer actually sets or some deriva-ml reader dispatches
+on.** A term whose sole consumer is downstream tooling belongs in that
+tooling's catalogs via per-catalog `add_term` — vocabularies are
+extensible by design; the library-wide seed list is not the place to
+park another repo's conventions. (The pre-existing Model_File/
+Metrics_File terms are grandfathered taxonomy, not license to grow
+it.) The Workflow.version staleness caveat — #377's other half —
+stands. Note: v1.59.0/v1.60.0 installs still seed the term on catalog
+init until the revert is released; catalogs initialized in that window
+may carry a harmless orphan term.
