@@ -644,8 +644,12 @@ def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] 
                         "deduplicated per definition, so this records the "
                         "version when the row was FIRST registered — not "
                         "necessarily the code version any particular "
-                        "execution ran. Per-run code identity comes from "
-                        "the execution's captured environment snapshot."
+                        "execution ran. Per-run code identity is recorded "
+                        "in the execution's run metadata: "
+                        "`configuration.json` (Deriva_Config) serializes "
+                        "the workflow URL/version/checksum at run time, "
+                        "and the environment snapshot's installed-package "
+                        "versions corroborate the running commit."
                     ),
                 ),
             ],

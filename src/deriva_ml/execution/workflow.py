@@ -63,8 +63,12 @@ class Workflow(BaseModel):
         version (str | None): Version identifier (semantic versioning).
             Caveat: workflows are deduplicated per definition, so a looked-up
             row's version reflects when the row was FIRST registered — not
-            necessarily the code version a particular execution ran; per-run
-            code identity comes from that execution's environment snapshot.
+            necessarily the code version a particular execution ran. Per-run code identity
+            is recorded in the execution's run metadata: its
+            ``configuration.json`` (Deriva_Config) serializes the workflow
+            URL/version/checksum at run time, and the environment
+            snapshot's installed-package versions corroborate the running
+            commit.
         description (str | None): Description of workflow purpose and behavior.
             When the workflow is bound to a writable catalog, setting this property
             will update the catalog record.
