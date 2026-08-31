@@ -374,3 +374,52 @@ versioned — i.e. production, not fresh test catalogs. Offline unit
 tests can reproduce it cheaply by building a snapshot pathBuilder whose
 `schemas[...].tables` dict simply omits the table (see
 `tests/execution/test_producers_of_dataset_members.py`).
+
+### 2026-08-31 — Dataset origin = earliest-version author; trace root-only (issue #367 design)
+
+**Decision (with Carl):** `lookup_lineage`'s `producing_execution` for
+an unversioned dataset root resolves to the author of the **earliest**
+`Dataset_Version` row (structural origin), not the latest
+(last-writer-wins, the #367 bug where a data migration was reported as
+producer of the LAC splits). A new `version_history` trace (ordered
+`(version, execution, description)` list) rides on the **root
+descriptor only**, plus `origin_recorded: bool` flagging
+sentinel/None origins. **No schema change.**
+
+**Why no schema change:** the semantics question in #367 was already
+settled by the provenance contract — `Dataset_Version.Execution` means
+"author of this version" (authorship-canonical model), and the 92%
+sentinel population is the contract's documented adoption backfill,
+not corruption. The defect was presentation: the unversioned path
+answered "who last touched it?" while lineage presented it as "how did
+this come to exist?". Origin is derivable because `create_dataset`
+writes the v0.1.0 row with the creating execution — earliest-row
+author = origin **by construction** going forward; pre-contract
+datasets honestly resolve to the sentinel ("origin unrecorded",
+unrecoverable).
+
+**Why trace root-only, not on consumed-dataset mentions:** consumed
+mentions are version-pinned and the pin IS the provenance of that
+consumption; a popular dataset appears in every walk that trained on
+it (payload multiplies across the MCP boundary); and any dataset's
+full trace is one `lookup_lineage(rid, depth=0)` call away. Rejected
+alternative: explicit origin modeling (Version_Kind column /
+Produced_By FK) — schema change + 5,258-row backfill for something
+derivable; revisit only if migration-tagging is needed beyond
+presentation.
+
+**Implementation traps recorded in the spec:** (1) the existing `_key`
+collapses unparseable versions to `(0,)` — fine under `max`, but under
+`min` a dev row `0.4.0.post1.dev3` would sort before `0.1.0` and steal
+the origin; parse PEP 440 via `packaging` (already a dep), RCT
+fallback. (2) sentinel classification must degrade, not raise, when
+the sentinel is absent (#365 lesson: lineage leaf helpers never abort
+the walk). (3) `origin_recorded` carries interpretation separately
+from `producing_execution`, which keeps the sentinel value — truth and
+judgment as separate fields.
+
+**Related gap deliberately split out:** `Dataset_Dataset` has no
+version pin (can't say which of a parent's 85 versions a child derived
+from) — separate schema decision, own issue.
+
+Spec: `docs/superpowers/specs/2026-08-31-dataset-origin-lineage-design.md`.
