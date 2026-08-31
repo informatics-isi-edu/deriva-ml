@@ -40,3 +40,20 @@ def test_model_dump_is_additive():
     d = RootDescriptor(rid=_rid(1), type="Dataset", description=None).model_dump()
     for key in ("rid", "type", "description", "producing_execution", "origin_recorded", "version_history"):
         assert key in d
+
+
+def test_workflow_summary_carries_code_identity():
+    """WorkflowSummary exposes url and version (issue #372)."""
+    from deriva_ml.execution.lineage import WorkflowSummary
+
+    wf = WorkflowSummary(
+        rid=_rid(9),
+        name="training",
+        url="https://github.com/org/repo",
+        version="1.2.3",
+    )
+    assert wf.url == "https://github.com/org/repo"
+    assert wf.version == "1.2.3"
+    # Defaults stay None so existing construction sites are unaffected.
+    bare = WorkflowSummary(rid=_rid(9), name=None)
+    assert bare.url is None and bare.version is None

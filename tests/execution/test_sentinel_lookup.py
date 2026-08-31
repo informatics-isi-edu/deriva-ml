@@ -58,3 +58,12 @@ def test_public_raising_wrapper_unchanged():
     ml, _ = _mixin_with_sentinel_rows([])
     with pytest.raises(DerivaMLException, match="sentinel"):
         ml.unknown_provenance_execution_rid()
+
+
+def test_public_non_raising_accessor():
+    """unknown_provenance_execution_rid_or_none: public, absence -> None (issue #372)."""
+    ml, _ = _mixin_with_sentinel_rows([])
+    assert ml.unknown_provenance_execution_rid_or_none() is None
+
+    ml2, _ = _mixin_with_sentinel_rows([{"RID": _rid(7)}])
+    assert ml2.unknown_provenance_execution_rid_or_none() == _rid(7)

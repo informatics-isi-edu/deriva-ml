@@ -39,12 +39,25 @@ class WorkflowSummary(BaseModel):
         rid: Workflow RID.
         name: Human-readable workflow name (None if the row has no
             name set).
+        url: URI of the workflow's source code (typically a GitHub URL);
+            None if unrecorded.
+        version: Version label recorded on the Workflow row. Caveat: a
+            Workflow row is deduplicated per definition, so this reflects
+            when the row was FIRST registered — not necessarily the code
+            version any particular execution ran (see issue #373). Per-run
+            code identity is recorded in the execution's run metadata:
+            ``configuration.json`` (Deriva_Config) serializes the workflow
+            URL/version/checksum at run time, and the environment
+            snapshot's installed-package versions corroborate the running
+            commit.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     rid: RID
     name: str | None = None
+    url: str | None = None
+    version: str | None = None
 
 
 class ExecutionSummary(BaseModel):

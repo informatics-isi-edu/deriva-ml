@@ -106,3 +106,14 @@ def test_unresolvable_rid_absent_from_result():
     out = ml._execution_summaries([row["RID"], _rid(999)])
     assert _rid(999) not in out
     assert row["RID"] in out
+
+
+def test_batched_workflow_summary_carries_url_and_version():
+    """Batched summaries project URL/Version from the Workflow rows (#372)."""
+    wf = {"RID": _rid(900), "Name": "trainer", "URL": "https://github.com/org/r", "Version": "2.0.0"}
+    row = _exec_row(1, wf_n=900)
+    ml, _, _ = _mixin({row["RID"]: row}, {wf["RID"]: wf})
+    out = ml._execution_summaries([row["RID"]])
+    summary = out[row["RID"]].workflow
+    assert summary.url == "https://github.com/org/r"
+    assert summary.version == "2.0.0"
