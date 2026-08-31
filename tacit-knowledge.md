@@ -452,3 +452,21 @@ both verified against the code before accepting:
    `create_schema.py` Dataset_Version.Execution comment still said the
    initial row "has no producing execution" — contradicting the
    contract it predates; comments are contract surface too.
+
+**Codex code-review catch before merge (2026-08-31, commit 2ebbd429):**
+cross-model review of the finished branch found the one hole every
+per-task review and the whole-branch review missed: **the sentinel
+enters `member_producers` too.** The provenance backfill attributes
+producerless member *assets* to the unknown-provenance sentinel via
+`Asset_Role="Output"` edges — so on any backfilled catalog the sentinel
+RID sits in the member-producer set, and the member-fallback path could
+seed the walk from it (or attach it as an extra parent), re-fabricating
+exactly the sentinel-consumption edges the design forbids. The
+origin-path guard alone was insufficient; the invariant is
+**"the sentinel never enters the walk by ANY route"** — enforce it by
+filtering the candidate set, not by guarding one path. Second catch:
+candidate seeding must iterate ALL member producers (first-N-stale →
+lineage silently lost). Lesson: an invariant stated as "X never happens
+via path P" should be re-checked against every OTHER path that supplies
+the same value — the backfill made the sentinel an ordinary member of a
+set the design treated as sentinel-free.
