@@ -263,3 +263,36 @@ def test_svg_tooltip_text_is_escaped():
     page = lineage_result_to_html(hostile)
     assert "<img src=x" not in page
     assert "&lt;img" in page
+
+
+def test_svg_draws_consumed_assets():
+    """Consumed assets appear in the FIGURE, not only the walk list.
+
+    Pins the live 7-QCAA gap: 5 dataset pills drawn, the consumed
+    detector-weights asset absent from the figure entirely.
+    """
+    from deriva_ml.execution.lineage import AssetSummary
+
+    walk = LineageNode(
+        execution=_exec_summary(50),
+        consumed_assets=[AssetSummary(rid=_rid(51), filename="weights.keras", asset_table="Execution_Asset")],
+    )
+    result = LineageResult(
+        root=RootDescriptor(rid=_rid(52), type="Execution", description=None), lineage=walk
+    )
+    page = lineage_result_to_html(result)
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert "weights.keras" in svg
+    assert _rid(51) in svg
+    assert "Execution_Asset" in svg  # tooltip carries the table
+
+
+def test_svg_marks_already_shown_nodes():
+    shown_twice = LineageNode(execution=_exec_summary(55), already_shown=True)
+    walk = LineageNode(execution=_exec_summary(54), parents=[shown_twice])
+    result = LineageResult(
+        root=RootDescriptor(rid=_rid(53), type="Execution", description=None), lineage=walk
+    )
+    page = lineage_result_to_html(result)
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert "already shown" in svg  # tooltip notes the collapse

@@ -274,8 +274,9 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
 
     def node_height(n: dict) -> int:
         n_ds = len(n.get("consumed_datasets") or [])
+        n_assets = len(n.get("consumed_assets") or [])
         n_feat = sum(1 for d in (n.get("consumed_datasets") or []) if (d.get("rid") in feat_counts))
-        return box_h + (n_ds + n_feat) * (ds_h + 4)
+        return box_h + (n_ds + n_assets + n_feat) * (ds_h + 4)
 
     col_heights = [sum(node_height(n) for n in col) + gap_y * max(len(col) - 1, 0) for col in columns]
     height = max(col_heights or [box_h]) + 2 * pad
@@ -298,6 +299,7 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
             wf = wf_rec.get("name") or ""
             tip_lines = [
                 f"{rid} [{ex.get('status') or 'Unknown'}]",
+                "already shown elsewhere in this tree" if n.get("already_shown") else "",
                 ex.get("description") or "",
                 f"workflow: {wf}" + (f" v{wf_rec['version']}" if wf_rec.get("version") else ""),
                 wf_rec.get("url") or "",
@@ -306,7 +308,8 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
             parts.append(
                 f"<g><title>{tip}</title>"
                 f'<rect x="{x}" y="{y}" width="{box_w}" height="{box_h}" rx="8" '
-                f'fill="#eef2f6" stroke="#1c4f8a"/>'
+                f'fill="#eef2f6" stroke="#1c4f8a"'
+                f"{" stroke-dasharray='5 3'" if n.get('already_shown') else ''}/>"
                 f'<text x="{x + 10}" y="{y + 19}" font-size="12" '
                 f'font-family="ui-monospace,monospace">{_esc(rid)}</text>'
                 f'<text x="{x + 10}" y="{y + 36}" font-size="10" fill="#6b7686">'
@@ -348,6 +351,27 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                         f"{n_feat} feature producer(s)</text></g>"
                     )
                     dy += ds_h + 4
+            for a in n.get("consumed_assets") or []:
+                a_label = _esc((a.get("filename") or a.get("rid") or "")[:24])
+                a_tip = _esc(
+                    chr(10).join(
+                        x
+                        for x in [
+                            a.get("filename") or "",
+                            f"{a.get('rid')} in {a.get('asset_table')}",
+                            f"consumed by {rid}",
+                        ]
+                        if x
+                    )
+                )
+                parts.append(
+                    f"<g><title>{a_tip}</title>"
+                    f'<rect x="{x + 14}" y="{dy}" width="{box_w - 28}" height="{ds_h}" '
+                    f'rx="3" fill="#eef7ee" stroke="#4e8a5a"/>'
+                    f'<text x="{x + 24}" y="{dy + 15}" font-size="10" '
+                    f'font-family="ui-monospace,monospace">{a_label}</text></g>'
+                )
+                dy += ds_h + 4
             y += node_height(n) + gap_y
         # Arrows child ← parent: draw from this column's nodes to their parents.
     for depth, col in enumerate(columns):
@@ -369,8 +393,8 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
     return (
         "<h2>Walk figure</h2>"
         '<p class="note">Executions by depth (root leftmost; arrows point from producer '
-        "to consumer), consumed datasets under their consuming execution, dashed marks "
-        "where feature-producer candidates exist. The model records parents as a set, "
+        "to consumer), consumed datasets (blue pills) and assets (green pills) under their consuming execution, dashed marks "
+        "where feature-producer candidates exist. Hover any element for its full record. The model records parents as a set, "
         "so dataset&rarr;producer pairings are deliberately not drawn.</p>" + "".join(parts)
     )
 
