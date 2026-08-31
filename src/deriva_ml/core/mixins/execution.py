@@ -11,6 +11,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
+from packaging.version import InvalidVersion
+from packaging.version import Version as _PEP440Version
+
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
@@ -46,6 +49,43 @@ if TYPE_CHECKING:
 
 
 __all__ = ["ExecutionMixin"]
+
+
+def _version_row_sort_key(row: dict[str, Any]) -> tuple:
+    """Total sort key for a ``Dataset_Version`` row (spec: issue #367).
+
+    Ordering is ``(RCT, parseable-flag, parsed PEP 440 version, raw label)``:
+
+    - ``RCT`` primary: chronology of *recording*, which is the question the
+      origin resolution asks. ERMrest emits RCT as ISO-8601 UTC text, so
+      lexicographic comparison is chronological; a missing RCT sorts first
+      (epoch-minimum) and defers to the tiebreaks.
+    - Parseable labels sort before unparseable ones within an RCT tie; among
+      parseable ones PEP 440 order applies (``0.2.0`` < ``0.10.0``).
+    - The raw label string is the final tiebreak, making the order total even
+      for two unparseable labels or labels that normalize equal
+      (``1.0`` vs ``1.0.0``).
+
+    Args:
+        row: A ``Dataset_Version`` row dict (``RCT``, ``Version`` keys used).
+
+    Returns:
+        A tuple comparable against any other row's key.
+
+    Example:
+        >>> _version_row_sort_key({"RCT": "2025-01-01T00:00:00Z", "Version": "1.0.0"}) < \
+        ...     _version_row_sort_key({"RCT": "2026-01-01T00:00:00Z", "Version": "0.1.0"})
+        True
+    """
+    rct = row.get("RCT") or ""
+    label = row.get("Version") or ""
+    try:
+        return (rct, 0, _PEP440Version(label), label)
+    except InvalidVersion:
+        # Constant Version("0") in slot 3: never compared against a parseable
+        # row's key (flag differs), and equal among unparseable rows so the
+        # raw label decides.
+        return (rct, 1, _PEP440Version("0"), label)
 
 
 class ExecutionMixin:
@@ -1317,6 +1357,29 @@ class ExecutionMixin:
             f"lineage-shaped. lookup_lineage accepts Dataset, Asset, "
             f"Feature-value, or Execution RIDs."
         )
+
+    def _dataset_version_rows(self, dataset_rid: RID) -> list[dict[str, Any]]:
+        """All ``Dataset_Version`` rows for ``dataset_rid``, earliest first.
+
+        Single catalog fetch; sorted by :func:`_version_row_sort_key` (RCT-primary
+        total order). The first row's ``Execution`` is the dataset's origin
+        attribution; the full list becomes the lineage root's version history.
+
+        Args:
+            dataset_rid: Dataset whose version history to fetch.
+
+        Returns:
+            Row dicts (system columns included), sorted earliest → latest.
+            Empty list if the dataset has no version rows.
+
+        Example:
+            >>> rows = ml._dataset_version_rows("1-DSAA")  # doctest: +SKIP
+            >>> origin_rid = rows[0]["Execution"] if rows else None  # doctest: +SKIP
+        """
+        pb = self.pathBuilder()
+        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
+        return sorted(rows, key=_version_row_sort_key)
 
     def _producer_of_dataset(self, dataset_rid: RID, version: Any | None = None) -> RID | None:
         """Return the Execution RID that produced a version of ``dataset_rid``.
