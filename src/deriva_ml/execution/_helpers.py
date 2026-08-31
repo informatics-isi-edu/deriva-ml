@@ -413,7 +413,70 @@ def insert_nested_execution_link(
     exec_exec_path.insert([record])
 
 
+def list_execution_metadata(
+    *,
+    ml_instance: Any,
+    execution_rid: str,
+    logger: Any = None,
+) -> list:
+    """Return the run-metadata assets recorded for an execution.
+
+    Run metadata (environment snapshots, ``uv.lock``, Hydra overrides,
+    ``configuration.json``) lives in the ``Execution_Metadata`` table,
+    joined to the execution through ``Execution_Metadata_Execution`` —
+    it is **not** reachable efficiently through :func:`list_assets`,
+    which streams every output asset (a cropping run emitting thousands
+    of images has been observed not to return in 15 minutes, while this
+    join returns its handful of metadata rows in seconds). The direct
+    join also makes absence distinguishable from a timeout: an execution
+    with no captured environment returns an empty list quickly.
+
+    Args:
+        ml_instance: The bound :class:`DerivaML` instance.
+        execution_rid: The anchor execution RID.
+        logger: Optional logger for per-asset debug lines. Defaults to
+            the module logger.
+
+    Returns:
+        List of :class:`Asset` objects for the execution's metadata
+        rows. Empty when the execution recorded no metadata. Per-asset
+        ``lookup_asset`` failures are logged and skipped (one bad row
+        must not hide the rest); failures of the join query itself
+        propagate — silently returning an empty list for a catalog
+        problem would misreport "not recorded".
+
+    Example:
+        >>> assets = list_execution_metadata(  # doctest: +SKIP
+        ...     ml_instance=ml, execution_rid=execution.rid)
+        >>> [a.asset_rid for a in assets]  # doctest: +SKIP
+        ['...', '...']
+    """
+    if logger is None:
+        from deriva_ml.core.logging_config import get_logger
+
+        logger = get_logger(__name__)
+
+    pb = ml_instance.pathBuilder()
+    schema = pb.schemas[ml_instance.ml_schema]
+    assoc = schema.tables["Execution_Metadata_Execution"]
+    metadata = schema.tables["Execution_Metadata"]
+    path = assoc.filter(assoc.Execution == execution_rid).link(metadata, on=(assoc.Execution_Metadata == metadata.RID))
+    rows = list(path.entities().fetch())
+
+    assets = []
+    for row in rows:
+        rid = row.get("RID")
+        if not rid:
+            continue
+        try:
+            assets.append(ml_instance.lookup_asset(rid))
+        except Exception as e:  # noqa: BLE001 — per-row degrade only
+            logger.debug("Could not look up metadata asset %s: %s", rid, e)
+    return assets
+
+
 __all__ = [
+    "list_execution_metadata",
     "check_writable_catalog",
     "fetch_nested_execution_rows",
     "insert_nested_execution_link",
