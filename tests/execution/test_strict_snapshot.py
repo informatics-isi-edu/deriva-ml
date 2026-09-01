@@ -156,6 +156,40 @@ class TestStrictVersionSnapshotCatalog:
         with pytest.raises(SnapshotUnavailable):
             ds.strict_version_snapshot_catalog("1.0.0")
 
+    def test_falsy_snapshot_refused_even_when_ml_instance_already_snapshot_bound(self):
+        """Regression pin: the discriminator must read the history row, not the id string.
+
+        When ``self._ml_instance`` is ITSELF already a snapshot-bound
+        catalog (as happens while chaining hops — e.g.
+        ``strict_parents_at`` calling ``strict_version_snapshot_catalog``
+        on a parent ``Dataset`` whose ``_ml_instance`` is the child's
+        pinned snapshot), ``catalog.catalog_id`` is already of the form
+        ``"1@SNAPA"`` — it already contains ``"@"``. A version row with a
+        NULL ``Snapshot`` (the normal shape of a dev row: dev rows always
+        carry ``Snapshot=NULL``, and ``current_version`` can return a dev
+        label) must still be refused. A string-based ``"@" not in id``
+        check would be fooled here because the BARE branch returns
+        ``self._ml_instance.catalog.catalog_id`` verbatim — which already
+        contains ``"@"`` — so the guard would incorrectly pass and either
+        return a wrongly-scoped live catalog or a malformed
+        ``"1@SNAPA@SNAPA"`` id. This test fails against that string-based
+        discriminator and passes against the row-based one.
+        """
+        already_pinned = _fake_catalog(catalog_id="1@SNAPA")
+        ds_rid = _rid(1)
+        ds = Dataset(catalog=already_pinned, dataset_rid=ds_rid)
+        ds.dataset_history = MagicMock(
+            return_value=[_history_row("0.4.0.post1.dev3", snapshot=None, dataset_rid=ds_rid, version_rid_n=10)]
+        )
+
+        with pytest.raises(SnapshotUnavailable):
+            ds.strict_version_snapshot_catalog("0.4.0.post1.dev3")
+
+        # And catalog_snapshot must never have been called with any id
+        # composed from the already-"@"-bearing bare id — the whole point
+        # is refusing before any id is composed at all.
+        already_pinned.catalog_snapshot.assert_not_called()
+
     def test_catalog_snapshot_raising_is_wrapped(self):
         """An unreadable (e.g. GC'd) snapshot is wrapped as SnapshotUnavailable."""
         live = _fake_catalog(catalog_id="1")

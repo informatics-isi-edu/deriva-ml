@@ -3036,6 +3036,34 @@ class Dataset:
         else:
             return self._ml_instance
 
+    def _resolve_version_record(self, version: DatasetVersion | str) -> DatasetHistory:
+        """Look up the ``dataset_history()`` row matching ``version``.
+
+        Shared by :meth:`_version_snapshot_catalog_id` and
+        :meth:`strict_version_snapshot_catalog` so the two cannot drift on
+        what counts as "this version's history row" — only on what each
+        does once it has it (bare-id live fallback vs. strict refusal).
+
+        Args:
+            version: The dataset version to look up.
+
+        Returns:
+            DatasetHistory: The matching history row.
+
+        Raises:
+            DerivaMLException: If the specified version doesn't exist.
+        """
+        version = str(version)
+        history = self.dataset_history()
+        try:
+            return next(h for h in history if str(h.dataset_version) == version)
+        except StopIteration:
+            available = [(str(h.dataset_version), h.snapshot) for h in history]
+            raise DerivaMLException(
+                f"Dataset version {version} not found for dataset {self.dataset_rid}. "
+                f"Available versions in history: {available}"
+            )
+
     def _version_snapshot_catalog_id(self, version: DatasetVersion | str) -> str:
         """Get the catalog ID with snapshot suffix for a specific version.
 
@@ -3052,16 +3080,7 @@ class Dataset:
         Raises:
             DerivaMLException: If the specified version doesn't exist.
         """
-        version = str(version)
-        history = self.dataset_history()
-        try:
-            version_record = next(h for h in history if str(h.dataset_version) == version)
-        except StopIteration:
-            available = [(str(h.dataset_version), h.snapshot) for h in history]
-            raise DerivaMLException(
-                f"Dataset version {version} not found for dataset {self.dataset_rid}. "
-                f"Available versions in history: {available}"
-            )
+        version_record = self._resolve_version_record(version)
         return (
             f"{self._ml_instance.catalog.catalog_id}@{version_record.snapshot}"
             if version_record.snapshot
@@ -3104,23 +3123,30 @@ class Dataset:
             >>> catalog = ds.strict_version_snapshot_catalog("1.0.0")  # doctest: +SKIP
         """
         try:
-            snapshot_id = self._version_snapshot_catalog_id(version)
+            version_record = self._resolve_version_record(version)
         except DerivaMLException as e:
             raise SnapshotUnavailable(
                 f"Dataset {self.dataset_rid} version {version}: version not resolvable in history ({e})"
             ) from e
 
-        # ``_version_snapshot_catalog_id`` returns the BARE catalog id
-        # (no "@snapshot" suffix) when the version row's Snapshot column
-        # is falsy — that is exactly the live-fallback case this method
-        # must refuse. Bare ids never contain "@", so this is a reliable
-        # discriminator without re-querying history.
-        if "@" not in snapshot_id:
+        # Discriminate on the SOURCE OF TRUTH — the history row's
+        # ``Snapshot`` column — never on the composed id string. A
+        # string-based check (e.g. "does the id contain '@'") is not
+        # airtight: when ``self._ml_instance`` is ITSELF already
+        # snapshot-bound, ``self._ml_instance.catalog.catalog_id`` is
+        # already of the form ``"<id>@<snap>"``, so composing
+        # ``f"{that}@{version_record.snapshot}"`` — or even the BARE
+        # (falsy-snapshot) branch, which returns that already-"@"-bearing
+        # id verbatim — would contain "@" regardless of whether this
+        # version's own Snapshot column is set. Checking the row directly
+        # sidesteps that entirely.
+        if not version_record.snapshot:
             raise SnapshotUnavailable(
                 f"Dataset {self.dataset_rid} version {version} has no recorded catalog snapshot "
                 "(Snapshot column is empty) — cannot resolve a snapshot-closed view."
             )
 
+        snapshot_id = f"{self._ml_instance.catalog.catalog_id}@{version_record.snapshot}"
         try:
             return self._ml_instance.catalog_snapshot(snapshot_id)
         except Exception as e:
