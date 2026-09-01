@@ -1,7 +1,10 @@
 # `lookup_provenance`: the complete provenance closure (issue #383)
 
-**Status:** draft v2 — revised after Codex round 1 (16/17 P1s and 4/4 P2s
-accepted; see §10).
+**Status:** approved (Carl, 2026-09-01) — v2.2 after Codex round 1
+(16/17 P1s and 4/4 P2s accepted; see §10) plus idiom rulings (§4).
+Open question §9.1 resolved to the stated leaning (proportional internal
+dataset budget, no public knob); §9.2 (docs/CLI framing) deferred to the
+documentation step of implementation.
 **Depends on:** #385/#386 (shipped, v1.61.0) — `find_feature_producers` with
 FK-reachable member scope and version-snapshot scoping.
 **Contract basis:** `docs/reference/provenance-contract.md` (binding definition,
