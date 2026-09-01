@@ -760,3 +760,17 @@ scope); gap taxonomy grew to 12 kinds so nothing disappears silently;
 `traversal_complete` ≠ gap-freedom. Partially rejected (1/17): the
 named live artifact in the validation PLAN is documentation; the
 committed form resolves it by lookup per the RID rule.
+
+**2026-09-01 — #383 model idioms settled (Carl): StrEnum for closed
+vocabularies; Pydantic public / dataclass internal.** Arc kinds, gap
+kinds, input types, and ancestry states are `StrEnum`s (`ArcKind`,
+`GapKind`, `ArcInputType`, `AncestryState`), not `Literal`s: consumers
+DISPATCH on these (filter arcs, group gaps), so the vocabulary must be
+importable and autocompletable with typos failing at authoring time —
+the `ExecutionStatus` precedent, not the `RootDescriptor.type` one
+(Literal is for read-and-display fields). Costs nil: StrEnum members
+compare equal to their strings and dump as plain strings, so the JSON
+envelope and string-literal comparisons in user code are unaffected.
+Closure result classes are Pydantic per the CLAUDE.md class-idiom rule
+(boundary-crossing, user-facing, all-Pydantic siblings); only
+engine-private bookkeeping may be dataclasses.
