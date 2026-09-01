@@ -73,6 +73,8 @@ class WorkflowSummary(BaseModel):
             URL/version/checksum at run time, and the environment
             snapshot's installed-package versions corroborate the running
             commit.
+        checksum: Workflow content checksum — the identity deriva-ml
+            dedupes workflows by; None when the record carries none.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -81,6 +83,7 @@ class WorkflowSummary(BaseModel):
     name: str | None = None
     url: str | None = None
     version: str | None = None
+    checksum: str | None = None
 
 
 class ExecutionSummary(BaseModel):

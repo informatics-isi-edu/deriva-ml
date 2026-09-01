@@ -1568,6 +1568,7 @@ class ExecutionMixin:
                     name=wrow.get("Name"),
                     url=wrow.get("URL"),
                     version=wrow.get("Version"),
+                    checksum=wrow.get("Checksum"),
                 )
             out[row["RID"]] = ExecutionSummary(
                 rid=row["RID"],
@@ -2103,6 +2104,7 @@ class ExecutionMixin:
                     name=record.workflow.name,
                     url=getattr(record.workflow, "url", None),
                     version=getattr(record.workflow, "version", None),
+                    checksum=getattr(record.workflow, "checksum", None),
                 )
 
             execution_summary = ExecutionSummary(

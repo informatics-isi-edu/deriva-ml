@@ -59,6 +59,17 @@ def test_workflow_summary_carries_code_identity():
     assert bare.url is None and bare.version is None
 
 
+def test_workflow_summary_carries_checksum():
+    """WorkflowSummary exposes checksum — the identity deriva-ml dedupes workflows by (#383)."""
+    from deriva_ml.execution.lineage import WorkflowSummary
+
+    wf = WorkflowSummary(rid=_rid(9), name="training", checksum="sha256:abc")
+    assert wf.model_dump()["checksum"] == "sha256:abc"
+    # Default stays None so existing construction sites are unaffected.
+    bare = WorkflowSummary(rid=_rid(9), name=None)
+    assert bare.checksum is None
+
+
 def test_root_type_enum_is_string_compatible():
     from deriva_ml.execution.lineage import RootDescriptor, RootType
 

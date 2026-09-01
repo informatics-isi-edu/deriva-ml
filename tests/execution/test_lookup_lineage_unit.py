@@ -55,6 +55,7 @@ class _StubWorkflow:
     name: str
     url: str | None = None
     version: str | None = None
+    checksum: str | None = None
 
 
 @dataclass
@@ -284,7 +285,13 @@ class _FakeML(ExecutionMixin):
             if rec is None:
                 continue
             wf_summary = (
-                WorkflowSummary(rid=rec.workflow.workflow_rid, name=rec.workflow.name) if rec.workflow else None
+                WorkflowSummary(
+                    rid=rec.workflow.workflow_rid,
+                    name=rec.workflow.name,
+                    checksum=getattr(rec.workflow, "checksum", None),
+                )
+                if rec.workflow
+                else None
             )
             out[rid] = ExecutionSummary(
                 rid=rec.execution_rid,
@@ -361,6 +368,30 @@ def test_lineage_dataset_one_level_chain():
     assert result.lineage.parents == []  # DS-0 has no producer
     assert result.executions_visited == 1
     assert result.walked_complete is True
+
+
+def test_lineage_walk_populates_workflow_checksum():
+    """The per-node walk path (_walk_node -> record.workflow) threads checksum (#383).
+
+    Pins the path Codex flagged: _walk_node builds WorkflowSummary from
+    record.workflow (a _StubWorkflow / Workflow object), not from a raw row
+    dict, so checksum must be read off that object's attribute.
+    """
+    ml = _FakeML()
+    ml.add_dataset("1-DSAA", description="root data", producer=None)
+    ml.add_execution(
+        "2-EXAA",
+        description="train",
+        workflow=_StubWorkflow(workflow_rid="3-WFAB", name="trainer", checksum="sha256:deadbeef"),
+        input_datasets=[_StubDataset("1-DSAA", "root data", "0.1.0")],
+    )
+    ml.add_dataset("1-DSAB", description="trained set", producer="2-EXAA")
+
+    result = ml.lookup_lineage("1-DSAB")
+
+    assert result.lineage is not None
+    assert result.lineage.execution.workflow is not None
+    assert result.lineage.execution.workflow.checksum == "sha256:deadbeef"
 
 
 def test_lineage_two_level_chain():
@@ -1131,6 +1162,8 @@ def test_asset_root_shape_carries_no_dataset_fields():
     assert result.lineage is not None
     assert result.lineage.execution.rid == producer
     assert result.root.producing_execution.rid == producer  # non-Dataset overwrite kept
+
+
 def test_walk_node_workflow_summary_carries_url_and_version():
     """Lineage nodes expose workflow code identity with no extra lookups (#372)."""
     producer = _gen_rid(80)

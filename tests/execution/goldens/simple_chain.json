@@ -17,6 +17,7 @@
       "rid": "2-0001",
       "status": "Uploaded",
       "workflow": {
+        "checksum": null,
         "name": "trainer",
         "rid": "3-0001",
         "url": null,
@@ -33,6 +34,7 @@
       "rid": "2-0001",
       "status": "Uploaded",
       "workflow": {
+        "checksum": null,
         "name": "trainer",
         "rid": "3-0001",
         "url": null,
@@ -50,6 +52,7 @@
           "rid": "2-0001",
           "status": "Uploaded",
           "workflow": {
+            "checksum": null,
             "name": "trainer",
             "rid": "3-0001",
             "url": null,

@@ -17,6 +17,7 @@
       "rid": "2-000B",
       "status": "Uploaded",
       "workflow": {
+        "checksum": null,
         "name": "stage-two",
         "rid": "3-000B",
         "url": null,
@@ -39,6 +40,7 @@
           "rid": "2-000A",
           "status": "Uploaded",
           "workflow": {
+            "checksum": null,
             "name": "stage-one",
             "rid": "3-000A",
             "url": null,
@@ -57,6 +59,7 @@
       "rid": "2-000B",
       "status": "Uploaded",
       "workflow": {
+        "checksum": null,
         "name": "stage-two",
         "rid": "3-000B",
         "url": null,
@@ -74,6 +77,7 @@
           "rid": "2-000B",
           "status": "Uploaded",
           "workflow": {
+            "checksum": null,
             "name": "stage-two",
             "rid": "3-000B",
             "url": null,
