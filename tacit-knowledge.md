@@ -728,3 +728,14 @@ Verification standard raised accordingly: hover + screenshot on the
 live page (CSS overlays appear in screenshots; native tooltips never
 did — which is also why the gap survived earlier "verify tooltips"
 passes that only inspected markup).
+
+**2026-08-31 addendum (same PR #387): keeping `<title>` "for
+accessibility" alongside CSS overlays produces TWO tooltips.** In a
+full browser the CSS overlay appears instantly and the browser chrome
+then draws the native `<title>` tooltip on top a second later — two
+different-looking tooltips for one element (user-reported). The
+accessible text belongs in `aria-label` (with `role="img"`) on the
+hover group: announced by screen readers, rendered by no browser.
+Rule of thumb: `<title>` in SVG is a VISUAL feature (browser-chrome
+tooltip), not merely a semantic one — if you draw your own tooltip,
+`<title>` must go.
