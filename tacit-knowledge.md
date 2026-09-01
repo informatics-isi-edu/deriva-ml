@@ -967,3 +967,18 @@ execution expansion walks INPUTS only; nothing enumerates an
 execution's other outputs or annotation targets. Forward reachability
 ("what else did E touch") is a different question
 (find_executions_consuming), not provenance.
+
+**2026-09-01 — lookup_provenance profiled on eye-ai: latency × request
+count, NOT schema refetch.** 294s total; 61% (179s) in the 31 member-
+binding scans; 2,703 sequential HTTP GETs at ~0.10s each account for
+~all wall time. The multiplier is (dataset, version) PAIRS (31 for 12
+datasets — ancestry walks each dataset at several snapshot-resolved
+versions, each getting its own full #385 binding scan: FK-path walk +
+one grouped query per feature-route). The schema-refetch hypothesis
+(the estimate-perf trap) was WRONG here: 124 catalog_snapshot handles
+cost only 7.8s — eye-ai serves schema cheaply. Levers, impact order:
+(1) reuse FK-path discovery across versions of one dataset
+(snapshot-checked); (2) batch/parallelize per-feature queries;
+(3) expose the engine's arc gating publicly so callers can skip
+binding scans for a fast structural pass. Batch-appropriate as-is;
+optimize before any interactive use.
