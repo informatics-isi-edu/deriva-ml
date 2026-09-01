@@ -504,7 +504,9 @@ class ClosureBuilder:
             facts.version_authors.append(attribution)
 
     def on_binding_record(self, *, dataset_rid: str, version: str, record: "FeatureProducerRecord", depth: int) -> None:
-        """Observe one feature-binding record (Task 12 fills the arc leg)."""
+        """No-op: the closure builder records binding arcs directly (see
+        ``WalkEngine._expand_member_bindings``), so this hook has nothing
+        additional to accumulate."""
 
     def on_parent_link(self, *, dataset_rid: str, link: "ParentLink") -> None:
         """Record one snapshot-resolved parent hop (Task 13 fills the leg)."""
@@ -879,6 +881,9 @@ class WalkEngine(Generic[N]):
         if ArcKind.version_authorship in self.arcs:
             self._expand_version_authorship(dataset_rid, version, snapshot_catalog, depth=depth)
 
+        if ArcKind.member_binding in self.arcs:
+            self._expand_member_bindings(dataset_rid, version, depth=depth)
+
     def _strict_snapshot_or_gap(self, dataset_rid: str, version: str) -> Any:
         """Resolve the strict version snapshot, or report a chain break.
 
@@ -1011,6 +1016,75 @@ class WalkEngine(Generic[N]):
 
         if facts is not None:
             self.visitor.on_dataset_facts(dataset_rid=dataset_rid, facts=facts)
+
+    def _expand_member_bindings(self, dataset_rid: str, version: str, *, depth: int) -> None:
+        """Attribute the executions that bound feature values onto a walked
+        dataset version's members (spec §6.4).
+
+        Runs the internal diagnostic-returning binding scan
+        (``ml._find_feature_producers_impl``) exactly once per walked
+        ``(dataset_rid, version)`` — the caller (``expand_dataset``) already
+        memoizes on that key, so this method is never invoked twice for the
+        same pair. Each record naming an execution becomes a
+        ``member_binding`` arc carrying the record as evidence; a record with
+        no execution is a ``null_binding_execution`` gap; each diagnostic
+        collected during the scan is a ``binding_scan_failed`` gap. Neither
+        kind of hole suppresses the other records' arcs (degrade-with-honesty
+        — a partial scan still reports what it found).
+
+        Args:
+            dataset_rid: The walked dataset.
+            version: The walked version the scan is scoped to.
+            depth: Walk depth of the consuming execution (or 0 for the root).
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._expand_member_bindings)
+            True
+        """
+        records, diagnostics = self.ml._find_feature_producers_impl(dataset_rid, version=version)
+
+        for record in records:
+            self.visitor.on_binding_record(dataset_rid=dataset_rid, version=version, record=record, depth=depth)
+
+            author_rid = record.execution_rid
+            if not author_rid:
+                self.visitor.on_gap(
+                    GapKind.null_binding_execution,
+                    dataset_rid,
+                    f"feature '{record.feature_name}' on element '{record.element_type}' has bound values "
+                    "with no recorded Execution",
+                )
+                continue
+            if self.is_sentinel(author_rid):
+                # Recorded, but recorded as unknown: an honest gap, never a
+                # closure member (sentinel discipline, §6.1) — same rule the
+                # authorship leg applies to a sentinel-authored origin.
+                self.visitor.on_gap(
+                    GapKind.sentinel_origin,
+                    author_rid,
+                    f"feature '{record.feature_name}' on element '{record.element_type}' of "
+                    f"{dataset_rid}@{version} is bound by the unknown-provenance Execution sentinel",
+                )
+                continue
+
+            self._record_arc(
+                author_rid,
+                kind=ArcKind.member_binding,
+                depth=depth + 1,
+                input_rid=dataset_rid,
+                input_type=ArcInputType.dataset,
+                input_version=version,
+                evidence=[record],
+            )
+            self.enqueue_or_truncate(author_rid, depth=depth + 1)
+
+        for diagnostic in diagnostics:
+            self.visitor.on_gap(
+                GapKind.binding_scan_failed,
+                diagnostic.subject,
+                f"{diagnostic.kind}: {diagnostic.detail}",
+            )
 
     def _facts_for(self, dataset_rid: str, version: str) -> "DatasetVersionFacts | None":
         """Return the visitor's mutable facts record, when it keeps one.

@@ -1468,7 +1468,7 @@ class ExecutionMixin:
         engine: "WalkEngine[str]" = WalkEngine(
             self,
             builder,
-            arcs=frozenset({ArcKind.root, ArcKind.consumption, ArcKind.version_authorship}),
+            arcs=frozenset({ArcKind.root, ArcKind.consumption, ArcKind.version_authorship, ArcKind.member_binding}),
             max_executions=max_executions,
             dataset_budget=_DATASET_BUDGET_FACTOR * max_executions,
             closure_mode=True,

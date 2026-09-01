@@ -31,6 +31,7 @@ import pytest
 from pydantic import ValidationError
 
 from deriva_ml.core.exceptions import DerivaMLValidationError
+from deriva_ml.core.mixins.execution import BindingDiagnostic
 from deriva_ml.execution.provenance import (
     AncestryState,
     ArcInputType,
@@ -38,6 +39,7 @@ from deriva_ml.execution.provenance import (
     GapKind,
     ProvenanceClosure,
 )
+from deriva_ml.feature import FeatureProducerRecord
 from tests.execution.test_lookup_lineage_unit import (
     _FakeML,
     _StubAsset,
@@ -1351,6 +1353,275 @@ def test_lookup_provenance_dataset_budget_stop_reports_traversal_incomplete():
     # And the budget stop invented no gaps for the datasets it refused.
     assert _gaps_for(closure, GapKind.unresolved_rid) == []
     assert _gaps_for(closure, GapKind.snapshot_chain_break) == []
+
+
+# ---------------------------------------------------------------------------
+# Member-binding arc (§6.4) — snapshot-read, evidence-carrying.
+# ---------------------------------------------------------------------------
+
+
+def _binding_arcs(closure: ProvenanceClosure, rid: str):
+    return [a for a in _arcs_of(closure, rid) if a.kind == ArcKind.member_binding]
+
+
+def _binding_record(
+    execution_rid: str | None, feature_name: str = "Annotation", element_type: str = "Image", value_count: int = 1
+) -> FeatureProducerRecord:
+    return FeatureProducerRecord(
+        execution_rid=execution_rid,
+        feature_name=feature_name,
+        element_type=element_type,
+        value_count=value_count,
+    )
+
+
+def _dataset_root_with_bindings(
+    ml: _FakeML,
+    dataset_rid: str,
+    walked_version: str,
+    records: list[FeatureProducerRecord],
+    diagnostics: list[BindingDiagnostic] | None = None,
+    *,
+    producer: str | None = None,
+) -> None:
+    """Script a Dataset root pinned at ``walked_version`` with an available
+    strict snapshot and a scripted binding scan result."""
+    ml.add_dataset(dataset_rid, description="root", producer=producer)
+    ml.add_version_row(dataset_rid, walked_version, producer, rct="2025-01-01T00:00:00Z")
+    ml.set_snapshot_available(dataset_rid, walked_version, True)
+    ml.set_snapshot_version_rows(
+        dataset_rid, walked_version, [_snapshot_row(dataset_rid, walked_version, producer, "2025-01-01T00:00:00Z")]
+    )
+    ml.set_binding_scan(dataset_rid, walked_version, records, diagnostics or [])
+
+
+def test_binding_producer_enters_closure_with_evidence_and_is_expanded():
+    """A binding record naming an execution enters the closure with a
+    ``member_binding`` arc carrying the record as evidence, and the binding
+    producer is itself expanded (its own consumed input's producer enters
+    too)."""
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    binder, upstream = _ex(1), _ex(2)
+
+    ml.add_dataset(ds_input, description="input to the binder", producer=upstream)
+    ml.set_versioned_producer(ds_input, "1.0.0", upstream)
+    ml.add_execution(upstream, description="upstream producer")
+    ml.add_execution(
+        binder,
+        description="bound feature values",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version="1.0.0")],
+    )
+    record = _binding_record(binder)
+    _dataset_root_with_bindings(ml, ds_root, "1.0.0", [record])
+
+    closure = ml.lookup_provenance(ds_root, version="1.0.0")
+
+    assert binder in closure.executions
+    arcs = _binding_arcs(closure, binder)
+    assert len(arcs) == 1
+    assert arcs[0].input_rid == ds_root
+    assert arcs[0].input_type == ArcInputType.dataset
+    assert arcs[0].input_version == "1.0.0"
+    assert arcs[0].consumed_by is None
+    assert arcs[0].evidence == [record]
+
+    # The binder is a full closure member: its own consumed input's producer
+    # (upstream) is reached through the binder's expansion.
+    assert upstream in closure.executions
+    consumption = [a for a in _arcs_of(closure, upstream) if a.kind == ArcKind.consumption]
+    assert [a.consumed_by for a in consumption] == [binder]
+
+
+def test_binding_null_execution_emits_gap_no_arc():
+    """A binding record with ``execution_rid=None`` becomes a
+    ``null_binding_execution`` gap naming the feature/element; no arc is
+    recorded for it."""
+    ml = _FakeML()
+    ds_root = _ds(1)
+    record = _binding_record(None, feature_name="Annotation", element_type="Image")
+    _dataset_root_with_bindings(ml, ds_root, "1.0.0", [record])
+
+    closure = ml.lookup_provenance(ds_root, version="1.0.0")
+
+    gaps = _gaps_for(closure, GapKind.null_binding_execution, ds_root)
+    assert len(gaps) == 1
+    assert "Annotation" in gaps[0].detail
+    assert "Image" in gaps[0].detail
+    # No member_binding arc anywhere records a None-consumed_by/no-execution
+    # entry — there is nothing to attach one to.
+    assert all(a.kind != ArcKind.member_binding or a.evidence[0].execution_rid is not None for a in closure.gaps)
+
+
+def test_binding_scan_diagnostic_emits_gap_while_surviving_records_still_arc():
+    """A scripted ``BindingDiagnostic`` becomes a ``binding_scan_failed`` gap
+    (degrade-with-honesty), while OTHER records from the same scan still
+    produce arcs."""
+    ml = _FakeML()
+    ds_root = _ds(1)
+    binder = _ex(1)
+    ml.add_execution(binder, description="bound some features despite partial failure")
+    record = _binding_record(binder, feature_name="Label", element_type="Image")
+    diagnostic = BindingDiagnostic(kind="ambiguous_hop", subject="Annotation", detail="ambiguous target link")
+    _dataset_root_with_bindings(ml, ds_root, "1.0.0", [record], [diagnostic])
+
+    closure = ml.lookup_provenance(ds_root, version="1.0.0")
+
+    gaps = _gaps_for(closure, GapKind.binding_scan_failed, "Annotation")
+    assert len(gaps) == 1
+    assert "ambiguous_hop" in gaps[0].detail
+    assert "ambiguous target link" in gaps[0].detail
+
+    arcs = _binding_arcs(closure, binder)
+    assert len(arcs) == 1
+    assert arcs[0].evidence == [record]
+
+
+def test_two_datasets_sharing_binding_execution_two_arcs_one_execution():
+    """Two DIFFERENT walked datasets whose binding scans both name the same
+    execution produce ONE ``ProvenanceExecution`` with TWO ``member_binding``
+    arcs (different ``input_rid``)."""
+    ml = _FakeML()
+    ds_root, ds_a, ds_b = _ds(1), _ds(2), _ds(3)
+    consumer, shared_binder = _ex(1), _ex(2)
+
+    ml.add_execution(shared_binder, description="binds features on both datasets")
+    ml.add_execution(
+        consumer,
+        description="consumes both",
+        input_datasets=[
+            _StubDataset(ds_a, "a", "1.0.0", consumed_version="1.0.0"),
+            _StubDataset(ds_b, "b", "1.0.0", consumed_version="1.0.0"),
+        ],
+    )
+    for ds in (ds_a, ds_b):
+        ml.add_dataset(ds, description="input", producer=None)
+        ml.set_snapshot_available(ds, "1.0.0", True)
+        ml.set_snapshot_version_rows(ds, "1.0.0", [_snapshot_row(ds, "1.0.0", None, "2025-01-01T00:00:00Z")])
+        ml.set_binding_scan(ds, "1.0.0", [_binding_record(shared_binder)], [])
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert set(closure.executions) >= {consumer, shared_binder}
+    arcs = _binding_arcs(closure, shared_binder)
+    assert len(arcs) == 2
+    assert {a.input_rid for a in arcs} == {ds_a, ds_b}
+
+
+def test_binding_evidence_merge_dedups_records_min_depth():
+    """The same arc identity (same execution, same walked dataset/version)
+    rediscovered with overlapping evidence merges into ONE arc: records are
+    deduped by equality and the minimum depth is kept."""
+    ml = _FakeML()
+    ds_root, ds_shared = _ds(1), _ds(2)
+    top, left, right, shared_binder = _ex(1), _ex(2), _ex(3), _ex(4)
+
+    ml.add_execution(shared_binder, description="binder of the shared version")
+    record_1 = _binding_record(shared_binder, feature_name="Annotation", element_type="Image", value_count=3)
+    record_2 = _binding_record(shared_binder, feature_name="Label", element_type="Image", value_count=1)
+    for consumer in (left, right):
+        ml.add_execution(
+            consumer,
+            description=f"consumer {consumer}",
+            input_datasets=[_StubDataset(ds_shared, "shared", "1.0.0", consumed_version="1.0.0")],
+        )
+    ml.add_dataset(ds_shared, description="shared", producer=None)
+    ml.set_snapshot_available(ds_shared, "1.0.0", True)
+    ml.set_snapshot_version_rows(ds_shared, "1.0.0", [_snapshot_row(ds_shared, "1.0.0", None, "2025-01-01T00:00:00Z")])
+    # Both discovery paths scan the SAME (dataset, version) — the scan is
+    # memoized, so both consumers' expansion sees the identical record set,
+    # exercising the evidence-merge path (record_1 ∈ both, record_2 only
+    # discovered once but merged onto the same arc).
+    ml.set_binding_scan(ds_shared, "1.0.0", [record_1, record_2], [])
+    ml.add_dataset(ds_root, description="root", producer=top)
+    ml.add_execution(top, description="top")
+    ml.set_member_producers(ds_root, {left, right})
+
+    closure = ml.lookup_provenance(ds_root)
+
+    arcs = _binding_arcs(closure, shared_binder)
+    assert len(arcs) == 1
+    assert sorted(arcs[0].evidence, key=lambda r: r.feature_name) == sorted(
+        [record_1, record_2], key=lambda r: r.feature_name
+    )
+    # depth: left/right are root-seeded member-producers of ds_root (depth
+    # 0), so their expansion's binding scan discovers shared_binder at
+    # depth 0+1=1 via either seed; rediscovery must not raise it.
+    assert arcs[0].depth == 1
+
+    # And the binding scan itself ran exactly once for the shared pair.
+    scans = [c for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1] == (ds_shared, "1.0.0")]
+    assert len(scans) == 1
+
+
+def test_binding_sentinel_execution_emits_gap_no_arc_not_enqueued():
+    """A binding record attributed to the unknown-provenance sentinel is a
+    ``sentinel_origin`` gap, never an arc, and the sentinel is not enqueued."""
+    ml = _FakeML()
+    ds_root, sentinel = _ds(1), _ex(66)
+    ml.add_execution(sentinel, description="unknown provenance")
+    ml._sentinel_execution_rid_or_none = lambda: sentinel  # type: ignore[method-assign]
+    record = _binding_record(sentinel)
+    _dataset_root_with_bindings(ml, ds_root, "1.0.0", [record])
+
+    closure = ml.lookup_provenance(ds_root, version="1.0.0")
+
+    assert sentinel not in closure.executions
+    # Not a closure member, so it carries no arcs at all (the sentinel is
+    # never enqueued).
+    assert _gaps_for(closure, GapKind.sentinel_origin, sentinel)
+
+
+def test_binding_snapshot_unavailable_no_scan_call_no_second_gap():
+    """A dataset whose strict snapshot is unavailable never reaches the
+    binding scan at all: NO ``_find_feature_producers_impl`` call, and the
+    chain-break gap already emitted by the authorship leg is the only gap —
+    no second, binding-specific gap duplicates it."""
+    ml = _FakeML()
+    ds, binder = _ds(1), _ex(1)
+    ml.add_execution(binder, description="would-be binder")
+    ml.add_dataset(ds, description="root", producer=None)
+    ml.add_version_row(ds, "0.1.0", None, rct="2025-01-01T00:00:00Z")
+    ml.set_snapshot_available(ds, "0.1.0", False)
+    # Scripted, but must never be read without a resolvable snapshot.
+    ml.set_binding_scan(ds, "0.1.0", [_binding_record(binder)], [])
+    ml.calls.clear()
+
+    closure = ml.lookup_provenance(ds, version="0.1.0")
+
+    chain_break_gaps = _gaps_for(closure, GapKind.snapshot_chain_break, ds)
+    assert len(chain_break_gaps) == 1
+    assert not [c for c in ml.calls if c[0] == "_find_feature_producers_impl"]
+    assert binder not in closure.executions
+    # Not a closure member, so it carries no arcs at all.
+
+
+def test_binding_discovered_execution_refused_for_budget_is_truncated_not_unresolved():
+    """A binding-discovered execution the EXECUTION budget refuses to
+    enqueue lands in ``engine.truncated`` — never a false ``unresolved_rid``
+    gap; ``cap_hit`` is the explanation."""
+    ml = _FakeML()
+    ds_root, consumer, binder = _ds(1), _ex(1), _ex(2)
+
+    ml.add_execution(binder, description="binder refused for budget")
+    ml.add_execution(consumer, description="consumer")
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+    ml.add_version_row(ds_root, "0.1.0", consumer, rct="2025-01-01T00:00:00Z")
+    ml.set_snapshot_available(ds_root, "0.1.0", True)
+    ml.set_snapshot_version_rows(ds_root, "0.1.0", [_snapshot_row(ds_root, "0.1.0", consumer, "2025-01-01T00:00:00Z")])
+    ml.set_binding_scan(ds_root, "0.1.0", [_binding_record(binder)], [])
+
+    # Budget of one: the consumer fills it, so the binder's arc is recorded
+    # but the binder itself is never expanded.
+    closure = ml.lookup_provenance(ds_root, version="0.1.0", max_executions=1)
+
+    assert set(closure.executions) == {consumer}
+    assert binder not in closure.executions
+    assert closure.cap_hit is True
+    assert closure.traversal_complete is False
+    assert _gaps_for(closure, GapKind.unresolved_rid, binder) == []
+    assert _gaps_for(closure, GapKind.unresolved_rid) == []
 
 
 # ---------------------------------------------------------------------------
