@@ -30,7 +30,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from deriva_ml.core.exceptions import DerivaMLValidationError
+from deriva_ml.core.exceptions import DerivaMLValidationError, SnapshotUnavailable
 from deriva_ml.core.mixins.execution import BindingDiagnostic
 from deriva_ml.execution.provenance import (
     AncestryState,
@@ -1026,8 +1026,18 @@ def test_authorship_authors_are_themselves_expanded():
 
 
 def test_authorship_memoizes_snapshot_resolution_per_dataset_version():
-    """The same (dataset, version) reached through two paths resolves its
-    snapshot exactly once."""
+    """The same (dataset, version) reached through two paths is EXPANDED
+    exactly once, so each snapshot-dependent leg runs once.
+
+    The invariant is per-expansion memoization, not a raw seam-call count.
+    ``expand_dataset`` resolves the shared snapshot once via
+    ``_strict_snapshot_or_gap``; the ancestry leg (Task 13) then calls
+    ``strict_parents_at``, which — mirroring the real ``Dataset`` method,
+    whose signature takes no snapshot and resolves its own — resolves it a
+    second time internally. Two resolutions per EXPANSION is therefore the
+    real method shape; what must never happen is two EXPANSIONS, which is
+    what the per-leg call counts below pin directly.
+    """
     ml = _FakeML()
     ds_root, ds_shared = _ds(1), _ds(2)
     top, left, right, shared_author = _ex(1), _ex(2), _ex(3), _ex(4)
@@ -1052,10 +1062,21 @@ def test_authorship_memoizes_snapshot_resolution_per_dataset_version():
     closure = ml.lookup_provenance(ds_root)
 
     assert shared_author in closure.executions
+
+    # ONE expansion: each snapshot-dependent leg fired exactly once for the
+    # shared pair, even though two consumers reached it. These are the
+    # assertions a memoization regression actually breaks.
+    for seam in ("_dataset_version_rows_at", "_find_feature_producers_impl", "Dataset.strict_parents_at"):
+        leg_calls = [c for c in ml.calls if c[0] == seam and c[1][:2] == (ds_shared, "1.0.0")]
+        assert len(leg_calls) == 1, f"{seam} ran {len(leg_calls)} times for the shared pair, expected once"
+
+    # And the snapshot resolutions are exactly the two an expansion makes:
+    # the engine's shared one, plus strict_parents_at's own internal one.
+    # A third would mean a second expansion slipped through the memo.
     resolutions = [
         c for c in ml.calls if c[0] == "Dataset.strict_version_snapshot_catalog" and c[1] == (ds_shared, "1.0.0")
     ]
-    assert len(resolutions) == 1, f"snapshot resolved {len(resolutions)} times, expected once: {resolutions}"
+    assert len(resolutions) == 2, f"snapshot resolved {len(resolutions)} times, expected two per expansion"
 
 
 def _dataset_budget_walk(ml: _FakeML, consumer: str, *, dataset_budget: int):
@@ -1820,6 +1841,309 @@ def test_binding_discovered_execution_refused_for_budget_is_truncated_not_unreso
     assert closure.traversal_complete is False
     assert _gaps_for(closure, GapKind.unresolved_rid, binder) == []
     assert _gaps_for(closure, GapKind.unresolved_rid) == []
+
+
+# ---------------------------------------------------------------------------
+# Snapshot-strict ancestry (§6.5) — parent chain walked to a source.
+# ---------------------------------------------------------------------------
+
+
+def _ancestry_dataset(
+    ml: _FakeML,
+    dataset_rid: str,
+    version: str,
+    parents: list[dict] | None,
+    *,
+    author: str | None = None,
+    snapshot_ok: bool = True,
+) -> None:
+    """Script one dataset version that the ancestry leg can walk.
+
+    ``parents=None`` leaves ``strict_parents_at`` unscripted, which the stub
+    reads back as an empty parent list — i.e. a source. Pass ``[]`` for the
+    same effect explicitly; pass rows to script real parent hops.
+
+    ``author`` (optional) also gives the version a snapshot-scoped authorship
+    row, so the ancestry × authorship integration can be exercised.
+    """
+    ml.add_dataset(dataset_rid, description=f"dataset {dataset_rid}", producer=None)
+    ml.add_version_row(dataset_rid, version, author, rct="2025-01-01T00:00:00Z")
+    ml.set_snapshot_available(dataset_rid, version, snapshot_ok)
+    ml.set_snapshot_version_rows(
+        dataset_rid, version, [_snapshot_row(dataset_rid, version, author, "2025-01-01T00:00:00Z")]
+    )
+    ml.set_parents_at(dataset_rid, version, list(parents or []))
+
+
+def _facts(closure: ProvenanceClosure, dataset_rid: str, version: str):
+    return closure.datasets[dataset_rid].versions[version]
+
+
+def test_ancestry_three_deep_chain_resolves_to_a_source():
+    """child@1.0.0 -> mid@0.5.0 -> root@0.1.0 (a source).
+
+    Every hop's ``ParentLink`` chains the versions correctly, only the top of
+    the chain is ``is_source=True``, and every walked version reports
+    ``ancestry_state=resolved``.
+    """
+    ml = _FakeML()
+    child, mid, ancestor = _ds(1), _ds(2), _ds(3)
+
+    _ancestry_dataset(ml, child, "1.0.0", [{"parent_rid": mid, "parent_version_then": "0.5.0"}])
+    _ancestry_dataset(ml, mid, "0.5.0", [{"parent_rid": ancestor, "parent_version_then": "0.1.0"}])
+    _ancestry_dataset(ml, ancestor, "0.1.0", [])
+
+    closure = ml.lookup_provenance(child, version="1.0.0")
+
+    # All three (dataset, version) pairs are closure members.
+    assert _facts(closure, child, "1.0.0").ancestry_state == AncestryState.resolved
+    assert _facts(closure, mid, "0.5.0").ancestry_state == AncestryState.resolved
+    assert _facts(closure, ancestor, "0.1.0").ancestry_state == AncestryState.resolved
+
+    # Only the top of the chain has no parents.
+    assert _facts(closure, child, "1.0.0").is_source is False
+    assert _facts(closure, mid, "0.5.0").is_source is False
+    assert _facts(closure, ancestor, "0.1.0").is_source is True
+
+    # The links chain: each records the CHILD's walked version and the
+    # parent's then-current version.
+    child_links = _facts(closure, child, "1.0.0").parents
+    assert len(child_links) == 1
+    assert child_links[0].parent_rid == mid
+    assert child_links[0].child_version == "1.0.0"
+    assert child_links[0].parent_version_then == "0.5.0"
+
+    mid_links = _facts(closure, mid, "0.5.0").parents
+    assert len(mid_links) == 1
+    assert mid_links[0].parent_rid == ancestor
+    assert mid_links[0].child_version == "0.5.0"
+    assert mid_links[0].parent_version_then == "0.1.0"
+
+    assert _facts(closure, ancestor, "0.1.0").parents == []
+    assert closure.datasets_visited == 3
+    assert _gaps_for(closure, GapKind.snapshot_chain_break) == []
+
+
+def test_ancestry_parents_authors_enter_the_closure():
+    """The point of the leg: recursing into a parent runs ALL of that
+    parent's dataset arcs, so an ANCESTOR's version author becomes a closure
+    member with its own ``version_authorship`` arc."""
+    ml = _FakeML()
+    child, ancestor = _ds(1), _ds(2)
+    child_author, ancestor_author = _ex(1), _ex(2)
+    ml.add_execution(child_author, description="authored the child version")
+    ml.add_execution(ancestor_author, description="authored the ancestor version")
+
+    _ancestry_dataset(
+        ml, child, "1.0.0", [{"parent_rid": ancestor, "parent_version_then": "0.1.0"}], author=child_author
+    )
+    _ancestry_dataset(ml, ancestor, "0.1.0", [], author=ancestor_author)
+
+    closure = ml.lookup_provenance(child, version="1.0.0")
+
+    # The ancestor's author is in the closure ONLY because ancestry walked to
+    # it — no consumption edge or root arc reaches it.
+    assert ancestor_author in closure.executions
+    arcs = _authorship_arcs(closure, ancestor_author)
+    assert len(arcs) == 1
+    assert arcs[0].input_rid == ancestor
+    assert arcs[0].input_version == "0.1.0"
+    assert _facts(closure, ancestor, "0.1.0").origin_recorded is True
+
+
+def test_ancestry_snapshot_unavailable_mid_chain_is_a_chain_break():
+    """A PARENTS READ that raises ``SnapshotUnavailable`` mid-chain reports a
+    ``snapshot_chain_break``, marks that version ``chain_break`` with
+    ``is_source=None``, and stops — deeper ancestors are NOT walked.
+
+    Distinct from ``test_authorship_snapshot_unavailable_is_a_chain_break``,
+    where the SHARED snapshot resolution fails and no snapshot-dependent leg
+    runs at all (``ancestry_state`` stays ``not_walked``). Here the shared
+    resolution succeeds — the version is genuinely walked, and its authorship
+    leg runs — but the ancestry hop itself cannot be read, which is what
+    ``chain_break`` means: ancestry was attempted and broke.
+    """
+    ml = _FakeML()
+    child, mid, deeper = _ds(1), _ds(2), _ds(3)
+
+    _ancestry_dataset(ml, child, "1.0.0", [{"parent_rid": mid, "parent_version_then": "0.5.0"}])
+    # `mid` has a resolvable snapshot (so it IS walked)...
+    _ancestry_dataset(ml, mid, "0.5.0", [{"parent_rid": deeper, "parent_version_then": "0.1.0"}])
+    _ancestry_dataset(ml, deeper, "0.1.0", [])
+
+    # ...but its PARENTS read raises: the ancestry hop is what breaks.
+    original_lookup = ml.lookup_dataset
+
+    def _lookup(rid: str):
+        handle = original_lookup(rid)
+        if rid == mid:
+
+            def _raise(version):
+                ml.calls.append(("Dataset.strict_parents_at", (mid, str(version))))
+                raise SnapshotUnavailable(f"parents of {mid}@{version} are unreadable")
+
+            handle.strict_parents_at = _raise  # type: ignore[method-assign]
+        return handle
+
+    ml.lookup_dataset = _lookup  # type: ignore[method-assign]
+
+    closure = ml.lookup_provenance(child, version="1.0.0")
+
+    assert _gaps_for(closure, GapKind.snapshot_chain_break, mid)
+    mid_facts = _facts(closure, mid, "0.5.0")
+    assert mid_facts.ancestry_state == AncestryState.chain_break
+    assert mid_facts.is_source is None
+    # The branch stopped: the deeper ancestor was never walked.
+    assert deeper not in closure.datasets or "0.1.0" not in closure.datasets[deeper].versions
+    assert not [c for c in ml.calls if c[0] == "Dataset.strict_parents_at" and c[1] == (deeper, "0.1.0")]
+    # ...and the child's own hop still resolved and recorded its link.
+    assert _facts(closure, child, "1.0.0").ancestry_state == AncestryState.resolved
+    assert [p.parent_rid for p in _facts(closure, child, "1.0.0").parents] == [mid]
+
+
+def test_ancestry_null_parent_version_then_breaks_that_link_only():
+    """A parent row whose ``parent_version_then`` is None cannot be walked
+    (there is no version to pin a snapshot to): the LINK is still recorded,
+    a ``snapshot_chain_break`` explains it, and that branch stops — while a
+    sibling parent with a resolvable version is still walked."""
+    ml = _FakeML()
+    child, broken, ok_parent = _ds(1), _ds(2), _ds(3)
+
+    _ancestry_dataset(
+        ml,
+        child,
+        "1.0.0",
+        [
+            {"parent_rid": broken, "parent_version_then": None},
+            {"parent_rid": ok_parent, "parent_version_then": "0.2.0"},
+        ],
+    )
+    _ancestry_dataset(ml, broken, "9.9.9", [])
+    _ancestry_dataset(ml, ok_parent, "0.2.0", [])
+
+    closure = ml.lookup_provenance(child, version="1.0.0")
+
+    child_facts = _facts(closure, child, "1.0.0")
+    # BOTH links recorded, including the broken one.
+    assert {p.parent_rid for p in child_facts.parents} == {broken, ok_parent}
+    broken_link = next(p for p in child_facts.parents if p.parent_rid == broken)
+    assert broken_link.parent_version_then is None
+    # The child's own ancestry still RESOLVED — the break is on the link.
+    assert child_facts.ancestry_state == AncestryState.resolved
+    assert child_facts.is_source is False
+    assert _gaps_for(closure, GapKind.snapshot_chain_break, broken)
+    # The unresolvable branch stopped: nothing of `broken` was walked.
+    assert broken not in closure.datasets or closure.datasets[broken].versions == {}
+    # ...while the sibling with a resolvable version WAS walked.
+    assert _facts(closure, ok_parent, "0.2.0").ancestry_state == AncestryState.resolved
+    assert _facts(closure, ok_parent, "0.2.0").is_source is True
+
+
+def test_ancestry_cycle_terminates_with_a_cycle_gap():
+    """A -> B -> A: the revisit of a dataset already on the ACTIVE ancestry
+    path is a cycle, reported as a ``snapshot_chain_break`` whose detail names
+    it, with the branch stopped rather than looping forever."""
+    ml = _FakeML()
+    ds_a, ds_b = _ds(1), _ds(2)
+
+    _ancestry_dataset(ml, ds_a, "1.0.0", [{"parent_rid": ds_b, "parent_version_then": "1.0.0"}])
+    # B claims A as its parent — a cycle in the ancestry graph.
+    _ancestry_dataset(ml, ds_b, "1.0.0", [{"parent_rid": ds_a, "parent_version_then": "2.0.0"}])
+    ml.set_snapshot_available(ds_a, "2.0.0", True)
+    ml.set_snapshot_version_rows(ds_a, "2.0.0", [_snapshot_row(ds_a, "2.0.0", None, "2025-01-01T00:00:00Z")])
+    ml.set_parents_at(ds_a, "2.0.0", [{"parent_rid": ds_b, "parent_version_then": "1.0.0"}])
+
+    closure = ml.lookup_provenance(ds_a, version="1.0.0")
+
+    cycle_gaps = [g for g in closure.gaps if g.kind == GapKind.snapshot_chain_break and "ancestry cycle" in g.detail]
+    assert cycle_gaps, f"expected an ancestry-cycle gap, got {[(g.kind, g.detail) for g in closure.gaps]}"
+    # The walk returned rather than recursing forever.
+    assert closure.traversal_complete is True
+    assert _facts(closure, ds_a, "1.0.0").parents
+
+
+def test_ancestry_diamond_does_not_false_cycle():
+    """Two children sharing one parent is a DIAMOND, not a cycle: the shared
+    parent is expanded once (memoized), and BOTH parent links are recorded."""
+    ml = _FakeML()
+    root, left, right, shared = _ds(1), _ds(2), _ds(3), _ds(4)
+
+    _ancestry_dataset(
+        ml,
+        root,
+        "1.0.0",
+        [
+            {"parent_rid": left, "parent_version_then": "0.5.0"},
+            {"parent_rid": right, "parent_version_then": "0.5.0"},
+        ],
+    )
+    _ancestry_dataset(ml, left, "0.5.0", [{"parent_rid": shared, "parent_version_then": "0.1.0"}])
+    _ancestry_dataset(ml, right, "0.5.0", [{"parent_rid": shared, "parent_version_then": "0.1.0"}])
+    _ancestry_dataset(ml, shared, "0.1.0", [])
+
+    closure = ml.lookup_provenance(root, version="1.0.0")
+
+    # No false cycle: the shared ancestor resolved normally and is a source.
+    shared_facts = _facts(closure, shared, "0.1.0")
+    assert shared_facts.ancestry_state == AncestryState.resolved
+    assert shared_facts.is_source is True
+    assert not [g for g in closure.gaps if "ancestry cycle" in g.detail]
+
+    # Both children recorded their link to it...
+    assert [p.parent_rid for p in _facts(closure, left, "0.5.0").parents] == [shared]
+    assert [p.parent_rid for p in _facts(closure, right, "0.5.0").parents] == [shared]
+    # ...but the shared parent was expanded exactly once (memo, not re-walk).
+    scans = [c for c in ml.calls if c[0] == "Dataset.strict_parents_at" and c[1] == (shared, "0.1.0")]
+    assert len(scans) == 1, f"shared ancestor walked {len(scans)} times: {scans}"
+
+
+def test_ancestry_wide_fan_trips_the_dataset_budget_without_hanging():
+    """A wide ancestry fan under a small ``max_executions`` exhausts the
+    DATASET budget (4 * max_executions): ``cap_hit`` is True,
+    ``traversal_complete`` False, no false ``unresolved_rid`` gaps, and the
+    walk terminates."""
+    ml = _FakeML()
+    root = _ds(1)
+    ancestors = [_ds(n) for n in range(10, 30)]
+
+    _ancestry_dataset(
+        ml,
+        root,
+        "1.0.0",
+        [{"parent_rid": a, "parent_version_then": "0.1.0"} for a in ancestors],
+    )
+    for ancestor in ancestors:
+        _ancestry_dataset(ml, ancestor, "0.1.0", [])
+
+    # max_executions=1 -> dataset budget 4: the root pin plus three ancestors.
+    closure = ml.lookup_provenance(root, version="1.0.0", max_executions=1)
+
+    assert closure.cap_hit is True
+    assert closure.traversal_complete is False
+    assert closure.datasets_visited == 4
+    assert _gaps_for(closure, GapKind.unresolved_rid) == []
+    # Every link is still recorded — the budget stopped the WALK of the
+    # refused parents, not the honest record of the hop.
+    assert len(_facts(closure, root, "1.0.0").parents) == len(ancestors)
+
+
+def test_ancestry_leg_never_runs_for_an_unpinned_dataset():
+    """The §6.1 quarantine covers ancestry too: an unpinned edge makes ZERO
+    ``strict_parents_at`` calls."""
+    ml = _FakeML()
+    ds_root, ds_unpinned, consumer = _ds(1), _ds(2), _ex(1)
+    ml.add_dataset(ds_unpinned, description="unpinned input", producer=None)
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_datasets=[_StubDataset(ds_unpinned, "unpinned input", "1.0.0", consumed_version=None)],
+    )
+    ml.add_dataset(ds_root, producer=consumer)
+    ml.calls.clear()
+
+    ml.lookup_provenance(ds_root)
+
+    assert not [c for c in ml.calls if c[0] == "Dataset.strict_parents_at"]
 
 
 # ---------------------------------------------------------------------------

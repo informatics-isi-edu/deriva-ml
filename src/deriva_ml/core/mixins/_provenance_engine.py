@@ -702,6 +702,7 @@ class WalkEngine(Generic[N]):
     truncated: set[RID] = field(init=False)
     _queue: list[tuple[RID, int]] = field(init=False)
     _unpinned_quarantined: set[tuple[str, str | None]] = field(init=False)
+    _ancestry_path: set[str] = field(init=False)
 
     def __init__(
         self,
@@ -729,6 +730,11 @@ class WalkEngine(Generic[N]):
         self.truncated = set()
         self._queue = []
         self._unpinned_quarantined = set()
+        # Dataset RIDs on the ancestry branch currently being walked. NOT the
+        # memo: a diamond ancestry (two children sharing an ancestor) is legal
+        # and must expand the shared ancestor once, so only a revisit while
+        # still ON the path is a cycle.
+        self._ancestry_path = set()
         self._sentinel_resolved = False
         self._sentinel_rid: RID | None = None
 
@@ -883,6 +889,19 @@ class WalkEngine(Generic[N]):
 
         if ArcKind.member_binding in self.arcs:
             self._expand_member_bindings(dataset_rid, version, depth=depth)
+
+        # Ancestry (§6.5) has no ArcKind of its own — parents contribute to
+        # the closure through their OWN authorship/binding arcs, discovered by
+        # the recursive `expand_dataset` below, so there is nothing for an
+        # "ancestry" arc kind to attach to. It is gated on ``closure_mode``
+        # instead: ``ancestry_state`` / ``is_source`` / ``parents`` live on
+        # ``DatasetVersionFacts``, which only a closure visitor keeps. The leg
+        # runs INSIDE the snapshot-dependent block, so it inherits the same
+        # quarantines the sibling legs have: a lineage walk (no dataset arcs,
+        # no closure mode) never reaches here, and neither does an unpinned
+        # edge or a version whose strict snapshot did not resolve.
+        if self.closure_mode:
+            self._expand_ancestry(dataset_rid, version, depth=depth)
 
     def _strict_snapshot_or_gap(self, dataset_rid: str, version: str) -> Any:
         """Resolve the strict version snapshot, or report a chain break.
@@ -1085,6 +1104,140 @@ class WalkEngine(Generic[N]):
                 diagnostic.subject,
                 f"{diagnostic.kind}: {diagnostic.detail}",
             )
+
+    def _expand_ancestry(self, dataset_rid: str, version: str, *, depth: int) -> None:
+        """Walk the snapshot-strict parent chain of one walked version (§6.5).
+
+        Reads ``strict_parents_at(version)`` — the snapshot-anchored
+        ``Dataset_Dataset`` hop, which resolves the strict snapshot itself
+        (the real ``Dataset`` method's shape; the engine's earlier resolution
+        gates whether the leg runs at all, it does not substitute for it).
+        Each returned row becomes a
+        :class:`~deriva_ml.execution.provenance.ParentLink` recorded on this
+        version's facts, and each parent whose ``parent_version_then``
+        resolved is recursed through :meth:`expand_dataset` — which runs ALL
+        of the parent's legs, so an ancestor's version authors and member
+        binders enter the closure exactly as a consumed dataset's would.
+
+        Three holes are reported as ``snapshot_chain_break`` gaps:
+
+        - the parents read itself raising (no resolvable snapshot at this
+          hop): ``ancestry_state=chain_break``, ``is_source=None``, branch
+          stops;
+        - a row whose ``parent_version_then`` is ``None``: the link is still
+          recorded (the hop is a real schema fact) but that branch cannot be
+          walked, because there is no version to pin a snapshot to;
+        - a parent already on the ACTIVE ancestry path — a cycle. Note this
+          is the active path, not the memo: a diamond (two children sharing
+          one ancestor) is legal ancestry and must expand the shared ancestor
+          once, not report a cycle.
+
+        Args:
+            dataset_rid: The walked dataset.
+            version: The walked version whose snaptime anchors the hop.
+            depth: Walk depth of the consuming execution.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._expand_ancestry)
+            True
+        """
+        from deriva_ml.core.exceptions import SnapshotUnavailable
+
+        facts = self._facts_for(dataset_rid, version)
+
+        try:
+            rows = self.ml.lookup_dataset(dataset_rid).strict_parents_at(version)
+        except (SnapshotUnavailable, DerivaMLException) as exc:
+            self.visitor.on_gap(
+                GapKind.snapshot_chain_break,
+                dataset_rid,
+                f"parents of version {version} could not be read at its snapshot, "
+                f"so the ancestry chain stops here: {exc}",
+            )
+            if facts is not None:
+                # `is_source` is only meaningful once ancestry resolved; a
+                # broken chain means "unknown", which is spelled None.
+                facts.ancestry_state = AncestryState.chain_break
+                facts.is_source = None
+                self.visitor.on_dataset_facts(dataset_rid=dataset_rid, facts=facts)
+            return
+
+        # This dataset is on the active path for exactly as long as its own
+        # ancestors are being walked below it — that window is what makes a
+        # parent naming it back a cycle, while a sibling branch reaching it
+        # after the window closed is an ordinary diamond.
+        already_on_path = dataset_rid in self._ancestry_path
+        self._ancestry_path.add(dataset_rid)
+        try:
+            self._walk_parent_rows(dataset_rid, version, rows, depth=depth)
+        finally:
+            if not already_on_path:
+                self._ancestry_path.discard(dataset_rid)
+
+        if facts is not None:
+            facts.ancestry_state = AncestryState.resolved
+            facts.is_source = not rows
+            self.visitor.on_dataset_facts(dataset_rid=dataset_rid, facts=facts)
+
+    def _walk_parent_rows(self, dataset_rid: str, version: str, rows: list, *, depth: int) -> None:
+        """Record and recurse one walked version's parent rows.
+
+        Split out of :meth:`_expand_ancestry` so the active-path bookkeeping
+        reads as one ``try``/``finally`` around the whole descent rather than
+        being interleaved with the per-row logic.
+
+        Args:
+            dataset_rid: The walked (child) dataset.
+            version: The child version whose snaptime anchored the read.
+            rows: ``strict_parents_at``'s rows, each with ``parent_rid`` and
+                ``parent_version_then``.
+            depth: Walk depth of the consuming execution.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._walk_parent_rows("1-ABCD", "1.0.0", [], depth=0) is None
+            True
+        """
+        from deriva_ml.execution.provenance import ParentLink
+
+        for row in rows:
+            parent_rid = row.get("parent_rid")
+            parent_version_then = row.get("parent_version_then")
+            self.visitor.on_parent_link(
+                dataset_rid=dataset_rid,
+                link=ParentLink(
+                    parent_rid=parent_rid,
+                    child_version=version,
+                    parent_version_then=parent_version_then,
+                ),
+            )
+
+            if parent_version_then is None:
+                # The hop is recorded (it is a real schema fact) but cannot be
+                # walked: without a version there is no snapshot to pin to,
+                # and reading the parent live would leak post-snaptime state.
+                self.visitor.on_gap(
+                    GapKind.snapshot_chain_break,
+                    parent_rid,
+                    f"parent of {dataset_rid}@{version} has no resolvable version at that snaptime, "
+                    "so its own ancestry could not be walked",
+                )
+                continue
+
+            if parent_rid in self._ancestry_path:
+                # A cycle in the ancestry graph. Detected on the ACTIVE PATH,
+                # never on the memo: revisiting an already-expanded ancestor
+                # off-path is an ordinary diamond, which must expand once.
+                self.visitor.on_gap(
+                    GapKind.snapshot_chain_break,
+                    parent_rid,
+                    f"ancestry cycle: {parent_rid} is already on the ancestry path being walked "
+                    f"from {dataset_rid}@{version}, so the chain stops here",
+                )
+                continue
+
+            self.expand_dataset(parent_rid, parent_version_then, depth=depth + 1)
 
     def _facts_for(self, dataset_rid: str, version: str) -> "DatasetVersionFacts | None":
         """Return the visitor's mutable facts record, when it keeps one.
