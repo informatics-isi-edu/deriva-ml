@@ -803,3 +803,16 @@ leak); authorship facts read AT the strict snapshot like everything
 else. Plan v2 adds a dedicated harness-extension task with seam-call
 RECORDING (`ml.calls`) so quarantine tests can assert what was NOT
 queried — absence-of-work claims need instrumentation, not hope.
+
+**2026-09-01 — #383 Task 7: never infer snapshot-ness from the catalog-id
+string.** The strict snapshot resolver first discriminated the NULL-snapshot
+fallback via `"@" not in snapshot_id` — airtight-looking, but when the
+Dataset's `_ml_instance` is ITSELF snapshot-bound its `catalog_id` is
+already `"1@SNAP"`, so the bare-id branch composes a string containing "@"
+and a NULL-snapshot row slips through as a live/mis-scoped read (and
+`"1@SNAPA@SNAPA"` malformed ids). Reachable through the ancestry hop
+chain's normal dev-row state (dev rows carry Snapshot=NULL). Fix:
+discriminate on the RESOLVED VERSION RECORD's `.snapshot` value via a
+shared `_resolve_version_record` helper, raising before any id is
+composed. General rule: catalog-id strings are compositional (`id@snap`
+nests); never parse them for semantics — read the source row.
