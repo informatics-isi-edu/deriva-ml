@@ -982,3 +982,15 @@ cost only 7.8s — eye-ai serves schema cheaply. Levers, impact order:
 (3) expose the engine's arc gating publicly so callers can skip
 binding scans for a fast structural pass. Batch-appropriate as-is;
 optimize before any interactive use.
+
+**2026-09-01 addendum — worked example: how "sibling-looking" datasets
+enter a closure (eye-ai training run).** The 12 closure datasets
+decompose as 3 consumed (G/39FY/M graded splits) + 4 via ancestry of
+consumed (Test 2-277C, Validation 2-277J, Development 2-277E, LAC
+Complete 2-1S12 — the graded subsets' PARENTS at their snaptimes,
+verified against Dataset_Dataset edges) + 2 via consumption by
+discovered annotator/grader executions (2-7KA2, 5-1W26) + 3 via THOSE
+datasets' ancestry (4-Z6K8 → 4-S42W → 2-N93J). Nothing enters
+sideways: what looks like a sibling split is either a subset-parent
+(ancestry) or an input of a binding execution (upstream consumption).
+Useful template for answering "why is dataset X in my provenance".
