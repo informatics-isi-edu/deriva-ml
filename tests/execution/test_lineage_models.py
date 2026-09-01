@@ -57,3 +57,15 @@ def test_workflow_summary_carries_code_identity():
     # Defaults stay None so existing construction sites are unaffected.
     bare = WorkflowSummary(rid=_rid(9), name=None)
     assert bare.url is None and bare.version is None
+
+
+def test_root_type_enum_is_string_compatible():
+    from deriva_ml.execution.lineage import RootDescriptor, RootType
+
+    rid = f"1-{1:04X}"
+    r = RootDescriptor(rid=rid, type="Dataset", description=None)  # str input validates
+    assert r.type == "Dataset" and r.type == RootType.dataset
+    assert r.model_dump(mode="json")["type"] == "Dataset"
+    from deriva_ml.execution.provenance import RootType as ReExported
+
+    assert ReExported is RootType

@@ -20,11 +20,9 @@ Idiom notes (from that spec, §4):
       at authoring time. Catalog-sourced open vocabularies (execution
       status, table names) deliberately stay ``str``.
 
-Note on ``RootType``: this enum is DEFINED here for now. A later task
-(per the design's locked import-cycle rule) moves the definition to
-``lineage.py`` and converts this module's ``RootType`` into a
-re-export, so that ``lineage.py`` does not need to import from
-``provenance.py``.
+Note on ``RootType``: this enum is now defined in ``lineage.py``
+and re-exported here to keep the import flow acyclic (``lineage.py``
+no longer imports from ``provenance.py``).
 """
 
 from __future__ import annotations
@@ -38,30 +36,26 @@ from deriva_ml.execution.lineage import (
     AssetSummary,
     ExecutionSummary,
     RootDescriptor,
+    RootType,
     VersionAttribution,
 )
 from deriva_ml.feature import FeatureProducerRecord
 
-
-class RootType(StrEnum):
-    """Kind of artifact a provenance closure was rooted at.
-
-    Placeholder definition (see module docstring): a later task moves
-    this to ``lineage.py`` — where it replaces ``RootDescriptor.type``'s
-    ``Literal`` — and this module re-exports it instead of defining it.
-
-    Example:
-        >>> from deriva_ml.execution.provenance import RootType
-        >>> RootType.dataset == "Dataset"
-        True
-        >>> RootType.execution
-        <RootType.execution: 'Execution'>
-    """
-
-    dataset = "Dataset"
-    asset = "Asset"
-    feature = "Feature"
-    execution = "Execution"
+__all__ = [
+    "RootType",
+    "ArcKind",
+    "ArcInputType",
+    "AncestryState",
+    "GapKind",
+    "ParentLink",
+    "ProvenanceArc",
+    "ProvenanceExecution",
+    "DatasetVersionFacts",
+    "ProvenanceDataset",
+    "ProvenanceAsset",
+    "ProvenanceGap",
+    "ProvenanceClosure",
+]
 
 
 class ArcKind(StrEnum):

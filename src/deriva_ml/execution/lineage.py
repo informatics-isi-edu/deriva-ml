@@ -22,11 +22,34 @@ Example:
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from deriva_ml.core.definitions import RID
+
+
+class RootType(StrEnum):
+    """Kind of artifact a lineage walk was rooted at.
+
+    Attributes:
+        dataset: Dataset artifact.
+        asset: Asset artifact.
+        feature: Feature value artifact.
+        execution: Execution artifact.
+
+    Example:
+        >>> from deriva_ml.execution.lineage import RootType
+        >>> RootType.dataset == "Dataset"
+        True
+        >>> RootType.execution
+        <RootType.execution: 'Execution'>
+    """
+
+    dataset = "Dataset"
+    asset = "Asset"
+    feature = "Feature"
+    execution = "Execution"
 
 
 class WorkflowSummary(BaseModel):
@@ -212,7 +235,7 @@ class RootDescriptor(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rid: RID
-    type: Literal["Dataset", "Asset", "Feature", "Execution"]
+    type: RootType
     description: str | None = None
     version: str | None = None
     producing_execution: ExecutionSummary | None = None
