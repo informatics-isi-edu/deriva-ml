@@ -915,3 +915,21 @@ Timing on this root (www.eye-ai.org, warm): `lookup_lineage` 8.5s,
 hit. The cost is dominated by per-version authorship + binding reads
 across 31 visited dataset-versions, so it scales with ancestry breadth,
 not execution count — budget minutes, not seconds, for real catalogs.
+
+**2026-09-01 — Ruling 7 (Carl): fifth arc kind `member_production`
+(#383 final review).** The closure inherited lineage's member-producer
+fallback: executions that produced MEMBER ASSETS of a consumed dataset
+are expanded, but the settled 4-kind typology had no slot for them —
+they sat in closure.executions with empty arcs, breaking the model's
+"arcs record every reason" promise. Carl ruled: add
+`ArcKind.member_production` — "produced a member (asset) of the walked
+dataset@version" — the asset analogue of member_binding under ruling
+3's content reasoning (a dataset's content is members + bindings;
+member producers are content contributors). Alternatives rejected:
+arcs-may-be-empty (weakens the model), exclusion (closure would be
+SMALLER than the lineage walk — contradicts its purpose). Attachment
+point: the member relation at the walked (dataset, version); root-seed
+member-fallback producers keep ArcKind.root (they are the seed, not a
+mid-walk discovery). Lesson: a byte-frozen lift can carry BEHAVIOR into
+a new semantic frame that the frame's typology never modeled — sweep
+inherited behaviors against the new model's self-description.
