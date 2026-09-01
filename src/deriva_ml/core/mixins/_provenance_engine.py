@@ -57,6 +57,11 @@ __all__ = ["InputRef", "WalkVisitor", "WalkEngine", "TreeBuilder", "ClosureBuild
 # never collide with a walked version in ``ProvenanceDataset.versions``.
 UNPINNED_VERSION_KEY = "<unpinned>"
 
+# Arc legs whose facts must be read AT the walked version's catalog snapshot.
+# Enabling any of them makes ``expand_dataset`` resolve the strict snapshot
+# (once, shared); enabling none of them means no snapshot is ever resolved.
+_SNAPSHOT_DEPENDENT_ARCS = frozenset({ArcKind.version_authorship, ArcKind.member_binding})
+
 N = TypeVar("N")
 
 
@@ -785,7 +790,7 @@ class WalkEngine(Generic[N]):
     @property
     def _dataset_arcs_enabled(self) -> bool:
         """True when any dataset-oriented arc leg is enabled."""
-        return bool(self.arcs & {ArcKind.version_authorship, ArcKind.member_binding})
+        return bool(self.arcs & _SNAPSHOT_DEPENDENT_ARCS)
 
     def expand_dataset(self, dataset_rid: str, version: str | None, *, depth: int) -> None:
         """Expand the dataset-side arcs for one consumed dataset version.
@@ -840,15 +845,230 @@ class WalkEngine(Generic[N]):
             return
 
         if self.dataset_budget is not None and len(self.datasets_expanded) >= self.dataset_budget:
+            # ``cap_hit`` (and therefore ``traversal_complete``) is what
+            # reports a partial closure. ``walked_complete`` is deliberately
+            # NOT touched: it is the LINEAGE result's flag, describing the
+            # execution walk, and lineage never runs the dataset legs at all.
+            # Conflating the two would make a dataset-budget stop
+            # indistinguishable from an execution-cap stop in the lineage
+            # result, and would let ``traversal_complete`` be (wrongly)
+            # derived from ``walked_complete``.
             self.cap_hit = True
-            self.flags["walked_complete"] = False
             return
 
         self.datasets_expanded.add(key)
         # A walked (dataset, version) is a closure member in its own right.
         # Its facts start "not walked" and are filled in by the dataset arc
-        # legs (authorship, bindings, ancestry) in later tasks.
+        # legs (authorship, bindings, ancestry).
         self.visitor.on_dataset_walked(dataset_rid=dataset_rid, version=version)
+
+        # Every snapshot-dependent leg (authorship here; bindings and ancestry
+        # in the sibling legs) shares ONE strict snapshot resolution: resolved
+        # here, once per walked (dataset, version), and handed down. A walk
+        # that cannot pin the snapshot does no snapshot-dependent work at all
+        # — reading live state would let post-snaptime facts leak into a
+        # pinned closure, which is exactly what the strict resolver exists to
+        # prevent. Resolved lazily: a walk with no snapshot-dependent leg
+        # enabled must not pay for (or fail on) a snapshot it never reads.
+        if not (self.arcs & _SNAPSHOT_DEPENDENT_ARCS):
+            return
+        snapshot_catalog = self._strict_snapshot_or_gap(dataset_rid, version)
+        if snapshot_catalog is None:
+            return
+
+        if ArcKind.version_authorship in self.arcs:
+            self._expand_version_authorship(dataset_rid, version, snapshot_catalog, depth=depth)
+
+    def _strict_snapshot_or_gap(self, dataset_rid: str, version: str) -> Any:
+        """Resolve the strict version snapshot, or report a chain break.
+
+        Args:
+            dataset_rid: The walked dataset.
+            version: The walked version.
+
+        Returns:
+            The snapshot-bound catalog, or ``None`` when it could not be
+            resolved (a ``snapshot_chain_break`` gap has then been emitted).
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._strict_snapshot_or_gap)
+            True
+        """
+        from deriva_ml.core.exceptions import SnapshotUnavailable
+
+        try:
+            return self.ml.lookup_dataset(dataset_rid).strict_version_snapshot_catalog(version)
+        except (SnapshotUnavailable, DerivaMLException) as exc:
+            self.visitor.on_gap(
+                GapKind.snapshot_chain_break,
+                dataset_rid,
+                f"version {version} has no resolvable catalog snapshot, so authorship read skipped "
+                f"and no snapshot-dependent provenance was walked for it: {exc}",
+            )
+            return None
+
+    def _expand_version_authorship(self, dataset_rid: str, version: str, snapshot_catalog: Any, *, depth: int) -> None:
+        """Attribute the walked version and every version recorded before it.
+
+        Spec §6.3: for a walked ``D@vN``, the authors of versions **up to and
+        including** ``vN`` in the RCT-primary total order enter the closure;
+        later versions' authors do not, because a pinned closure must not
+        report authors who acted after the snaptime it is pinned to. The rows
+        are read AT the snapshot, so even the historical rows are the ones
+        the catalog recorded then, not their live rewrites.
+
+        Args:
+            dataset_rid: The walked dataset.
+            version: The walked version — the inclusive upper bound.
+            snapshot_catalog: Catalog bound to that version's snaptime.
+            depth: Walk depth of the consuming execution.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._expand_version_authorship)
+            True
+        """
+        from deriva_ml.core.mixins.execution import _version_row_sort_key
+        from deriva_ml.execution.lineage import VersionAttribution
+
+        rows = sorted(
+            self.ml._dataset_version_rows_at(dataset_rid, version, snapshot_catalog),
+            key=_version_row_sort_key,
+        )
+
+        # Truncate AFTER the walked version's row. Comparing by label (not by
+        # sort key) keeps the bound anchored to the row the caller actually
+        # pinned, even if two rows normalize to the same key.
+        cutoff = next((index for index, row in enumerate(rows) if row.get("Version") == version), None)
+        if cutoff is None:
+            self.visitor.on_gap(
+                GapKind.version_unresolvable,
+                dataset_rid,
+                f"walked version {version} has no Dataset_Version row at its own snapshot; "
+                "no authorship could be bounded",
+            )
+            return
+        bounded = rows[: cutoff + 1]
+
+        facts = None
+        for index, row in enumerate(bounded):
+            author_rid = row.get("Execution")
+            self.visitor.on_version_author(
+                dataset_rid=dataset_rid,
+                version=version,
+                attribution=VersionAttribution(
+                    version=row.get("Version") or "",
+                    execution_rid=author_rid,
+                    description=row.get("Description"),
+                ),
+                depth=depth,
+            )
+            if index == 0:
+                # The ORIGIN row: `origin_recorded` answers "is a real,
+                # non-sentinel execution recorded as having created this
+                # dataset", read at this snapshot.
+                facts = self._facts_for(dataset_rid, version)
+                if facts is not None:
+                    facts.origin_recorded = bool(author_rid) and not self.is_sentinel(author_rid)
+
+            if not author_rid:
+                self.visitor.on_gap(
+                    GapKind.no_version_author,
+                    dataset_rid,
+                    f"Dataset_Version row for {row.get('Version')} records no authoring Execution",
+                )
+                continue
+            if self.is_sentinel(author_rid):
+                # Recorded, but recorded as unknown: an honest gap, never a
+                # closure member (sentinel discipline, §6.1).
+                self.visitor.on_gap(
+                    GapKind.sentinel_origin,
+                    author_rid,
+                    f"version {row.get('Version')} of {dataset_rid} is authored by the "
+                    "unknown-provenance Execution sentinel",
+                )
+                continue
+
+            self._record_arc(
+                author_rid,
+                kind=ArcKind.version_authorship,
+                depth=depth + 1,
+                input_rid=dataset_rid,
+                input_type=ArcInputType.dataset,
+                input_version=row.get("Version"),
+            )
+            self.enqueue_or_truncate(author_rid, depth=depth + 1)
+
+        if facts is not None:
+            self.visitor.on_dataset_facts(dataset_rid=dataset_rid, facts=facts)
+
+    def _facts_for(self, dataset_rid: str, version: str) -> "DatasetVersionFacts | None":
+        """Return the visitor's mutable facts record, when it keeps one.
+
+        A tree-building visitor has no facts store; the closure builder does.
+
+        Args:
+            dataset_rid: The walked dataset.
+            version: The walked version.
+
+        Returns:
+            The facts record, or ``None`` for a visitor that keeps none.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._facts_for("1-ABCD", "1.0.0") is None
+            True
+        """
+        getter = getattr(self.visitor, "dataset_facts", None)
+        return getter(dataset_rid, version) if getter is not None else None
+
+    def _record_arc(self, execution_rid: RID, **kwargs: Any) -> None:
+        """Record one arc on the visitor, when the visitor accumulates arcs.
+
+        The tree visitor keeps no arcs, so this is a no-op there — the same
+        shape as :meth:`_facts_for`.
+
+        Args:
+            execution_rid: The execution the arc attaches to.
+            **kwargs: Forwarded to
+                :meth:`ClosureBuilder.record_arc` verbatim.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._record_arc("1-ABCD", kind=ArcKind.root, depth=0) is None
+            True
+        """
+        recorder = getattr(self.visitor, "record_arc", None)
+        if recorder is not None:
+            recorder(execution_rid, **kwargs)
+
+    def enqueue_or_truncate(self, rid: RID, *, depth: int) -> None:
+        """Queue ``rid``, or record it as budget-truncated when it cannot be.
+
+        An execution the engine declines to enqueue because the execution
+        budget is already exhausted is still perfectly resolvable — it was
+        reached and dropped for budget. Recording it in ``truncated`` is what
+        stops a later dangling-arc sweep from calling it ``unresolved_rid``.
+
+        Args:
+            rid: Execution RID discovered through a non-tree arc.
+            depth: Depth to record for the queued node.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder(), max_executions=0)
+            >>> engine.enqueue_or_truncate("1-ABCD", depth=1)
+            >>> "1-ABCD" in engine.truncated
+            True
+        """
+        if rid in self.visited_global:
+            return
+        if len(self.visited_global) + len(self._queue) >= self.max_executions:
+            self.flags["walked_complete"] = False
+            self.cap_hit = True
+            self.truncated.add(rid)
+            return
+        self.enqueue_execution(rid, depth=depth)
 
     # -- asset facts ------------------------------------------------------
 

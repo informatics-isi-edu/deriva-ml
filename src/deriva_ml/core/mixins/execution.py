@@ -1468,7 +1468,7 @@ class ExecutionMixin:
         engine: "WalkEngine[str]" = WalkEngine(
             self,
             builder,
-            arcs=frozenset({ArcKind.root, ArcKind.consumption}),
+            arcs=frozenset({ArcKind.root, ArcKind.consumption, ArcKind.version_authorship}),
             max_executions=max_executions,
             dataset_budget=_DATASET_BUDGET_FACTOR * max_executions,
             closure_mode=True,
@@ -1874,6 +1874,44 @@ class ExecutionMixin:
             >>> origin_rid = rows[0]["Execution"] if rows else None  # doctest: +SKIP
         """
         pb = self.pathBuilder()
+        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
+        return sorted(rows, key=_version_row_sort_key)
+
+    def _dataset_version_rows_at(self, dataset_rid: RID, version: str, snapshot_catalog: Any) -> list[dict[str, Any]]:
+        """``Dataset_Version`` rows for ``dataset_rid`` read AT a snapshot.
+
+        The snapshot-closed sibling of :meth:`_dataset_version_rows`. The
+        version-authorship arc (design §6.3) must attribute versions as the
+        catalog recorded them at the walked version's snaptime, not as the
+        live catalog reads them now: a later rewrite of a historical version
+        row must not retroactively change who a pinned closure says authored
+        it, and version rows created after the snaptime must not appear at
+        all.
+
+        The caller resolves the snapshot strictly (never a live fallback) and
+        passes the resulting catalog in, so this method cannot accidentally
+        read live state.
+
+        Args:
+            dataset_rid: Dataset whose version history to fetch.
+            version: The walked version the snapshot was resolved for. Not
+                used to filter (the snaptime already bounds the rows); it is
+                carried for the seam's identity so a test harness can script
+                per-``(dataset, version)`` snapshot views.
+            snapshot_catalog: A catalog bound to the version's snaptime, from
+                :meth:`~deriva_ml.dataset.dataset.Dataset.strict_version_snapshot_catalog`.
+
+        Returns:
+            Row dicts sorted by :func:`_version_row_sort_key`, earliest
+            recorded first. Empty when the snapshot records none.
+
+        Example:
+            >>> ds = ml.lookup_dataset(dataset_rid)  # doctest: +SKIP
+            >>> snap = ds.strict_version_snapshot_catalog("1.0.0")  # doctest: +SKIP
+            >>> rows = ml._dataset_version_rows_at(dataset_rid, "1.0.0", snap)  # doctest: +SKIP
+        """
+        pb = snapshot_catalog.pathBuilder()
         version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
         rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
         return sorted(rows, key=_version_row_sort_key)

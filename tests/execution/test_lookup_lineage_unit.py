@@ -424,6 +424,20 @@ class _FakeML(ExecutionMixin):
             }
         ]
 
+    def _dataset_version_rows_at(  # type: ignore[override]
+        self, dataset_rid: str, version: Any, snapshot_catalog: Any
+    ) -> list[dict[str, Any]]:
+        """Return the SNAPSHOT-scoped version-row history (Task 11).
+
+        Reads the rows scripted by ``set_snapshot_version_rows`` for
+        ``(dataset_rid, version)``. An unscripted pair returns ``[]`` — the
+        honest "the snapshot records no version rows" answer, never a silent
+        fall-through to the live ``_dataset_version_rows`` view (which is
+        exactly the leak the snapshot-faithfulness pin guards against).
+        """
+        self.calls.append(("_dataset_version_rows_at", (dataset_rid, str(version))))
+        return list(self._snapshot_version_rows.get((dataset_rid, str(version)), []))
+
     def _sentinel_execution_rid_or_none(self) -> str | None:  # type: ignore[override]
         return None
 
