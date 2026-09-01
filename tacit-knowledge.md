@@ -956,3 +956,14 @@ arc depths). Pattern worth naming: every snapshot-related fix this
 cycle was the SAME rule — bind discovery, data, and attribution to one
 snapshot handle, and turn every failure of that binding into a typed
 gap.
+
+**2026-09-01 — Confirmed (Carl's question): binding executions do not
+leak sibling datasets into a closure.** Probe-verified on the harness:
+if execution E bound features on dataset D and ALSO on sibling S, D's
+closure contains E (member_binding arc on D) and E's own consumed
+inputs (upstream), but S never enters — its binding scan is never even
+queried. Structural reason: arc discovery runs dataset→executions and
+execution expansion walks INPUTS only; nothing enumerates an
+execution's other outputs or annotation targets. Forward reachability
+("what else did E touch") is a different question
+(find_executions_consuming), not provenance.
