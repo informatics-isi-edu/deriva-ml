@@ -239,12 +239,15 @@ def test_bare_model_dump_input_still_works(tmp_path):
     assert _rid(1) in out.read_text(encoding="utf-8")
 
 
-def test_svg_nodes_carry_native_tooltips():
+def test_svg_nodes_carry_hover_tooltips():
     """Execution boxes, dataset pills, feature marks, and arrows carry
-    SVG <title> hover tooltips (parity with the deploy visualizer)."""
+    hover tooltips (parity with the deploy visualizer). The text lives in
+    aria-label, NOT a native <title>: a browser draws <title> as its own
+    chrome tooltip on top of the CSS overlay — two tooltips, two styles."""
     page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
     svg = page[page.index("<svg") : page.index("</svg>")]
-    assert svg.count("<title>") >= 4  # exec node, dataset pill, feature mark, arrow
+    assert svg.count("aria-label=") >= 4  # exec node, dataset pill, feature mark, arrow
+    assert "<title>" not in svg  # native tooltip would double the CSS one
     assert "Completed" in svg  # execution tooltip carries status
     assert "cohort" in svg  # dataset tooltip carries the description
     assert _rid(40) in svg  # feature tooltip names the producing execution
@@ -256,7 +259,7 @@ def test_svg_tooltip_text_is_escaped():
         root=RootDescriptor(rid=_rid(9), type="Execution", description=None),
         lineage=LineageNode(
             execution=ExecutionSummary(
-                rid=_rid(60), description='<img src=x onerror=alert(1)>', workflow=None, status="Failed"
+                rid=_rid(60), description="<img src=x onerror=alert(1)>", workflow=None, status="Failed"
             )
         ),
     )
@@ -277,9 +280,7 @@ def test_svg_draws_consumed_assets():
         execution=_exec_summary(50),
         consumed_assets=[AssetSummary(rid=_rid(51), filename="weights.keras", asset_table="Execution_Asset")],
     )
-    result = LineageResult(
-        root=RootDescriptor(rid=_rid(52), type="Execution", description=None), lineage=walk
-    )
+    result = LineageResult(root=RootDescriptor(rid=_rid(52), type="Execution", description=None), lineage=walk)
     page = lineage_result_to_html(result)
     svg = page[page.index("<svg") : page.index("</svg>")]
     assert "weights.keras" in svg
@@ -290,9 +291,32 @@ def test_svg_draws_consumed_assets():
 def test_svg_marks_already_shown_nodes():
     shown_twice = LineageNode(execution=_exec_summary(55), already_shown=True)
     walk = LineageNode(execution=_exec_summary(54), parents=[shown_twice])
-    result = LineageResult(
-        root=RootDescriptor(rid=_rid(53), type="Execution", description=None), lineage=walk
-    )
+    result = LineageResult(root=RootDescriptor(rid=_rid(53), type="Execution", description=None), lineage=walk)
     page = lineage_result_to_html(result)
     svg = page[page.index("<svg") : page.index("</svg>")]
     assert "already shown" in svg  # tooltip notes the collapse
+
+
+def test_svg_tooltips_are_css_drawn_not_native_only():
+    """Tooltips must render in viewers that never surface native SVG
+    <title> hover text (embedded preview panes). The figure draws its own
+    overlays, hidden until :hover, with no JavaScript."""
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert ".tt{visibility:hidden" in svg  # overlays exist and start hidden
+    assert ":hover~#tt" in svg  # pure-CSS reveal, sibling combinator
+    labeled = svg.count("aria-label=") - 1  # the <svg> element's own aria-label
+    assert svg.count('class="tt"') == labeled  # one overlay per labeled node
+    assert "<script" not in svg
+
+
+def test_svg_tooltip_long_producer_list_truncates_to_summary():
+    many = {
+        _rid(30): [
+            {"execution_rid": _rid(100 + i), "feature_name": "F", "element_type": "Image", "value_count": i}
+            for i in range(30)
+        ]
+    }
+    page = lineage_result_to_html(_dataset_result(), feature_producers=many)
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert "19 more" in svg  # 1 header + 30 rows -> 12 shown + summary line

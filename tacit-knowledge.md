@@ -712,3 +712,30 @@ counting strategy (single route → server-side grouped distinct; only
 multi-route features pay client-side RID-union). Live eye-ai results
 unchanged by the rework — the fixes close pathological-schema holes,
 not the common case.
+
+**2026-08-31 — SVG tooltips must be CSS-drawn, not native `<title>`
+(PR #387).** The lineage figure's hover tooltips were native SVG
+`<title>` elements — structurally present on every node and correct in
+a full browser, yet the user saw nothing: native tooltips are rendered
+by the BROWSER CHROME, and embedded preview panes (Claude Code's side
+panel, IDE webviews) never surface them. Lesson: "tooltip exists in
+the DOM" and "tooltip the reviewer can see" are different claims, and
+the test asserting `<title>` counts only pinned the first. The fix
+draws overlays inside the SVG revealed by a pure-CSS `.hvN:hover~#ttN`
+sibling rule — no JS, so self-containment holds; overlays appended
+last for z-order and because `~` needs the target after the trigger.
+Verification standard raised accordingly: hover + screenshot on the
+live page (CSS overlays appear in screenshots; native tooltips never
+did — which is also why the gap survived earlier "verify tooltips"
+passes that only inspected markup).
+
+**2026-08-31 addendum (same PR #387): keeping `<title>` "for
+accessibility" alongside CSS overlays produces TWO tooltips.** In a
+full browser the CSS overlay appears instantly and the browser chrome
+then draws the native `<title>` tooltip on top a second later — two
+different-looking tooltips for one element (user-reported). The
+accessible text belongs in `aria-label` (with `role="img"`) on the
+hover group: announced by screen readers, rendered by no browser.
+Rule of thumb: `<title>` in SVG is a VISUAL feature (browser-chrome
+tooltip), not merely a semantic one — if you draw your own tooltip,
+`<title>` must go.
