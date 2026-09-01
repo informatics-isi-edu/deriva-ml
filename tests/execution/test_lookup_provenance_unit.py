@@ -2007,6 +2007,52 @@ def test_ancestry_snapshot_unavailable_mid_chain_is_a_chain_break():
     assert mid_facts.is_source is None
     # The branch stopped: the deeper ancestor was never walked.
     assert deeper not in closure.datasets or "0.1.0" not in closure.datasets[deeper].versions
+
+
+@pytest.mark.parametrize(
+    "schema_error",
+    [
+        AttributeError("'_TableWrapper' object for table 'Dataset' has no attribute or column 'Deleted'"),
+        KeyError("Snapshot"),
+    ],
+    ids=["missing-Dataset.Deleted", "missing-Dataset_Version.Snapshot"],
+)
+def test_snapshot_schema_evolution_is_a_chain_break_not_a_crash(schema_error):
+    """A schema-shape failure at a snaptime degrades to a gap, not a crash.
+
+    The sibling test above injects ``SnapshotUnavailable`` directly. This
+    one scripts the RAW ``AttributeError``/``KeyError`` that deriva-py
+    actually raises when a snapshot-bound read touches a column the schema
+    lacked at that snaptime, and asserts it lands as the same
+    ``snapshot_chain_break`` gap rather than propagating.
+
+    That was the #383 live blind spot: every offline harness presents
+    current-schema tables, so "missing ROWS at a snapshot" was covered while
+    "missing SCHEMA at a snapshot" crashed ``lookup_provenance`` outright on
+    eye-ai. Both flavors here were observed live on that catalog
+    (``Dataset.Deleted`` and ``Dataset_Version.Snapshot``). The conversion
+    itself is pinned against the real ``Dataset`` in
+    ``test_strict_snapshot.py::TestSnapshotSchemaEvolutionDegradesToGap``.
+    """
+    ml = _FakeML()
+    child, mid, deeper = _ds(1), _ds(2), _ds(3)
+
+    _ancestry_dataset(ml, child, "1.0.0", [{"parent_rid": mid, "parent_version_then": "0.5.0"}])
+    _ancestry_dataset(ml, mid, "0.5.0", [{"parent_rid": deeper, "parent_version_then": "0.1.0"}])
+    _ancestry_dataset(ml, deeper, "0.1.0", [])
+
+    # `mid`'s snapshot resolves, but reading parents there hits the old schema.
+    ml.set_schema_failure_at(mid, "0.5.0", schema_error)
+
+    # Must NOT raise -- before the fix this propagated out of lookup_provenance.
+    closure = ml.lookup_provenance(child, version="1.0.0")
+
+    assert _gaps_for(closure, GapKind.snapshot_chain_break, mid)
+    mid_facts = _facts(closure, mid, "0.5.0")
+    assert mid_facts.ancestry_state == AncestryState.chain_break
+    assert mid_facts.is_source is None
+    # The branch stopped: the deeper ancestor was never walked.
+    assert deeper not in closure.datasets or "0.1.0" not in closure.datasets[deeper].versions
     assert not [c for c in ml.calls if c[0] == "Dataset.strict_parents_at" and c[1] == (deeper, "0.1.0")]
     # ...and the child's own hop still resolved and recorded its link.
     assert _facts(closure, child, "1.0.0").ancestry_state == AncestryState.resolved

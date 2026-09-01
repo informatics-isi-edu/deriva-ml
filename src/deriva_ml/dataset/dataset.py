@@ -28,6 +28,7 @@ Typical usage example:
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 
 # Standard library imports
@@ -69,6 +70,42 @@ from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
+
+
+def _missing_name(error: AttributeError | KeyError) -> str:
+    """Name the column/attribute a snapshot-schema failure tripped over.
+
+    Snapshot-bound reads run against the schema as it stood at that
+    snaptime, so a column added later is simply absent. deriva-py reports
+    that as ``AttributeError`` from its datapath wrapper (attribute
+    access) or ``KeyError`` (row indexing). This extracts the offending
+    name so ``SnapshotUnavailable`` details say *which* column was
+    missing rather than just that something was.
+
+    Args:
+        error: The ``AttributeError`` or ``KeyError`` that was raised.
+
+    Returns:
+        A phrase naming the missing column, e.g. ``"column 'Snapshot'"``,
+        falling back to ``"a column"`` when the name can't be recovered.
+
+    Example:
+        >>> _missing_name(KeyError("Snapshot"))
+        "column 'Snapshot'"
+        >>> _missing_name(AttributeError("no attribute or column 'Deleted'"))
+        "column 'Deleted'"
+        >>> _missing_name(AttributeError())
+        'a column'
+    """
+    if isinstance(error, KeyError):
+        return f"column {error.args[0]!r}" if error.args else "a column"
+    name = getattr(error, "name", None)
+    if not name:
+        # deriva-py's datapath wrapper builds its own message rather than
+        # setting ``.name``; recover the quoted identifier from the text.
+        match = re.search(r"'([^']+)'\s*$", str(error))
+        name = match.group(1) if match else None
+    return f"column {name!r}" if name else "a column"
 
 
 class Dataset:
@@ -3114,7 +3151,10 @@ class Dataset:
         Raises:
             SnapshotUnavailable: If the version is not found in
                 :meth:`dataset_history`, if the version row's ``Snapshot``
-                is empty/None, or if the underlying ``catalog_snapshot(...)``
+                is empty/None, if reading that history row trips over a
+                column the schema lacked at this dataset's snaptime (a
+                snapshot-schema failure, reported with the missing column
+                named), or if the underlying ``catalog_snapshot(...)``
                 call itself raises (e.g. the snapshot has been garbage
                 collected or is otherwise unreadable).
 
@@ -3127,6 +3167,20 @@ class Dataset:
         except DerivaMLException as e:
             raise SnapshotUnavailable(
                 f"Dataset {self.dataset_rid} version {version}: version not resolvable in history ({e})"
+            ) from e
+        except (AttributeError, KeyError) as e:
+            # ``_resolve_version_record`` reads ``dataset_history()``,
+            # which indexes columns (``Snapshot``, ``Minid``, …) that
+            # older ``Dataset_Version`` schemas lack. When this Dataset is
+            # itself bound to a historical snapshot, that read runs
+            # against the old schema and raises KeyError/AttributeError
+            # rather than a DerivaMLException. Strictness owns this: a
+            # version whose own history row cannot be read is not
+            # resolvable to a pinned snapshot.
+            raise SnapshotUnavailable(
+                f"Dataset {self.dataset_rid} version {version}: the catalog schema at this "
+                f"dataset's snapshot does not have {_missing_name(e)} that reading version "
+                f"history requires ({type(e).__name__}: {e})"
             ) from e
 
         # Discriminate on the SOURCE OF TRUTH — the history row's
@@ -3195,7 +3249,13 @@ class Dataset:
 
         Raises:
             SnapshotUnavailable: If ``version`` cannot be resolved to a
-                pinned snapshot for this dataset.
+                pinned snapshot for this dataset, or if reading parents at
+                that snapshot trips over a column the catalog schema
+                lacked at that snaptime (e.g. ``Dataset.Deleted`` on an
+                old snapshot). Schema shape at a snaptime is treated as a
+                snapshot-resolution failure, so callers building a
+                snapshot-closed closure get an honest gap rather than a
+                raw ``AttributeError``/``KeyError``.
 
         Example:
             >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
@@ -3203,18 +3263,42 @@ class Dataset:
             [{'parent_rid': '1-DEF', 'parent_version_then': '0.3.0'}]
         """
         version_snapshot_catalog = self.strict_version_snapshot_catalog(version)
-        pb = version_snapshot_catalog.pathBuilder()
-        atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
-        parents = [
-            version_snapshot_catalog.lookup_dataset(p["Dataset"])
-            for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
-        ]
+
+        # Every read below runs against the SNAPSHOT-BOUND catalog, whose
+        # schema is the schema as it stood at that snaptime — not today's.
+        # A column this code refers to may simply not exist back then
+        # (e.g. ``Dataset.Deleted``, added later, which
+        # ``lookup_dataset`` filters on unconditionally). deriva-py
+        # surfaces that as ``AttributeError`` from the datapath wrapper,
+        # and a missing row key as ``KeyError``; neither is a
+        # ``DerivaMLException``, so without this both would escape
+        # ``lookup_provenance`` as a hard crash instead of degrading to
+        # the ``snapshot_chain_break`` gap the design calls for. Schema
+        # shape at a snaptime is exactly as much a snapshot-resolution
+        # failure as a missing snapshot id is.
+        try:
+            pb = version_snapshot_catalog.pathBuilder()
+            atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
+            parents = [
+                version_snapshot_catalog.lookup_dataset(p["Dataset"])
+                for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
+            ]
+        except (AttributeError, KeyError) as e:
+            raise SnapshotUnavailable(
+                f"Dataset {self.dataset_rid} version {version}: the catalog schema at this "
+                f"version's snapshot does not have {_missing_name(e)} that reading parents "
+                f"requires, so the ancestry chain cannot be read here ({type(e).__name__}: {e})"
+            ) from e
 
         results: list[dict] = []
         for parent in parents:
             try:
                 parent_version_then = str(parent.current_version)
-            except DerivaMLException:
+            except (DerivaMLException, AttributeError, KeyError):
+                # Same snapshot-schema hazard, but scoped to ONE parent:
+                # an unreadable parent version is already modeled as
+                # ``parent_version_then=None`` (a reported gap for the
+                # caller), not a fatal error for the whole hop.
                 parent_version_then = None
             results.append(
                 {

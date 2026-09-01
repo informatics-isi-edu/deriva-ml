@@ -878,7 +878,7 @@ Every difference is principled; none needed a code change:
   up is the feature, not a regression — `traversal_complete=True` and
   `cap_hit=False` throughout, confirming gaps are orthogonal to caps.
 
-**Two schema-evolution bugs found, NOT patched (reported instead).**
+**Two schema-evolution bugs found and FIXED in this same PR.**
 Old eye-ai snaptimes predate columns the current code assumes, and the
 raw exception escapes `lookup_provenance` instead of becoming a gap:
 (1) `core/mixins/dataset.py:200` — `lookup_dataset` unconditionally
@@ -890,15 +890,25 @@ historical snapshot, so this aborts the whole walk. (2)
 `KeyError`; `strict_parents_at` catches only `DerivaMLException`, so it
 escapes too. Repro without the closure:
 `ml.lookup_dataset('2-277G').strict_parents_at('0.1.0')` and
-`...strict_parents_at('1.0.0')`. Both are one-line-catchable into
+`...strict_parents_at('1.0.0')`. Both are catchable into
 `SnapshotUnavailable`, which the engine ALREADY converts into a
-`snapshot_chain_break` gap — with a local shim doing exactly that, the
-walk completes and produces precisely the 5 `snapshot_chain_break` gaps
-in the table above (`2-277C/G/J/M`, `2-7KA2`, all at v0.1.0). General
+`snapshot_chain_break` gap. The fix wraps each snapshot-bound read at
+the strict layer (scoped to `AttributeError`/`KeyError` at the point of
+the read, never a blanket `except Exception`), naming the missing column
+in the gap detail. Confirmed live with no monkeypatch: the walk
+completes and produces precisely the 5 `snapshot_chain_break` gaps in
+the table above (`2-277C/G/J/M`, `2-7KA2`, all at v0.1.0), with every
+other number identical to the shimmed run. General
 rule this reinforces: **a snapshot-strict walk must treat "the schema
 itself differs at that snaptime" as a first-class gap source**, not
 just missing rows — reading history means reading OLD SCHEMA, and every
 column reference on a snapshot-bound path is a potential `AttributeError`.
+The offline blind spot that let this ship is worth naming too: every
+mocked harness presents CURRENT-schema tables, so "missing rows at a
+snapshot" was well covered while "missing schema at a snapshot" had no
+coverage at all. The harness now has a `set_schema_failure_at` seam and
+the real `Dataset` is pinned directly in
+`test_strict_snapshot.py::TestSnapshotSchemaEvolutionDegradesToGap`.
 
 Timing on this root (www.eye-ai.org, warm): `lookup_lineage` 8.5s,
 `lookup_provenance` 249s at the default `max_executions=500` with no cap

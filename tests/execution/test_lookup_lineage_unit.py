@@ -154,6 +154,22 @@ class _StubDatasetHandle:
         # raise here too, matching the real contract.
         self.strict_version_snapshot_catalog(version)
         key = (self.dataset_rid, str(version))
+        # Mirror the real method's schema-shape guard: a snapshot-bound read
+        # can trip over a column the schema lacked at that snaptime, which
+        # deriva-py raises as AttributeError/KeyError. The real
+        # ``strict_parents_at`` converts those to ``SnapshotUnavailable``;
+        # the stub must convert them identically or the harness would let a
+        # regression in that conversion pass unnoticed.
+        schema_error = self._owner._schema_failure_at.get(key)
+        if schema_error is not None:
+            try:
+                raise schema_error
+            except (AttributeError, KeyError) as e:
+                raise SnapshotUnavailable(
+                    f"Dataset {self.dataset_rid} version {version}: the catalog schema at this "
+                    f"version's snapshot does not have a column that reading parents requires "
+                    f"({type(e).__name__}: {e})"
+                ) from e
         return list(self._owner._parents_at.get(key, []))
 
 
@@ -197,6 +213,7 @@ class _FakeML(ExecutionMixin):
         self._snapshot_markers: dict[tuple[str, str], Any] = {}
         # (dataset_rid, version) -> [{"parent_rid": ..., "parent_version_then": ...}].
         self._parents_at: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        self._schema_failure_at: dict[tuple[str, str], BaseException] = {}
         # (dataset_rid, version) -> (records, diagnostics) for
         # _find_feature_producers_impl.
         self._binding_scans: dict[tuple[str, Any], tuple[list[Any], list[BindingDiagnostic]]] = {}
@@ -328,6 +345,17 @@ class _FakeML(ExecutionMixin):
         return value: a list of ``{"parent_rid": ..., "parent_version_then": ...}``.
         """
         self._parents_at[(dataset_rid, str(version))] = list(parents)
+
+    def set_schema_failure_at(self, dataset_rid: str, version: str, error: BaseException) -> None:
+        """Script a SNAPSHOT-SCHEMA failure for ``strict_parents_at(version)``.
+
+        Models the case where the catalog schema at that snaptime lacks a
+        column today's code references — deriva-py raises ``AttributeError``
+        (datapath attribute access) or ``KeyError`` (row indexing). Distinct
+        from ``set_snapshot_available(..., False)``, which models a missing
+        SNAPSHOT rather than a missing COLUMN within a resolvable one.
+        """
+        self._schema_failure_at[(dataset_rid, str(version))] = error
 
     def set_binding_scan(
         self,
