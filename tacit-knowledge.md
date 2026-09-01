@@ -695,3 +695,20 @@ feature scans. Snapshot-chain breaks (dev rows, pre-snapshot legacy) =
 reported gaps, never live-state guesses. Depth: to SOURCE under the
 global cap; a dedicated depth knob is YAGNI. This completed the
 boundary interview — six rulings, all recorded on #383.
+
+**Codex pre-merge round on #385 (PR #386): two P1s refined the
+reachability semantics.** (1) Snapshot mode must bind DISCOVERY, not
+just data — live-model path enumeration against a snapshot's data
+silently omits post-snapshot-removed features and mis-joins changed
+topology; version= now sources model+planner+find_features from the
+snapshot catalog. (2) **Paths run to the feature's TARGET, and feature
+tables are never reachability intermediates**: arriving at a feature
+table via a value/asset FK would count bindings whose target member is
+outside the dataset, and tunneling THROUGH a binding to its value
+objects is not membership — reachability is over the object graph; the
+target→feature hop is appended per feature. Also: schema-qualified
+path keys (same-named tables in two domain schemas), and a hybrid
+counting strategy (single route → server-side grouped distinct; only
+multi-route features pay client-side RID-union). Live eye-ai results
+unchanged by the rework — the fixes close pathological-schema holes,
+not the common case.

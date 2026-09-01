@@ -1664,47 +1664,57 @@ class ExecutionMixin:
         # is fine — they all point at executions that wrote this asset.
         return rows[0].get("Execution")
 
-    def find_feature_producers(self, dataset_rid: RID) -> "list[FeatureProducerRecord]":
+    def find_feature_producers(self, dataset_rid: RID, version: Any | None = None) -> "list[FeatureProducerRecord]":
         """Executions that wrote feature values onto a dataset's members.
 
-        The feature arc of provenance (issue #370, closing #367 §6): a
-        contributor that only *annotated* a dataset's members — writing
-        feature values, e.g. bounding boxes or labels — is a sibling
-        consumer, not a data-flow ancestor, so no lineage walk reaches it.
-        Every feature value carries an ``Execution`` FK, so a dataset-scoped
-        server-side aggregate recovers those contributors in seconds: for
-        each member table and each feature defined on it,
-        ``Dataset_<Member>(Dataset = rid) ⋈ <FeatureTable>`` grouped by
-        ``Execution`` with a distinct-RID count.
+        The feature arc of provenance (issues #370/#385; semantics fixed by
+        the binding definition in ``docs/reference/provenance-contract.md``):
+        a feature value is the binding *(member, value, execution)*, so the
+        executions bound to a dataset's members are part of the dataset's
+        provenance **by construction**. "Members" follows FK-reachability —
+        a feature bound to an object *referenced by* a member counts (a
+        subject-partitioned dataset's Image annotations are in scope even
+        though only Subjects are direct members).
 
-        The request URL carries only the dataset RID — never a client-side
-        member list — so this is safe for datasets with thousands of
-        members. Membership is evaluated against the dataset's **current**
-        state.
+        Discovery enumerates FK paths from ``Dataset`` to each feature's
+        **target table** via the denormalize planner's schema walk (the
+        #316-hardened rules), with feature tables excluded as
+        intermediates — membership reachability runs through the object
+        graph, never *through* bindings — and the single target→feature
+        hop appended per feature. In ``version=`` mode both discovery and
+        querying bind to the version's snapshot (model, planner, and data),
+        so schema evolution after the snapshot cannot distort the result.
 
-        Results are provenance *candidates*: which features downstream code
-        actually read is unknowable from the catalog; the contract is a
-        bounded superset with evidence. Feature values with no producing
-        execution surface as records with ``execution_rid=None`` — a gap to
-        report, not to hide. A single feature table failing to query
-        degrades to a warning so it cannot mask the rest.
+        A single-path feature counts server-side (grouped distinct); only
+        a feature with multiple FK routes unions row RIDs client-side so a
+        row reachable two ways counts exactly once. Ambiguous hops skip
+        with a warning; a failing feature degrades without masking the
+        rest.
 
         Args:
-            dataset_rid: RID of the dataset whose members' feature values
-                to inspect.
+            dataset_rid: RID of the dataset whose members' bindings to
+                inspect.
+            version: Optional dataset version. ``None`` (default) evaluates
+                against the **live** catalog — "who has ever annotated
+                this". A version resolves discovery *and* data against that
+                version's catalog snapshot: the bindings that existed when
+                the version was cut (post-hoc annotators of the same
+                members are excluded). Tables absent from an old snapshot
+                contribute no rows — never an error.
 
         Returns:
             :class:`~deriva_ml.feature.FeatureProducerRecord` list, one per
             ``(execution, feature, element)`` group, sorted by
             ``(feature_name, element_type)`` with a stable internal
-            tiebreak for a deterministic result order (the tiebreak
-            carries no RID-ordering semantics). Empty when no member has
-            feature values.
+            tiebreak (no RID-ordering semantics). Empty when no member has
+            bindings.
 
         Example:
             >>> for rec in ml.find_feature_producers(dataset.rid):  # doctest: +SKIP
             ...     print(rec.execution_rid, rec.feature_name, rec.value_count)
         """
+        from collections import Counter
+
         from deriva.core import datapath
 
         from deriva_ml.core.logging_config import get_logger
@@ -1712,66 +1722,158 @@ class ExecutionMixin:
 
         logger = get_logger(__name__)
         dataset = self.lookup_dataset(dataset_rid)
-        pb = self.pathBuilder()
+        if version is not None:
+            # Snapshot-bind EVERYTHING: model, planner, feature discovery,
+            # and data. Binding only the data path while discovering against
+            # the live schema silently omits features removed after the
+            # snapshot and mis-joins across changed FK topology.
+            source = dataset._version_snapshot_catalog(version)
+        else:
+            source = self
+        pb = source.pathBuilder()
+        model = source.model
+        planner = model._planner
+
+        try:
+            features = list(model.find_features())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Feature discovery failed: %s", exc)
+            return []
+        if not features:
+            return []
+
+        feature_table_names = {f.feature_table.name for f in features}
+        try:
+            # Feature tables are excluded as intermediates: reachability is
+            # over the object graph; tunneling through a binding to its
+            # value/asset objects is not membership.
+            all_paths = planner._schema_to_paths(exclude_tables=set(feature_table_names))
+        except Exception as exc:  # noqa: BLE001 — no paths means no arc, not a crash
+            logger.warning("Feature-path enumeration failed: %s", exc)
+            return []
+
+        # Paths keyed by schema-qualified TARGET table — arriving at a
+        # feature table via a value/asset FK must never count (the binding
+        # attaches to its target object only).
+        paths_by_target: dict[tuple[str, str], list[list[Any]]] = {}
+        for path in all_paths:
+            if len(path) >= 3:
+                last = path[-1]
+                paths_by_target.setdefault((last.schema.name, last.name), []).append(path)
+
         records: list[FeatureProducerRecord] = []
-
-        for assoc_table in dataset._dataset_table.find_associations():
-            other_fkey = assoc_table.other_fkeys.pop()
-            member_table = other_fkey.pk_table
-            membership_table = assoc_table.table
-            if member_table.name == "Dataset":
-                # Nested datasets carry no member-level features.
+        for feature in features:
+            target_meta = feature.target_table
+            ftable_meta = feature.feature_table
+            target_paths = paths_by_target.get((target_meta.schema.name, target_meta.name), [])
+            if not target_paths:
                 continue
-            member_link_column = other_fkey.foreign_key_columns[0].name
-            # The FK's actual referenced column — NOT always RID. Supported
-            # shapes include e.g. Dataset_file.file -> file.id, so the join
-            # must route through the member table on this column and only
-            # then reach the feature table (whose member FK does target RID,
-            # since deriva-ml creates feature associations itself).
-            member_target_column = other_fkey.referenced_columns[0].name
-
             try:
-                features = self.find_features(member_table)
-            except Exception as exc:  # noqa: BLE001 — one member kind must not mask the rest
-                logger.warning("Feature discovery on %s failed: %s", member_table.name, exc)
+                final_hop = planner._table_relationship(target_meta, ftable_meta)
+            except DerivaMLException as exc:
+                logger.warning(
+                    "Skipping feature %s: ambiguous target link %s -> %s: %s",
+                    feature.feature_name,
+                    target_meta.name,
+                    ftable_meta.name,
+                    exc,
+                )
                 continue
 
-            for feature in features:
-                ftable_meta = feature.feature_table
+            usable: list[tuple[list[Any], list[list[tuple[Any, Any]]]]] = []
+            for path in target_paths:
                 try:
-                    membership_path = pb.schemas[membership_table.schema.name].tables[membership_table.name]
-                    member_path = pb.schemas[member_table.schema.name].tables[member_table.name]
-                    ftable = pb.schemas[ftable_meta.schema.name].tables[ftable_meta.name]
-                    path = (
-                        membership_path.filter(membership_path.Dataset == dataset_rid)
-                        .link(
-                            member_path,
-                            on=(
-                                membership_path.columns[member_link_column] == member_path.columns[member_target_column]
-                            ),
-                        )
-                        .link(
-                            ftable,
-                            on=(member_path.RID == ftable.columns[member_table.name]),
-                        )
-                    )
-                    groups = path.groupby(ftable.Execution).attributes(datapath.CntD(ftable.RID).alias("value_count"))
-                    for row in groups.fetch():
-                        records.append(
-                            FeatureProducerRecord(
-                                execution_rid=row.get("Execution") or None,
-                                feature_name=str(feature.feature_name),
-                                element_type=member_table.name,
-                                value_count=int(row.get("value_count") or 0),
-                            )
-                        )
-                except Exception as exc:  # noqa: BLE001 — one feature must not mask the rest
+                    joins = [planner._table_relationship(path[i], path[i + 1]) for i in range(len(path) - 1)]
+                except DerivaMLException as exc:
                     logger.warning(
-                        "Feature-producer scan %s on %s failed: %s",
-                        getattr(feature, "feature_name", "?"),
+                        "Skipping ambiguous feature path %s: %s",
+                        " -> ".join(t.name for t in path),
+                        exc,
+                    )
+                    continue
+                usable.append((path + [ftable_meta], joins + [final_hop]))
+            if not usable:
+                continue
+
+            def _build(dp_tables: list[Any], joins: list[list[tuple[Any, Any]]]):
+                dp = dp_tables[0].filter(dp_tables[0].RID == dataset_rid)
+                for i, tbl_path in enumerate(dp_tables[1:]):
+                    pred = None
+                    for left_col, right_col in joins[i]:
+                        clause = dp_tables[i].columns[left_col.name] == tbl_path.columns[right_col.name]
+                        pred = clause if pred is None else (pred & clause)
+                    dp = dp.link(tbl_path, on=pred)
+                return dp
+
+            def _resolve_tables(path: list[Any]) -> list[Any] | None:
+                try:
+                    return [pb.schemas[t.schema.name].tables[t.name] for t in path]
+                except KeyError:
+                    # Absent from the (snapshot) schema — predates the
+                    # version; no rows, never an error (#365).
+                    return None
+
+            counts: "Counter[Any]" = Counter()
+            if len(usable) == 1:
+                # Common case: one route — count server-side (grouped
+                # distinct), nothing fetched to the client heap.
+                path, joins = usable[0]
+                tables = _resolve_tables(path)
+                if tables is None:
+                    continue
+                try:
+                    dp = _build(tables, joins)
+                    ftable_path = tables[-1]
+                    grouped = dp.groupby(ftable_path.Execution).attributes(
+                        datapath.CntD(ftable_path.RID).alias("value_count")
+                    )
+                    for row in grouped.fetch():
+                        counts[row.get("Execution") or None] = int(row.get("value_count") or 0)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Feature-producer path %s on %s failed: %s",
+                        " -> ".join(t.name for t in path),
                         dataset_rid,
                         exc,
                     )
+                    continue
+            else:
+                # Multiple routes: union feature-row RIDs across paths so a
+                # row reachable two ways counts exactly once.
+                row_exec: dict[str, Any] = {}
+                any_ran = False
+                for path, joins in usable:
+                    tables = _resolve_tables(path)
+                    if tables is None:
+                        continue
+                    try:
+                        dp = _build(tables, joins)
+                        ftable_path = tables[-1]
+                        for row in dp.attributes(ftable_path.RID, ftable_path.Execution).fetch():
+                            rid_val = row.get("RID")
+                            if rid_val is not None:
+                                row_exec[rid_val] = row.get("Execution") or None
+                        any_ran = True
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Feature-producer path %s on %s failed: %s",
+                            " -> ".join(t.name for t in path),
+                            dataset_rid,
+                            exc,
+                        )
+                if not any_ran:
+                    continue
+                counts = Counter(row_exec.values())
+
+            for exec_rid, n in counts.items():
+                records.append(
+                    FeatureProducerRecord(
+                        execution_rid=exec_rid,
+                        feature_name=str(feature.feature_name),
+                        element_type=target_meta.name,
+                        value_count=int(n),
+                    )
+                )
 
         records.sort(key=lambda r: (r.feature_name, r.element_type, r.execution_rid or ""))
         return records
