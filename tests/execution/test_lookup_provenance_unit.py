@@ -1510,9 +1510,16 @@ def test_two_datasets_sharing_binding_execution_two_arcs_one_execution():
 
 
 def test_binding_evidence_merge_dedups_records_min_depth():
-    """The same arc identity (same execution, same walked dataset/version)
-    rediscovered with overlapping evidence merges into ONE arc: records are
-    deduped by equality and the minimum depth is kept."""
+    """A single binding scan returning multiple records for the SAME
+    execution produces ONE ``member_binding`` arc whose evidence carries
+    every record from that scan.
+
+    This does NOT exercise ``ClosureBuilder.record_arc``'s cross-call merge
+    branches (equality-dedup of overlapping evidence, min-depth-on-
+    rediscovery) — the binding scan is memoized per ``(dataset, version)``,
+    so the walk can never offer the same arc identity to ``record_arc``
+    twice. Those branches are pinned directly in
+    ``TestClosureBuilderRecordArcMerge`` below."""
     ml = _FakeML()
     ds_root, ds_shared = _ds(1), _ds(2)
     top, left, right, shared_binder = _ex(1), _ex(2), _ex(3), _ex(4)
@@ -1529,10 +1536,16 @@ def test_binding_evidence_merge_dedups_records_min_depth():
     ml.add_dataset(ds_shared, description="shared", producer=None)
     ml.set_snapshot_available(ds_shared, "1.0.0", True)
     ml.set_snapshot_version_rows(ds_shared, "1.0.0", [_snapshot_row(ds_shared, "1.0.0", None, "2025-01-01T00:00:00Z")])
-    # Both discovery paths scan the SAME (dataset, version) — the scan is
-    # memoized, so both consumers' expansion sees the identical record set,
-    # exercising the evidence-merge path (record_1 ∈ both, record_2 only
-    # discovered once but merged onto the same arc).
+    # NOTE: the scan is memoized per (dataset, version) — `expand_dataset`
+    # runs the binding scan exactly ONCE for ds_shared@1.0.0 regardless of
+    # how many consumers reach it, so left/right do NOT independently
+    # rediscover this arc; there is only ever one `record_arc` call here.
+    # This test therefore only pins that BOTH records from a single scan
+    # become evidence on one arc — it does NOT exercise `record_arc`'s
+    # cross-call merge branches (equality-dedup / min-depth), which are
+    # structurally unreachable via the walk under memoization. Those
+    # branches are pinned directly against `ClosureBuilder.record_arc` in
+    # the `TestClosureBuilderRecordArcMerge` tests below.
     ml.set_binding_scan(ds_shared, "1.0.0", [record_1, record_2], [])
     ml.add_dataset(ds_root, description="root", producer=top)
     ml.add_execution(top, description="top")
@@ -1557,12 +1570,24 @@ def test_binding_evidence_merge_dedups_records_min_depth():
 
 def test_binding_sentinel_execution_emits_gap_no_arc_not_enqueued():
     """A binding record attributed to the unknown-provenance sentinel is a
-    ``sentinel_origin`` gap, never an arc, and the sentinel is not enqueued."""
+    ``sentinel_origin`` gap, never an arc, and the sentinel is not enqueued.
+
+    The gap's detail must carry the BINDING LEG's own wording (naming the
+    feature/element and the dataset@version) — not ``expand_execution``'s
+    independent sentinel backstop, whose detail is generic ("provenance
+    terminates at..."). Asserting the leg-specific wording is what makes
+    this test fail if the leg's own guard (``_provenance_engine.py``,
+    ``_expand_member_bindings``) were deleted and only the backstop caught
+    the sentinel — without this assertion, a mutant that removes the guard
+    is invisible: the backstop only fires once the sentinel is actually
+    DEQUEUED, so the guard's real job is never consuming a queue slot for
+    it in the first place (see the budget-sensitive variant below).
+    """
     ml = _FakeML()
     ds_root, sentinel = _ds(1), _ex(66)
     ml.add_execution(sentinel, description="unknown provenance")
     ml._sentinel_execution_rid_or_none = lambda: sentinel  # type: ignore[method-assign]
-    record = _binding_record(sentinel)
+    record = _binding_record(sentinel, feature_name="Annotation", element_type="Image")
     _dataset_root_with_bindings(ml, ds_root, "1.0.0", [record])
 
     closure = ml.lookup_provenance(ds_root, version="1.0.0")
@@ -1570,7 +1595,180 @@ def test_binding_sentinel_execution_emits_gap_no_arc_not_enqueued():
     assert sentinel not in closure.executions
     # Not a closure member, so it carries no arcs at all (the sentinel is
     # never enqueued).
-    assert _gaps_for(closure, GapKind.sentinel_origin, sentinel)
+    gaps = _gaps_for(closure, GapKind.sentinel_origin, sentinel)
+    assert len(gaps) == 1
+    detail = gaps[0].detail
+    assert "Annotation" in detail
+    assert "Image" in detail
+    assert f"{ds_root}@1.0.0" in detail
+    assert "is bound by the unknown-provenance Execution sentinel" in detail
+
+
+def test_binding_sentinel_guard_frees_budget_for_the_real_binder():
+    """Budget-sensitive proof that the leg's sentinel guard is load-bearing:
+    a scan returning TWO records — one sentinel-attributed, one a real
+    binder — with a budget of exactly 1 (enough for only ONE further
+    execution beyond the root's own producer).
+
+    If the guard is REMOVED, the sentinel would be offered to
+    ``enqueue_or_truncate`` like any other author, consuming the single
+    remaining budget slot ahead of the real binder (records are processed
+    in scan order) — the mutant caps out with an EMPTY closure beyond the
+    producer, ``cap_hit=True``, and the real binder never entered. With the
+    guard in place, the sentinel is filtered out before it ever reaches
+    ``enqueue_or_truncate``, so the real binder gets the slot: it enters
+    the closure and ``cap_hit`` stays False.
+    """
+    ml = _FakeML()
+    ds_root, consumer, sentinel, real_binder = _ds(1), _ex(1), _ex(66), _ex(2)
+    ml.add_execution(sentinel, description="unknown provenance")
+    ml.add_execution(real_binder, description="real binder")
+    ml._sentinel_execution_rid_or_none = lambda: sentinel  # type: ignore[method-assign]
+    ml.add_execution(consumer, description="root producer")
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+    ml.add_version_row(ds_root, "1.0.0", consumer, rct="2025-01-01T00:00:00Z")
+    ml.set_snapshot_available(ds_root, "1.0.0", True)
+    ml.set_snapshot_version_rows(ds_root, "1.0.0", [_snapshot_row(ds_root, "1.0.0", consumer, "2025-01-01T00:00:00Z")])
+    # Sentinel record FIRST in scan order: a guard-deletion mutant would
+    # offer it to enqueue_or_truncate before the real binder, consuming the
+    # only remaining budget slot and starving the real binder out.
+    ml.set_binding_scan(
+        ds_root,
+        "1.0.0",
+        [_binding_record(sentinel), _binding_record(real_binder, feature_name="Label")],
+        [],
+    )
+
+    # Budget of 2: the root's producer (consumer) fills one slot, leaving
+    # exactly one slot for whichever binding record is offered first.
+    closure = ml.lookup_provenance(ds_root, version="1.0.0", max_executions=2)
+
+    assert sentinel not in closure.executions
+    assert real_binder in closure.executions
+    assert closure.cap_hit is False
+    assert closure.traversal_complete is True
+
+
+# ---------------------------------------------------------------------------
+# ClosureBuilder.record_arc — merge branches, pinned directly (I-2).
+#
+# The walk-level tests above cannot reach these branches: every dataset-side
+# leg (authorship, bindings) runs its scan/read exactly ONCE per walked
+# (dataset, version) — memoized by ``expand_dataset`` — so the SAME arc
+# identity is never offered to ``record_arc`` twice by a real walk. The
+# merge logic is still real production code (a rediscovery IS possible in
+# principle, e.g. a future leg that isn't memoized, or two distinct legs
+# converging on the same identity), so it is pinned here directly against
+# the builder rather than left uncovered.
+# ---------------------------------------------------------------------------
+
+
+class TestClosureBuilderRecordArcMerge:
+    """Direct unit tests for ``ClosureBuilder.record_arc``'s rediscovery
+    merge branches: evidence dedup-by-equality and minimum-depth."""
+
+    def _arc(self, builder, execution_rid: str):
+        arcs = builder.arcs_for(execution_rid)
+        assert len(arcs) == 1
+        return arcs[0]
+
+    def test_overlapping_evidence_merges_into_one_arc_deduped_by_equality(self):
+        """Re-recording the SAME arc identity with evidence that partially
+        overlaps the existing arc's evidence merges into one arc: the
+        overlapping record is not duplicated, and the new-only record is
+        appended."""
+        from deriva_ml.core.mixins._provenance_engine import ClosureBuilder
+
+        builder = ClosureBuilder()
+        execution_rid = _ex(1)
+        record_shared = _binding_record(execution_rid, feature_name="Annotation", element_type="Image")
+        record_new = _binding_record(execution_rid, feature_name="Label", element_type="Image")
+
+        builder.record_arc(
+            execution_rid,
+            kind=ArcKind.member_binding,
+            depth=1,
+            input_rid=_ds(1),
+            input_type=ArcInputType.dataset,
+            input_version="1.0.0",
+            evidence=[record_shared],
+        )
+        builder.record_arc(
+            execution_rid,
+            kind=ArcKind.member_binding,
+            depth=1,
+            input_rid=_ds(1),
+            input_type=ArcInputType.dataset,
+            input_version="1.0.0",
+            # A record equal to the existing one, plus a genuinely new one.
+            evidence=[record_shared.model_copy(), record_new],
+        )
+
+        arc = self._arc(builder, execution_rid)
+        # Equality-dedup: the shared record appears exactly once, not twice.
+        assert arc.evidence.count(record_shared) == 1
+        assert record_new in arc.evidence
+        assert len(arc.evidence) == 2
+
+    def test_rediscovery_at_shallower_depth_lowers_recorded_depth(self):
+        """A rediscovery of the same identity at a SHALLOWER depth lowers
+        the arc's recorded depth."""
+        from deriva_ml.core.mixins._provenance_engine import ClosureBuilder
+
+        builder = ClosureBuilder()
+        execution_rid = _ex(1)
+        record = _binding_record(execution_rid)
+
+        builder.record_arc(
+            execution_rid,
+            kind=ArcKind.member_binding,
+            depth=3,
+            input_rid=_ds(1),
+            input_type=ArcInputType.dataset,
+            input_version="1.0.0",
+            evidence=[record],
+        )
+        builder.record_arc(
+            execution_rid,
+            kind=ArcKind.member_binding,
+            depth=1,
+            input_rid=_ds(1),
+            input_type=ArcInputType.dataset,
+            input_version="1.0.0",
+            evidence=[record],
+        )
+
+        assert self._arc(builder, execution_rid).depth == 1
+
+    def test_rediscovery_at_deeper_depth_keeps_the_minimum(self):
+        """A rediscovery of the same identity at a DEEPER depth does NOT
+        raise the arc's already-recorded (shallower) depth."""
+        from deriva_ml.core.mixins._provenance_engine import ClosureBuilder
+
+        builder = ClosureBuilder()
+        execution_rid = _ex(1)
+        record = _binding_record(execution_rid)
+
+        builder.record_arc(
+            execution_rid,
+            kind=ArcKind.member_binding,
+            depth=1,
+            input_rid=_ds(1),
+            input_type=ArcInputType.dataset,
+            input_version="1.0.0",
+            evidence=[record],
+        )
+        builder.record_arc(
+            execution_rid,
+            kind=ArcKind.member_binding,
+            depth=3,
+            input_rid=_ds(1),
+            input_type=ArcInputType.dataset,
+            input_version="1.0.0",
+            evidence=[record],
+        )
+
+        assert self._arc(builder, execution_rid).depth == 1
 
 
 def test_binding_snapshot_unavailable_no_scan_call_no_second_gap():
