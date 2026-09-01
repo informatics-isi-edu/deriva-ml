@@ -739,3 +739,24 @@ hover group: announced by screen readers, rendered by no browser.
 Rule of thumb: `<title>` in SVG is a VISUAL feature (browser-chrome
 tooltip), not merely a semantic one — if you draw your own tooltip,
 `<title>` must go.
+
+**2026-08-31 — lookup_provenance spec, Codex round 1: the snapshot-
+strictness cluster (#383).** 17 P1s; 16 accepted. The load-bearing
+catch: the draft spec would have violated ruling 6 AS WRITTEN through
+three inherited behaviors — `_version_snapshot_catalog()` silently
+falls back to the LIVE catalog on `Snapshot=NULL` version rows (spec
+now requires a strict resolver that raises → `snapshot_chain_break`
+gap); live `version_history` leaks post-vN authors into a vN closure
+(authorship arc now bounded ≤ vN); and unpinned `Dataset_Execution`
+inputs had no defined behavior (now quarantined: `unpinned_input` gap,
+no snapshot-dependent expansion ever). Lesson: a ruling is only as
+strong as the primitives that implement it — reusing an existing
+helper imports its fallback semantics, so each ruling needs an audit
+of every primitive on its path. Other accepted structure: ancestry is
+dataset-discovery not an execution arc; datasets keyed per-version
+(snapshot facts never conflated); assets are first-class members with
+ALL producers followed (`_producer_of_asset` first-match is a bug in
+scope); gap taxonomy grew to 12 kinds so nothing disappears silently;
+`traversal_complete` ≠ gap-freedom. Partially rejected (1/17): the
+named live artifact in the validation PLAN is documentation; the
+committed form resolves it by lookup per the RID rule.
