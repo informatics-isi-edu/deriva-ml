@@ -933,3 +933,26 @@ member-fallback producers keep ArcKind.root (they are the seed, not a
 mid-walk discovery). Lesson: a byte-frozen lift can carry BEHAVIOR into
 a new semantic frame that the frame's typology never modeled — sweep
 inherited behaviors against the new model's self-description.
+
+**2026-09-01 — #383 Codex pre-merge round (PR #388): the pinned-root
+path and three recurrences.** 2 P1 / 3 P2 / 1 P3, all accepted, fixed
+in `1b603ae9`. (1) Pinned Dataset roots seeded/attributed from LIVE
+classification — root attribution now snapshot-faithful (reuses the
+authorship leg's snapshot rows, zero extra fetches); PARKED residual:
+the walk seed itself is still live-derived — requires a post-hoc
+rewrite of a version row's Execution FK to matter, which the writer
+contract never does. (2) Recorded-but-UNREADABLE snapshots crashed the
+member scan before the gap path — now degrade to snapshot_chain_break;
+this moved the eye-ai reconciliation from 5 to **10 chain-break gaps
+(142→147 total)**, paired 1:1 with the five already-broken v0.1.0
+snapshots: pre-fix the member scans failed SILENTLY, so the closure
+claimed member knowledge it did not have. 44 executions and
+traversal_complete unchanged. (3) Recurrences of prior lessons caught
+again by fresh review: live-model DISCOVERY under snapshot data reads
+(the #385 P1 pattern, this time in _producers_of_dataset_members) and
+recursion-depth ceilings (the lineage-HTML lesson, this time in
+ancestry — now an explicit stack, mutant- and A/B-verified including
+arc depths). Pattern worth naming: every snapshot-related fix this
+cycle was the SAME rule — bind discovery, data, and attribution to one
+snapshot handle, and turn every failure of that binding into a typed
+gap.
