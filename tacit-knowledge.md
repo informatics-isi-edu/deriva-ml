@@ -782,3 +782,24 @@ vocabularies deriva-ml itself CLOSES — catalog-sourced open
 vocabularies (status, element_type, asset_table) stay `str`, because
 enum validation would reject older/foreign catalog values deriva-ml
 doesn't control.
+
+**2026-09-01 — #383 plan, Codex round: byte-compat vs new-semantics
+splits are where plans rot.** 20 P1s on the implementation plan; 19
+accepted, 1 amended. The recurring shape across the best findings: a
+primitive serving BOTH the byte-frozen lineage frontend and the new
+closure must split explicitly, never "improve" shared behavior —
+(a) asset producer choice: lineage keeps FETCHED-first (sorted-first
+would silently change output AND assign semantics to RID order,
+violating our own RID rule); the closure sorts only at finalize;
+(b) unpinned-input handling: lineage keeps its live-display fallback,
+the closure quarantines — same engine, frontend-gated; (c) chunked
+fetching: closure chunks, lineage keeps per-node fetches (documented
+spec deviation). Also empirically verified by the reviewer: under our
+non-strict VALIDATION_CONFIG, `Field(ge=1)` accepts `True` and `"2"` —
+public int boundaries need `Field(strict=True, ge=1)`. And the
+snapshot-strictness discipline extended again: truncating a LIVE
+version-row list at vN is not snapshot-faithful (post-snapshot edits
+leak); authorship facts read AT the strict snapshot like everything
+else. Plan v2 adds a dedicated harness-extension task with seam-call
+RECORDING (`ml.calls`) so quarantine tests can assert what was NOT
+queried — absence-of-work claims need instrumentation, not hope.
