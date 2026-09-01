@@ -1538,12 +1538,28 @@ class ExecutionMixin:
         for seed in seeds:
             engine.expand_execution(seed, depth_remaining=None, depth=0)
 
+        # Non-Dataset roots carry the expanded producer summary back onto the
+        # descriptor, exactly as ``lookup_lineage`` does — ``RootDescriptor``
+        # is a SHARED contract, so a closure root must not leave
+        # ``producing_execution`` None for an Asset/Feature/Execution root the
+        # walk resolved. Dataset roots keep the origin attribution
+        # ``_classify_rid`` (or the snapshot rebuild below) established; their
+        # walk root may legitimately be a member producer instead.
+        if root_descriptor.type != "Dataset":
+            producer_summary = next(
+                (builder.executions[s] for s in seeds if s in builder.executions),
+                None,
+            )
+            if producer_summary is not None:
+                root_descriptor = root_descriptor.model_copy(update={"producing_execution": producer_summary})
+
         # The root dataset's own pinned version is a walked version: its
         # dataset-side arcs (authorship, bindings, ancestry) land in later
         # tasks, but the gating call belongs here so the root pin is walked
         # exactly like any consumed pin.
         if root_descriptor.type == "Dataset" and root_version is not None:
             engine.expand_dataset(rid, root_version, depth=0)
+            root_descriptor = self._snapshot_faithful_root(rid, root_version, root_descriptor, builder)
 
         # Executions discovered through a non-tree arc (the dataset-side legs)
         # were queued on the engine as they were found; drain them under the
@@ -1588,6 +1604,62 @@ class ExecutionMixin:
             datasets_visited=engine.datasets_visited,
             traversal_complete=not engine.cap_hit,
             cap_hit=engine.cap_hit,
+        )
+
+    def _snapshot_faithful_root(
+        self,
+        rid: RID,
+        root_version: str,
+        root_descriptor: "RootDescriptor",
+        builder: "ClosureBuilder",
+    ) -> "RootDescriptor":
+        """Rebuild a version-pinned Dataset root's attribution from the snapshot.
+
+        ``_classify_rid`` derives ``producing_execution`` / ``version_history``
+        from the LIVE ``Dataset_Version`` rows, which is right for
+        ``lookup_lineage`` (always latest-state) but wrong for a pinned
+        closure: a post-pin rewrite of an old row's ``Execution`` would leak a
+        live author into the root's attribution, and ``version_history`` would
+        expose rows created after the pin. The authorship leg already read the
+        rows AT the strict snapshot and recorded them as
+        :attr:`DatasetVersionFacts.version_authors` (bounded at the pin), so
+        this rebuilds the descriptor from those accumulated attributions
+        instead of re-fetching them.
+
+        On a snapshot that did not resolve, the authorship leg recorded
+        nothing and the live descriptor is kept for display — the
+        ``snapshot_chain_break`` gap the leg emitted is what reports the hole,
+        so the root must not additionally be blanked.
+
+        Args:
+            rid: The root Dataset RID.
+            root_version: The resolved version pin.
+            root_descriptor: The live-derived descriptor to rebuild.
+            builder: Accumulator holding the snapshot-read attributions.
+
+        Returns:
+            The descriptor with snapshot-faithful ``producing_execution``,
+            ``origin_recorded``, and ``version_history``; or the original when
+            the snapshot did not resolve.
+
+        Example:
+            >>> ml._snapshot_faithful_root(rid, "1.0.0", desc, builder)  # doctest: +SKIP
+        """
+        facts = builder.datasets.get(rid, {}).get(root_version)
+        if facts is None or not facts.version_authors:
+            # No snapshot-read authorship: either the strict snapshot did not
+            # resolve (the leg emitted its own gap) or the pin had no rows at
+            # its own snapshot. Either way the live descriptor stands.
+            return root_descriptor
+
+        history = list(facts.version_authors)
+        origin = history[0]
+        return root_descriptor.model_copy(
+            update={
+                "producing_execution": origin.execution,
+                "origin_recorded": bool(facts.origin_recorded),
+                "version_history": history,
+            }
         )
 
     def _resolve_root_version(
@@ -1705,8 +1777,11 @@ class ExecutionMixin:
             seeds.add(producer_rid)
 
         if root_descriptor.type == "Dataset":
-            # Version-scoped: the members of the PIN, not of live state.
-            seeds |= self._producers_of_dataset_members(rid, version=root_version)
+            # Version-scoped: the members of the PIN, not of live state. Routed
+            # through the engine's gap-safe wrapper so an unreadable snapshot
+            # degrades to a ``snapshot_chain_break`` gap instead of escaping as
+            # a raw error before the walk ever starts.
+            seeds |= engine.member_producers_or_gap(rid, root_version)
         elif root_descriptor.type == "Asset":
             seeds |= self._seed_asset_root(rid, engine, builder)
         elif root_descriptor.type == "Feature" and producer_rid is None:
@@ -2456,29 +2531,46 @@ class ExecutionMixin:
         The work is bounded by the number of member *asset tables* (typically
         1-2), independent of member count.
 
+        In versioned mode the association TOPOLOGY is discovered against the
+        SAME snapshot-bound model the data query runs on (#385): discovering
+        Dataset associations and classifying member tables as assets against
+        the LIVE model, while joining against the snapshot's path builder,
+        silently mis-joins across FK topology that changed after the snaptime
+        and mis-classifies tables whose asset shape differs there. Per the
+        #365 discipline, tables absent from the snapshot's schema contribute
+        no rows rather than raising.
+
         Args:
             dataset_rid: RID of the dataset whose member assets to inspect.
             version: Optional dataset version. ``None`` uses the current version;
-                a version resolves the membership join against that version's
-                catalog snapshot (consumed-version faithfulness).
+                a version resolves discovery *and* the membership join against
+                that version's catalog snapshot (consumed-version faithfulness).
 
         Returns:
             Set of distinct producing-execution RIDs. Empty when the dataset has
             no member assets or none have a recorded ``Output`` producer.
 
         Example:
-            >>> producers = ml._producers_of_dataset_members("1-DSAA")  # doctest: +SKIP
+            >>> producers = ml._producers_of_dataset_members(dataset_rid)  # doctest: +SKIP
             >>> sorted(producers)  # doctest: +SKIP
             ['2-EXUP']
         """
         dataset = self.lookup_dataset(dataset_rid)
-        snapshot_pb = dataset._version_snapshot_catalog(version).pathBuilder()
+        snapshot_source = dataset._version_snapshot_catalog(version)
+        snapshot_pb = snapshot_source.pathBuilder()
+        if version is not None:
+            # Snapshot-bind discovery to match the data path (#385).
+            model = snapshot_source.model
+            dataset_table = snapshot_source.lookup_dataset(dataset_rid)._dataset_table
+        else:
+            model = self.model
+            dataset_table = dataset._dataset_table
         producers: set[RID] = set()
-        for assoc_table in dataset._dataset_table.find_associations():
+        for assoc_table in dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
             member_table = other_fkey.pk_table  # the member asset table (e.g. Image)
             membership_table = assoc_table.table  # the membership table (e.g. Dataset_Image)
-            if not self.model.is_asset(member_table):
+            if not model.is_asset(member_table):
                 # Nested-Dataset / non-asset member kinds are not asset-producer-shaped.
                 continue
             member_link_column = other_fkey.foreign_key_columns[0].name
@@ -2490,6 +2582,7 @@ class ExecutionMixin:
                 member_link_column,
                 target_column,
                 dataset.dataset_rid,
+                model=model,
             )
         return producers
 
@@ -2501,6 +2594,7 @@ class ExecutionMixin:
         member_link_column: str,
         target_column: str,
         dataset_rid: RID,
+        model: Any | None = None,
     ) -> set[RID]:
         """Distinct ``Output`` producing executions of a dataset's members of one
         asset table, via a server-side membership join.
@@ -2520,13 +2614,17 @@ class ExecutionMixin:
             target_column: The referenced column on the member table (often
                 ``"RID"``).
             dataset_rid: RID of the dataset whose members to inspect.
+            model: Model the ``<member>_Execution`` association is discovered
+                against. Must be the SAME model ``snapshot_pb`` was built from
+                (#385) — defaults to the live model for the unversioned path.
 
         Returns:
             Set of distinct producing-execution RIDs (``Output`` role). Empty if
             the member asset table has no ``<member>_Execution`` association.
         """
+        model = self.model if model is None else model
         try:
-            exec_assoc, member_exec_fk, _exec_fk = self.model.find_association(member_table, "Execution")
+            exec_assoc, member_exec_fk, _exec_fk = model.find_association(member_table, "Execution")
         except NoAssociationException:
             return set()
 

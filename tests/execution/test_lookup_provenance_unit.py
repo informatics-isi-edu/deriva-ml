@@ -2762,3 +2762,346 @@ def test_shuffled_insertion_order_yields_byte_identical_closure():
     assert len(closure_forward.assets[_as(1)].producers) == 2
     binding_arcs = [a for e in closure_forward.executions.values() for a in e.arcs if a.kind == ArcKind.member_binding]
     assert any(len(a.evidence) >= 1 for a in binding_arcs)
+
+
+# ---------------------------------------------------------------------------
+# Codex review fixes.
+# ---------------------------------------------------------------------------
+
+
+def test_pinned_root_attribution_is_snapshot_faithful_not_live():
+    """P1-1: for a version-pinned Dataset root whose strict snapshot
+    resolves, ``root.producing_execution`` and ``root.version_history`` come
+    from the SNAPSHOT rows, not the live ones.
+
+    ``_classify_rid`` derives both from the live ``Dataset_Version`` rows. If
+    an old row's ``Execution`` was rewritten after the pin, the live-derived
+    author would leak into a pinned closure's root attribution — and
+    ``version_history`` would expose live rows the pin must not see.
+    """
+    ml = _FakeML()
+    ds = _ds(1)
+    snapshot_origin, live_rewrite = _ex(1), _ex(2)
+    ml.add_execution(snapshot_origin, description="origin as recorded at the snapshot")
+    ml.add_execution(live_rewrite, description="rewritten author, live only")
+
+    # Live history names the rewrite AND carries a later row the pin predates.
+    live_rows = [
+        _snapshot_row(ds, "1.0.0", live_rewrite, "2025-01-01T00:00:00Z"),
+        _snapshot_row(ds, "2.0.0", live_rewrite, "2025-06-01T00:00:00Z"),
+    ]
+    snapshot_rows = [_snapshot_row(ds, "1.0.0", snapshot_origin, "2025-01-01T00:00:00Z")]
+    _dataset_root_with_snapshot_authors(ml, ds, "1.0.0", snapshot_rows, live_rows=live_rows)
+
+    closure = ml.lookup_provenance(ds, version="1.0.0")
+
+    # The root's attribution is the SNAPSHOT's.
+    assert closure.root.producing_execution is not None
+    assert closure.root.producing_execution.rid == snapshot_origin
+    assert [va.execution_rid for va in closure.root.version_history] == [snapshot_origin]
+    assert closure.root.origin_recorded is True
+
+    # The live rewrite contributes no ATTRIBUTION: it authors nothing in the
+    # root's history and holds no version_authorship arc. (It still carries a
+    # root arc — it was the live-derived seed the walk started from, which is
+    # an honest record of why the walk began there, not an authorship claim.)
+    assert snapshot_origin in closure.executions
+    assert not [a for a in _arcs_of(closure, live_rewrite) if a.kind == ArcKind.version_authorship]
+    assert len(_authorship_arcs(closure, snapshot_origin)) == 1
+
+    # And the walked version's facts agree with the root descriptor.
+    facts = closure.datasets[ds].versions["1.0.0"]
+    assert [va.execution_rid for va in facts.version_authors] == [snapshot_origin]
+
+
+def test_unpinned_root_keeps_live_derived_attribution():
+    """P1-1 boundary: an unpinned/latest root keeps the live-derived
+    descriptor — the snapshot rebuild applies only to a resolved pin."""
+    ml = _FakeML()
+    ds, origin = _ds(1), _ex(1)
+    ml.add_execution(origin, description="origin")
+    ml.add_dataset(ds, description="root", producer=origin)
+    ml.add_version_row(ds, "1.0.0", origin, rct="2025-01-01T00:00:00Z")
+    # Deliberately NO snapshot scripted: the strict resolve fails, so the
+    # live descriptor must stand (the chain-break gap reports the hole).
+
+    closure = ml.lookup_provenance(ds)
+
+    assert closure.root.producing_execution is not None
+    assert closure.root.producing_execution.rid == origin
+    assert [va.execution_rid for va in closure.root.version_history] == [origin]
+    assert _gaps_for(closure, GapKind.snapshot_chain_break, ds)
+
+
+def test_root_member_scan_failure_is_a_gap_not_a_crash():
+    """P1-2: an unreadable snapshot escaping the ROOT member scan degrades to
+    a ``snapshot_chain_break`` gap; the closure still returns."""
+    ml = _FakeML()
+    ds, origin = _ds(1), _ex(1)
+    ml.add_execution(origin, description="origin")
+    ml.add_dataset(ds, description="root", producer=origin)
+    ml.add_version_row(ds, "1.0.0", origin, rct="2025-01-01T00:00:00Z", snapshot="snap")
+    ml.set_snapshot_version_rows(ds, "1.0.0", [_snapshot_row(ds, "1.0.0", origin, "2025-01-01T00:00:00Z")])
+
+    def _boom(dataset_rid, version=None):
+        ml.calls.append(("_producers_of_dataset_members", (dataset_rid, version)))
+        raise KeyError("Dataset_Image")
+
+    ml._producers_of_dataset_members = _boom  # type: ignore[method-assign]
+
+    closure = ml.lookup_provenance(ds, version="1.0.0")
+
+    scan_gaps = [g for g in _gaps_for(closure, GapKind.snapshot_chain_break, ds) if "member-producer scan" in g.detail]
+    assert scan_gaps, f"expected a member-scan gap, got {[(g.kind, g.detail) for g in closure.gaps]}"
+    # The walk still ran: the origin author is in the closure.
+    assert origin in closure.executions
+
+
+def test_midwalk_member_scan_failure_is_a_gap_not_a_crash():
+    """P1-2: the same degrade applies to the ENGINE's mid-walk member scan of
+    a consumed dataset, which also goes through the non-strict snapshot."""
+    ml = _FakeML()
+    ds_root, ds_consumed = _ds(1), _ds(2)
+    consumer, origin = _ex(1), _ex(2)
+
+    ml.add_dataset(ds_consumed, description="consumed", producer=origin)
+    ml.add_execution(origin, description="origin of the consumed dataset")
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_datasets=[_StubDataset(ds_consumed, "consumed", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+    ml.add_version_row(ds_root, "1.0.0", consumer, rct="2025-01-01T00:00:00Z", snapshot="snap")
+    ml.set_snapshot_version_rows(ds_root, "1.0.0", [_snapshot_row(ds_root, "1.0.0", consumer, "2025-01-01T00:00:00Z")])
+
+    real_scan = ml._producers_of_dataset_members
+
+    def _boom_on_consumed(dataset_rid, version=None):
+        if dataset_rid == ds_consumed:
+            ml.calls.append(("_producers_of_dataset_members", (dataset_rid, version)))
+            raise KeyError("Image_Execution")
+        return real_scan(dataset_rid, version=version)
+
+    ml._producers_of_dataset_members = _boom_on_consumed  # type: ignore[method-assign]
+
+    closure = ml.lookup_provenance(ds_root, version="1.0.0")
+
+    scan_gaps = [
+        g for g in _gaps_for(closure, GapKind.snapshot_chain_break, ds_consumed) if "member-producer scan" in g.detail
+    ]
+    assert scan_gaps, f"expected a mid-walk member-scan gap, got {[(g.kind, g.detail) for g in closure.gaps]}"
+    # The walk continued past the failing scan.
+    assert consumer in closure.executions
+
+
+def test_member_scan_snapshot_unavailable_is_a_gap():
+    """P1-2: ``SnapshotUnavailable`` from the member scan degrades the same
+    way the raw errors do."""
+    ml = _FakeML()
+    ds, origin = _ds(1), _ex(1)
+    ml.add_execution(origin, description="origin")
+    ml.add_dataset(ds, description="root", producer=origin)
+    ml.add_version_row(ds, "1.0.0", origin, rct="2025-01-01T00:00:00Z", snapshot="snap")
+    ml.set_snapshot_version_rows(ds, "1.0.0", [_snapshot_row(ds, "1.0.0", origin, "2025-01-01T00:00:00Z")])
+
+    def _unavailable(dataset_rid, version=None):
+        raise SnapshotUnavailable("snapshot was garbage-collected")
+
+    ml._producers_of_dataset_members = _unavailable  # type: ignore[method-assign]
+
+    closure = ml.lookup_provenance(ds, version="1.0.0")
+
+    assert [g for g in _gaps_for(closure, GapKind.snapshot_chain_break, ds) if "member-producer scan" in g.detail]
+    assert origin in closure.executions
+
+
+def test_asset_root_closure_carries_producing_execution():
+    """P2-1: ``closure.root.producing_execution`` is filled for a non-Dataset
+    root, matching the shared ``RootDescriptor`` contract lookup_lineage
+    already honors."""
+    ml = _FakeML()
+    asset, producer = _as(1), _ex(1)
+    ml.add_execution(producer, description="the producing execution")
+    ml.add_asset(asset, "Execution_Asset", filename="model.pt", producer=producer)
+
+    closure = ml.lookup_provenance(asset)
+
+    assert closure.root.producing_execution is not None
+    assert closure.root.producing_execution.rid == producer
+    assert closure.root.producing_execution.description == "the producing execution"
+
+
+def test_execution_root_closure_carries_producing_execution():
+    """P2-1: the same copy-back for an Execution root."""
+    ml = _FakeML()
+    execution = _ex(1)
+    ml.add_execution(execution, description="the root execution")
+
+    closure = ml.lookup_provenance(execution)
+
+    assert closure.root.producing_execution is not None
+    assert closure.root.producing_execution.rid == execution
+
+
+class _FkeySet(list):
+    """Minimal stand-in for the model's ``other_fkeys`` set.
+
+    ``_producers_of_dataset_members`` calls ``.pop()`` on it; a real ``set``
+    cannot hold ``SimpleNamespace`` stubs (unhashable), and a list's ``pop()``
+    has the same "take one" meaning here because these stubs carry exactly one
+    foreign key.
+    """
+
+
+def test_versioned_member_scan_uses_the_snapshot_bound_model():
+    """P2-2 (#385 discipline): in versioned mode, the Dataset association
+    topology and the asset classification come from the SNAPSHOT-bound
+    model handle, not the live one.
+
+    Asserted by identity: the live model classifies the member table as an
+    asset and the snapshot model does not. If discovery consulted the live
+    model, the scan would join a table the snapshot's data path cannot serve.
+    """
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from deriva_ml.core.mixins.execution import ExecutionMixin
+
+    member_table = SimpleNamespace(name="Image", schema=SimpleNamespace(name="domain"))
+    membership_table = SimpleNamespace(name="Dataset_Image", schema=SimpleNamespace(name="domain"))
+    other_fkey = SimpleNamespace(
+        pk_table=member_table,
+        foreign_key_columns=[SimpleNamespace(name="Image")],
+        referenced_columns=[SimpleNamespace(name="RID")],
+    )
+    # other_fkeys is a set on the real model; _FkeySet gives the one
+    # operation the scan uses (pop()) without needing hashable stubs.
+    assoc = SimpleNamespace(table=membership_table, other_fkeys=_FkeySet([other_fkey]))
+
+    live_dataset_table = SimpleNamespace(find_associations=lambda: [])
+    snapshot_dataset_table = SimpleNamespace(find_associations=lambda: [assoc])
+
+    live_model = MagicMock(name="live_model")
+    live_model.is_asset = lambda table: True
+    snapshot_model = MagicMock(name="snapshot_model")
+    snapshot_model.is_asset = lambda table: True
+
+    seen: dict = {}
+
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.model = live_model
+
+    snapshot_source = SimpleNamespace(
+        pathBuilder=lambda: "<snapshot-pb>",
+        model=snapshot_model,
+        lookup_dataset=lambda rid: SimpleNamespace(_dataset_table=snapshot_dataset_table),
+    )
+    dataset_rid = _ds(1)
+    live_dataset = SimpleNamespace(
+        dataset_rid=dataset_rid,
+        _dataset_table=live_dataset_table,
+        _version_snapshot_catalog=lambda version: snapshot_source,
+    )
+    ml.lookup_dataset = lambda rid: live_dataset  # type: ignore[method-assign]
+
+    def _capture(snapshot_pb, mt, member, link_col, target_col, ds_rid, model=None):
+        seen["model"] = model
+        seen["snapshot_pb"] = snapshot_pb
+        seen["member"] = member
+        return {_ex(1)}
+
+    ml._distinct_member_output_producers = _capture  # type: ignore[method-assign]
+
+    producers = ml._producers_of_dataset_members(dataset_rid, version="1.0.0")
+
+    assert producers == {_ex(1)}
+    # The association walk came from the SNAPSHOT dataset table (the live one
+    # yields no associations at all, so a live walk would have found nothing).
+    assert seen["member"] is member_table
+    # And the model handed to the data query is the snapshot's, by identity.
+    assert seen["model"] is snapshot_model
+    assert seen["model"] is not live_model
+    assert seen["snapshot_pb"] == "<snapshot-pb>"
+
+
+def test_unversioned_member_scan_uses_the_live_model():
+    """P2-2 boundary: the unversioned path still discovers against the live
+    model — snapshot-binding applies to versioned reads only."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from deriva_ml.core.mixins.execution import ExecutionMixin
+
+    member_table = SimpleNamespace(name="Image", schema=SimpleNamespace(name="domain"))
+    membership_table = SimpleNamespace(name="Dataset_Image", schema=SimpleNamespace(name="domain"))
+    other_fkey = SimpleNamespace(
+        pk_table=member_table,
+        foreign_key_columns=[SimpleNamespace(name="Image")],
+        referenced_columns=[SimpleNamespace(name="RID")],
+    )
+    # other_fkeys is a set on the real model; _FkeySet gives the one
+    # operation the scan uses (pop()) without needing hashable stubs.
+    assoc = SimpleNamespace(table=membership_table, other_fkeys=_FkeySet([other_fkey]))
+
+    live_model = MagicMock(name="live_model")
+    live_model.is_asset = lambda table: True
+
+    seen: dict = {}
+
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.model = live_model
+
+    dataset_rid = _ds(1)
+    live_dataset = SimpleNamespace(
+        dataset_rid=dataset_rid,
+        _dataset_table=SimpleNamespace(find_associations=lambda: [assoc]),
+        _version_snapshot_catalog=lambda version: SimpleNamespace(pathBuilder=lambda: "<live-pb>"),
+    )
+    ml.lookup_dataset = lambda rid: live_dataset  # type: ignore[method-assign]
+
+    def _capture(snapshot_pb, mt, member, link_col, target_col, ds_rid, model=None):
+        seen["model"] = model
+        return set()
+
+    ml._distinct_member_output_producers = _capture  # type: ignore[method-assign]
+
+    ml._producers_of_dataset_members(dataset_rid)
+
+    assert seen["model"] is live_model
+
+
+def test_deep_ancestry_chain_completes_without_recursion_error():
+    """P2-3: a 1500-deep parent chain walks to completion under a generous
+    dataset budget, with the interpreter's recursion limit set low enough
+    that a recursive implementation would raise ``RecursionError``.
+
+    Mirrors the deep-chain proof in ``test_lineage_html.py``: the low limit
+    is what makes this a test of iterativeness rather than of stack size.
+    """
+    import sys
+
+    depth = 1500
+    ml = _FakeML()
+    chain = [_ds(i) for i in range(depth)]
+
+    for index, ds in enumerate(chain):
+        ml.add_dataset(ds, description=f"generation {index}", producer=None)
+        ml.add_version_row(ds, "1.0.0", None, rct="2025-01-01T00:00:00Z", snapshot=f"snap-{index}")
+        ml.set_snapshot_version_rows(ds, "1.0.0", [_snapshot_row(ds, "1.0.0", None, "2025-01-01T00:00:00Z")])
+        parents = [{"parent_rid": chain[index + 1], "parent_version_then": "1.0.0"}] if index + 1 < depth else []
+        ml.set_parents_at(ds, "1.0.0", parents)
+
+    original_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(200)
+    try:
+        closure = ml.lookup_provenance(chain[0], version="1.0.0", max_executions=500)
+    finally:
+        sys.setrecursionlimit(original_limit)
+
+    # Every generation was walked, and the chain terminates at a source.
+    assert closure.datasets_visited == depth
+    assert set(closure.datasets) == set(chain)
+    assert closure.datasets[chain[-1]].versions["1.0.0"].is_source is True
+    assert closure.datasets[chain[0]].versions["1.0.0"].is_source is False
+    assert closure.datasets[chain[0]].versions["1.0.0"].ancestry_state == AncestryState.resolved
