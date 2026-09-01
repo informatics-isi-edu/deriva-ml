@@ -80,6 +80,51 @@ All models live in `execution/provenance.py` (new), importing shared
 summaries (`ExecutionSummary`, `DatasetSummary`, `AssetSummary`,
 `WorkflowSummary`, `VersionAttribution`) from `execution/lineage.py`.
 
+**Idiom decisions (Carl, 2026-09-01):**
+
+- **Public result models are Pydantic `BaseModel`** (per the CLAUDE.md class-
+  idiom rule: serialized across a boundary, user-facing return types,
+  composing with the all-Pydantic lineage models). Engine-internal
+  bookkeeping (visited-set entries, walk events inside
+  `_provenance_engine.py`) may be `@dataclass` — it has no public surface.
+- **Closed vocabularies are `StrEnum`, not `Literal`** — consumers dispatch
+  on them (filter arcs by kind, group gaps by kind), so the vocabulary must
+  be importable and autocompletable, with typos failing at authoring time.
+  `StrEnum` members compare equal to their strings and `model_dump()`
+  serializes them as plain strings, so the JSON envelope is unaffected.
+  Exported from `execution/provenance.py`:
+
+```python
+class ArcKind(StrEnum):
+    root = "root"
+    consumption = "consumption"
+    version_authorship = "version_authorship"
+    member_binding = "member_binding"
+
+class ArcInputType(StrEnum):
+    dataset = "dataset"
+    asset = "asset"
+
+class AncestryState(StrEnum):
+    resolved = "resolved"
+    chain_break = "chain_break"
+    not_walked = "not_walked"
+
+class GapKind(StrEnum):
+    sentinel_origin = "sentinel_origin"
+    origin_unrecorded = "origin_unrecorded"
+    null_binding_execution = "null_binding_execution"
+    no_workflow = "no_workflow"
+    snapshot_chain_break = "snapshot_chain_break"
+    unpinned_input = "unpinned_input"
+    version_unresolvable = "version_unresolvable"
+    no_version_author = "no_version_author"
+    no_asset_producer = "no_asset_producer"
+    multiple_asset_producers = "multiple_asset_producers"
+    unresolved_rid = "unresolved_rid"
+    binding_scan_failed = "binding_scan_failed"
+```
+
 ```python
 class ProvenanceArc(BaseModel):
     """One schema-recorded reason an execution is in the closure.
@@ -90,15 +135,14 @@ class ProvenanceArc(BaseModel):
     not appended again; a rediscovery with a different identity is a new
     arc. `evidence` is merged (deduped by record equality) on identity match.
     """
-    kind: Literal[
-        "root",              # the root artifact itself / its direct producer
-        "consumption",       # produced an input some closure member consumed
-        "version_authorship",# authored a version (<= walked version) of a walked dataset
-        "member_binding",    # bound feature values onto a walked dataset@version's members
-    ]
+    kind: ArcKind      # see enum above; comments per member:
+                       #   root — the root artifact itself / its direct producer
+                       #   consumption — produced an input some closure member consumed
+                       #   version_authorship — authored a version (<= walked version) of a walked dataset
+                       #   member_binding — bound feature values onto a walked dataset@version's members
     consumed_by: str | None = None    # consuming execution RID (consumption)
     input_rid: str | None = None      # the CONCRETE input: dataset or asset RID
-    input_type: Literal["dataset", "asset", None] = None
+    input_type: ArcInputType | None = None
     input_version: str | None = None  # dataset inputs: the pinned version (None = unpinned, see gaps)
     evidence: list[FeatureProducerRecord] = []   # member_binding only; sorted (feature_name, element_type, execution_rid)
     depth: int                        # MINIMUM hops from root at which this arc was found
@@ -111,7 +155,7 @@ class DatasetVersionFacts(BaseModel):
     """Facts observed AT one version's snapshot. Never merged across versions."""
     version: str
     parents: list[ParentLink]         # snapshot-resolved (ruling 6); sorted by parent_rid
-    ancestry_state: Literal["resolved", "chain_break", "not_walked"]
+    ancestry_state: AncestryState
     is_source: bool | None            # True/False only when ancestry_state == "resolved"; else None
     origin_recorded: bool | None      # tri-state, as observed at this snapshot
     version_authors: list[VersionAttribution]  # bounded at this version (§6.3)
@@ -133,20 +177,7 @@ class ProvenanceAsset(BaseModel):
 
 class ProvenanceGap(BaseModel):
     """First-class honest-gap record (ruling 2). Orthogonal to arcs."""
-    kind: Literal[
-        "sentinel_origin",          # origin attributed to the unknown-provenance sentinel
-        "origin_unrecorded",        # dataset with origin_recorded=False at the walked snapshot
-        "null_binding_execution",   # malformed binding: feature value, no execution
-        "no_workflow",              # execution with no workflow record
-        "snapshot_chain_break",     # ancestry hop unresolvable (incl. Snapshot=NULL version rows)
-        "unpinned_input",           # Dataset_Execution input with no Dataset_Version pin
-        "version_unresolvable",     # dataset root/input version could not be resolved
-        "no_version_author",        # version row with no Execution attribution
-        "no_asset_producer",        # consumed asset with zero recorded producers
-        "multiple_asset_producers", # consumed asset with >1 Output rows (malformed multiplicity, all still reported)
-        "unresolved_rid",           # a referenced RID that failed to resolve during the walk
-        "binding_scan_failed",      # feature discovery/query failure for a (dataset, version) — NOT "no bindings"
-    ]
+    kind: GapKind      # see enum above (12 kinds)
     subject_rid: str
     detail: str
 
