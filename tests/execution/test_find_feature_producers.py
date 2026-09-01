@@ -1,13 +1,14 @@
 """Unit tests for DerivaML.find_feature_producers (issues #370, #385).
 
-The API answers: which executions wrote feature values onto a dataset's
-members — where "members" follows the binding definition (provenance
-contract): objects that are members OR are FK-reachable from members
-(subject-partitioned datasets), with optional version-snapshot scoping.
+The API follows the binding definition (provenance contract): the
+executions bound to a dataset's FK-reachable members are provenance by
+construction, version-scoped when requested. Path discovery targets the
+feature's TARGET table (never a value/asset FK into the feature table),
+feature tables are excluded as reachability intermediates, and in
+version mode discovery binds to the snapshot model.
 
-Offline: the planner's path enumeration, feature discovery, and the
-datapath chain execution are mocked at their seams. RIDs are
-programmatically generated; assertions compare only flow-through values.
+Offline: planner, feature discovery, and datapath execution mocked at
+their seams. RIDs are programmatically generated.
 """
 
 from __future__ import annotations
@@ -24,42 +25,43 @@ def _rid(n: int) -> str:
     return f"1-{n:04X}"
 
 
-def _tbl(name: str):
-    return SimpleNamespace(name=name, schema=SimpleNamespace(name="domain"))
+def _tbl(name: str, schema: str = "domain"):
+    return SimpleNamespace(name=name, schema=SimpleNamespace(name=schema))
 
 
-def _feature(name: str, target, ftable_name: str):
-    return SimpleNamespace(
-        feature_name=name,
-        target_table=target,
-        feature_table=_tbl(ftable_name),
-    )
+def _feature(name: str, target, ftable):
+    return SimpleNamespace(feature_name=name, target_table=target, feature_table=ftable)
 
 
 class _ChainPath:
-    """Datapath stand-in: filter/link chain ending in attributes().fetch()."""
-
     def __init__(self, harness, tables_visited):
         self.harness = harness
         self.tables = tables_visited
+        self._grouped = False
 
     def link(self, table, on=None):
-        return _ChainPath(self.harness, self.tables + [table._name])
+        return _ChainPath(self.harness, self.tables + [(table._schema, table._name)])
+
+    def groupby(self, col):
+        self._grouped = True
+        return self
 
     def attributes(self, *cols):
         terminal = self.tables[-1]
-        rows = self.harness.rows_by_terminal.get(terminal)
+        source = self.harness.grouped_rows if self._grouped else self.harness.raw_rows
+        rows = source.get(terminal)
         if isinstance(rows, Exception):
             raise rows
         result = MagicMock()
         result.fetch.return_value = list(rows or [])
-        self.harness.executed_paths.append(list(self.tables))
+        self.harness.executed.append((list(self.tables), "grouped" if self._grouped else "raw"))
         return result
 
 
 class _PBTable:
-    def __init__(self, harness, name):
+    def __init__(self, harness, schema, name):
         self.harness = harness
+        self._schema = schema
         self._name = name
         self.RID = MagicMock()
         self.Execution = MagicMock()
@@ -71,119 +73,164 @@ class _PBTable:
         return rec
 
     def filter(self, pred):
-        return _ChainPath(self.harness, [self._name])
+        return _ChainPath(self.harness, [(self._schema, self._name)])
 
 
-class _Harness:
-    """Wires an ExecutionMixin with mocked planner paths + datapath."""
+class _Source:
+    """A catalog source (live mixin or snapshot) with its own model/planner."""
 
-    def __init__(self, *, paths, features, rows_by_terminal, relationships=None, missing_tables=frozenset()):
-        self.rows_by_terminal = rows_by_terminal
-        self.executed_paths = []
-        self.missing_tables = set(missing_tables)
-
-        ml = ExecutionMixin.__new__(ExecutionMixin)
-        ml.ml_schema = "deriva-ml"
-
+    def __init__(self, harness, paths, features, relationships=None):
+        self.harness = harness
         planner = MagicMock()
-        planner._schema_to_paths.return_value = [[_tbl(n) for n in p] for p in paths]
+        planner._schema_to_paths.return_value = [[_tbl(n, s) for s, n in p] for p in paths]
 
         def table_relationship(a, b):
             key = (getattr(a, "name", a), getattr(b, "name", b))
             rel = (relationships or {}).get(key, "ok")
             if rel == "ambiguous":
                 raise DerivaMLException(f"Ambiguous linkage between {key[0]} and {key[1]}")
-            col = SimpleNamespace(name="RID", table=a)
-            col2 = SimpleNamespace(name=key[0], table=b)
-            return [(col, col2)]
+            return [(SimpleNamespace(name="RID", table=a), SimpleNamespace(name=key[0], table=b))]
 
         planner._table_relationship.side_effect = table_relationship
+        self.planner = planner
+        self.model = MagicMock()
+        self.model._planner = planner
+        self.model.find_features.return_value = list(features)
 
-        model = MagicMock()
-        model._planner = planner
-        model.find_features.return_value = list(features)
-        ml.model = model
-        ml.lookup_dataset = lambda rid: SimpleNamespace(
-            dataset_rid=rid,
-            _version_snapshot_catalog=lambda v: SimpleNamespace(pathBuilder=lambda: self._pb()),
-        )
-        ml.pathBuilder = lambda: self._pb()
-        self.ml = ml
-
-    def _pb(self):
-        harness = self
+    def pathBuilder(self):
+        harness = self.harness
 
         class _Schema:
+            def __init__(self, sname):
+                self.sname = sname
+
             @property
             def tables(self):
+                sname = self.sname
+
                 class _T:
                     def __getitem__(_s, name):
-                        if name in harness.missing_tables:
+                        if (sname, name) in harness.missing_tables:
                             raise KeyError(name)
-                        return _PBTable(harness, name)
+                        return _PBTable(harness, sname, name)
 
                 return _T()
 
         pb = MagicMock()
-        pb.schemas = {"domain": _Schema(), "deriva-ml": _Schema()}
+        pb.schemas = MagicMock()
+        pb.schemas.__getitem__ = lambda _s, sname: _Schema(sname)
         return pb
 
 
-IMG = "Image"
-SUBJ = "Subject"
-FT_IMG = "Execution_Image_Annotation"
-FT_SUBJ = "Execution_Subject_Grade"
+class _Harness:
+    def __init__(
+        self,
+        *,
+        paths,
+        features,
+        grouped_rows=None,
+        raw_rows=None,
+        relationships=None,
+        missing_tables=frozenset(),
+        snapshot=None,
+    ):
+        self.grouped_rows = grouped_rows or {}
+        self.raw_rows = raw_rows or {}
+        self.executed = []
+        self.missing_tables = set(missing_tables)
+
+        ml = ExecutionMixin.__new__(ExecutionMixin)
+        ml.ml_schema = "deriva-ml"
+        live = _Source(self, paths, features, relationships)
+        ml.model = live.model
+        ml.pathBuilder = live.pathBuilder
+        self.live = live
+        self.snapshot = snapshot
+        snap_obj = snapshot if snapshot is not None else live
+        ml.lookup_dataset = lambda rid: SimpleNamespace(dataset_rid=rid, _version_snapshot_catalog=lambda v: snap_obj)
+        self.ml = ml
 
 
-def _direct_paths():
-    return [["Dataset", "Dataset_Image", IMG, FT_IMG]]
+# (schema, name) path shorthand
+def _p(*names, schema="domain"):
+    out = [("deriva-ml", "Dataset")] + [(schema, n) for n in names]
+    return out
 
 
-def _reachable_paths():
-    return [["Dataset", "Dataset_Subject", SUBJ, "Observation", IMG, FT_IMG]]
+IMG, SUBJ = "Image", "Subject"
+FT_IMG, FT_SUBJ = "Execution_Image_Annotation", "Execution_Subject_Grade"
 
 
-def test_direct_membership_still_works():
+def test_direct_membership_counts_server_side():
+    """Single-route features count via server-side groupby — nothing raw-fetched."""
     e1 = _rid(10)
     h = _Harness(
-        paths=_direct_paths(),
-        features=[_feature("Annotation", _tbl(IMG), FT_IMG)],
-        rows_by_terminal={FT_IMG: [{"RID": _rid(100), "Execution": e1}, {"RID": _rid(101), "Execution": e1}]},
+        paths=[_p("Dataset_Image", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": e1, "value_count": 2}]},
     )
     out = h.ml.find_feature_producers(_rid(500))
     assert [(r.execution_rid, r.feature_name, r.element_type, r.value_count) for r in out] == [
         (e1, "Annotation", IMG, 2)
     ]
     assert all(isinstance(r, FeatureProducerRecord) for r in out)
+    assert all(mode == "grouped" for _t, mode in h.executed)  # P2: server-side
 
 
 def test_fk_reachable_members_are_in_scope():
-    """THE #385 blind-spot pin: a subject-partitioned dataset (members =
-    Subjects; features bound to FK-reachable Images) must return the
-    producers. The shipped direct-membership implementation returns []."""
+    """The #385 blind-spot pin: subject-partitioned dataset finds Image producers."""
     e1 = _rid(10)
     h = _Harness(
-        paths=_reachable_paths(),
-        features=[_feature("Annotation", _tbl(IMG), FT_IMG)],
-        rows_by_terminal={FT_IMG: [{"RID": _rid(100), "Execution": e1}]},
+        paths=[_p("Dataset_Subject", SUBJ, "Observation", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": e1, "value_count": 1}]},
     )
     out = h.ml.find_feature_producers(_rid(500))
     assert [(r.execution_rid, r.element_type, r.value_count) for r in out] == [(e1, IMG, 1)]
-    # And the executed chain really walked the multi-hop path.
-    assert ["Dataset", "Dataset_Subject", SUBJ, "Observation", IMG, FT_IMG] in h.executed_paths
+    tables, _mode = h.executed[0]
+    assert [n for _s, n in tables] == ["Dataset", "Dataset_Subject", SUBJ, "Observation", IMG, FT_IMG]
+
+
+def test_value_fk_arrival_at_feature_table_never_counts():
+    """Codex P1 pin: a path reaching the FEATURE table via a value/asset FK
+    (no path to the feature's TARGET) yields nothing — the binding
+    attaches to its target object only."""
+    h = _Harness(
+        # Reachable path ends at an asset table the feature references as a
+        # VALUE — not at the feature's target (Image), to which no path exists.
+        paths=[_p("Dataset_File", "BBox_File")],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": _rid(10), "value_count": 5}]},
+    )
+    assert h.ml.find_feature_producers(_rid(500)) == []
+
+
+def test_feature_tables_excluded_as_intermediates():
+    """Codex P1 pin: path enumeration excludes feature tables so
+    reachability never tunnels through bindings."""
+    h = _Harness(
+        paths=[_p("Dataset_Image", IMG)],
+        features=[
+            _feature("Annotation", _tbl(IMG), _tbl(FT_IMG)),
+            _feature("Grade", _tbl(SUBJ), _tbl(FT_SUBJ)),
+        ],
+        grouped_rows={("domain", FT_IMG): []},
+    )
+    h.ml.find_feature_producers(_rid(500))
+    (_args, kwargs) = h.live.planner._schema_to_paths.call_args
+    assert {FT_IMG, FT_SUBJ}.issubset(kwargs["exclude_tables"])
 
 
 def test_multiple_paths_union_feature_rows_not_double_count():
-    """A feature row reachable via two FK routes counts once (#316 lesson)."""
     e1 = _rid(10)
-    shared_row = {"RID": _rid(100), "Execution": e1}
+    shared = {"RID": _rid(100), "Execution": e1}
     h = _Harness(
         paths=[
-            ["Dataset", "Dataset_Image", IMG, FT_IMG],
-            ["Dataset", "Dataset_Subject", SUBJ, "Observation", IMG, FT_IMG],
+            _p("Dataset_Image", IMG),
+            _p("Dataset_Subject", SUBJ, "Observation", IMG),
         ],
-        features=[_feature("Annotation", _tbl(IMG), FT_IMG)],
-        rows_by_terminal={FT_IMG: [shared_row]},
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        raw_rows={("domain", FT_IMG): [shared]},
     )
     out = h.ml.find_feature_producers(_rid(500))
     assert [(r.execution_rid, r.value_count) for r in out] == [(e1, 1)]  # not 2
@@ -193,92 +240,109 @@ def test_ambiguous_hop_skips_path_keeping_others():
     e1 = _rid(10)
     h = _Harness(
         paths=[
-            ["Dataset", "Dataset_Image", IMG, FT_IMG],
-            ["Dataset", "Dataset_Subject", SUBJ, "Observation", IMG, FT_IMG],
+            _p("Dataset_Image", IMG),
+            _p("Dataset_Subject", SUBJ, "Observation", IMG),
         ],
-        features=[_feature("Annotation", _tbl(IMG), FT_IMG)],
-        rows_by_terminal={FT_IMG: [{"RID": _rid(100), "Execution": e1}]},
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": e1, "value_count": 1}]},
         relationships={("Observation", IMG): "ambiguous"},
     )
     out = h.ml.find_feature_producers(_rid(500))
     assert [(r.execution_rid, r.value_count) for r in out] == [(e1, 1)]
-    assert ["Dataset", "Dataset_Subject", SUBJ, "Observation", IMG, FT_IMG] not in h.executed_paths
+    # Ambiguous route dropped -> single usable path -> server-side grouped.
+    assert all(mode == "grouped" for _t, mode in h.executed)
+
+
+def test_schema_qualified_target_keys_no_collision():
+    """Codex P2 pin: same-named target tables in two schemas do not merge."""
+    e1, e2 = _rid(10), _rid(11)
+    h = _Harness(
+        paths=[
+            _p("Dataset_Image", IMG, schema="alpha"),
+            _p("Dataset_Image", IMG, schema="beta"),
+        ],
+        features=[
+            _feature("Annotation", _tbl(IMG, "alpha"), _tbl(FT_IMG, "alpha")),
+            _feature("Annotation", _tbl(IMG, "beta"), _tbl(FT_IMG, "beta")),
+        ],
+        grouped_rows={
+            ("alpha", FT_IMG): [{"Execution": e1, "value_count": 3}],
+            ("beta", FT_IMG): [{"Execution": e2, "value_count": 4}],
+        },
+    )
+    out = h.ml.find_feature_producers(_rid(500))
+    assert [(r.execution_rid, r.value_count) for r in out] == [(e1, 3), (e2, 4)]
 
 
 def test_null_execution_is_first_class_result():
     h = _Harness(
-        paths=_direct_paths(),
-        features=[_feature("Annotation", _tbl(IMG), FT_IMG)],
-        rows_by_terminal={FT_IMG: [{"RID": _rid(100), "Execution": None}]},
+        paths=[_p("Dataset_Image", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": None, "value_count": 7}]},
     )
     out = h.ml.find_feature_producers(_rid(500))
-    assert len(out) == 1 and out[0].execution_rid is None and out[0].value_count == 1
+    assert len(out) == 1 and out[0].execution_rid is None and out[0].value_count == 7
 
 
 def test_per_feature_failure_degrades_keeping_others():
     e1 = _rid(10)
     h = _Harness(
-        paths=[
-            ["Dataset", "Dataset_Image", IMG, FT_IMG],
-            ["Dataset", "Dataset_Subject", SUBJ, FT_SUBJ],
-        ],
+        paths=[_p("Dataset_Image", IMG), _p("Dataset_Subject", SUBJ)],
         features=[
-            _feature("Annotation", _tbl(IMG), FT_IMG),
-            _feature("Grade", _tbl(SUBJ), FT_SUBJ),
+            _feature("Annotation", _tbl(IMG), _tbl(FT_IMG)),
+            _feature("Grade", _tbl(SUBJ), _tbl(FT_SUBJ)),
         ],
-        rows_by_terminal={
-            FT_IMG: RuntimeError("feature table unreadable"),
-            FT_SUBJ: [{"RID": _rid(100), "Execution": e1}],
+        grouped_rows={
+            ("domain", FT_IMG): RuntimeError("feature table unreadable"),
+            ("domain", FT_SUBJ): [{"Execution": e1, "value_count": 1}],
         },
     )
     out = h.ml.find_feature_producers(_rid(500))
     assert [(r.feature_name, r.execution_rid) for r in out] == [("Grade", e1)]
 
 
+def test_version_uses_snapshot_model_and_absent_table_is_empty():
+    """Codex P1 pin: version= binds discovery AND data to the snapshot —
+    the snapshot's find_features/planner are used, the live model's are
+    not; a table absent from the snapshot contributes nothing (#365)."""
+    e1 = _rid(10)
+    h = _Harness(paths=[], features=[])  # live source: empty on purpose
+    snap = _Source(
+        h,
+        paths=[_p("Dataset_Image", IMG), _p("Dataset_Subject", SUBJ)],
+        features=[
+            _feature("Annotation", _tbl(IMG), _tbl(FT_IMG)),
+            _feature("Grade", _tbl(SUBJ), _tbl(FT_SUBJ)),
+        ],
+    )
+    h.snapshot = snap
+    h.ml.lookup_dataset = lambda rid: SimpleNamespace(dataset_rid=rid, _version_snapshot_catalog=lambda v: snap)
+    h.grouped_rows = {("domain", FT_IMG): [{"Execution": e1, "value_count": 2}]}
+    h.missing_tables = {("domain", FT_SUBJ)}  # predates the snapshot
+
+    out = h.ml.find_feature_producers(_rid(500), version="0.4.0")
+    assert [(r.feature_name, r.execution_rid, r.value_count) for r in out] == [("Annotation", e1, 2)]
+    assert snap.model.find_features.called
+    assert not h.live.model.find_features.called
+
+
 def test_deterministic_order():
     e1 = _rid(10)
     h = _Harness(
-        paths=[
-            ["Dataset", "Dataset_Image", IMG, FT_IMG],
-            ["Dataset", "Dataset_Subject", SUBJ, FT_SUBJ],
-        ],
+        paths=[_p("Dataset_Image", IMG), _p("Dataset_Subject", SUBJ)],
         features=[
-            _feature("Zeta", _tbl(IMG), FT_IMG),
-            _feature("Alpha", _tbl(SUBJ), FT_SUBJ),
+            _feature("Zeta", _tbl(IMG), _tbl(FT_IMG)),
+            _feature("Alpha", _tbl(SUBJ), _tbl(FT_SUBJ)),
         ],
-        rows_by_terminal={
-            FT_IMG: [{"RID": _rid(100), "Execution": e1}],
-            FT_SUBJ: [{"RID": _rid(101), "Execution": e1}],
+        grouped_rows={
+            ("domain", FT_IMG): [{"Execution": e1, "value_count": 1}],
+            ("domain", FT_SUBJ): [{"Execution": e1, "value_count": 4}],
         },
     )
     out = h.ml.find_feature_producers(_rid(500))
     assert [(r.feature_name, r.element_type) for r in out] == [("Alpha", SUBJ), ("Zeta", IMG)]
 
 
-def test_version_scoping_uses_snapshot_and_absent_table_is_empty():
-    """version= resolves via the version snapshot; a feature table absent
-    from that snapshot (predates it) yields no rows for that path — never
-    a raise (the #365 discipline)."""
-    e1 = _rid(10)
-    h = _Harness(
-        paths=[
-            ["Dataset", "Dataset_Image", IMG, FT_IMG],
-            ["Dataset", "Dataset_Subject", SUBJ, FT_SUBJ],
-        ],
-        features=[
-            _feature("Annotation", _tbl(IMG), FT_IMG),
-            _feature("Grade", _tbl(SUBJ), FT_SUBJ),
-        ],
-        rows_by_terminal={
-            FT_IMG: [{"RID": _rid(100), "Execution": e1}],
-            FT_SUBJ: [{"RID": _rid(101), "Execution": e1}],
-        },
-        missing_tables={FT_SUBJ},  # absent from the snapshot schema
-    )
-    out = h.ml.find_feature_producers(_rid(500), version="0.4.0")
-    assert [(r.feature_name, r.execution_rid) for r in out] == [("Annotation", e1)]
-
-
 def test_no_features_empty():
-    h = _Harness(paths=_direct_paths(), features=[], rows_by_terminal={})
+    h = _Harness(paths=[_p("Dataset_Image", IMG)], features=[])
     assert h.ml.find_feature_producers(_rid(500)) == []

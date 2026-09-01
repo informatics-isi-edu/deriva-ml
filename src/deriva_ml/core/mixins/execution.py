@@ -1676,26 +1676,31 @@ class ExecutionMixin:
         subject-partitioned dataset's Image annotations are in scope even
         though only Subjects are direct members).
 
-        Discovery enumerates every FK path from ``Dataset`` to each feature
-        table via the denormalize planner's schema walk (the #316-hardened
-        rules: loopback prevention, skip tables), then executes each path as
-        a server-side membership join. Feature rows reachable through
-        multiple paths are unioned by RID before counting, so a row never
-        counts twice. A path with an ambiguous hop (multiple distinct FK
-        constraints between consecutive tables) is skipped with a warning;
-        a failing feature table degrades without masking the rest.
+        Discovery enumerates FK paths from ``Dataset`` to each feature's
+        **target table** via the denormalize planner's schema walk (the
+        #316-hardened rules), with feature tables excluded as
+        intermediates — membership reachability runs through the object
+        graph, never *through* bindings — and the single target→feature
+        hop appended per feature. In ``version=`` mode both discovery and
+        querying bind to the version's snapshot (model, planner, and data),
+        so schema evolution after the snapshot cannot distort the result.
+
+        A single-path feature counts server-side (grouped distinct); only
+        a feature with multiple FK routes unions row RIDs client-side so a
+        row reachable two ways counts exactly once. Ambiguous hops skip
+        with a warning; a failing feature degrades without masking the
+        rest.
 
         Args:
             dataset_rid: RID of the dataset whose members' bindings to
                 inspect.
             version: Optional dataset version. ``None`` (default) evaluates
-                membership and bindings against the **live** catalog —
-                "who has ever annotated this". A version resolves the query
-                against that version's catalog snapshot: the bindings that
-                existed when the version was cut, which is the
-                provenance-correct scope for a consumed version (post-hoc
-                annotators of the same members are excluded). Tables absent
-                from an old snapshot contribute no rows — never an error.
+                against the **live** catalog — "who has ever annotated
+                this". A version resolves discovery *and* data against that
+                version's catalog snapshot: the bindings that existed when
+                the version was cut (post-hoc annotators of the same
+                members are excluded). Tables absent from an old snapshot
+                contribute no rows — never an error.
 
         Returns:
             :class:`~deriva_ml.feature.FeatureProducerRecord` list, one per
@@ -1710,45 +1715,73 @@ class ExecutionMixin:
         """
         from collections import Counter
 
+        from deriva.core import datapath
+
         from deriva_ml.core.logging_config import get_logger
         from deriva_ml.feature import FeatureProducerRecord
 
         logger = get_logger(__name__)
         dataset = self.lookup_dataset(dataset_rid)
         if version is not None:
-            pb = dataset._version_snapshot_catalog(version).pathBuilder()
+            # Snapshot-bind EVERYTHING: model, planner, feature discovery,
+            # and data. Binding only the data path while discovering against
+            # the live schema silently omits features removed after the
+            # snapshot and mis-joins across changed FK topology.
+            source = dataset._version_snapshot_catalog(version)
         else:
-            pb = self.pathBuilder()
+            source = self
+        pb = source.pathBuilder()
+        model = source.model
+        planner = model._planner
 
-        planner = self.model._planner
         try:
-            all_paths = planner._schema_to_paths()
+            features = list(model.find_features())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Feature discovery failed: %s", exc)
+            return []
+        if not features:
+            return []
+
+        feature_table_names = {f.feature_table.name for f in features}
+        try:
+            # Feature tables are excluded as intermediates: reachability is
+            # over the object graph; tunneling through a binding to its
+            # value/asset objects is not membership.
+            all_paths = planner._schema_to_paths(exclude_tables=set(feature_table_names))
         except Exception as exc:  # noqa: BLE001 — no paths means no arc, not a crash
             logger.warning("Feature-path enumeration failed: %s", exc)
             return []
 
-        try:
-            features = list(self.model.find_features())
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Feature discovery failed: %s", exc)
-            return []
-
-        paths_by_table: dict[str, list[list[Any]]] = {}
+        # Paths keyed by schema-qualified TARGET table — arriving at a
+        # feature table via a value/asset FK must never count (the binding
+        # attaches to its target object only).
+        paths_by_target: dict[tuple[str, str], list[list[Any]]] = {}
         for path in all_paths:
             if len(path) >= 3:
-                paths_by_table.setdefault(path[-1].name, []).append(path)
+                last = path[-1]
+                paths_by_target.setdefault((last.schema.name, last.name), []).append(path)
 
         records: list[FeatureProducerRecord] = []
         for feature in features:
+            target_meta = feature.target_table
             ftable_meta = feature.feature_table
-            feature_paths = paths_by_table.get(ftable_meta.name, [])
-            if not feature_paths:
+            target_paths = paths_by_target.get((target_meta.schema.name, target_meta.name), [])
+            if not target_paths:
                 continue
-            # Union of (feature-row RID -> execution) across every path —
-            # a row reachable via two FK routes must count exactly once.
-            row_exec: dict[str, Any] = {}
-            any_path_ran = False
-            for path in feature_paths:
+            try:
+                final_hop = planner._table_relationship(target_meta, ftable_meta)
+            except DerivaMLException as exc:
+                logger.warning(
+                    "Skipping feature %s: ambiguous target link %s -> %s: %s",
+                    feature.feature_name,
+                    target_meta.name,
+                    ftable_meta.name,
+                    exc,
+                )
+                continue
+
+            usable: list[tuple[list[Any], list[list[tuple[Any, Any]]]]] = []
+            for path in target_paths:
                 try:
                     joins = [planner._table_relationship(path[i], path[i + 1]) for i in range(len(path) - 1)]
                 except DerivaMLException as exc:
@@ -1758,43 +1791,86 @@ class ExecutionMixin:
                         exc,
                     )
                     continue
+                usable.append((path + [ftable_meta], joins + [final_hop]))
+            if not usable:
+                continue
+
+            def _build(dp_tables: list[Any], joins: list[list[tuple[Any, Any]]]):
+                dp = dp_tables[0].filter(dp_tables[0].RID == dataset_rid)
+                for i, tbl_path in enumerate(dp_tables[1:]):
+                    pred = None
+                    for left_col, right_col in joins[i]:
+                        clause = dp_tables[i].columns[left_col.name] == tbl_path.columns[right_col.name]
+                        pred = clause if pred is None else (pred & clause)
+                    dp = dp.link(tbl_path, on=pred)
+                return dp
+
+            def _resolve_tables(path: list[Any]) -> list[Any] | None:
                 try:
-                    table_paths = [pb.schemas[t.schema.name].tables[t.name] for t in path]
+                    return [pb.schemas[t.schema.name].tables[t.name] for t in path]
                 except KeyError:
-                    # A table on this path is absent from the (snapshot)
-                    # schema — it predates the version; the snapshot holds
-                    # no rows for it. Empty result, never an error (#365).
+                    # Absent from the (snapshot) schema — predates the
+                    # version; no rows, never an error (#365).
+                    return None
+
+            counts: "Counter[Any]" = Counter()
+            if len(usable) == 1:
+                # Common case: one route — count server-side (grouped
+                # distinct), nothing fetched to the client heap.
+                path, joins = usable[0]
+                tables = _resolve_tables(path)
+                if tables is None:
                     continue
                 try:
-                    dp = table_paths[0].filter(table_paths[0].RID == dataset_rid)
-                    for i, tbl_path in enumerate(table_paths[1:]):
-                        pred = None
-                        for left_col, right_col in joins[i]:
-                            clause = table_paths[i].columns[left_col.name] == tbl_path.columns[right_col.name]
-                            pred = clause if pred is None else (pred & clause)
-                        dp = dp.link(tbl_path, on=pred)
-                    ftable_path = table_paths[-1]
-                    for row in dp.attributes(ftable_path.RID, ftable_path.Execution).fetch():
-                        rid_val = row.get("RID")
-                        if rid_val is not None:
-                            row_exec[rid_val] = row.get("Execution") or None
-                    any_path_ran = True
-                except Exception as exc:  # noqa: BLE001 — one path must not mask the rest
+                    dp = _build(tables, joins)
+                    ftable_path = tables[-1]
+                    grouped = dp.groupby(ftable_path.Execution).attributes(
+                        datapath.CntD(ftable_path.RID).alias("value_count")
+                    )
+                    for row in grouped.fetch():
+                        counts[row.get("Execution") or None] = int(row.get("value_count") or 0)
+                except Exception as exc:  # noqa: BLE001
                     logger.warning(
                         "Feature-producer path %s on %s failed: %s",
                         " -> ".join(t.name for t in path),
                         dataset_rid,
                         exc,
                     )
-            if not any_path_ran:
-                continue
-            counts = Counter(row_exec.values())
+                    continue
+            else:
+                # Multiple routes: union feature-row RIDs across paths so a
+                # row reachable two ways counts exactly once.
+                row_exec: dict[str, Any] = {}
+                any_ran = False
+                for path, joins in usable:
+                    tables = _resolve_tables(path)
+                    if tables is None:
+                        continue
+                    try:
+                        dp = _build(tables, joins)
+                        ftable_path = tables[-1]
+                        for row in dp.attributes(ftable_path.RID, ftable_path.Execution).fetch():
+                            rid_val = row.get("RID")
+                            if rid_val is not None:
+                                row_exec[rid_val] = row.get("Execution") or None
+                        any_ran = True
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Feature-producer path %s on %s failed: %s",
+                            " -> ".join(t.name for t in path),
+                            dataset_rid,
+                            exc,
+                        )
+                if not any_ran:
+                    continue
+                counts = Counter(row_exec.values())
+
             for exec_rid, n in counts.items():
                 records.append(
                     FeatureProducerRecord(
                         execution_rid=exec_rid,
                         feature_name=str(feature.feature_name),
-                        element_type=feature.target_table.name,
+                        element_type=target_meta.name,
                         value_count=int(n),
                     )
                 )
