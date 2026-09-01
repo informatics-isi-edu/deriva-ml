@@ -2,7 +2,7 @@
 
 These tests mock the catalog-touching primitives (``resolve_rid``,
 ``_retrieve_rid``, ``lookup_execution``, ``_producer_of_dataset``,
-``_producer_of_asset``) and exercise the walk shape, RID-type
+``_producers_of_asset``) and exercise the walk shape, RID-type
 detection, depth/cycle/cap behavior, and Pydantic round-tripping.
 
 A live-catalog smoke test lives in
@@ -130,8 +130,8 @@ class _FakeML(ExecutionMixin):
         self._dataset_producers: dict[str, str | None] = {}
         # Map (dataset_rid, version) -> producing-execution RID.
         self._versioned_dataset_producers: dict[tuple[str, str], str] = {}
-        # Map asset_rid -> producing-execution RID (or None).
-        self._asset_producers: dict[str, str | None] = {}
+        # Map asset_rid -> list of producing-execution RIDs (fetched order).
+        self._asset_producers: dict[str, list[str]] = {}
         # Map dataset_rid -> set of member-producing execution RIDs.
         self._dataset_member_producers: dict[str, set[str]] = {}
         # Map (dataset_rid, version) -> set of member-producing execution RIDs.
@@ -159,7 +159,7 @@ class _FakeML(ExecutionMixin):
     ) -> None:
         self._rids[rid] = (asset_table, set(), {"Description": description, "Filename": filename})
         self._asset_table_names.add(asset_table)
-        self._asset_producers[rid] = producer
+        self._asset_producers[rid] = [producer] if producer is not None else []
 
     def add_workflow(self, rid: str) -> None:
         self._rids[rid] = ("Workflow", set(), {})
@@ -301,8 +301,8 @@ class _FakeML(ExecutionMixin):
             )
         return out
 
-    def _producer_of_asset(self, asset_rid: str, asset_table: Any) -> str | None:  # type: ignore[override]
-        return self._asset_producers.get(asset_rid)
+    def _producers_of_asset(self, asset_rid: str, asset_table: Any) -> list[str]:  # type: ignore[override]
+        return list(self._asset_producers.get(asset_rid, []))
 
     def _producers_of_dataset_members(self, dataset_rid: str, version: Any = None) -> set[str]:  # type: ignore[override]
         if version is not None and (dataset_rid, str(version)) in self._versioned_member_producers:

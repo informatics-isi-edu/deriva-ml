@@ -1641,15 +1641,48 @@ class ExecutionMixin:
     def _producer_of_asset(self, asset_rid: RID, asset_table: Any) -> RID | None:
         """Return the Execution RID that produced ``asset_rid`` (asset_role="Output").
 
+        Delegates to :meth:`_producers_of_asset` and takes the fetched-first
+        entry — identical to the previous ``rows[0]`` behavior even when an
+        asset carries more than one Output association (malformed
+        multi-producer data).
+
         Returns None if the asset has no Output association in any
         ``<AssetTable>_Execution`` row.
+        """
+        return next(iter(self._producers_of_asset(asset_rid, asset_table)), None)
+
+    def _producers_of_asset(self, asset_rid: RID, asset_table: Any) -> list[RID]:
+        """Return every Execution RID that produced ``asset_rid`` (asset_role="Output").
+
+        Queries the ``<AssetTable>_Execution`` association table for all rows
+        linking ``asset_rid`` with ``Asset_Role == "Output"``. Results are
+        returned in fetched order — the order rows come back from the
+        catalog — and deduped keeping the first occurrence of each Execution
+        RID. RIDs carry no ordering semantics in this codebase, so callers
+        must not assume any particular producer is "first" in a temporal or
+        authoritative sense; sorting (e.g. by ``RCT``) is the caller's
+        responsibility if it's needed.
+
+        Args:
+            asset_rid: RID of the asset row to look up producers for.
+            asset_table: The asset's table object (from ``self.model``).
+
+        Returns:
+            List of Execution RIDs with an Output association to
+            ``asset_rid``, in fetched order, deduped. Empty list if the
+            asset has no Output association, or if the asset table has no
+            ``<AssetTable>_Execution`` tracking at all.
+
+        Example:
+            >>> ml._producers_of_asset(asset_rid, asset_table)  # doctest: +SKIP
+            ['2-EXAA', '2-EXAB']
         """
         try:
             assoc_table, asset_fk, _exec_fk = self.model.find_association(asset_table, "Execution")
         except NoAssociationException:
             # Asset table has no <AssetTable>_Execution tracking — legitimate
             # case for catalogs that don't track execution provenance per asset.
-            return None
+            return []
 
         pb = self.pathBuilder()
         assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
@@ -1659,11 +1692,16 @@ class ExecutionMixin:
             .entities()
             .fetch()
         )
-        if not rows:
-            return None
-        # If multiple Output associations exist (rare), the first one
-        # is fine — they all point at executions that wrote this asset.
-        return rows[0].get("Execution")
+
+        producers: list[RID] = []
+        seen: set[RID] = set()
+        for row in rows:
+            execution_rid = row.get("Execution")
+            if execution_rid is None or execution_rid in seen:
+                continue
+            seen.add(execution_rid)
+            producers.append(execution_rid)
+        return producers
 
     def find_feature_producers(self, dataset_rid: RID, version: Any | None = None) -> "list[FeatureProducerRecord]":
         """Executions that wrote feature values onto a dataset's members.
