@@ -803,3 +803,156 @@ leak); authorship facts read AT the strict snapshot like everything
 else. Plan v2 adds a dedicated harness-extension task with seam-call
 RECORDING (`ml.calls`) so quarantine tests can assert what was NOT
 queried — absence-of-work claims need instrumentation, not hope.
+
+**2026-09-01 — #383 Task 7: never infer snapshot-ness from the catalog-id
+string.** The strict snapshot resolver first discriminated the NULL-snapshot
+fallback via `"@" not in snapshot_id` — airtight-looking, but when the
+Dataset's `_ml_instance` is ITSELF snapshot-bound its `catalog_id` is
+already `"1@SNAP"`, so the bare-id branch composes a string containing "@"
+and a NULL-snapshot row slips through as a live/mis-scoped read (and
+`"1@SNAPA@SNAPA"` malformed ids). Reachable through the ancestry hop
+chain's normal dev-row state (dev rows carry Snapshot=NULL). Fix:
+discriminate on the RESOLVED VERSION RECORD's `.snapshot` value via a
+shared `_resolve_version_record` helper, raising before any id is
+composed. General rule: catalog-id strings are compositional (`id@snap`
+nests); never parse them for semantics — read the source row.
+
+**2026-09-01 — #383 live reconciliation: lookup_provenance vs the deploy
+inventory (eye-ai).** Ran both closures against the SAME root, resolved
+by catalog lookup at run time (workflow `VGG-19 Glaucoma Diagnosis
+Training` + description `VGG-19 training on Kyle's full datasets` +
+consuming exactly the Train/Validation/Test trio named in its own
+description text + `Status=Uploaded` + newest RCT). `lookup_lineage`
+reaches 2 executions on that root; `lookup_provenance` reaches 44 and
+the deploy inventory 46 — the spec's 45/17/14 aggregate has drifted
+slightly with catalog growth, which is why the reconciliation must run
+BOTH sides live rather than compare against a remembered number.
+
+| Measure | closure | deploy | difference |
+|---|---|---|---|
+| executions | 44 | 46 | 6 deploy-only, 4 closure-only |
+| distinct workflows | 15 | 17 | 4 deploy-only, 2 closure-only |
+| datasets | 12 | 14 | 5 deploy-only, 3 closure-only |
+| assets | 1 | n/a | deploy has no asset domain |
+| gaps | 142 (7 kinds) | 9 (2 kinds) | richer taxonomy |
+
+Every difference is principled; none needed a code change:
+
+- **Sentinel by identity, not name-matching (ruling 2).** Deploy counts
+  the sentinel execution `6-0B3J` and workflows `6-0B3E`
+  ('Unknown Provenance') / `6-FRFT` ('BlackBox unknown-asset producer')
+  as closure MEMBERS. The closure never admits the sentinel: it
+  terminates that branch with one `sentinel_origin` gap. So 1 execution
+  + 2 workflows of the deploy-only delta are the sentinel triple, and
+  deploy's 3 `sentinel` missing-arcs collapse into the closure's 1
+  honest gap.
+- **Snapshot-strict beats live-read (rulings 3 + 6) — the load-bearing
+  one.** The remaining 4 deploy-only executions (`7-GDAA`, `7-GV6C`,
+  `7-QCAA`, `7-VZQY`, workflows `7-GD96` / `7-ZX2J`) are exactly the 4
+  rows by which `find_feature_producers('2-277G')` UNVERSIONED (14 rows,
+  live) exceeds the same call at the walked pin v4.13.0 (10 rows). All
+  four executions have RCT in 2026-07-08..07-18; the v4.13.0 version row
+  has RCT 2026-07-02 — they bound their feature values AFTER the walked
+  version's snapshot. Deploy reads live and picks them up; the closure
+  reads at the pin and correctly does not. **The brief's spot-check
+  ("the 14 rows should appear as member_binding evidence") is therefore
+  satisfied at 10, not 14** — the correct assertion is
+  `find_feature_producers(ds, version=walked_pin) ⊆ arc evidence`, and
+  that holds exactly. Anyone re-running this must version-scope the
+  spot-check or they will chase a phantom bug.
+- **Closure-only executions = arcs deploy has no concept of.** `4-53ZE`
+  (Fill diag exec_rid), `4-WRGW` (Cropping Image), `4-Z7XC`
+  (Image_Grading), `5-278E` (Create Condition_Label) enter via
+  `version_authorship` / `member_binding` on ancestry datasets deploy
+  never walks (`2-N93J`, `4-S42W`, `4-Z6K8` — the 3 closure-only
+  datasets). Deploy's 5 dataset-only rows (`4-4116`, `4-411G`,
+  `5-WEBG`, `5-ZHRE`, `5-ZMGJ`) come from its Hydra `key=RID` config
+  mining, which ruling 1 explicitly excludes as an arc.
+- **Richer gap taxonomy (ruling 2).** Deploy reports 2 kinds; the
+  closure reports 7 of the 12. Its 6 `null_feature_execution` map 1:1
+  onto 6 of the closure's 7 `null_binding_execution` (closure adds
+  `5-1W26`, a dataset deploy never reaches). The other 4 kinds are
+  strictly new visibility deploy's heuristic never had: 109
+  `no_version_author`, 10 `version_unresolvable`, 9
+  `origin_unrecorded`, 1 `no_asset_producer` (`2-4JR6`). Gap COUNT going
+  up is the feature, not a regression — `traversal_complete=True` and
+  `cap_hit=False` throughout, confirming gaps are orthogonal to caps.
+
+**Two schema-evolution bugs found and FIXED in this same PR.**
+Old eye-ai snaptimes predate columns the current code assumes, and the
+raw exception escapes `lookup_provenance` instead of becoming a gap:
+(1) `core/mixins/dataset.py:200` — `lookup_dataset` unconditionally
+filters on `Dataset.Deleted`, which does not exist at v0.1.0 snaptimes
+→ `AttributeError` from datapath; `strict_parents_at` calls it AT the
+historical snapshot, so this aborts the whole walk. (2)
+`dataset/dataset.py:906` — `dataset_history` does `v["Snapshot"]`, and
+`Dataset_Version` has no `Snapshot` column at v1.0.0–4.1.0 snaptimes →
+`KeyError`; `strict_parents_at` catches only `DerivaMLException`, so it
+escapes too. Repro without the closure:
+`ml.lookup_dataset('2-277G').strict_parents_at('0.1.0')` and
+`...strict_parents_at('1.0.0')`. Both are catchable into
+`SnapshotUnavailable`, which the engine ALREADY converts into a
+`snapshot_chain_break` gap. The fix wraps each snapshot-bound read at
+the strict layer (scoped to `AttributeError`/`KeyError` at the point of
+the read, never a blanket `except Exception`), naming the missing column
+in the gap detail. Confirmed live with no monkeypatch: the walk
+completes and produces precisely the 5 `snapshot_chain_break` gaps in
+the table above (`2-277C/G/J/M`, `2-7KA2`, all at v0.1.0), with every
+other number identical to the shimmed run. General
+rule this reinforces: **a snapshot-strict walk must treat "the schema
+itself differs at that snaptime" as a first-class gap source**, not
+just missing rows — reading history means reading OLD SCHEMA, and every
+column reference on a snapshot-bound path is a potential `AttributeError`.
+The offline blind spot that let this ship is worth naming too: every
+mocked harness presents CURRENT-schema tables, so "missing rows at a
+snapshot" was well covered while "missing schema at a snapshot" had no
+coverage at all. The harness now has a `set_schema_failure_at` seam and
+the real `Dataset` is pinned directly in
+`test_strict_snapshot.py::TestSnapshotSchemaEvolutionDegradesToGap`.
+
+Timing on this root (www.eye-ai.org, warm): `lookup_lineage` 8.5s,
+`lookup_provenance` 249s at the default `max_executions=500` with no cap
+hit. The cost is dominated by per-version authorship + binding reads
+across 31 visited dataset-versions, so it scales with ancestry breadth,
+not execution count — budget minutes, not seconds, for real catalogs.
+
+**2026-09-01 — Ruling 7 (Carl): fifth arc kind `member_production`
+(#383 final review).** The closure inherited lineage's member-producer
+fallback: executions that produced MEMBER ASSETS of a consumed dataset
+are expanded, but the settled 4-kind typology had no slot for them —
+they sat in closure.executions with empty arcs, breaking the model's
+"arcs record every reason" promise. Carl ruled: add
+`ArcKind.member_production` — "produced a member (asset) of the walked
+dataset@version" — the asset analogue of member_binding under ruling
+3's content reasoning (a dataset's content is members + bindings;
+member producers are content contributors). Alternatives rejected:
+arcs-may-be-empty (weakens the model), exclusion (closure would be
+SMALLER than the lineage walk — contradicts its purpose). Attachment
+point: the member relation at the walked (dataset, version); root-seed
+member-fallback producers keep ArcKind.root (they are the seed, not a
+mid-walk discovery). Lesson: a byte-frozen lift can carry BEHAVIOR into
+a new semantic frame that the frame's typology never modeled — sweep
+inherited behaviors against the new model's self-description.
+
+**2026-09-01 — #383 Codex pre-merge round (PR #388): the pinned-root
+path and three recurrences.** 2 P1 / 3 P2 / 1 P3, all accepted, fixed
+in `1b603ae9`. (1) Pinned Dataset roots seeded/attributed from LIVE
+classification — root attribution now snapshot-faithful (reuses the
+authorship leg's snapshot rows, zero extra fetches); PARKED residual:
+the walk seed itself is still live-derived — requires a post-hoc
+rewrite of a version row's Execution FK to matter, which the writer
+contract never does. (2) Recorded-but-UNREADABLE snapshots crashed the
+member scan before the gap path — now degrade to snapshot_chain_break;
+this moved the eye-ai reconciliation from 5 to **10 chain-break gaps
+(142→147 total)**, paired 1:1 with the five already-broken v0.1.0
+snapshots: pre-fix the member scans failed SILENTLY, so the closure
+claimed member knowledge it did not have. 44 executions and
+traversal_complete unchanged. (3) Recurrences of prior lessons caught
+again by fresh review: live-model DISCOVERY under snapshot data reads
+(the #385 P1 pattern, this time in _producers_of_dataset_members) and
+recursion-depth ceilings (the lineage-HTML lesson, this time in
+ancestry — now an explicit stack, mutant- and A/B-verified including
+arc depths). Pattern worth naming: every snapshot-related fix this
+cycle was the SAME rule — bind discovery, data, and attribution to one
+snapshot handle, and turn every failure of that binding into a typed
+gap.

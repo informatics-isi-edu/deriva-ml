@@ -133,13 +133,16 @@ def reduce_with_selector(
 
 
 class FeatureProducerRecord(BaseModel):
-    """Evidence that an execution produced feature values on a dataset's members.
+    """A binding-fact summary: executions bound to a dataset's members via feature values.
 
     One record per ``(execution, feature, element)`` group returned by
-    :meth:`DerivaML.find_feature_producers`. These are provenance
-    *candidates*: which features downstream code actually read is not
-    recorded in the catalog, so the contract is a bounded superset with
-    per-feature evidence rather than a claimed-exact dependency set.
+    :meth:`DerivaML.find_feature_producers`. A feature value is the binding
+    of *(member, value, execution)* — the execution is part of the binding's
+    identity, not provenance metadata layered on top of it (see
+    ``docs/reference/provenance-contract.md``, "Feature value = a binding").
+    These records are therefore provenance *facts by construction*: each one
+    reports an execution that is actually bound to the dataset's members,
+    not a candidate whose relevance is inferred or guessed at.
 
     Attributes:
         execution_rid: The producing execution, or None when the feature

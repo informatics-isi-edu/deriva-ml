@@ -604,7 +604,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-features",
         action="store_true",
-        help="Walk mode: skip the find_feature_producers candidate scan.",
+        help="Walk mode: skip the find_feature_producers binding-fact scan.",
     )
     parser.add_argument("--json", dest="json_out", help="Also write the walk's model_dump() JSON here.")
     args = parser.parse_args(argv)

@@ -1,0 +1,118 @@
+{
+  "cycle_detected": false,
+  "depth_capped": false,
+  "executions_visited": 3,
+  "lineage": {
+    "already_shown": false,
+    "consumed_assets": [],
+    "consumed_datasets": [
+      {
+        "description": "link 5",
+        "rid": "1-0037",
+        "version": "0.1.0"
+      }
+    ],
+    "execution": {
+      "description": "link 5",
+      "rid": "2-0037",
+      "status": "Uploaded",
+      "workflow": {
+        "checksum": null,
+        "name": "stage-5",
+        "rid": "3-0037",
+        "url": null,
+        "version": null
+      }
+    },
+    "parents": [
+      {
+        "already_shown": false,
+        "consumed_assets": [],
+        "consumed_datasets": [
+          {
+            "description": "link 4",
+            "rid": "1-0036",
+            "version": "0.1.0"
+          }
+        ],
+        "execution": {
+          "description": "link 4",
+          "rid": "2-0036",
+          "status": "Uploaded",
+          "workflow": {
+            "checksum": null,
+            "name": "stage-4",
+            "rid": "3-0036",
+            "url": null,
+            "version": null
+          }
+        },
+        "parents": [
+          {
+            "already_shown": false,
+            "consumed_assets": [],
+            "consumed_datasets": [
+              {
+                "description": "link 3",
+                "rid": "1-0035",
+                "version": "0.1.0"
+              }
+            ],
+            "execution": {
+              "description": "link 3",
+              "rid": "2-0035",
+              "status": "Uploaded",
+              "workflow": {
+                "checksum": null,
+                "name": "stage-3",
+                "rid": "3-0035",
+                "url": null,
+                "version": null
+              }
+            },
+            "parents": []
+          }
+        ]
+      }
+    ]
+  },
+  "root": {
+    "description": "link 6",
+    "origin_recorded": true,
+    "producing_execution": {
+      "description": "link 5",
+      "rid": "2-0037",
+      "status": "Uploaded",
+      "workflow": {
+        "checksum": null,
+        "name": "stage-5",
+        "rid": "3-0037",
+        "url": null,
+        "version": null
+      }
+    },
+    "rid": "1-0038",
+    "type": "Dataset",
+    "version": "0.1.0",
+    "version_history": [
+      {
+        "description": null,
+        "execution": {
+          "description": "link 5",
+          "rid": "2-0037",
+          "status": "Uploaded",
+          "workflow": {
+            "checksum": null,
+            "name": "stage-5",
+            "rid": "3-0037",
+            "url": null,
+            "version": null
+          }
+        },
+        "execution_rid": "2-0037",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "walked_complete": false
+}

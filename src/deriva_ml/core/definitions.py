@@ -125,6 +125,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLValidationError,
     DerivaMLWorkflowError,
     NoAssociationException,
+    SnapshotUnavailable,
 )
 
 # =============================================================================
@@ -208,6 +209,7 @@ __all__ = [
     "DerivaMLDirtyWorkflowError",
     "DerivaMLUploadError",
     "DerivaMLReadOnlyError",
+    "SnapshotUnavailable",
     "DerivaMLDenormalizeError",
     "DerivaMLDenormalizeMultiLeaf",
     "DerivaMLDenormalizeNoSink",

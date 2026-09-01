@@ -1,0 +1,98 @@
+{
+  "cycle_detected": false,
+  "depth_capped": false,
+  "executions_visited": 2,
+  "lineage": {
+    "already_shown": false,
+    "consumed_assets": [],
+    "consumed_datasets": [
+      {
+        "description": "branch a",
+        "rid": "1-0015",
+        "version": "0.1.0"
+      },
+      {
+        "description": "branch b",
+        "rid": "1-0016",
+        "version": "0.1.0"
+      }
+    ],
+    "execution": {
+      "description": "merge",
+      "rid": "2-0015",
+      "status": "Uploaded",
+      "workflow": {
+        "checksum": null,
+        "name": "merger",
+        "rid": "3-0015",
+        "url": null,
+        "version": null
+      }
+    },
+    "parents": [
+      {
+        "already_shown": false,
+        "consumed_assets": [],
+        "consumed_datasets": [
+          {
+            "description": "shared source",
+            "rid": "1-0014",
+            "version": "0.1.0"
+          }
+        ],
+        "execution": {
+          "description": "shared producer",
+          "rid": "2-0014",
+          "status": "Uploaded",
+          "workflow": {
+            "checksum": null,
+            "name": "splitter",
+            "rid": "3-0014",
+            "url": null,
+            "version": null
+          }
+        },
+        "parents": []
+      }
+    ]
+  },
+  "root": {
+    "description": "merged",
+    "origin_recorded": true,
+    "producing_execution": {
+      "description": "merge",
+      "rid": "2-0015",
+      "status": "Uploaded",
+      "workflow": {
+        "checksum": null,
+        "name": "merger",
+        "rid": "3-0015",
+        "url": null,
+        "version": null
+      }
+    },
+    "rid": "1-0017",
+    "type": "Dataset",
+    "version": "0.1.0",
+    "version_history": [
+      {
+        "description": null,
+        "execution": {
+          "description": "merge",
+          "rid": "2-0015",
+          "status": "Uploaded",
+          "workflow": {
+            "checksum": null,
+            "name": "merger",
+            "rid": "3-0015",
+            "url": null,
+            "version": null
+          }
+        },
+        "execution_rid": "2-0015",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "walked_complete": true
+}

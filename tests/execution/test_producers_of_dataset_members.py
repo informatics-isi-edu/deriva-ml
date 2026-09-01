@@ -85,6 +85,7 @@ class _FakeMembersML(ExecutionMixin):
         member_link_column,
         target_column,
         dataset_rid,
+        model=None,
     ):
         # Seam: return scripted producers for this member table.
         return set(self._producers_by_table.get(getattr(member_table, "name", member_table), set()))

@@ -1,0 +1,93 @@
+{
+  "cycle_detected": false,
+  "depth_capped": false,
+  "executions_visited": 2,
+  "lineage": {
+    "already_shown": false,
+    "consumed_assets": [],
+    "consumed_datasets": [
+      {
+        "description": "intermediate",
+        "rid": "1-000B",
+        "version": "0.1.0"
+      }
+    ],
+    "execution": {
+      "description": "stage two",
+      "rid": "2-000B",
+      "status": "Uploaded",
+      "workflow": {
+        "checksum": null,
+        "name": "stage-two",
+        "rid": "3-000B",
+        "url": null,
+        "version": null
+      }
+    },
+    "parents": [
+      {
+        "already_shown": false,
+        "consumed_assets": [],
+        "consumed_datasets": [
+          {
+            "description": "raw",
+            "rid": "1-000A",
+            "version": "0.1.0"
+          }
+        ],
+        "execution": {
+          "description": "stage one",
+          "rid": "2-000A",
+          "status": "Uploaded",
+          "workflow": {
+            "checksum": null,
+            "name": "stage-one",
+            "rid": "3-000A",
+            "url": null,
+            "version": null
+          }
+        },
+        "parents": []
+      }
+    ]
+  },
+  "root": {
+    "description": "final",
+    "origin_recorded": true,
+    "producing_execution": {
+      "description": "stage two",
+      "rid": "2-000B",
+      "status": "Uploaded",
+      "workflow": {
+        "checksum": null,
+        "name": "stage-two",
+        "rid": "3-000B",
+        "url": null,
+        "version": null
+      }
+    },
+    "rid": "1-000C",
+    "type": "Dataset",
+    "version": "0.1.0",
+    "version_history": [
+      {
+        "description": null,
+        "execution": {
+          "description": "stage two",
+          "rid": "2-000B",
+          "status": "Uploaded",
+          "workflow": {
+            "checksum": null,
+            "name": "stage-two",
+            "rid": "3-000B",
+            "url": null,
+            "version": null
+          }
+        },
+        "execution_rid": "2-000B",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "walked_complete": true
+}

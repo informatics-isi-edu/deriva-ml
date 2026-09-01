@@ -7,20 +7,29 @@ execution status.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Iterable
 
 from packaging.version import InvalidVersion
 from packaging.version import Version as _PEP440Version
+from pydantic import Field, validate_call
 
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
-from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
+from deriva_ml.core.exceptions import (
+    DerivaMLException,
+    DerivaMLValidationError,
+    NoAssociationException,
+)
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.mixins._provenance_engine import TreeBuilder, WalkEngine
 from deriva_ml.core.sort import SortSpec, resolve_sort
+from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+from deriva_ml.execution.provenance import ArcInputType, ArcKind, GapKind, ProvenanceClosure
 from deriva_ml.execution.state_machine import (
     flush_pending_sync,
     reconcile_with_catalog,
@@ -31,6 +40,7 @@ logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from deriva_ml.asset.aux_classes import AssetSpec
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder
     from deriva_ml.dataset.aux_classes import DatasetSpec
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord, MultirunStatusSummary
@@ -39,7 +49,6 @@ if TYPE_CHECKING:
         LineageNode,
         LineageResult,
         RootDescriptor,
-        WorkflowSummary,
     )
     from deriva_ml.execution.pending_summary import WorkspacePendingSummary
     from deriva_ml.execution.provenance_audit import ProvenanceAuditReport
@@ -52,10 +61,41 @@ if TYPE_CHECKING:
 
 __all__ = ["ExecutionMixin"]
 
+
+@dataclass(frozen=True)
+class BindingDiagnostic:
+    """Internal record of a silent-degrade branch hit during a binding scan.
+
+    Not part of the public API — ``_find_feature_producers_impl`` collects
+    these so a caller with diagnostic needs (e.g. a future MCP surface) can
+    see *why* the returned record set is smaller than the full schema walk,
+    without the public :meth:`ExecutionMixin.find_feature_producers` wrapper
+    changing its return shape.
+
+    Attributes:
+        kind: One of ``"ambiguous_hop"``, ``"snapshot_absent"``,
+            ``"query_failed"``, ``"discovery_failed"``.
+        subject: The feature name, table name, or other identifier the
+            diagnostic is about.
+        detail: Human-readable detail, typically the stringified exception
+            or reason for the skip.
+    """
+
+    kind: str
+    subject: str
+    detail: str
+
+
 # Chunk size for batched RID-disjunction fetches. Bounds URL length (the
 # tk-023 lesson: never one unbounded .in_()/disjunction over a caller-sized
 # set) while keeping request count low for realistic author counts.
 _SUMMARY_CHUNK_SIZE = 25
+
+# Proportional internal dataset budget for a provenance closure (design §5,
+# open question 1 resolved to "proportional internal default, no public
+# knob"): a large ancestry graph containing few executions must not walk
+# unboundedly just because the execution budget is untouched.
+_DATASET_BUDGET_FACTOR = 4
 
 
 def _version_row_sort_key(row: dict[str, Any]) -> tuple:
@@ -1309,9 +1349,15 @@ class ExecutionMixin:
         if producer_rid is None and not member_producers:
             return LineageResult(root=root_descriptor)
 
-        visited_global: set[RID] = set()
-        in_progress: set[RID] = set()
-        flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
+        # Lineage runs the shared walk engine with no dataset arcs enabled, so
+        # `expand_dataset` is a total no-op and the tree path costs exactly
+        # what the pre-extraction per-node walk cost.
+        engine: "WalkEngine[LineageNode]" = WalkEngine(
+            self,
+            TreeBuilder(),
+            arcs=frozenset(),
+            max_executions=max_executions,
+        )
 
         lineage_root_node: "LineageNode | None" = None
         if root_descriptor.type == "Dataset":
@@ -1328,30 +1374,9 @@ class ExecutionMixin:
                 candidates.append(producer_rid)
             candidates.extend(r for r in sorted(member_producers) if r != producer_rid)
 
-            all_candidates = set(candidates)
-            tried: set[RID] = set()
-            for seed in candidates:
-                tried.add(seed)
-                lineage_root_node = self._walk_node(
-                    execution_rid=seed,
-                    depth_remaining=depth,
-                    max_executions=max_executions,
-                    visited_global=visited_global,
-                    in_progress=in_progress,
-                    flags=flags,
-                    extra_parent_rids=(all_candidates - tried) or None,
-                )
-                if lineage_root_node is not None:
-                    break
+            lineage_root_node = engine.run_seed_candidates(candidates, depth_remaining=depth)
         else:
-            lineage_root_node = self._walk_node(
-                execution_rid=producer_rid,
-                depth_remaining=depth,
-                max_executions=max_executions,
-                visited_global=visited_global,
-                in_progress=in_progress,
-                flags=flags,
-            )
+            lineage_root_node = engine.expand_execution(producer_rid, depth_remaining=depth)
 
         # Non-Dataset roots keep the historical behavior: the root's
         # producing_execution is the walk-root summary. Dataset roots carry
@@ -1363,11 +1388,480 @@ class ExecutionMixin:
         return LineageResult(
             root=root_descriptor,
             lineage=lineage_root_node,
-            executions_visited=len(visited_global),
-            walked_complete=flags["walked_complete"],
-            cycle_detected=flags["cycle_detected"],
-            depth_capped=flags["depth_capped"],
+            executions_visited=engine.executions_visited,
+            walked_complete=engine.flags["walked_complete"],
+            cycle_detected=engine.flags["cycle_detected"],
+            depth_capped=engine.flags["depth_capped"],
         )
+
+    @validate_call(config=VALIDATION_CONFIG)
+    def lookup_provenance(
+        self,
+        rid: RID,
+        *,
+        version: str | None = None,
+        max_executions: Annotated[int, Field(strict=True, ge=1)] = 500,
+    ) -> ProvenanceClosure:
+        """Compute the full provenance closure behind an artifact.
+
+        Where :meth:`lookup_lineage` walks one producing-execution chain and
+        stops at lineage edges, this walks the **transitive closure**: every
+        discovered execution is itself expanded, consumed assets and walked
+        dataset versions become first-class closure members, and everything
+        the walk could not resolve is reported as a typed
+        :class:`~deriva_ml.execution.provenance.ProvenanceGap` rather than
+        silently dropped.
+
+        The closure follows only **schema-recorded facts** — no config
+        mining, no heuristics (design ruling 1). Legacy holes surface as
+        gaps; they are never compensated for (ruling 2). The
+        unknown-provenance sentinel is never a closure member: encountering
+        it terminates that branch with a ``sentinel_origin`` gap.
+
+        An execution can be in the closure for more than one reason at
+        once — it consumed an input, authored a dataset version, and bound
+        feature values, say — and each reason is recorded as its own
+        :class:`~deriva_ml.execution.provenance.ProvenanceArc` on
+        :attr:`~deriva_ml.execution.provenance.ProvenanceExecution.arcs`.
+        Arcs form a **set with no ranking**: there is no "strongest" arc
+        deciding why an execution is present (design ruling 4) — a consumer
+        that wants "the" reason must pick a policy itself. Gaps are
+        orthogonal to arcs: a gap documents a place the walk could not
+        fully resolve, independent of which (if any) executions were found.
+
+        Args:
+            rid: RID of any Dataset, Asset, Feature value, or Execution —
+                the same root typology :meth:`lookup_lineage` accepts.
+            version: Dataset roots only. When given, the closure is of
+                ``dataset@version`` and the version must appear in the
+                dataset's recorded history. When omitted, the root resolves
+                to the dataset's latest recorded version (RCT-primary order,
+                #367) and the resolved pin is recorded in ``root.version`` so
+                the result is self-describing. Passing it for a non-Dataset
+                root is an error.
+            max_executions: Defensive cap on distinct executions expanded.
+                Strictly typed: booleans, strings, and floats are rejected at
+                the call boundary, not silently coerced. A proportional
+                internal dataset-version budget (``4 * max_executions``)
+                bounds ``datasets_visited`` the same way, so a large
+                ancestry graph with few executions cannot walk unboundedly.
+
+        Returns:
+            A :class:`~deriva_ml.execution.provenance.ProvenanceClosure`
+            whose ``executions`` / ``datasets`` / ``assets`` maps and
+            ``gaps`` list are fully sorted for deterministic output
+            (``model_dump()`` is byte-identical across repeated calls on the
+            same catalog state). ``traversal_complete`` is False iff either
+            budget (``executions_visited`` vs ``max_executions``, or
+            ``datasets_visited`` vs its internal proportional budget) was
+            hit — it is **not** a claim of gap-freedom, which is
+            ``not closure.gaps`` and can be True or False independently of
+            ``traversal_complete``. ``cap_hit`` is the same signal as
+            ``not traversal_complete``, exposed under the name the budget
+            machinery itself uses. It is *related to* but not the same as
+            :attr:`~deriva_ml.execution.lineage.LineageResult.walked_complete`,
+            which reports only whether the EXECUTION walk finished: a
+            dataset-version budget stop sets ``cap_hit`` while leaving the
+            execution walk complete.
+
+        Raises:
+            DerivaMLValidationError: If ``version`` is given for a
+                non-Dataset root, or names a version the dataset has no
+                recorded row for.
+            DerivaMLException: If ``rid`` does not exist or is not
+                lineage-shaped (e.g. a Workflow RID).
+
+        Example:
+            Trace everything that contributed to a trained model asset::
+
+                >>> closure = ml.lookup_provenance(asset_rid)  # doctest: +SKIP
+                >>> len(closure.executions)  # doctest: +SKIP
+                45
+                >>> [(g.kind, g.subject_rid) for g in closure.gaps]  # doctest: +SKIP
+
+            Pin the closure to a historical dataset version::
+
+                >>> closure = ml.lookup_provenance(  # doctest: +SKIP
+                ...     dataset_rid, version="1.2.0",
+                ... )
+                >>> closure.root.version  # doctest: +SKIP
+                '1.2.0'
+
+            Inspect why one execution is in the closure and what it consumed
+            versus authored::
+
+                >>> execution = closure.executions[some_rid]  # doctest: +SKIP
+                >>> {arc.kind for arc in execution.arcs}  # doctest: +SKIP
+                {<ArcKind.consumption: 'consumption'>, <ArcKind.version_authorship: 'version_authorship'>}
+        """
+        from deriva_ml.core.mixins._provenance_engine import ClosureBuilder
+
+        root_descriptor, producer_rid = self._classify_rid(rid)
+
+        builder = ClosureBuilder()
+        engine: "WalkEngine[str]" = WalkEngine(
+            self,
+            builder,
+            arcs=frozenset(
+                {
+                    ArcKind.root,
+                    ArcKind.consumption,
+                    ArcKind.version_authorship,
+                    ArcKind.member_binding,
+                    ArcKind.member_production,
+                }
+            ),
+            max_executions=max_executions,
+            dataset_budget=_DATASET_BUDGET_FACTOR * max_executions,
+            closure_mode=True,
+        )
+
+        # Root version resolution (spec §3) — Dataset roots only.
+        root_version: str | None = None
+        if root_descriptor.type == "Dataset":
+            root_version = self._resolve_root_version(rid, version, root_descriptor, builder)
+        elif version is not None:
+            raise DerivaMLValidationError(
+                f"'version' applies to Dataset roots only; RID '{rid}' is a {root_descriptor.type} root."
+            )
+        root_descriptor = root_descriptor.model_copy(update={"version": root_version})
+
+        seeds = self._closure_seeds(rid, root_descriptor, producer_rid, engine, builder, root_version)
+
+        # Root arcs (depth 0) are recorded BEFORE expansion so a seed that
+        # fails to expand still leaves the honest record of why it was
+        # tried — the arc is a schema-recorded fact, independent of whether
+        # the walk could follow it.
+        for seed in seeds:
+            builder.record_arc(seed, kind=ArcKind.root, depth=0)
+
+        for seed in seeds:
+            engine.expand_execution(seed, depth_remaining=None, depth=0)
+
+        # Non-Dataset roots carry the expanded producer summary back onto the
+        # descriptor, exactly as ``lookup_lineage`` does — ``RootDescriptor``
+        # is a SHARED contract, so a closure root must not leave
+        # ``producing_execution`` None for an Asset/Feature/Execution root the
+        # walk resolved. Dataset roots keep the origin attribution
+        # ``_classify_rid`` (or the snapshot rebuild below) established; their
+        # walk root may legitimately be a member producer instead.
+        if root_descriptor.type != "Dataset":
+            producer_summary = next(
+                (builder.executions[s] for s in seeds if s in builder.executions),
+                None,
+            )
+            if producer_summary is not None:
+                root_descriptor = root_descriptor.model_copy(update={"producing_execution": producer_summary})
+
+        # The root dataset's own pinned version is a walked version: its
+        # dataset-side arcs (authorship, bindings, ancestry) land in later
+        # tasks, but the gating call belongs here so the root pin is walked
+        # exactly like any consumed pin.
+        if root_descriptor.type == "Dataset" and root_version is not None:
+            engine.expand_dataset(rid, root_version, depth=0)
+            root_descriptor = self._snapshot_faithful_root(rid, root_version, root_descriptor, builder)
+
+        # Executions discovered through a non-tree arc (the dataset-side legs)
+        # were queued on the engine as they were found; drain them under the
+        # same execution budget.
+        engine.drain(depth_remaining=None)
+
+        # An arc recorded against a RID that never became a closure member
+        # needs an explanation. Three are already accounted for:
+        #   - the RID failed to resolve (engine emitted ``unresolved_rid``);
+        #   - it is the sentinel, excluded BY DESIGN, not a hole (engine
+        #     emitted ``sentinel_origin``);
+        #   - the execution cap truncated it — it is perfectly resolvable and
+        #     ``cap_hit`` / ``traversal_complete=False`` already say the
+        #     closure is partial, so calling it "unresolved" would be a lie.
+        # Anything left over is an unexplained dangling arc, and gets
+        # reported rather than quietly dropped. This membership check runs
+        # BEFORE ``finalize()`` — it must observe every recorded arc and
+        # every gap emitted so far, and it itself emits a gap that
+        # ``finalize()`` needs to pick up.
+        explained = {g.subject_rid for g in builder.gaps if g.kind in (GapKind.unresolved_rid, GapKind.sentinel_origin)}
+        explained |= engine.truncated
+        for orphan in set(builder.arcs) - set(builder.build_executions()):
+            if orphan not in explained:
+                builder.on_gap(
+                    GapKind.unresolved_rid,
+                    orphan,
+                    "arc recorded against an execution that never entered the closure",
+                )
+
+        # Single determinism seam (spec §4): every sorted collection in the
+        # closure is assembled here, once, after all walking and gap
+        # emission is done.
+        executions, datasets, assets, gaps = builder.finalize()
+
+        return ProvenanceClosure(
+            root=root_descriptor,
+            executions=executions,
+            datasets=datasets,
+            assets=assets,
+            gaps=gaps,
+            executions_visited=engine.executions_visited,
+            datasets_visited=engine.datasets_visited,
+            traversal_complete=not engine.cap_hit,
+            cap_hit=engine.cap_hit,
+        )
+
+    def _snapshot_faithful_root(
+        self,
+        rid: RID,
+        root_version: str,
+        root_descriptor: "RootDescriptor",
+        builder: "ClosureBuilder",
+    ) -> "RootDescriptor":
+        """Rebuild a version-pinned Dataset root's attribution from the snapshot.
+
+        ``_classify_rid`` derives ``producing_execution`` / ``version_history``
+        from the LIVE ``Dataset_Version`` rows, which is right for
+        ``lookup_lineage`` (always latest-state) but wrong for a pinned
+        closure: a post-pin rewrite of an old row's ``Execution`` would leak a
+        live author into the root's attribution, and ``version_history`` would
+        expose rows created after the pin. The authorship leg already read the
+        rows AT the strict snapshot and recorded them as
+        :attr:`DatasetVersionFacts.version_authors` (bounded at the pin), so
+        this rebuilds the descriptor from those accumulated attributions
+        instead of re-fetching them.
+
+        On a snapshot that did not resolve, the authorship leg recorded
+        nothing and the live descriptor is kept for display — the
+        ``snapshot_chain_break`` gap the leg emitted is what reports the hole,
+        so the root must not additionally be blanked.
+
+        Args:
+            rid: The root Dataset RID.
+            root_version: The resolved version pin.
+            root_descriptor: The live-derived descriptor to rebuild.
+            builder: Accumulator holding the snapshot-read attributions.
+
+        Returns:
+            The descriptor with snapshot-faithful ``producing_execution``,
+            ``origin_recorded``, and ``version_history``; or the original when
+            the snapshot did not resolve.
+
+        Example:
+            >>> ml._snapshot_faithful_root(rid, "1.0.0", desc, builder)  # doctest: +SKIP
+        """
+        facts = builder.datasets.get(rid, {}).get(root_version)
+        if facts is None or not facts.version_authors:
+            # No snapshot-read authorship: either the strict snapshot did not
+            # resolve (the leg emitted its own gap) or the pin had no rows at
+            # its own snapshot. Either way the live descriptor stands.
+            return root_descriptor
+
+        history = list(facts.version_authors)
+        origin = history[0]
+        return root_descriptor.model_copy(
+            update={
+                "producing_execution": origin.execution,
+                "origin_recorded": bool(facts.origin_recorded),
+                "version_history": history,
+            }
+        )
+
+    def _resolve_root_version(
+        self,
+        rid: RID,
+        version: str | None,
+        root_descriptor: "RootDescriptor",
+        builder: "ClosureBuilder",
+    ) -> str | None:
+        """Resolve the root dataset's walked version pin (spec §3).
+
+        An explicit ``version`` is validated against the dataset's recorded
+        history; an omitted one resolves to the latest recorded version by
+        :func:`_version_row_sort_key` (the authorship-order helper — never a
+        RID sort, which carries no semantics). A dataset with no version rows
+        at all yields ``None`` plus a ``version_unresolvable`` gap, and the
+        walk proceeds only on arcs that need no snapshot.
+
+        The membership check runs against ``root_descriptor.version_history``
+        (already built by ``_classify_rid`` from the same rows) so the common
+        explicit-pin path costs no extra catalog read; only the "resolve the
+        latest" path refetches, because picking a maximum requires the
+        ``RCT`` column that the attribution trace does not carry.
+
+        Args:
+            rid: The root Dataset RID.
+            version: The caller's explicit pin, or None.
+            root_descriptor: The classification carrying ``version_history``.
+            builder: Accumulator the ``version_unresolvable`` gap lands on.
+
+        Returns:
+            The resolved version label, or None when none could be resolved.
+
+        Raises:
+            DerivaMLValidationError: If ``version`` names a version the
+                dataset has no recorded row for.
+
+        Example:
+            >>> ml._resolve_root_version(rid, "1.0.0", descriptor, builder)  # doctest: +SKIP
+            '1.0.0'
+        """
+        history = root_descriptor.version_history
+        if version is not None:
+            if not any(entry.version == version for entry in history):
+                raise DerivaMLValidationError(
+                    f"Dataset '{rid}' has no recorded version '{version}'. "
+                    f"Recorded versions: {[entry.version for entry in history]}"
+                )
+            return version
+
+        if not history:
+            builder.on_gap(
+                GapKind.version_unresolvable,
+                rid,
+                "dataset has no Dataset_Version rows; no version pin could be resolved",
+            )
+            return None
+
+        version_rows = self._dataset_version_rows(rid)
+        if not version_rows:
+            builder.on_gap(
+                GapKind.version_unresolvable,
+                rid,
+                "dataset has no Dataset_Version rows; no version pin could be resolved",
+            )
+            return None
+        return max(version_rows, key=_version_row_sort_key).get("Version") or None
+
+    def _closure_seeds(
+        self,
+        rid: RID,
+        root_descriptor: "RootDescriptor",
+        producer_rid: RID | None,
+        engine: "WalkEngine[str]",
+        builder: "ClosureBuilder",
+        root_version: str | None = None,
+    ) -> list[RID]:
+        """Return the root-arc seed executions for a closure walk.
+
+        Unlike lineage's candidate iteration (which stops at the first seed
+        that expands, because a tree has one root), a closure seeds from
+        EVERY root-arc execution: an artifact with an origin author and three
+        member producers has four schema-recorded root-adjacent facts, and
+        dropping three of them would understate the closure.
+
+        Root-type specifics:
+
+        - **Dataset** — the origin author plus the member producers **of the
+          walked version**. Scanning members live would leak executions that
+          post-date the pin into a historical closure.
+        - **Asset** — ALL recorded producers (spec §6.2), never
+          ``_classify_rid``'s first-match choice, and the root asset itself
+          is registered as a closure member with the same producer-count gaps
+          a consumed asset gets.
+        - **Feature** — the binding execution; a null one is a gap.
+
+        Args:
+            rid: The root artifact's RID.
+            root_descriptor: Its classification.
+            producer_rid: The direct producer from ``_classify_rid``.
+            engine: The walk engine (for sentinel classification and the
+                shared asset-producer reporting).
+            builder: Accumulator the root asset and root-level gaps land on.
+            root_version: The resolved Dataset-root pin, or None.
+
+        Returns:
+            Deduped seed execution RIDs, sorted for determinism.
+
+        Example:
+            >>> ml._closure_seeds(rid, descriptor, producer, engine, builder)  # doctest: +SKIP
+            ['2-EXAA']
+        """
+        seeds: set[RID] = set()
+        if producer_rid is not None:
+            seeds.add(producer_rid)
+
+        if root_descriptor.type == "Dataset":
+            # Version-scoped: the members of the PIN, not of live state. Routed
+            # through the engine's gap-safe wrapper so an unreadable snapshot
+            # degrades to a ``snapshot_chain_break`` gap instead of escaping as
+            # a raw error before the walk ever starts.
+            seeds |= engine.member_producers_or_gap(rid, root_version)
+        elif root_descriptor.type == "Asset":
+            seeds |= self._seed_asset_root(rid, engine, builder)
+        elif root_descriptor.type == "Feature" and producer_rid is None:
+            # A feature value IS the binding (member, value, execution); a
+            # null execution column means the binding records no author.
+            builder.on_gap(
+                GapKind.null_binding_execution,
+                rid,
+                "feature-value row records no binding execution",
+            )
+
+        # The sentinel is never a closure member, so it is never a seed —
+        # seeding from it would fabricate edges claiming it consumed the
+        # things it merely stands in for.
+        sentinel_seeds = {s for s in seeds if engine.is_sentinel(s)}
+        for sentinel in sentinel_seeds:
+            builder.on_gap(
+                GapKind.sentinel_origin,
+                sentinel,
+                "root provenance terminates at the unknown-provenance Execution sentinel",
+            )
+        return sorted(seeds - sentinel_seeds)
+
+    def _seed_asset_root(
+        self,
+        rid: RID,
+        engine: "WalkEngine[str]",
+        builder: "ClosureBuilder",
+    ) -> set[RID]:
+        """Register an Asset root as a closure member and return its producers.
+
+        Applies spec §6.2 to the ROOT asset exactly as the walk applies it to
+        a consumed asset: every recorded Output row is followed (never
+        ``_classify_rid``'s first-match ``_producer_of_asset``), the asset
+        itself becomes a member of ``closure.assets`` even when it has no
+        producer at all, and the producer-count gaps come from the engine's
+        shared reporter rather than a second copy of the rules.
+
+        Args:
+            rid: The root asset's RID.
+            engine: Supplies the shared ``report_asset_producers`` path.
+            builder: Accumulator the asset and its gaps land on.
+
+        Returns:
+            Every recorded producing execution RID.
+
+        Example:
+            >>> ml._seed_asset_root(asset_rid, engine, builder)  # doctest: +SKIP
+            {'2-EXAA'}
+        """
+        from deriva_ml.core.mixins._provenance_engine import InputRef
+        from deriva_ml.execution.lineage import AssetSummary
+
+        resolved = self.resolve_rid(rid)
+        row = self._retrieve_rid(rid)
+
+        producer_rids: tuple[RID, ...] = ()
+        resolution_failed = False
+        try:
+            producer_rids = tuple(self._producers_of_asset(rid, resolved.table))
+        except Exception:
+            # Same degrade-but-report contract the consumed-asset leg uses:
+            # an unreadable producer association is a gap, never a silent
+            # "this asset has no producer".
+            resolution_failed = True
+
+        builder.register_asset(
+            InputRef(
+                kind=ArcInputType.asset,
+                rid=rid,
+                summary=AssetSummary(
+                    rid=rid,
+                    filename=row.get("Filename") or None,
+                    asset_table=resolved.table.name,
+                ),
+                producer_rids=producer_rids,
+            )
+        )
+        engine.report_asset_producers(rid, producer_rids, resolution_failed=resolution_failed)
+        return set(producer_rids)
 
     # -- private helpers -------------------------------------------------
 
@@ -1507,6 +2001,44 @@ class ExecutionMixin:
         rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
         return sorted(rows, key=_version_row_sort_key)
 
+    def _dataset_version_rows_at(self, dataset_rid: RID, version: str, snapshot_catalog: Any) -> list[dict[str, Any]]:
+        """``Dataset_Version`` rows for ``dataset_rid`` read AT a snapshot.
+
+        The snapshot-closed sibling of :meth:`_dataset_version_rows`. The
+        version-authorship arc (design §6.3) must attribute versions as the
+        catalog recorded them at the walked version's snaptime, not as the
+        live catalog reads them now: a later rewrite of a historical version
+        row must not retroactively change who a pinned closure says authored
+        it, and version rows created after the snaptime must not appear at
+        all.
+
+        The caller resolves the snapshot strictly (never a live fallback) and
+        passes the resulting catalog in, so this method cannot accidentally
+        read live state.
+
+        Args:
+            dataset_rid: Dataset whose version history to fetch.
+            version: The walked version the snapshot was resolved for. Not
+                used to filter (the snaptime already bounds the rows); it is
+                carried for the seam's identity so a test harness can script
+                per-``(dataset, version)`` snapshot views.
+            snapshot_catalog: A catalog bound to the version's snaptime, from
+                :meth:`~deriva_ml.dataset.dataset.Dataset.strict_version_snapshot_catalog`.
+
+        Returns:
+            Row dicts sorted by :func:`_version_row_sort_key`, earliest
+            recorded first. Empty when the snapshot records none.
+
+        Example:
+            >>> ds = ml.lookup_dataset(dataset_rid)  # doctest: +SKIP
+            >>> snap = ds.strict_version_snapshot_catalog("1.0.0")  # doctest: +SKIP
+            >>> rows = ml._dataset_version_rows_at(dataset_rid, "1.0.0", snap)  # doctest: +SKIP
+        """
+        pb = snapshot_catalog.pathBuilder()
+        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
+        return sorted(rows, key=_version_row_sort_key)
+
     def _execution_summaries(self, rids: "Iterable[RID | None]") -> dict[RID, "ExecutionSummary"]:
         """Resolve ExecutionSummary objects for a set of execution RIDs, batched.
 
@@ -1568,6 +2100,7 @@ class ExecutionMixin:
                     name=wrow.get("Name"),
                     url=wrow.get("URL"),
                     version=wrow.get("Version"),
+                    checksum=wrow.get("Checksum"),
                 )
             out[row["RID"]] = ExecutionSummary(
                 rid=row["RID"],
@@ -1640,15 +2173,48 @@ class ExecutionMixin:
     def _producer_of_asset(self, asset_rid: RID, asset_table: Any) -> RID | None:
         """Return the Execution RID that produced ``asset_rid`` (asset_role="Output").
 
+        Delegates to :meth:`_producers_of_asset` and takes the fetched-first
+        entry — identical to the previous ``rows[0]`` behavior even when an
+        asset carries more than one Output association (malformed
+        multi-producer data).
+
         Returns None if the asset has no Output association in any
         ``<AssetTable>_Execution`` row.
+        """
+        return next(iter(self._producers_of_asset(asset_rid, asset_table)), None)
+
+    def _producers_of_asset(self, asset_rid: RID, asset_table: Any) -> list[RID]:
+        """Return every Execution RID that produced ``asset_rid`` (asset_role="Output").
+
+        Queries the ``<AssetTable>_Execution`` association table for all rows
+        linking ``asset_rid`` with ``Asset_Role == "Output"``. Results are
+        returned in fetched order — the order rows come back from the
+        catalog — and deduped keeping the first occurrence of each Execution
+        RID. RIDs carry no ordering semantics in this codebase, so callers
+        must not assume any particular producer is "first" in a temporal or
+        authoritative sense; sorting (e.g. by ``RCT``) is the caller's
+        responsibility if it's needed.
+
+        Args:
+            asset_rid: RID of the asset row to look up producers for.
+            asset_table: The asset's table object (from ``self.model``).
+
+        Returns:
+            List of Execution RIDs with an Output association to
+            ``asset_rid``, in fetched order, deduped. Empty list if the
+            asset has no Output association, or if the asset table has no
+            ``<AssetTable>_Execution`` tracking at all.
+
+        Example:
+            >>> ml._producers_of_asset(asset_rid, asset_table)  # doctest: +SKIP
+            ['2-EXAA', '2-EXAB']
         """
         try:
             assoc_table, asset_fk, _exec_fk = self.model.find_association(asset_table, "Execution")
         except NoAssociationException:
             # Asset table has no <AssetTable>_Execution tracking — legitimate
             # case for catalogs that don't track execution provenance per asset.
-            return None
+            return []
 
         pb = self.pathBuilder()
         assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
@@ -1658,11 +2224,16 @@ class ExecutionMixin:
             .entities()
             .fetch()
         )
-        if not rows:
-            return None
-        # If multiple Output associations exist (rare), the first one
-        # is fine — they all point at executions that wrote this asset.
-        return rows[0].get("Execution")
+
+        producers: list[RID] = []
+        seen: set[RID] = set()
+        for row in rows:
+            execution_rid = row.get("Execution")
+            if execution_rid is None or execution_rid in seen:
+                continue
+            seen.add(execution_rid)
+            producers.append(execution_rid)
+        return producers
 
     def find_feature_producers(self, dataset_rid: RID, version: Any | None = None) -> "list[FeatureProducerRecord]":
         """Executions that wrote feature values onto a dataset's members.
@@ -1713,6 +2284,29 @@ class ExecutionMixin:
             >>> for rec in ml.find_feature_producers(dataset.rid):  # doctest: +SKIP
             ...     print(rec.execution_rid, rec.feature_name, rec.value_count)
         """
+        return self._find_feature_producers_impl(dataset_rid, version)[0]
+
+    def _find_feature_producers_impl(
+        self, dataset_rid: RID, version: Any | None = None
+    ) -> "tuple[list[FeatureProducerRecord], list[BindingDiagnostic]]":
+        """Implementation of :meth:`find_feature_producers` with diagnostics.
+
+        Identical binding-scan logic to the public method, but every
+        silent-degrade branch (ambiguous hop, snapshot-absent table,
+        per-feature query failure, discovery-level failure) appends a
+        :class:`BindingDiagnostic` instead of only logging a warning. The
+        returned records list is byte-identical to what the public wrapper
+        returns.
+
+        Args:
+            dataset_rid: RID of the dataset whose members' bindings to
+                inspect.
+            version: Optional dataset version — see
+                :meth:`find_feature_producers`.
+
+        Returns:
+            A ``(records, diagnostics)`` tuple.
+        """
         from collections import Counter
 
         from deriva.core import datapath
@@ -1721,6 +2315,7 @@ class ExecutionMixin:
         from deriva_ml.feature import FeatureProducerRecord
 
         logger = get_logger(__name__)
+        diagnostics: list[BindingDiagnostic] = []
         dataset = self.lookup_dataset(dataset_rid)
         if version is not None:
             # Snapshot-bind EVERYTHING: model, planner, feature discovery,
@@ -1738,9 +2333,10 @@ class ExecutionMixin:
             features = list(model.find_features())
         except Exception as exc:  # noqa: BLE001
             logger.warning("Feature discovery failed: %s", exc)
-            return []
+            diagnostics.append(BindingDiagnostic(kind="discovery_failed", subject="find_features", detail=str(exc)))
+            return [], diagnostics
         if not features:
-            return []
+            return [], diagnostics
 
         feature_table_names = {f.feature_table.name for f in features}
         try:
@@ -1750,7 +2346,8 @@ class ExecutionMixin:
             all_paths = planner._schema_to_paths(exclude_tables=set(feature_table_names))
         except Exception as exc:  # noqa: BLE001 — no paths means no arc, not a crash
             logger.warning("Feature-path enumeration failed: %s", exc)
-            return []
+            diagnostics.append(BindingDiagnostic(kind="discovery_failed", subject="_schema_to_paths", detail=str(exc)))
+            return [], diagnostics
 
         # Paths keyed by schema-qualified TARGET table — arriving at a
         # feature table via a value/asset FK must never count (the binding
@@ -1778,6 +2375,13 @@ class ExecutionMixin:
                     ftable_meta.name,
                     exc,
                 )
+                diagnostics.append(
+                    BindingDiagnostic(
+                        kind="ambiguous_hop",
+                        subject=str(feature.feature_name),
+                        detail=f"ambiguous target link {target_meta.name} -> {ftable_meta.name}: {exc}",
+                    )
+                )
                 continue
 
             usable: list[tuple[list[Any], list[list[tuple[Any, Any]]]]] = []
@@ -1789,6 +2393,13 @@ class ExecutionMixin:
                         "Skipping ambiguous feature path %s: %s",
                         " -> ".join(t.name for t in path),
                         exc,
+                    )
+                    diagnostics.append(
+                        BindingDiagnostic(
+                            kind="ambiguous_hop",
+                            subject=" -> ".join(t.name for t in path),
+                            detail=str(exc),
+                        )
                     )
                     continue
                 usable.append((path + [ftable_meta], joins + [final_hop]))
@@ -1820,6 +2431,13 @@ class ExecutionMixin:
                 path, joins = usable[0]
                 tables = _resolve_tables(path)
                 if tables is None:
+                    diagnostics.append(
+                        BindingDiagnostic(
+                            kind="snapshot_absent",
+                            subject=" -> ".join(t.name for t in path),
+                            detail="table absent from snapshot schema",
+                        )
+                    )
                     continue
                 try:
                     dp = _build(tables, joins)
@@ -1836,6 +2454,13 @@ class ExecutionMixin:
                         dataset_rid,
                         exc,
                     )
+                    diagnostics.append(
+                        BindingDiagnostic(
+                            kind="query_failed",
+                            subject=" -> ".join(t.name for t in path),
+                            detail=str(exc),
+                        )
+                    )
                     continue
             else:
                 # Multiple routes: union feature-row RIDs across paths so a
@@ -1845,6 +2470,13 @@ class ExecutionMixin:
                 for path, joins in usable:
                     tables = _resolve_tables(path)
                     if tables is None:
+                        diagnostics.append(
+                            BindingDiagnostic(
+                                kind="snapshot_absent",
+                                subject=" -> ".join(t.name for t in path),
+                                detail="table absent from snapshot schema",
+                            )
+                        )
                         continue
                     try:
                         dp = _build(tables, joins)
@@ -1861,6 +2493,13 @@ class ExecutionMixin:
                             dataset_rid,
                             exc,
                         )
+                        diagnostics.append(
+                            BindingDiagnostic(
+                                kind="query_failed",
+                                subject=" -> ".join(t.name for t in path),
+                                detail=str(exc),
+                            )
+                        )
                 if not any_ran:
                     continue
                 counts = Counter(row_exec.values())
@@ -1876,7 +2515,7 @@ class ExecutionMixin:
                 )
 
         records.sort(key=lambda r: (r.feature_name, r.element_type, r.execution_rid or ""))
-        return records
+        return records, diagnostics
 
     def _producers_of_dataset_members(self, dataset_rid: RID, version: Any | None = None) -> set[RID]:
         """Distinct executions that produced the member assets of a dataset.
@@ -1892,29 +2531,46 @@ class ExecutionMixin:
         The work is bounded by the number of member *asset tables* (typically
         1-2), independent of member count.
 
+        In versioned mode the association TOPOLOGY is discovered against the
+        SAME snapshot-bound model the data query runs on (#385): discovering
+        Dataset associations and classifying member tables as assets against
+        the LIVE model, while joining against the snapshot's path builder,
+        silently mis-joins across FK topology that changed after the snaptime
+        and mis-classifies tables whose asset shape differs there. Per the
+        #365 discipline, tables absent from the snapshot's schema contribute
+        no rows rather than raising.
+
         Args:
             dataset_rid: RID of the dataset whose member assets to inspect.
             version: Optional dataset version. ``None`` uses the current version;
-                a version resolves the membership join against that version's
-                catalog snapshot (consumed-version faithfulness).
+                a version resolves discovery *and* the membership join against
+                that version's catalog snapshot (consumed-version faithfulness).
 
         Returns:
             Set of distinct producing-execution RIDs. Empty when the dataset has
             no member assets or none have a recorded ``Output`` producer.
 
         Example:
-            >>> producers = ml._producers_of_dataset_members("1-DSAA")  # doctest: +SKIP
+            >>> producers = ml._producers_of_dataset_members(dataset_rid)  # doctest: +SKIP
             >>> sorted(producers)  # doctest: +SKIP
             ['2-EXUP']
         """
         dataset = self.lookup_dataset(dataset_rid)
-        snapshot_pb = dataset._version_snapshot_catalog(version).pathBuilder()
+        snapshot_source = dataset._version_snapshot_catalog(version)
+        snapshot_pb = snapshot_source.pathBuilder()
+        if version is not None:
+            # Snapshot-bind discovery to match the data path (#385).
+            model = snapshot_source.model
+            dataset_table = snapshot_source.lookup_dataset(dataset_rid)._dataset_table
+        else:
+            model = self.model
+            dataset_table = dataset._dataset_table
         producers: set[RID] = set()
-        for assoc_table in dataset._dataset_table.find_associations():
+        for assoc_table in dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
             member_table = other_fkey.pk_table  # the member asset table (e.g. Image)
             membership_table = assoc_table.table  # the membership table (e.g. Dataset_Image)
-            if not self.model.is_asset(member_table):
+            if not model.is_asset(member_table):
                 # Nested-Dataset / non-asset member kinds are not asset-producer-shaped.
                 continue
             member_link_column = other_fkey.foreign_key_columns[0].name
@@ -1926,6 +2582,7 @@ class ExecutionMixin:
                 member_link_column,
                 target_column,
                 dataset.dataset_rid,
+                model=model,
             )
         return producers
 
@@ -1937,6 +2594,7 @@ class ExecutionMixin:
         member_link_column: str,
         target_column: str,
         dataset_rid: RID,
+        model: Any | None = None,
     ) -> set[RID]:
         """Distinct ``Output`` producing executions of a dataset's members of one
         asset table, via a server-side membership join.
@@ -1956,13 +2614,17 @@ class ExecutionMixin:
             target_column: The referenced column on the member table (often
                 ``"RID"``).
             dataset_rid: RID of the dataset whose members to inspect.
+            model: Model the ``<member>_Execution`` association is discovered
+                against. Must be the SAME model ``snapshot_pb`` was built from
+                (#385) — defaults to the live model for the unversioned path.
 
         Returns:
             Set of distinct producing-execution RIDs (``Output`` role). Empty if
             the member asset table has no ``<member>_Execution`` association.
         """
+        model = self.model if model is None else model
         try:
-            exec_assoc, member_exec_fk, _exec_fk = self.model.find_association(member_table, "Execution")
+            exec_assoc, member_exec_fk, _exec_fk = model.find_association(member_table, "Execution")
         except NoAssociationException:
             return set()
 
@@ -2026,175 +2688,3 @@ class ExecutionMixin:
         from deriva_ml.execution._helpers import list_input_datasets_with_versions
 
         return list_input_datasets_with_versions(ml_instance=self, execution_rid=execution_rid)
-
-    def _walk_node(
-        self,
-        *,
-        execution_rid: RID,
-        depth_remaining: int | None,
-        max_executions: int,
-        visited_global: set[RID],
-        in_progress: set[RID],
-        flags: dict[str, bool],
-        extra_parent_rids: set[RID] | None = None,
-    ) -> "LineageNode | None":
-        """Expand one execution node and recurse on its data-flow parents.
-
-        Mutates ``visited_global``, ``in_progress``, and ``flags``.
-        Returns None only if the execution couldn't be looked up
-        (defensive).
-        """
-        from deriva_ml.execution.lineage import (
-            AssetSummary,
-            DatasetSummary,
-            ExecutionSummary,
-            LineageNode,
-            WorkflowSummary,
-        )
-
-        # Cycle on the active path: do not expand, set flag, return a
-        # leaf-style marker.
-        if execution_rid in in_progress:
-            flags["cycle_detected"] = True
-            return LineageNode(
-                execution=ExecutionSummary(
-                    rid=execution_rid,
-                    description=None,
-                    workflow=None,
-                    status="Unknown",
-                ),
-                already_shown=True,
-            )
-
-        # Diamond DAG: this execution was already expanded somewhere
-        # else in the tree. Mark and don't recurse.
-        if execution_rid in visited_global:
-            return LineageNode(
-                execution=ExecutionSummary(
-                    rid=execution_rid,
-                    description=None,
-                    workflow=None,
-                    status="Unknown",
-                ),
-                already_shown=True,
-            )
-
-        # Defensive cap on total expansions.
-        if len(visited_global) >= max_executions:
-            flags["walked_complete"] = False
-            return None
-
-        # Look up the execution and its inputs.
-        try:
-            record = self.lookup_execution(execution_rid)
-        except DerivaMLException:
-            # An input pointed at an Execution that no longer exists;
-            # treat as missing rather than failing the whole walk.
-            return None
-
-        visited_global.add(execution_rid)
-        in_progress.add(execution_rid)
-
-        try:
-            wf_summary: "WorkflowSummary | None" = None
-            if record.workflow is not None and record.workflow.workflow_rid is not None:
-                wf_summary = WorkflowSummary(
-                    rid=record.workflow.workflow_rid,
-                    name=record.workflow.name,
-                    url=getattr(record.workflow, "url", None),
-                    version=getattr(record.workflow, "version", None),
-                )
-
-            execution_summary = ExecutionSummary(
-                rid=execution_rid,
-                description=record.description,
-                workflow=wf_summary,
-                status=record.status.value if record.status else "Unknown",
-            )
-
-            # Consumed inputs. Walk the version that was ACTUALLY consumed
-            # (Dataset_Execution.Dataset_Version), not the dataset's current
-            # state, so lineage reflects the inputs as they were at consumption.
-            consumed_datasets: list[DatasetSummary] = []
-            parent_rids: set[RID] = set()
-            for ds, consumed_version in self._input_dataset_pairs(execution_rid):
-                version_str = consumed_version
-                if version_str is None:
-                    try:
-                        version_str = str(ds.current_version)
-                    except Exception:
-                        version_str = None
-                consumed_datasets.append(
-                    DatasetSummary(
-                        rid=ds.dataset_rid,
-                        description=ds.description or None,
-                        version=version_str,
-                    )
-                )
-                producer = self._producer_of_dataset(ds.dataset_rid, version=consumed_version)
-                # Never the execution we are currently expanding: if it produced
-                # the consumed version of a dataset it also consumed, listing it
-                # as its own parent re-enters `in_progress` and flags a false
-                # cycle (same reason the member-producers below subtract it).
-                if producer and producer != execution_rid:
-                    parent_rids.add(producer)
-                # Member-producers of the CONSUMED version. Never the execution
-                # we are currently expanding: an execution that both consumed
-                # this dataset and produced some of its members must not become
-                # its own parent (the mid-walk analogue of the root path's
-                # version-producer subtraction).
-                member_producers = self._producers_of_dataset_members(ds.dataset_rid, version=consumed_version)
-                parent_rids |= member_producers - {execution_rid}
-
-            consumed_assets: list[AssetSummary] = []
-            for asset in record.list_assets(asset_role="Input"):
-                consumed_assets.append(
-                    AssetSummary(
-                        rid=asset.asset_rid,
-                        filename=asset.filename or None,
-                        asset_table=asset.asset_table,
-                    )
-                )
-                try:
-                    asset_table_obj = self.model.name_to_table(asset.asset_table)
-                    producer = self._producer_of_asset(asset.asset_rid, asset_table_obj)
-                    if producer:
-                        parent_rids.add(producer)
-                except Exception:
-                    # If we can't resolve the producer of one asset,
-                    # keep walking the rest of the inputs.
-                    pass
-
-            # Root-seeded member-producers (and any other externally supplied
-            # parents) are merged in before recursion so they get full
-            # visited/cycle/depth handling.
-            if extra_parent_rids:
-                parent_rids |= extra_parent_rids
-
-            # Recurse on parents.
-            parents: list[LineageNode] = []
-            if depth_remaining is None or depth_remaining > 0:
-                next_depth = None if depth_remaining is None else depth_remaining - 1
-                for pr in parent_rids:
-                    child = self._walk_node(
-                        execution_rid=pr,
-                        depth_remaining=next_depth,
-                        max_executions=max_executions,
-                        visited_global=visited_global,
-                        in_progress=in_progress,
-                        flags=flags,
-                    )
-                    if child is not None:
-                        parents.append(child)
-            elif parent_rids:
-                # We had parents but depth said stop. Mark depth_capped.
-                flags["depth_capped"] = True
-
-            return LineageNode(
-                execution=execution_summary,
-                consumed_datasets=consumed_datasets,
-                consumed_assets=consumed_assets,
-                parents=parents,
-            )
-        finally:
-            in_progress.discard(execution_rid)
