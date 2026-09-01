@@ -94,7 +94,20 @@ summaries (`ExecutionSummary`, `DatasetSummary`, `AssetSummary`,
   serializes them as plain strings, so the JSON envelope is unaffected.
   Exported from `execution/provenance.py`:
 
+  The rule has a principled stopping point: **enums are for vocabularies
+  deriva-ml itself closes.** Catalog-sourced open vocabularies —
+  `ExecutionSummary.status`, `element_type` / table names, `asset_table` —
+  deliberately stay `str`: enum-validating them would make records from
+  older or foreign catalogs fail model validation on values deriva-ml
+  doesn't control.
+
 ```python
+class RootType(StrEnum):        # replaces RootDescriptor.type's Literal (in scope, §6.7)
+    dataset = "Dataset"
+    asset = "Asset"
+    feature = "Feature"
+    execution = "Execution"
+
 class ArcKind(StrEnum):
     root = "root"
     consumption = "consumption"
@@ -244,7 +257,9 @@ class _WalkEngine:
   (default `4 × max_executions`) so a large ancestry graph containing few
   executions cannot walk unboundedly. Hitting either sets
   `traversal_complete=False` and `cap_hit=True`.
-- **`lookup_lineage`** = engine with `arcs={"consumption"}` feeding a
+- The engine's arc gate is typed: `arcs: frozenset[ArcKind]`, never bare
+  strings.
+- **`lookup_lineage`** = engine with `arcs={ArcKind.consumption}` feeding a
   **TreeBuilder** that reproduces today's `LineageNode` tree — including
   `already_shown` collapse, member-producer fallback seeding, candidate
   iteration, and unpinned-input display behavior. Byte-identical output is
@@ -324,6 +339,15 @@ Executions with no workflow record emit `no_workflow` gaps. The spec's
 completeness claim is correspondingly precise: the closure identifies the
 workflow *record* and its checksum — not a git-state attestation beyond
 what capture recorded.
+
+### 6.7 `RootDescriptor.type` migration to `RootType`
+The shipped `RootDescriptor.type` is a `Literal` with the same four values.
+In scope: convert it to `RootType` (defined in `provenance.py`, imported by
+`lineage.py`). The change is runtime-compatible — members carry the
+identical string values, compare equal to the strings existing callers
+use, and `model_dump()` output is unchanged — so `lookup_lineage`'s
+byte-identical guarantee holds through it (the golden captures in §8
+prove it rather than assert it).
 
 ## 7. Non-goals (stay downstream, per the issue's boundary section)
 

@@ -773,4 +773,12 @@ compare equal to their strings and dump as plain strings, so the JSON
 envelope and string-literal comparisons in user code are unaffected.
 Closure result classes are Pydantic per the CLAUDE.md class-idiom rule
 (boundary-crossing, user-facing, all-Pydantic siblings); only
-engine-private bookkeeping may be dataclasses.
+engine-private bookkeeping may be dataclasses. Extended on Carl's
+follow-up ("more opportunities"): `RootType` replaces
+`RootDescriptor.type`'s Literal (runtime-compatible — same string
+values), and the engine's arc gate is `frozenset[ArcKind]`. The
+STOPPING POINT matters as much as the rule: enums only for
+vocabularies deriva-ml itself CLOSES — catalog-sourced open
+vocabularies (status, element_type, asset_table) stay `str`, because
+enum validation would reject older/foreign catalog values deriva-ml
+doesn't control.
