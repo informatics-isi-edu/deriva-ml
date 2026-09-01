@@ -239,12 +239,15 @@ def test_bare_model_dump_input_still_works(tmp_path):
     assert _rid(1) in out.read_text(encoding="utf-8")
 
 
-def test_svg_nodes_carry_native_tooltips():
+def test_svg_nodes_carry_hover_tooltips():
     """Execution boxes, dataset pills, feature marks, and arrows carry
-    SVG <title> hover tooltips (parity with the deploy visualizer)."""
+    hover tooltips (parity with the deploy visualizer). The text lives in
+    aria-label, NOT a native <title>: a browser draws <title> as its own
+    chrome tooltip on top of the CSS overlay — two tooltips, two styles."""
     page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
     svg = page[page.index("<svg") : page.index("</svg>")]
-    assert svg.count("<title>") >= 4  # exec node, dataset pill, feature mark, arrow
+    assert svg.count("aria-label=") >= 4  # exec node, dataset pill, feature mark, arrow
+    assert "<title>" not in svg  # native tooltip would double the CSS one
     assert "Completed" in svg  # execution tooltip carries status
     assert "cohort" in svg  # dataset tooltip carries the description
     assert _rid(40) in svg  # feature tooltip names the producing execution
@@ -302,7 +305,8 @@ def test_svg_tooltips_are_css_drawn_not_native_only():
     svg = page[page.index("<svg") : page.index("</svg>")]
     assert ".tt{visibility:hidden" in svg  # overlays exist and start hidden
     assert ":hover~#tt" in svg  # pure-CSS reveal, sibling combinator
-    assert svg.count('class="tt"') == svg.count("<title>")  # one overlay per titled node
+    labeled = svg.count("aria-label=") - 1  # the <svg> element's own aria-label
+    assert svg.count('class="tt"') == labeled  # one overlay per labeled node
     assert "<script" not in svg
 
 

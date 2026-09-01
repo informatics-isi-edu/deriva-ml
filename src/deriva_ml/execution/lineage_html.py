@@ -289,10 +289,12 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
         f'border:1px solid #dde3ea;border-radius:8px">'
     ]
 
-    # CSS-drawn hover tooltips. Native SVG <title> hover text (kept for
-    # accessibility) is rendered by the browser chrome, which embedded
-    # preview panes never surface — so the figure draws its own overlays,
-    # hidden until :hover, revealed by a pure-CSS sibling rule. Overlays
+    # CSS-drawn hover tooltips. Native SVG <title> hover text is rendered
+    # by the browser chrome: embedded preview panes never surface it, and
+    # full browsers would draw it ON TOP of these overlays as a second,
+    # differently-styled tooltip — so the figure carries the accessible
+    # text as aria-label instead and draws its own overlays, hidden until
+    # :hover, revealed by a pure-CSS sibling rule. Overlays
     # are appended after all content groups: that puts them last in
     # z-order and after their hover targets, which the `~` combinator
     # requires.
@@ -339,7 +341,7 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
             ex_lines = [x for x in tip_lines if x]
             tip = _esc(chr(10).join(ex_lines))
             parts.append(
-                f'<g class="{hover_cls(ex_lines, x + 12, y + box_h + 6)}"><title>{tip}</title>'
+                f'<g class="{hover_cls(ex_lines, x + 12, y + box_h + 6)}" role="img" aria-label="{tip}">'
                 f'<rect x="{x}" y="{y}" width="{box_w}" height="{box_h}" rx="8" '
                 f'fill="#eef2f6" stroke="#1c4f8a"'
                 f"{" stroke-dasharray='5 3'" if n.get('already_shown') else ''}/>"
@@ -362,7 +364,7 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                 ds_lines = [x for x in ds_tip_lines if x]
                 ds_tip = _esc(chr(10).join(ds_lines))
                 parts.append(
-                    f'<g class="{hover_cls(ds_lines, x + 20, dy + ds_h + 4)}"><title>{ds_tip}</title>'
+                    f'<g class="{hover_cls(ds_lines, x + 20, dy + ds_h + 4)}" role="img" aria-label="{ds_tip}">'
                     f'<rect x="{x + 14}" y="{dy}" width="{box_w - 28}" height="{ds_h}" '
                     f'rx="11" fill="#e8eef7" stroke="#9db4d3"/>'
                     f'<text x="{x + 24}" y="{dy + 15}" font-size="10" '
@@ -378,7 +380,8 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                     ]
                     feat_tip = _esc(chr(10).join(feat_tip_lines))
                     parts.append(
-                        f'<g class="{hover_cls(feat_tip_lines, x + 34, dy + ds_h + 4)}"><title>{feat_tip}</title>'
+                        f'<g class="{hover_cls(feat_tip_lines, x + 34, dy + ds_h + 4)}" '
+                        f'role="img" aria-label="{feat_tip}">'
                         f'<rect x="{x + 28}" y="{dy}" width="{box_w - 42}" height="{ds_h}" '
                         f'rx="4" fill="none" stroke="#a15c00" stroke-dasharray="4 3"/>'
                         f'<text x="{x + 36}" y="{dy + 15}" font-size="10" fill="#a15c00">'
@@ -398,7 +401,7 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                 ]
                 a_tip = _esc(chr(10).join(a_lines))
                 parts.append(
-                    f'<g class="{hover_cls(a_lines, x + 20, dy + ds_h + 4)}"><title>{a_tip}</title>'
+                    f'<g class="{hover_cls(a_lines, x + 20, dy + ds_h + 4)}" role="img" aria-label="{a_tip}">'
                     f'<rect x="{x + 14}" y="{dy}" width="{box_w - 28}" height="{ds_h}" '
                     f'rx="3" fill="#eef7ee" stroke="#4e8a5a"/>'
                     f'<text x="{x + 24}" y="{dy + 15}" font-size="10" '
@@ -418,7 +421,7 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                 arrow_tip = _esc(arrow_text)
                 arrow_cls = hover_cls([arrow_text], (px + cx + box_w) / 2, (py + cy) / 2 + 10)
                 parts.append(
-                    f'<g class="{arrow_cls}"><title>{arrow_tip}</title>'
+                    f'<g class="{arrow_cls}" role="img" aria-label="{arrow_tip}">'
                     f'<line x1="{px}" y1="{py}" x2="{cx + box_w}" y2="{cy}" '
                     f'stroke="#6b7686" stroke-width="1.5"/>'
                     f'<polygon points="{cx + box_w + 6},{cy} {cx + box_w + 14},{cy - 4} '
