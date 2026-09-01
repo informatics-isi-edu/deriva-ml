@@ -34,6 +34,8 @@ Exception Hierarchy:
     │
     ├── DerivaMLReadOnlyError (write operation on read-only resource)
     │
+    ├── SnapshotUnavailable (strict snapshot resolution failed)
+    │
     └── DerivaMLDenormalizeError (denormalization planning errors)
         ├── DerivaMLDenormalizeMultiLeaf
         ├── DerivaMLDenormalizeNoSink
@@ -80,6 +82,7 @@ __all__ = [
     "DerivaMLDirtyWorkflowError",
     "DerivaMLUploadError",
     "DerivaMLReadOnlyError",
+    "SnapshotUnavailable",
     "DerivaMLDenormalizeError",
     "DerivaMLDenormalizeMultiLeaf",
     "DerivaMLDenormalizeNoSink",
@@ -649,6 +652,39 @@ class DerivaMLReadOnlyError(DerivaMLException):
 
     Example:
         >>> raise DerivaMLReadOnlyError("Cannot create datasets in a downloaded bag")  # doctest: +SKIP
+    """
+
+    pass
+
+
+class SnapshotUnavailable(DerivaMLException):
+    """Raised when a dataset version's catalog snapshot cannot be resolved strictly.
+
+    Callers implementing snapshot-closed provenance semantics (e.g. the
+    ``lookup_provenance`` ancestry walk) must never silently read live
+    catalog state when a version's pinned snapshot is missing or
+    unreadable — doing so would let content that postdates the walked
+    version leak into a supposedly-frozen closure. This exception is the
+    signal that converts that situation into an honest gap for the
+    caller to report, rather than a value to keep going with.
+
+    Raised by :meth:`~deriva_ml.dataset.dataset.Dataset.strict_version_snapshot_catalog`
+    when:
+
+    - the version is not found in :meth:`~deriva_ml.dataset.dataset.Dataset.dataset_history`
+      (the version-lookup failure is wrapped into this type rather than
+      propagating the bare :class:`DerivaMLException` that the lookup
+      helper raises), or
+    - the version row exists but its ``Snapshot`` column is empty/None
+      (unlike :meth:`~deriva_ml.dataset.dataset.Dataset._version_snapshot_catalog`,
+      which falls back to a bare-catalog-id, i.e. live, snapshot handle
+      in this case), or
+    - the underlying ``catalog_snapshot(...)`` call itself raises (e.g.
+      the snapshot has been garbage-collected or is otherwise
+      unreadable).
+
+    Example:
+        >>> raise SnapshotUnavailable("Dataset 1-ABC version 1.0.0 has no recorded snapshot")  # doctest: +SKIP
     """
 
     pass

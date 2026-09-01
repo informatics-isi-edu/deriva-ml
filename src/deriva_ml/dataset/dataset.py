@@ -53,6 +53,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLCycleError,
     DerivaMLException,
     DerivaMLValidationError,
+    SnapshotUnavailable,
 )
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.mixins.rid_resolution import AnyQuantifier
@@ -3066,3 +3067,133 @@ class Dataset:
             if version_record.snapshot
             else self._ml_instance.catalog.catalog_id
         )
+
+    def strict_version_snapshot_catalog(self, version: DatasetVersion | str) -> DerivaMLCatalog:
+        """Get a catalog instance bound to a specific version's snapshot, with no live fallback.
+
+        This is the snapshot-closed sibling of :meth:`_version_snapshot_catalog`.
+        That method silently falls back to a bare-catalog-id (i.e. **live**)
+        snapshot handle when a version row's ``Snapshot`` column is empty —
+        acceptable for ordinary browsing, where "give me the closest thing
+        you can" is the right default. It is **not** acceptable for
+        provenance semantics: a caller building a snapshot-closed closure
+        (e.g. ``lookup_provenance``'s ancestry walk, per design ruling 6)
+        must never let content that postdates the walked version leak in
+        through a silent live read. This method enforces that by raising
+        :class:`~deriva_ml.core.exceptions.SnapshotUnavailable` instead of
+        ever returning a live or bare-id catalog.
+
+        Args:
+            version: The dataset version to get a snapshot for. Unlike
+                :meth:`_version_snapshot_catalog`, there is no "omit for
+                live" mode — every call must resolve to an actual pinned
+                snapshot or raise.
+
+        Returns:
+            DerivaMLCatalog: A catalog instance bound to ``"<catalog_id>@<snapshot>"``.
+
+        Raises:
+            SnapshotUnavailable: If the version is not found in
+                :meth:`dataset_history`, if the version row's ``Snapshot``
+                is empty/None, or if the underlying ``catalog_snapshot(...)``
+                call itself raises (e.g. the snapshot has been garbage
+                collected or is otherwise unreadable).
+
+        Example:
+            >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
+            >>> catalog = ds.strict_version_snapshot_catalog("1.0.0")  # doctest: +SKIP
+        """
+        try:
+            snapshot_id = self._version_snapshot_catalog_id(version)
+        except DerivaMLException as e:
+            raise SnapshotUnavailable(
+                f"Dataset {self.dataset_rid} version {version}: version not resolvable in history ({e})"
+            ) from e
+
+        # ``_version_snapshot_catalog_id`` returns the BARE catalog id
+        # (no "@snapshot" suffix) when the version row's Snapshot column
+        # is falsy — that is exactly the live-fallback case this method
+        # must refuse. Bare ids never contain "@", so this is a reliable
+        # discriminator without re-querying history.
+        if "@" not in snapshot_id:
+            raise SnapshotUnavailable(
+                f"Dataset {self.dataset_rid} version {version} has no recorded catalog snapshot "
+                "(Snapshot column is empty) — cannot resolve a snapshot-closed view."
+            )
+
+        try:
+            return self._ml_instance.catalog_snapshot(snapshot_id)
+        except Exception as e:
+            raise SnapshotUnavailable(
+                f"Dataset {self.dataset_rid} version {version}: snapshot {snapshot_id!r} is unreadable ({e})"
+            ) from e
+
+    def strict_parents_at(self, version: DatasetVersion | str) -> list[dict]:
+        """Return this dataset's parent datasets as read AT a specific version's snapshot.
+
+        Mirrors :meth:`list_dataset_parents`'s version-resolution semantics
+        exactly — parents are discovered via the same ``Dataset_Dataset``
+        association-table query, evaluated against the same snapshot-bound
+        catalog — but (a) uses the strict resolver
+        (:meth:`strict_version_snapshot_catalog`) so an unresolvable
+        snapshot raises rather than silently reading live state, and (b)
+        additionally reports each parent's **own** current version as of
+        that same snaptime (``parent_version_then``).
+
+        ``parent_version_then`` resolution: per the design's ruling 6
+        ("ancestry hops resolve at snapshots"), a ``Dataset_Dataset`` hop
+        reads the parent as of the child version's snaptime. Concretely,
+        each parent RID is looked up (``lookup_dataset``, exactly as
+        :meth:`list_dataset_parents` does) against the *child's* snapshot
+        catalog, and the parent's :attr:`current_version` is read from
+        that same snapshot-bound instance — i.e. "the parent's version-row
+        history, filtered as ERMrest naturally does at that snapshot,
+        then take the max". This is the parent's version FK/pointer as
+        observed at the child's snaptime, not an unbounded "latest ever"
+        read against live history. When the parent has no version history
+        visible at that snaptime (e.g. the parent dataset didn't exist yet,
+        or its version rows are otherwise unresolvable), ``parent_version_then``
+        is ``None`` rather than raising — that is itself a reported gap for
+        the caller, not a fatal error for the whole hop.
+
+        Args:
+            version: The version of *this* dataset whose snapshot anchors
+                the read. Must resolve to a pinned snapshot — see
+                :meth:`strict_version_snapshot_catalog`.
+
+        Returns:
+            list[dict]: One dict per parent, each with keys:
+                ``parent_rid`` (RID of the parent dataset) and
+                ``parent_version_then`` (the parent's current version as
+                of the child's snaptime, or ``None`` if unresolvable).
+
+        Raises:
+            SnapshotUnavailable: If ``version`` cannot be resolved to a
+                pinned snapshot for this dataset.
+
+        Example:
+            >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
+            >>> ds.strict_parents_at("1.0.0")  # doctest: +SKIP
+            [{'parent_rid': '1-DEF', 'parent_version_then': '0.3.0'}]
+        """
+        version_snapshot_catalog = self.strict_version_snapshot_catalog(version)
+        pb = version_snapshot_catalog.pathBuilder()
+        atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
+        parents = [
+            version_snapshot_catalog.lookup_dataset(p["Dataset"])
+            for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
+        ]
+
+        results: list[dict] = []
+        for parent in parents:
+            try:
+                parent_version_then = str(parent.current_version)
+            except DerivaMLException:
+                parent_version_then = None
+            results.append(
+                {
+                    "parent_rid": parent.dataset_rid,
+                    "parent_version_then": parent_version_then,
+                }
+            )
+        return results
