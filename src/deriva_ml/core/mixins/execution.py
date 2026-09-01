@@ -7,6 +7,7 @@ execution status.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
@@ -51,6 +52,31 @@ if TYPE_CHECKING:
 
 
 __all__ = ["ExecutionMixin"]
+
+
+@dataclass(frozen=True)
+class BindingDiagnostic:
+    """Internal record of a silent-degrade branch hit during a binding scan.
+
+    Not part of the public API — ``_find_feature_producers_impl`` collects
+    these so a caller with diagnostic needs (e.g. a future MCP surface) can
+    see *why* the returned record set is smaller than the full schema walk,
+    without the public :meth:`ExecutionMixin.find_feature_producers` wrapper
+    changing its return shape.
+
+    Attributes:
+        kind: One of ``"ambiguous_hop"``, ``"snapshot_absent"``,
+            ``"query_failed"``, ``"discovery_failed"``.
+        subject: The feature name, table name, or other identifier the
+            diagnostic is about.
+        detail: Human-readable detail, typically the stringified exception
+            or reason for the skip.
+    """
+
+    kind: str
+    subject: str
+    detail: str
+
 
 # Chunk size for batched RID-disjunction fetches. Bounds URL length (the
 # tk-023 lesson: never one unbounded .in_()/disjunction over a caller-sized
@@ -1752,6 +1778,29 @@ class ExecutionMixin:
             >>> for rec in ml.find_feature_producers(dataset.rid):  # doctest: +SKIP
             ...     print(rec.execution_rid, rec.feature_name, rec.value_count)
         """
+        return self._find_feature_producers_impl(dataset_rid, version)[0]
+
+    def _find_feature_producers_impl(
+        self, dataset_rid: RID, version: Any | None = None
+    ) -> "tuple[list[FeatureProducerRecord], list[BindingDiagnostic]]":
+        """Implementation of :meth:`find_feature_producers` with diagnostics.
+
+        Identical binding-scan logic to the public method, but every
+        silent-degrade branch (ambiguous hop, snapshot-absent table,
+        per-feature query failure, discovery-level failure) appends a
+        :class:`BindingDiagnostic` instead of only logging a warning. The
+        returned records list is byte-identical to what the public wrapper
+        returns.
+
+        Args:
+            dataset_rid: RID of the dataset whose members' bindings to
+                inspect.
+            version: Optional dataset version — see
+                :meth:`find_feature_producers`.
+
+        Returns:
+            A ``(records, diagnostics)`` tuple.
+        """
         from collections import Counter
 
         from deriva.core import datapath
@@ -1760,6 +1809,7 @@ class ExecutionMixin:
         from deriva_ml.feature import FeatureProducerRecord
 
         logger = get_logger(__name__)
+        diagnostics: list[BindingDiagnostic] = []
         dataset = self.lookup_dataset(dataset_rid)
         if version is not None:
             # Snapshot-bind EVERYTHING: model, planner, feature discovery,
@@ -1777,9 +1827,10 @@ class ExecutionMixin:
             features = list(model.find_features())
         except Exception as exc:  # noqa: BLE001
             logger.warning("Feature discovery failed: %s", exc)
-            return []
+            diagnostics.append(BindingDiagnostic(kind="discovery_failed", subject="find_features", detail=str(exc)))
+            return [], diagnostics
         if not features:
-            return []
+            return [], diagnostics
 
         feature_table_names = {f.feature_table.name for f in features}
         try:
@@ -1789,7 +1840,8 @@ class ExecutionMixin:
             all_paths = planner._schema_to_paths(exclude_tables=set(feature_table_names))
         except Exception as exc:  # noqa: BLE001 — no paths means no arc, not a crash
             logger.warning("Feature-path enumeration failed: %s", exc)
-            return []
+            diagnostics.append(BindingDiagnostic(kind="discovery_failed", subject="_schema_to_paths", detail=str(exc)))
+            return [], diagnostics
 
         # Paths keyed by schema-qualified TARGET table — arriving at a
         # feature table via a value/asset FK must never count (the binding
@@ -1817,6 +1869,13 @@ class ExecutionMixin:
                     ftable_meta.name,
                     exc,
                 )
+                diagnostics.append(
+                    BindingDiagnostic(
+                        kind="ambiguous_hop",
+                        subject=str(feature.feature_name),
+                        detail=f"ambiguous target link {target_meta.name} -> {ftable_meta.name}: {exc}",
+                    )
+                )
                 continue
 
             usable: list[tuple[list[Any], list[list[tuple[Any, Any]]]]] = []
@@ -1828,6 +1887,13 @@ class ExecutionMixin:
                         "Skipping ambiguous feature path %s: %s",
                         " -> ".join(t.name for t in path),
                         exc,
+                    )
+                    diagnostics.append(
+                        BindingDiagnostic(
+                            kind="ambiguous_hop",
+                            subject=" -> ".join(t.name for t in path),
+                            detail=str(exc),
+                        )
                     )
                     continue
                 usable.append((path + [ftable_meta], joins + [final_hop]))
@@ -1859,6 +1925,13 @@ class ExecutionMixin:
                 path, joins = usable[0]
                 tables = _resolve_tables(path)
                 if tables is None:
+                    diagnostics.append(
+                        BindingDiagnostic(
+                            kind="snapshot_absent",
+                            subject=" -> ".join(t.name for t in path),
+                            detail="table absent from snapshot schema",
+                        )
+                    )
                     continue
                 try:
                     dp = _build(tables, joins)
@@ -1875,6 +1948,13 @@ class ExecutionMixin:
                         dataset_rid,
                         exc,
                     )
+                    diagnostics.append(
+                        BindingDiagnostic(
+                            kind="query_failed",
+                            subject=" -> ".join(t.name for t in path),
+                            detail=str(exc),
+                        )
+                    )
                     continue
             else:
                 # Multiple routes: union feature-row RIDs across paths so a
@@ -1884,6 +1964,13 @@ class ExecutionMixin:
                 for path, joins in usable:
                     tables = _resolve_tables(path)
                     if tables is None:
+                        diagnostics.append(
+                            BindingDiagnostic(
+                                kind="snapshot_absent",
+                                subject=" -> ".join(t.name for t in path),
+                                detail="table absent from snapshot schema",
+                            )
+                        )
                         continue
                     try:
                         dp = _build(tables, joins)
@@ -1900,6 +1987,13 @@ class ExecutionMixin:
                             dataset_rid,
                             exc,
                         )
+                        diagnostics.append(
+                            BindingDiagnostic(
+                                kind="query_failed",
+                                subject=" -> ".join(t.name for t in path),
+                                detail=str(exc),
+                            )
+                        )
                 if not any_ran:
                     continue
                 counts = Counter(row_exec.values())
@@ -1915,7 +2009,7 @@ class ExecutionMixin:
                 )
 
         records.sort(key=lambda r: (r.feature_name, r.element_type, r.execution_rid or ""))
-        return records
+        return records, diagnostics
 
     def _producers_of_dataset_members(self, dataset_rid: RID, version: Any | None = None) -> set[RID]:
         """Distinct executions that produced the member assets of a dataset.

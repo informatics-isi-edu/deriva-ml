@@ -17,7 +17,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.core.mixins.execution import ExecutionMixin
+from deriva_ml.core.mixins.execution import BindingDiagnostic, ExecutionMixin
 from deriva_ml.feature import FeatureProducerRecord
 
 
@@ -346,3 +346,134 @@ def test_deterministic_order():
 def test_no_features_empty():
     h = _Harness(paths=[_p("Dataset_Image", IMG)], features=[])
     assert h.ml.find_feature_producers(_rid(500)) == []
+
+
+# --- Task 6: _find_feature_producers_impl diagnostics -----------------
+
+
+def test_impl_happy_path_returns_empty_diagnostics():
+    e1 = _rid(10)
+    h = _Harness(
+        paths=[_p("Dataset_Image", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": e1, "value_count": 2}]},
+    )
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+    assert [(r.execution_rid, r.feature_name, r.element_type, r.value_count) for r in records] == [
+        (e1, "Annotation", IMG, 2)
+    ]
+    assert diagnostics == []
+
+
+def test_wrapper_output_matches_impl_records():
+    e1 = _rid(10)
+    h = _Harness(
+        paths=[_p("Dataset_Image", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": e1, "value_count": 2}]},
+    )
+    records, _diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+    assert h.ml.find_feature_producers(_rid(500)) == records
+
+
+def test_impl_ambiguous_hop_yields_diagnostic_and_keeps_records():
+    e1 = _rid(10)
+    h = _Harness(
+        paths=[
+            _p("Dataset_Image", IMG),
+            _p("Dataset_Subject", SUBJ, "Observation", IMG),
+        ],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": e1, "value_count": 1}]},
+        relationships={("Observation", IMG): "ambiguous"},
+    )
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+    assert [(r.execution_rid, r.value_count) for r in records] == [(e1, 1)]
+    assert any(d.kind == "ambiguous_hop" for d in diagnostics)
+    assert all(isinstance(d, BindingDiagnostic) for d in diagnostics)
+
+
+def test_impl_ambiguous_final_hop_yields_diagnostic():
+    """The target->feature-table ambiguous hop (skips the whole feature),
+    distinct from an ambiguous intermediate hop within a path."""
+    h = _Harness(
+        paths=[_p("Dataset_Image", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        relationships={(IMG, FT_IMG): "ambiguous"},
+    )
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+    assert records == []
+    assert any(d.kind == "ambiguous_hop" and d.subject == "Annotation" for d in diagnostics)
+
+
+def test_impl_snapshot_absent_table_yields_diagnostic():
+    e1 = _rid(10)
+    h = _Harness(paths=[], features=[])  # live source: empty on purpose
+    snap = _Source(
+        h,
+        paths=[_p("Dataset_Image", IMG), _p("Dataset_Subject", SUBJ)],
+        features=[
+            _feature("Annotation", _tbl(IMG), _tbl(FT_IMG)),
+            _feature("Grade", _tbl(SUBJ), _tbl(FT_SUBJ)),
+        ],
+    )
+    h.snapshot = snap
+    h.ml.lookup_dataset = lambda rid: SimpleNamespace(dataset_rid=rid, _version_snapshot_catalog=lambda v: snap)
+    h.grouped_rows = {("domain", FT_IMG): [{"Execution": e1, "value_count": 2}]}
+    h.missing_tables = {("domain", FT_SUBJ)}  # predates the snapshot
+
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500), version="0.4.0")
+    assert [(r.feature_name, r.execution_rid, r.value_count) for r in records] == [("Annotation", e1, 2)]
+    assert any(d.kind == "snapshot_absent" for d in diagnostics)
+
+
+def test_impl_per_feature_query_failure_yields_diagnostic():
+    e1 = _rid(10)
+    h = _Harness(
+        paths=[_p("Dataset_Image", IMG), _p("Dataset_Subject", SUBJ)],
+        features=[
+            _feature("Annotation", _tbl(IMG), _tbl(FT_IMG)),
+            _feature("Grade", _tbl(SUBJ), _tbl(FT_SUBJ)),
+        ],
+        grouped_rows={
+            ("domain", FT_IMG): RuntimeError("feature table unreadable"),
+            ("domain", FT_SUBJ): [{"Execution": e1, "value_count": 1}],
+        },
+    )
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+    assert [(r.feature_name, r.execution_rid) for r in records] == [("Grade", e1)]
+    assert any(d.kind == "query_failed" for d in diagnostics)
+
+
+def test_impl_multi_path_query_failure_yields_diagnostic():
+    """The multi-route branch's per-path failure also produces a diagnostic."""
+    h = _Harness(
+        paths=[
+            _p("Dataset_Image", IMG),
+            _p("Dataset_Subject", SUBJ, "Observation", IMG),
+        ],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        raw_rows={("domain", FT_IMG): RuntimeError("boom")},
+    )
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+    assert records == []
+    assert any(d.kind == "query_failed" for d in diagnostics)
+
+
+def test_impl_discovery_failed_find_features_raises():
+    h = _Harness(paths=[_p("Dataset_Image", IMG)], features=[])
+    h.live.model.find_features.side_effect = RuntimeError("catalog unreachable")
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+    assert records == []
+    assert any(d.kind == "discovery_failed" for d in diagnostics)
+
+
+def test_impl_discovery_failed_schema_to_paths_raises():
+    h = _Harness(
+        paths=[_p("Dataset_Image", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+    )
+    h.live.planner._schema_to_paths.side_effect = RuntimeError("planner exploded")
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+    assert records == []
+    assert any(d.kind == "discovery_failed" for d in diagnostics)
