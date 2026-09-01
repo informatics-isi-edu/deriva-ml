@@ -766,6 +766,7 @@ is a closure member:
 | `consumption` | produced an input another closure member consumed |
 | `version_authorship` | authored a walked dataset version (≤ the pinned version) |
 | `member_binding` | bound feature values onto a walked dataset's members |
+| `member_production` | produced a member (asset) of a walked dataset version — the asset analogue of `member_binding`. Mid-walk discoveries only: a member producer that *seeds* the walk carries `root` instead |
 
 An execution can carry more than one arc at once — nothing here elects a
 single "the" reason. Arcs are a **set with no strength ordering** between
@@ -824,8 +825,11 @@ executions expanded; a proportional internal dataset-version budget
 ancestry graph with few executions cannot walk unboundedly.
 `traversal_complete=False` means one of the two budgets was hit — the
 closure is a **partial but honest** answer, not a false completeness claim.
-`cap_hit` is the same signal under the name that matches
-`LineageResult.walked_complete`'s sibling field.
+`cap_hit` is the same signal exposed under the name the budget machinery
+itself uses. It is related to, but not the same as,
+`LineageResult.walked_complete`, which reports only whether the *execution*
+walk finished: a dataset-version budget stop sets `cap_hit` while leaving
+the execution walk complete.
 
 For the full method signature and the Pydantic model definitions
 (`ProvenanceClosure`, `ProvenanceExecution`, `ProvenanceDataset`,

@@ -69,10 +69,19 @@ class ArcKind(StrEnum):
             before the walked version) of a walked dataset.
         member_binding: The execution bound feature values onto a
             walked dataset version's members.
+        member_production: The execution produced a member (asset) of a
+            walked dataset version — the asset analogue of
+            ``member_binding`` (a dataset's content is its members plus
+            the bindings onto them, and a member producer contributes
+            content). Recorded for mid-walk discoveries only: a member
+            producer that *seeds* the walk is the root, and keeps
+            :attr:`root`.
 
     Example:
         >>> from deriva_ml.execution.provenance import ArcKind
         >>> ArcKind.consumption == "consumption"
+        True
+        >>> ArcKind.member_production == "member_production"
         True
     """
 
@@ -80,6 +89,7 @@ class ArcKind(StrEnum):
     consumption = "consumption"
     version_authorship = "version_authorship"
     member_binding = "member_binding"
+    member_production = "member_production"
 
 
 class ArcInputType(StrEnum):
@@ -421,7 +431,12 @@ class ProvenanceGap(BaseModel):
 
     Attributes:
         kind: The gap category — see :class:`GapKind`.
-        subject_rid: RID of the entity the gap concerns.
+        subject_rid: The RID of the affected entity — or, for
+            ``binding_scan_failed`` gaps, a display identifier for the
+            scan path that failed (the
+            :class:`~deriva_ml.core.mixins.execution.BindingDiagnostic`'s
+            ``subject``, e.g. a feature or table name), because a failed
+            scan has no single entity RID to name.
         detail: Human-readable explanation of what could not be
             resolved and why.
 

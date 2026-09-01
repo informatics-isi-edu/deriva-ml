@@ -300,9 +300,6 @@ class ClosureBuilder:
         self.assets: dict[str, ProvenanceAsset] = {}
         self.gaps: list[ProvenanceGap] = []
         self._gap_keys: set[tuple] = set()
-        # Executions discovered through a non-tree arc but not yet expanded;
-        # the frontend hands these to the engine's queue.
-        self.pending: list[tuple[str, int]] = []
 
     # -- accumulation primitives ------------------------------------------
 
@@ -387,21 +384,6 @@ class ClosureBuilder:
                 key=lambda r: (r.feature_name, r.element_type, r.execution_rid or ""),
             )
         return arcs
-
-    def enqueue(self, rid: str, depth: int) -> None:
-        """Note an arc-discovered execution for the frontend to expand.
-
-        Args:
-            rid: Execution RID discovered through an arc.
-            depth: Depth at which it was discovered.
-
-        Example:
-            >>> builder = ClosureBuilder()
-            >>> builder.enqueue("1-ABCD", 1)
-            >>> builder.pending
-            [('1-ABCD', 1)]
-        """
-        self.pending.append((rid, depth))
 
     # -- tree construction (degenerate: a closure has no tree) ------------
 
@@ -1591,7 +1573,26 @@ class WalkEngine(Generic[N]):
                 # its own parent (the mid-walk analogue of the root path's
                 # version-producer subtraction).
                 member_producers = ml._producers_of_dataset_members(ds.dataset_rid, version=consumed_version)
-                parent_rids |= member_producers - {rid}
+                member_producers = member_producers - {rid}
+                parent_rids |= member_producers
+                if ArcKind.member_production in self.arcs:
+                    # Ruling 7: a mid-walk member producer is in the closure
+                    # because it produced a MEMBER of this consumed
+                    # dataset@version — the asset analogue of member_binding,
+                    # and a reason no other arc kind records. Without it these
+                    # executions would sit in the closure with empty arcs,
+                    # breaking the model's "arcs record every reason" promise.
+                    # (Root-path member-fallback seeds are NOT this case: they
+                    # are the seed, and keep ``ArcKind.root``.)
+                    for member_producer in sorted(member_producers):
+                        self._record_arc(
+                            member_producer,
+                            kind=ArcKind.member_production,
+                            depth=depth + 1,
+                            input_rid=ds.dataset_rid,
+                            input_type=ArcInputType.dataset,
+                            input_version=consumed_version,
+                        )
                 self.expand_dataset(ds.dataset_rid, consumed_version, depth=depth)
 
             for asset in record.list_assets(asset_role="Input"):

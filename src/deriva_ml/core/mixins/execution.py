@@ -1457,9 +1457,12 @@ class ExecutionMixin:
             hit — it is **not** a claim of gap-freedom, which is
             ``not closure.gaps`` and can be True or False independently of
             ``traversal_complete``. ``cap_hit`` is the same signal as
-            ``not traversal_complete``, exposed under the name that matches
-            :attr:`~deriva_ml.execution.lineage.LineageResult`'s analogous
-            field.
+            ``not traversal_complete``, exposed under the name the budget
+            machinery itself uses. It is *related to* but not the same as
+            :attr:`~deriva_ml.execution.lineage.LineageResult.walked_complete`,
+            which reports only whether the EXECUTION walk finished: a
+            dataset-version budget stop sets ``cap_hit`` while leaving the
+            execution walk complete.
 
         Raises:
             DerivaMLValidationError: If ``version`` is given for a
@@ -1499,7 +1502,15 @@ class ExecutionMixin:
         engine: "WalkEngine[str]" = WalkEngine(
             self,
             builder,
-            arcs=frozenset({ArcKind.root, ArcKind.consumption, ArcKind.version_authorship, ArcKind.member_binding}),
+            arcs=frozenset(
+                {
+                    ArcKind.root,
+                    ArcKind.consumption,
+                    ArcKind.version_authorship,
+                    ArcKind.member_binding,
+                    ArcKind.member_production,
+                }
+            ),
             max_executions=max_executions,
             dataset_budget=_DATASET_BUDGET_FACTOR * max_executions,
             closure_mode=True,
@@ -1534,10 +1545,9 @@ class ExecutionMixin:
         if root_descriptor.type == "Dataset" and root_version is not None:
             engine.expand_dataset(rid, root_version, depth=0)
 
-        # Executions discovered through a non-tree arc (later tasks' legs)
-        # are drained under the same execution budget.
-        for pending_rid, pending_depth in builder.pending:
-            engine.enqueue_execution(pending_rid, depth=pending_depth)
+        # Executions discovered through a non-tree arc (the dataset-side legs)
+        # were queued on the engine as they were found; drain them under the
+        # same execution budget.
         engine.drain(depth_remaining=None)
 
         # An arc recorded against a RID that never became a closure member

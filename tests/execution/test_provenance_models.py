@@ -42,6 +42,8 @@ def test_enums_are_strenums_with_string_equality():
     assert ArcKind.consumption == "consumption"
     assert ArcKind.version_authorship == "version_authorship"
     assert ArcKind.member_binding == "member_binding"
+    assert ArcKind.member_production == "member_production"
+    assert len(ArcKind) == 5
 
     assert ArcInputType.dataset == "dataset"
     assert ArcInputType.asset == "asset"

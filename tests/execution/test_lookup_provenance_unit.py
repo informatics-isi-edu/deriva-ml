@@ -1107,8 +1107,6 @@ def _dataset_budget_walk(ml: _FakeML, consumer: str, *, dataset_budget: int):
     )
     builder.record_arc(consumer, kind=ArcKind.root, depth=0)
     engine.expand_execution(consumer, depth_remaining=None, depth=0)
-    for pending_rid, pending_depth in builder.pending:
-        engine.enqueue_execution(pending_rid, depth=pending_depth)
     engine.drain(depth_remaining=None)
     return engine, builder
 
@@ -1481,9 +1479,13 @@ def test_binding_null_execution_emits_gap_no_arc():
     assert len(gaps) == 1
     assert "Annotation" in gaps[0].detail
     assert "Image" in gaps[0].detail
-    # No member_binding arc anywhere records a None-consumed_by/no-execution
-    # entry — there is nothing to attach one to.
-    assert all(a.kind != ArcKind.member_binding or a.evidence[0].execution_rid is not None for a in closure.gaps)
+    # The null-execution record produced NO member_binding arc anywhere in
+    # the closure: there is no execution to attach one to, so the dataset it
+    # was scanned on must not appear as any arc's ``input_rid``.
+    binding_arcs = [
+        arc for member in closure.executions.values() for arc in member.arcs if arc.kind == ArcKind.member_binding
+    ]
+    assert [arc for arc in binding_arcs if arc.input_rid == ds_root] == []
 
 
 def test_binding_scan_diagnostic_emits_gap_while_surviving_records_still_arc():
@@ -1680,6 +1682,223 @@ def test_binding_sentinel_guard_frees_budget_for_the_real_binder():
     assert real_binder in closure.executions
     assert closure.cap_hit is False
     assert closure.traversal_complete is True
+
+
+def test_authorship_sentinel_guard_frees_budget_for_the_real_author():
+    """The AUTHORSHIP leg's sentinel guard is load-bearing for the same
+    budget reason the binding leg's is (the clone of Task 12's
+    budget-sensitive test for ``_expand_version_authorship``).
+
+    The snapshot-scoped version history records TWO authors in order: the
+    sentinel (the origin row) and then a real author. With a budget of
+    exactly 2 — one slot spent on the root's own producer — only one further
+    execution fits. If the leg's sentinel guard
+    (``_provenance_engine.py::_expand_version_authorship``) were deleted,
+    the sentinel would be offered to ``enqueue_or_truncate`` first (rows are
+    processed in RCT order), consume the last slot, and starve the real
+    author out: the mutant caps out with ``cap_hit=True`` and no real author
+    in the closure. With the guard, the sentinel never reaches the queue and
+    the real author gets the slot.
+    """
+    ml = _FakeML()
+    ds_root, consumer, sentinel, real_author = _ds(1), _ex(1), _ex(66), _ex(2)
+    ml.add_execution(sentinel, description="unknown provenance")
+    ml.add_execution(real_author, description="real version author")
+    ml.add_execution(consumer, description="root producer")
+    ml._sentinel_execution_rid_or_none = lambda: sentinel  # type: ignore[method-assign]
+
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+    # The LIVE origin row seeds the walk (``_classify_rid`` reads row 0), so
+    # the root's own producer fills the first budget slot.
+    ml.add_version_row(ds_root, "0.2.0", consumer, rct="2025-02-01T00:00:00Z")
+    ml.set_snapshot_available(ds_root, "0.2.0", True)
+    # Sentinel FIRST in RCT order: a guard-deletion mutant offers it to
+    # enqueue_or_truncate ahead of the real author.
+    ml.set_snapshot_version_rows(
+        ds_root,
+        "0.2.0",
+        [
+            _snapshot_row(ds_root, "0.1.0", sentinel, "2025-01-01T00:00:00Z"),
+            _snapshot_row(ds_root, "0.2.0", real_author, "2025-02-01T00:00:00Z"),
+        ],
+    )
+
+    closure = ml.lookup_provenance(ds_root, version="0.2.0", max_executions=2)
+
+    assert sentinel not in closure.executions
+    assert real_author in closure.executions
+    assert _authorship_arcs(closure, real_author)
+    assert closure.cap_hit is False
+    assert closure.traversal_complete is True
+
+
+# ---------------------------------------------------------------------------
+# Member-production arc (ruling 7) — the asset analogue of member_binding.
+# ---------------------------------------------------------------------------
+
+
+def _member_production_arcs(closure: ProvenanceClosure, rid: str):
+    return [a for a in _arcs_of(closure, rid) if a.kind == ArcKind.member_production]
+
+
+def test_mid_walk_member_producer_carries_member_production_arc():
+    """A producer of a consumed dataset's MEMBERS, discovered mid-walk,
+    carries a ``member_production`` arc naming that dataset and the version
+    actually consumed (ruling 7).
+
+    Before ruling 7 these executions entered the closure with EMPTY arcs —
+    the walk expanded them (inherited from lineage's member-producer
+    fallback) but the arc typology had no slot for the reason.
+    """
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    consumer, member_producer = _ex(1), _ex(2)
+
+    ml.add_execution(member_producer, description="produced a member asset of the input")
+    ml.add_execution(
+        consumer,
+        description="consumes the input",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.add_dataset(ds_input, description="input", producer=None)
+    ml.set_versioned_member_producers(ds_input, "1.0.0", {member_producer})
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert member_producer in closure.executions
+    arcs = _member_production_arcs(closure, member_producer)
+    assert len(arcs) == 1
+    assert arcs[0].input_rid == ds_input
+    assert arcs[0].input_type == ArcInputType.dataset
+    assert arcs[0].input_version == "1.0.0"
+    assert arcs[0].consumed_by is None
+    # The consumed pin, not live membership: a producer that only appears in
+    # live member state must not be attributed to the walked version.
+    assert ("_producers_of_dataset_members", (ds_input, "1.0.0")) in ml.calls
+
+
+def test_unpinned_consumption_member_producer_arc_carries_no_version():
+    """An unpinned consumption edge still yields a ``member_production`` arc,
+    with ``input_version=None`` — the edge recorded no version to pin to
+    (the same honesty the ``unpinned_input`` gap expresses)."""
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    consumer, member_producer = _ex(1), _ex(2)
+
+    ml.add_execution(member_producer, description="member producer")
+    ml.add_execution(
+        consumer,
+        description="consumes unpinned",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version=None)],
+    )
+    ml.add_dataset(ds_input, description="input", producer=None)
+    ml.set_member_producers(ds_input, {member_producer})
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    closure = ml.lookup_provenance(ds_root)
+
+    arcs = _member_production_arcs(closure, member_producer)
+    assert len(arcs) == 1
+    assert arcs[0].input_rid == ds_input
+    assert arcs[0].input_version is None
+    assert _gaps_for(closure, GapKind.unpinned_input, ds_input)
+
+
+def test_root_member_fallback_seed_keeps_root_arc_not_member_production():
+    """ROOT-path member-fallback seeds are the SEED, not a mid-walk
+    discovery: they keep ``ArcKind.root`` at depth 0 (ruling 7 explicitly
+    does not change root attribution)."""
+    ml = _FakeML()
+    ds_root, member_producer = _ds(1), _ex(1)
+    ml.add_execution(member_producer, description="produced a member of the root dataset")
+    ml.add_dataset(ds_root, description="root", producer=None)
+    ml.set_member_producers(ds_root, {member_producer})
+
+    closure = ml.lookup_provenance(ds_root)
+
+    arcs = _arcs_of(closure, member_producer)
+    assert [a.kind for a in arcs] == [ArcKind.root]
+    assert arcs[0].depth == 0
+    assert _member_production_arcs(closure, member_producer) == []
+
+
+def test_lineage_mode_records_no_member_production_arc():
+    """Byte-compat guard: the leg is gated on ``ArcKind.member_production``
+    being in the engine's arc set, which lineage's empty ``frozenset()``
+    never contains — so the same scenario leaves the tree path untouched."""
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    consumer, member_producer = _ex(1), _ex(2)
+
+    ml.add_execution(member_producer, description="member producer")
+    ml.add_execution(
+        consumer,
+        description="consumes the input",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.add_dataset(ds_input, description="input", producer=None)
+    ml.set_versioned_member_producers(ds_input, "1.0.0", {member_producer})
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    lineage = ml.lookup_lineage(ds_root)
+
+    # The member producer is still WALKED (the inherited fallback) — ruling 7
+    # only names the reason in closure mode; it changes no lineage bytes.
+    assert lineage.executions_visited == 2
+
+
+# ---------------------------------------------------------------------------
+# Arcs-nonempty invariant (ruling 7's motivation): every execution in a
+# closure carries at least one arc.
+# ---------------------------------------------------------------------------
+
+
+def assert_every_execution_has_an_arc(closure: ProvenanceClosure) -> None:
+    """Assert the invariant ruling 7 restores.
+
+    An execution in ``closure.executions`` with an EMPTY ``arcs`` list is a
+    member for a reason the arc typology cannot name — exactly the hole
+    ``member_production`` closed. Shared by the scenario sweep below so a
+    future leg that expands executions without recording a reason fails
+    here rather than shipping silently.
+    """
+    arcless = sorted(rid for rid, member in closure.executions.items() if not member.arcs)
+    assert arcless == [], f"executions in the closure with no arc explaining their membership: {arcless}"
+
+
+@pytest.mark.parametrize("kind", sorted(GapKind, key=str))
+def test_arcs_nonempty_invariant_across_gap_scenarios(kind: GapKind):
+    """Every execution in every scenario the suite builds carries at least
+    one arc — swept across the whole ``_GAP_SCENARIOS`` registry, which is
+    the suite's broadest set of distinct closure shapes."""
+    assert_every_execution_has_an_arc(_GAP_SCENARIOS[kind]())
+
+
+def test_arcs_nonempty_invariant_on_determinism_scenario():
+    """The richest scenario in the suite (every arc kind, two versions of one
+    dataset, a multi-producer asset, ancestry, bindings) also satisfies the
+    arcs-nonempty invariant."""
+    ml, root, kwargs = _shuffled_determinism_scenario(reversed_order=False)
+    assert_every_execution_has_an_arc(ml.lookup_provenance(root, **kwargs))
+
+
+def test_arcs_nonempty_invariant_on_mid_walk_member_producer():
+    """The scenario that PROVED the invariant broken before ruling 7."""
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    consumer, member_producer = _ex(1), _ex(2)
+    ml.add_execution(member_producer, description="member producer")
+    ml.add_execution(
+        consumer,
+        description="consumes the input",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.add_dataset(ds_input, description="input", producer=None)
+    ml.set_versioned_member_producers(ds_input, "1.0.0", {member_producer})
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    assert_every_execution_has_an_arc(ml.lookup_provenance(ds_root))
 
 
 # ---------------------------------------------------------------------------

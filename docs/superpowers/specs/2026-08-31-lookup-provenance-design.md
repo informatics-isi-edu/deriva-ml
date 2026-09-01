@@ -116,6 +116,9 @@ class ArcKind(StrEnum):
     consumption = "consumption"
     version_authorship = "version_authorship"
     member_binding = "member_binding"
+    member_production = "member_production"   # ruling 7 (§10) — produced a member (asset)
+                                              # of the walked dataset@version; mid-walk only
+                                              # (root-seed member producers keep `root`)
 
 class ArcInputType(StrEnum):
     dataset = "dataset"
@@ -156,6 +159,7 @@ class ProvenanceArc(BaseModel):
                        #   consumption — produced an input some closure member consumed
                        #   version_authorship — authored a version (<= walked version) of a walked dataset
                        #   member_binding — bound feature values onto a walked dataset@version's members
+                       #   member_production — produced a member (asset) of a walked dataset@version
     consumed_by: str | None = None    # consuming execution RID (consumption)
     input_rid: str | None = None      # the CONCRETE input: dataset or asset RID
     input_type: ArcInputType | None = None
@@ -417,3 +421,8 @@ describes a manual live reconciliation against a named production artifact
 (documentation, like the repo's memory notes), but the legitimate kernel is
 accepted: any committed/scripted form resolves the artifact by catalog
 lookup, never a literal.
+
+**Ruling 7, post-final-review (owner decision):** `ArcKind.member_production`
+added — the asset analogue of `member_binding`, so a mid-walk producer of a
+consumed dataset's members no longer enters the closure with empty arcs
+(root-seed member producers keep `ArcKind.root`).
