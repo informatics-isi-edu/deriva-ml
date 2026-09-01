@@ -19,6 +19,7 @@ from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.mixins._provenance_engine import TreeBuilder, WalkEngine
 from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
@@ -40,7 +41,6 @@ if TYPE_CHECKING:
         LineageNode,
         LineageResult,
         RootDescriptor,
-        WorkflowSummary,
     )
     from deriva_ml.execution.pending_summary import WorkspacePendingSummary
     from deriva_ml.execution.provenance_audit import ProvenanceAuditReport
@@ -1335,9 +1335,15 @@ class ExecutionMixin:
         if producer_rid is None and not member_producers:
             return LineageResult(root=root_descriptor)
 
-        visited_global: set[RID] = set()
-        in_progress: set[RID] = set()
-        flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
+        # Lineage runs the shared walk engine with no dataset arcs enabled, so
+        # `expand_dataset` is a total no-op and the tree path costs exactly
+        # what the pre-extraction per-node walk cost.
+        engine: "WalkEngine[LineageNode]" = WalkEngine(
+            self,
+            TreeBuilder(),
+            arcs=frozenset(),
+            max_executions=max_executions,
+        )
 
         lineage_root_node: "LineageNode | None" = None
         if root_descriptor.type == "Dataset":
@@ -1354,30 +1360,9 @@ class ExecutionMixin:
                 candidates.append(producer_rid)
             candidates.extend(r for r in sorted(member_producers) if r != producer_rid)
 
-            all_candidates = set(candidates)
-            tried: set[RID] = set()
-            for seed in candidates:
-                tried.add(seed)
-                lineage_root_node = self._walk_node(
-                    execution_rid=seed,
-                    depth_remaining=depth,
-                    max_executions=max_executions,
-                    visited_global=visited_global,
-                    in_progress=in_progress,
-                    flags=flags,
-                    extra_parent_rids=(all_candidates - tried) or None,
-                )
-                if lineage_root_node is not None:
-                    break
+            lineage_root_node = engine.run_seed_candidates(candidates, depth_remaining=depth)
         else:
-            lineage_root_node = self._walk_node(
-                execution_rid=producer_rid,
-                depth_remaining=depth,
-                max_executions=max_executions,
-                visited_global=visited_global,
-                in_progress=in_progress,
-                flags=flags,
-            )
+            lineage_root_node = engine.expand_execution(producer_rid, depth_remaining=depth)
 
         # Non-Dataset roots keep the historical behavior: the root's
         # producing_execution is the walk-root summary. Dataset roots carry
@@ -1389,10 +1374,10 @@ class ExecutionMixin:
         return LineageResult(
             root=root_descriptor,
             lineage=lineage_root_node,
-            executions_visited=len(visited_global),
-            walked_complete=flags["walked_complete"],
-            cycle_detected=flags["cycle_detected"],
-            depth_capped=flags["depth_capped"],
+            executions_visited=engine.executions_visited,
+            walked_complete=engine.flags["walked_complete"],
+            cycle_detected=engine.flags["cycle_detected"],
+            depth_capped=engine.flags["depth_capped"],
         )
 
     # -- private helpers -------------------------------------------------
@@ -2159,176 +2144,3 @@ class ExecutionMixin:
         from deriva_ml.execution._helpers import list_input_datasets_with_versions
 
         return list_input_datasets_with_versions(ml_instance=self, execution_rid=execution_rid)
-
-    def _walk_node(
-        self,
-        *,
-        execution_rid: RID,
-        depth_remaining: int | None,
-        max_executions: int,
-        visited_global: set[RID],
-        in_progress: set[RID],
-        flags: dict[str, bool],
-        extra_parent_rids: set[RID] | None = None,
-    ) -> "LineageNode | None":
-        """Expand one execution node and recurse on its data-flow parents.
-
-        Mutates ``visited_global``, ``in_progress``, and ``flags``.
-        Returns None only if the execution couldn't be looked up
-        (defensive).
-        """
-        from deriva_ml.execution.lineage import (
-            AssetSummary,
-            DatasetSummary,
-            ExecutionSummary,
-            LineageNode,
-            WorkflowSummary,
-        )
-
-        # Cycle on the active path: do not expand, set flag, return a
-        # leaf-style marker.
-        if execution_rid in in_progress:
-            flags["cycle_detected"] = True
-            return LineageNode(
-                execution=ExecutionSummary(
-                    rid=execution_rid,
-                    description=None,
-                    workflow=None,
-                    status="Unknown",
-                ),
-                already_shown=True,
-            )
-
-        # Diamond DAG: this execution was already expanded somewhere
-        # else in the tree. Mark and don't recurse.
-        if execution_rid in visited_global:
-            return LineageNode(
-                execution=ExecutionSummary(
-                    rid=execution_rid,
-                    description=None,
-                    workflow=None,
-                    status="Unknown",
-                ),
-                already_shown=True,
-            )
-
-        # Defensive cap on total expansions.
-        if len(visited_global) >= max_executions:
-            flags["walked_complete"] = False
-            return None
-
-        # Look up the execution and its inputs.
-        try:
-            record = self.lookup_execution(execution_rid)
-        except DerivaMLException:
-            # An input pointed at an Execution that no longer exists;
-            # treat as missing rather than failing the whole walk.
-            return None
-
-        visited_global.add(execution_rid)
-        in_progress.add(execution_rid)
-
-        try:
-            wf_summary: "WorkflowSummary | None" = None
-            if record.workflow is not None and record.workflow.workflow_rid is not None:
-                wf_summary = WorkflowSummary(
-                    rid=record.workflow.workflow_rid,
-                    name=record.workflow.name,
-                    url=getattr(record.workflow, "url", None),
-                    version=getattr(record.workflow, "version", None),
-                    checksum=getattr(record.workflow, "checksum", None),
-                )
-
-            execution_summary = ExecutionSummary(
-                rid=execution_rid,
-                description=record.description,
-                workflow=wf_summary,
-                status=record.status.value if record.status else "Unknown",
-            )
-
-            # Consumed inputs. Walk the version that was ACTUALLY consumed
-            # (Dataset_Execution.Dataset_Version), not the dataset's current
-            # state, so lineage reflects the inputs as they were at consumption.
-            consumed_datasets: list[DatasetSummary] = []
-            parent_rids: set[RID] = set()
-            for ds, consumed_version in self._input_dataset_pairs(execution_rid):
-                version_str = consumed_version
-                if version_str is None:
-                    try:
-                        version_str = str(ds.current_version)
-                    except Exception:
-                        version_str = None
-                consumed_datasets.append(
-                    DatasetSummary(
-                        rid=ds.dataset_rid,
-                        description=ds.description or None,
-                        version=version_str,
-                    )
-                )
-                producer = self._producer_of_dataset(ds.dataset_rid, version=consumed_version)
-                # Never the execution we are currently expanding: if it produced
-                # the consumed version of a dataset it also consumed, listing it
-                # as its own parent re-enters `in_progress` and flags a false
-                # cycle (same reason the member-producers below subtract it).
-                if producer and producer != execution_rid:
-                    parent_rids.add(producer)
-                # Member-producers of the CONSUMED version. Never the execution
-                # we are currently expanding: an execution that both consumed
-                # this dataset and produced some of its members must not become
-                # its own parent (the mid-walk analogue of the root path's
-                # version-producer subtraction).
-                member_producers = self._producers_of_dataset_members(ds.dataset_rid, version=consumed_version)
-                parent_rids |= member_producers - {execution_rid}
-
-            consumed_assets: list[AssetSummary] = []
-            for asset in record.list_assets(asset_role="Input"):
-                consumed_assets.append(
-                    AssetSummary(
-                        rid=asset.asset_rid,
-                        filename=asset.filename or None,
-                        asset_table=asset.asset_table,
-                    )
-                )
-                try:
-                    asset_table_obj = self.model.name_to_table(asset.asset_table)
-                    producer = self._producer_of_asset(asset.asset_rid, asset_table_obj)
-                    if producer:
-                        parent_rids.add(producer)
-                except Exception:
-                    # If we can't resolve the producer of one asset,
-                    # keep walking the rest of the inputs.
-                    pass
-
-            # Root-seeded member-producers (and any other externally supplied
-            # parents) are merged in before recursion so they get full
-            # visited/cycle/depth handling.
-            if extra_parent_rids:
-                parent_rids |= extra_parent_rids
-
-            # Recurse on parents.
-            parents: list[LineageNode] = []
-            if depth_remaining is None or depth_remaining > 0:
-                next_depth = None if depth_remaining is None else depth_remaining - 1
-                for pr in parent_rids:
-                    child = self._walk_node(
-                        execution_rid=pr,
-                        depth_remaining=next_depth,
-                        max_executions=max_executions,
-                        visited_global=visited_global,
-                        in_progress=in_progress,
-                        flags=flags,
-                    )
-                    if child is not None:
-                        parents.append(child)
-            elif parent_rids:
-                # We had parents but depth said stop. Mark depth_capped.
-                flags["depth_capped"] = True
-
-            return LineageNode(
-                execution=execution_summary,
-                consumed_datasets=consumed_datasets,
-                consumed_assets=consumed_assets,
-                parents=parents,
-            )
-        finally:
-            in_progress.discard(execution_rid)
