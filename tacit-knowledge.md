@@ -816,3 +816,92 @@ discriminate on the RESOLVED VERSION RECORD's `.snapshot` value via a
 shared `_resolve_version_record` helper, raising before any id is
 composed. General rule: catalog-id strings are compositional (`id@snap`
 nests); never parse them for semantics — read the source row.
+
+**2026-09-01 — #383 live reconciliation: lookup_provenance vs the deploy
+inventory (eye-ai).** Ran both closures against the SAME root, resolved
+by catalog lookup at run time (workflow `VGG-19 Glaucoma Diagnosis
+Training` + description `VGG-19 training on Kyle's full datasets` +
+consuming exactly the Train/Validation/Test trio named in its own
+description text + `Status=Uploaded` + newest RCT). `lookup_lineage`
+reaches 2 executions on that root; `lookup_provenance` reaches 44 and
+the deploy inventory 46 — the spec's 45/17/14 aggregate has drifted
+slightly with catalog growth, which is why the reconciliation must run
+BOTH sides live rather than compare against a remembered number.
+
+| Measure | closure | deploy | difference |
+|---|---|---|---|
+| executions | 44 | 46 | 6 deploy-only, 4 closure-only |
+| distinct workflows | 15 | 17 | 4 deploy-only, 2 closure-only |
+| datasets | 12 | 14 | 5 deploy-only, 3 closure-only |
+| assets | 1 | n/a | deploy has no asset domain |
+| gaps | 142 (7 kinds) | 9 (2 kinds) | richer taxonomy |
+
+Every difference is principled; none needed a code change:
+
+- **Sentinel by identity, not name-matching (ruling 2).** Deploy counts
+  the sentinel execution `6-0B3J` and workflows `6-0B3E`
+  ('Unknown Provenance') / `6-FRFT` ('BlackBox unknown-asset producer')
+  as closure MEMBERS. The closure never admits the sentinel: it
+  terminates that branch with one `sentinel_origin` gap. So 1 execution
+  + 2 workflows of the deploy-only delta are the sentinel triple, and
+  deploy's 3 `sentinel` missing-arcs collapse into the closure's 1
+  honest gap.
+- **Snapshot-strict beats live-read (rulings 3 + 6) — the load-bearing
+  one.** The remaining 4 deploy-only executions (`7-GDAA`, `7-GV6C`,
+  `7-QCAA`, `7-VZQY`, workflows `7-GD96` / `7-ZX2J`) are exactly the 4
+  rows by which `find_feature_producers('2-277G')` UNVERSIONED (14 rows,
+  live) exceeds the same call at the walked pin v4.13.0 (10 rows). All
+  four executions have RCT in 2026-07-08..07-18; the v4.13.0 version row
+  has RCT 2026-07-02 — they bound their feature values AFTER the walked
+  version's snapshot. Deploy reads live and picks them up; the closure
+  reads at the pin and correctly does not. **The brief's spot-check
+  ("the 14 rows should appear as member_binding evidence") is therefore
+  satisfied at 10, not 14** — the correct assertion is
+  `find_feature_producers(ds, version=walked_pin) ⊆ arc evidence`, and
+  that holds exactly. Anyone re-running this must version-scope the
+  spot-check or they will chase a phantom bug.
+- **Closure-only executions = arcs deploy has no concept of.** `4-53ZE`
+  (Fill diag exec_rid), `4-WRGW` (Cropping Image), `4-Z7XC`
+  (Image_Grading), `5-278E` (Create Condition_Label) enter via
+  `version_authorship` / `member_binding` on ancestry datasets deploy
+  never walks (`2-N93J`, `4-S42W`, `4-Z6K8` — the 3 closure-only
+  datasets). Deploy's 5 dataset-only rows (`4-4116`, `4-411G`,
+  `5-WEBG`, `5-ZHRE`, `5-ZMGJ`) come from its Hydra `key=RID` config
+  mining, which ruling 1 explicitly excludes as an arc.
+- **Richer gap taxonomy (ruling 2).** Deploy reports 2 kinds; the
+  closure reports 7 of the 12. Its 6 `null_feature_execution` map 1:1
+  onto 6 of the closure's 7 `null_binding_execution` (closure adds
+  `5-1W26`, a dataset deploy never reaches). The other 4 kinds are
+  strictly new visibility deploy's heuristic never had: 109
+  `no_version_author`, 10 `version_unresolvable`, 9
+  `origin_unrecorded`, 1 `no_asset_producer` (`2-4JR6`). Gap COUNT going
+  up is the feature, not a regression — `traversal_complete=True` and
+  `cap_hit=False` throughout, confirming gaps are orthogonal to caps.
+
+**Two schema-evolution bugs found, NOT patched (reported instead).**
+Old eye-ai snaptimes predate columns the current code assumes, and the
+raw exception escapes `lookup_provenance` instead of becoming a gap:
+(1) `core/mixins/dataset.py:200` — `lookup_dataset` unconditionally
+filters on `Dataset.Deleted`, which does not exist at v0.1.0 snaptimes
+→ `AttributeError` from datapath; `strict_parents_at` calls it AT the
+historical snapshot, so this aborts the whole walk. (2)
+`dataset/dataset.py:906` — `dataset_history` does `v["Snapshot"]`, and
+`Dataset_Version` has no `Snapshot` column at v1.0.0–4.1.0 snaptimes →
+`KeyError`; `strict_parents_at` catches only `DerivaMLException`, so it
+escapes too. Repro without the closure:
+`ml.lookup_dataset('2-277G').strict_parents_at('0.1.0')` and
+`...strict_parents_at('1.0.0')`. Both are one-line-catchable into
+`SnapshotUnavailable`, which the engine ALREADY converts into a
+`snapshot_chain_break` gap — with a local shim doing exactly that, the
+walk completes and produces precisely the 5 `snapshot_chain_break` gaps
+in the table above (`2-277C/G/J/M`, `2-7KA2`, all at v0.1.0). General
+rule this reinforces: **a snapshot-strict walk must treat "the schema
+itself differs at that snaptime" as a first-class gap source**, not
+just missing rows — reading history means reading OLD SCHEMA, and every
+column reference on a snapshot-bound path is a potential `AttributeError`.
+
+Timing on this root (www.eye-ai.org, warm): `lookup_lineage` 8.5s,
+`lookup_provenance` 249s at the default `max_executions=500` with no cap
+hit. The cost is dominated by per-version authorship + binding reads
+across 31 visited dataset-versions, so it scales with ancestry breadth,
+not execution count — budget minutes, not seconds, for real catalogs.
