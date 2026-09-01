@@ -628,8 +628,10 @@ def test_asset_two_producers_all_reported_plus_gap():
     closure = ml.lookup_provenance(ds_root)
 
     assert asset in closure.assets
-    # Fetched order preserved verbatim (prod_b first, as scripted).
-    assert closure.assets[asset].producers == [prod_b, prod_a]
+    # Fetched order (prod_b first, as scripted) is preserved during
+    # accumulation, but the finalized closure sorts output lists for
+    # determinism (spec §4) — both producers are still reported, just sorted.
+    assert closure.assets[asset].producers == sorted([prod_b, prod_a])
     assert closure.assets[asset].consumed_by == [consumer]
     assert _gaps_for(closure, GapKind.multiple_asset_producers, asset)
     # Both producers enter the closure with consumption arcs.
@@ -654,7 +656,9 @@ def test_asset_root_reports_all_producers_plus_gap():
     for producer in (prod_a, prod_b):
         assert any(a.kind == ArcKind.root and a.depth == 0 for a in _arcs_of(closure, producer))
     assert asset in closure.assets
-    assert closure.assets[asset].producers == [prod_b, prod_a]  # fetched order
+    # Sorted at finalize (spec §4) — fetched order (prod_b first) governs
+    # accumulation only.
+    assert closure.assets[asset].producers == sorted([prod_b, prod_a])
     assert _gaps_for(closure, GapKind.multiple_asset_producers, asset)
 
 
@@ -907,6 +911,7 @@ def test_authorship_origin_recorded_true_from_snapshot_rows():
     closure = ml.lookup_provenance(ds, version="0.1.0")
 
     assert closure.datasets[ds].versions["0.1.0"].origin_recorded is True
+    assert _gaps_for(closure, GapKind.origin_unrecorded, ds) == []
 
 
 def test_authorship_origin_recorded_false_for_null_first_author():
@@ -926,6 +931,9 @@ def test_authorship_origin_recorded_false_for_null_first_author():
     facts = closure.datasets[ds].versions["0.2.0"]
     assert facts.origin_recorded is False
     assert _gaps_for(closure, GapKind.no_version_author, ds)
+    # origin_recorded=False on the ORIGIN row is its own gap kind, distinct
+    # from the row-level no_version_author gap above.
+    assert _gaps_for(closure, GapKind.origin_unrecorded, ds)
     # The author-less row is still part of the attribution trace.
     assert [va.version for va in facts.version_authors] == ["0.1.0", "0.2.0"]
     assert facts.version_authors[0].execution_rid is None
@@ -947,6 +955,10 @@ def test_authorship_origin_recorded_false_for_sentinel_first_author():
     assert closure.datasets[ds].versions["0.1.0"].origin_recorded is False
     assert sentinel not in closure.executions
     assert _gaps_for(closure, GapKind.sentinel_origin, sentinel)
+    # origin_recorded=False on the ORIGIN row is its own gap kind, distinct
+    # from the sentinel-authored-row gap above (which names the sentinel,
+    # not the dataset).
+    assert _gaps_for(closure, GapKind.origin_unrecorded, ds)
 
 
 def test_authorship_walked_version_absent_at_snapshot():
@@ -2147,6 +2159,183 @@ def test_ancestry_leg_never_runs_for_an_unpinned_dataset():
 
 
 # ---------------------------------------------------------------------------
+# Gap-coverage checklist (Task 14) — every GapKind member must be reachable.
+#
+# Each builder below is a minimal, self-contained scenario dedicated to
+# producing ONE GapKind (some incidentally produce a second — noted where it
+# happens). This is a coverage floor, not a re-test of any single gap's
+# detailed shape; the shape assertions live with each gap's dedicated test
+# above. A GapKind with no builder here (or whose builder's closure doesn't
+# actually carry that kind) fails the parametrized test below by name, so a
+# future GapKind addition can't silently ship without suite coverage.
+# ---------------------------------------------------------------------------
+
+
+def _gap_scenario_sentinel_origin() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds_root, ds_in, consumer, sentinel = _ds(1), _ds(2), _ex(1), _ex(66)
+    ml.add_execution(sentinel, description="unknown provenance")
+    ml.add_dataset(ds_in, description="input", producer=sentinel)
+    ml.set_versioned_producer(ds_in, "1.0.0", sentinel)
+    ml.add_execution(consumer, description="consumer", input_datasets=[_StubDataset(ds_in, consumed_version="1.0.0")])
+    ml.add_dataset(ds_root, producer=consumer)
+    ml._sentinel_execution_rid_or_none = lambda: sentinel  # type: ignore[method-assign]
+    return ml.lookup_provenance(ds_root)
+
+
+def _gap_scenario_origin_unrecorded() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds, later = _ds(1), _ex(1)
+    ml.add_execution(later, description="later toucher")
+    rows = [
+        _snapshot_row(ds, "0.1.0", None, "2025-01-01T00:00:00Z"),
+        _snapshot_row(ds, "0.2.0", later, "2025-02-01T00:00:00Z"),
+    ]
+    _dataset_root_with_snapshot_authors(ml, ds, "0.2.0", rows)
+    return ml.lookup_provenance(ds, version="0.2.0")
+
+
+def _gap_scenario_null_binding_execution() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds_root = _ds(1)
+    record = _binding_record(None, feature_name="Annotation", element_type="Image")
+    _dataset_root_with_bindings(ml, ds_root, "1.0.0", [record])
+    return ml.lookup_provenance(ds_root, version="1.0.0")
+
+
+def _gap_scenario_no_workflow() -> ProvenanceClosure:
+    ml = _FakeML()
+    exa, ds_root = _ex(1), _ds(1)
+    ml.add_execution(exa, description="no workflow", workflow=None)
+    ml.add_dataset(ds_root, producer=exa)
+    return ml.lookup_provenance(ds_root)
+
+
+def _gap_scenario_snapshot_chain_break() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds, author = _ds(1), _ex(1)
+    ml.add_execution(author, description="author")
+    ml.add_dataset(ds, description="root", producer=None)
+    ml.add_version_row(ds, "0.1.0", author, rct="2025-01-01T00:00:00Z")
+    ml.set_snapshot_available(ds, "0.1.0", False)
+    ml.set_snapshot_version_rows(ds, "0.1.0", [_snapshot_row(ds, "0.1.0", author, "2025-01-01T00:00:00Z")])
+    return ml.lookup_provenance(ds, version="0.1.0")
+
+
+def _gap_scenario_unpinned_input() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds_root, ds_unpinned, consumer = _ds(1), _ds(2), _ex(1)
+    ml.add_dataset(ds_unpinned, description="unpinned input", producer=None)
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_datasets=[_StubDataset(ds_unpinned, "unpinned input", "1.0.0", consumed_version=None)],
+    )
+    ml.add_dataset(ds_root, producer=consumer)
+    return ml.lookup_provenance(ds_root)
+
+
+def _gap_scenario_version_unresolvable() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds, other = _ds(1), _ex(1)
+    ml.add_execution(other, description="author of some other version")
+    ml.add_dataset(ds, description="root", producer=None)
+    ml.add_version_row(ds, "0.2.0", other, rct="2025-02-01T00:00:00Z")
+    ml.set_snapshot_available(ds, "0.2.0", True)
+    ml.set_snapshot_version_rows(ds, "0.2.0", [_snapshot_row(ds, "0.1.0", other, "2025-01-01T00:00:00Z")])
+    return ml.lookup_provenance(ds, version="0.2.0")
+
+
+def _gap_scenario_no_version_author() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds, later = _ds(1), _ex(1)
+    ml.add_execution(later, description="later toucher")
+    rows = [
+        _snapshot_row(ds, "0.1.0", None, "2025-01-01T00:00:00Z"),
+        _snapshot_row(ds, "0.2.0", later, "2025-02-01T00:00:00Z"),
+    ]
+    _dataset_root_with_snapshot_authors(ml, ds, "0.2.0", rows)
+    return ml.lookup_provenance(ds, version="0.2.0")
+
+
+def _gap_scenario_no_asset_producer() -> ProvenanceClosure:
+    ml = _FakeML()
+    asset = _as(1)
+    ml.add_asset(asset, "Execution_Asset", filename="orphan.csv", producers=[])
+    return ml.lookup_provenance(asset)
+
+
+def _gap_scenario_multiple_asset_producers() -> ProvenanceClosure:
+    ml = _FakeML()
+    asset, prod_a, prod_b = _as(1), _ex(1), _ex(2)
+    ml.add_asset(asset, "Execution_Asset", filename="w.pt", producers=[prod_b, prod_a])
+    ml.add_execution(prod_a, description="a")
+    ml.add_execution(prod_b, description="b")
+    return ml.lookup_provenance(asset)
+
+
+def _gap_scenario_unresolved_rid() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds_root, ds_in, good, ghost = _ds(1), _ds(2), _ex(1), _ex(99)
+    ml.add_dataset(ds_in, description="input", producer=ghost)
+    ml.set_versioned_producer(ds_in, "1.0.0", ghost)
+    ml.add_execution(good, description="good", input_datasets=[_StubDataset(ds_in, consumed_version="1.0.0")])
+    ml.add_dataset(ds_root, producer=good)
+    return ml.lookup_provenance(ds_root)
+
+
+def _gap_scenario_binding_scan_failed() -> ProvenanceClosure:
+    ml = _FakeML()
+    ds_root = _ds(1)
+    binder = _ex(1)
+    ml.add_execution(binder, description="bound some features despite partial failure")
+    record = _binding_record(binder, feature_name="Label", element_type="Image")
+    diagnostic = BindingDiagnostic(kind="ambiguous_hop", subject="Annotation", detail="ambiguous target link")
+    _dataset_root_with_bindings(ml, ds_root, "1.0.0", [record], [diagnostic])
+    return ml.lookup_provenance(ds_root, version="1.0.0")
+
+
+# One builder per GapKind member; the coverage test fails naming any member
+# with no builder here, or whose builder's closure doesn't actually carry it.
+_GAP_SCENARIOS: dict[GapKind, "callable[[], ProvenanceClosure]"] = {
+    GapKind.sentinel_origin: _gap_scenario_sentinel_origin,
+    GapKind.origin_unrecorded: _gap_scenario_origin_unrecorded,
+    GapKind.null_binding_execution: _gap_scenario_null_binding_execution,
+    GapKind.no_workflow: _gap_scenario_no_workflow,
+    GapKind.snapshot_chain_break: _gap_scenario_snapshot_chain_break,
+    GapKind.unpinned_input: _gap_scenario_unpinned_input,
+    GapKind.version_unresolvable: _gap_scenario_version_unresolvable,
+    GapKind.no_version_author: _gap_scenario_no_version_author,
+    GapKind.no_asset_producer: _gap_scenario_no_asset_producer,
+    GapKind.multiple_asset_producers: _gap_scenario_multiple_asset_producers,
+    GapKind.unresolved_rid: _gap_scenario_unresolved_rid,
+    GapKind.binding_scan_failed: _gap_scenario_binding_scan_failed,
+}
+
+
+@pytest.mark.parametrize("kind", sorted(GapKind, key=str))
+def test_every_gap_kind_is_producible_by_the_suite(kind: GapKind):
+    """Every one of the 12 ``GapKind`` members must be reachable by at least
+    one scenario in this file. A member with no entry in ``_GAP_SCENARIOS``
+    (or whose scenario's closure doesn't actually carry it) fails by name —
+    a hole in the suite, not a hole in the engine."""
+    assert kind in _GAP_SCENARIOS, f"GapKind.{kind.name} has no coverage scenario in this suite"
+    closure = _GAP_SCENARIOS[kind]()
+    kinds_produced = {g.kind for g in closure.gaps}
+    assert kind in kinds_produced, (
+        f"GapKind.{kind.name}'s dedicated scenario produced gaps {sorted(k.value for k in kinds_produced)}, "
+        f"but not {kind.name} itself"
+    )
+
+
+def test_gap_scenarios_cover_every_gap_kind_member():
+    """Belt-and-suspenders: the registry itself must have exactly the 12
+    members, so adding a 13th ``GapKind`` without a builder fails loudly
+    even if a parametrize ID gets skipped by a test-selection filter."""
+    assert set(_GAP_SCENARIOS) == set(GapKind)
+
+
+# ---------------------------------------------------------------------------
 # Serialization.
 # ---------------------------------------------------------------------------
 
@@ -2164,3 +2353,147 @@ def test_closure_round_trips_through_model_dump():
 
     assert isinstance(json.dumps(dumped), str)
     assert ProvenanceClosure.model_validate(dumped) == closure
+
+
+def test_public_exports_from_execution_package():
+    """The provenance names mirror the lineage export block in
+    ``deriva_ml.execution.__init__`` (Task 14 deliverable)."""
+    from deriva_ml.execution import (  # noqa: F401
+        AncestryState,
+        ArcInputType,
+        ArcKind,
+        DatasetVersionFacts,
+        GapKind,
+        ParentLink,
+        ProvenanceArc,
+        ProvenanceAsset,
+        ProvenanceClosure,
+        ProvenanceDataset,
+        ProvenanceExecution,
+        ProvenanceGap,
+        RootType,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Determinism (Task 14) — shuffled insertion order produces byte-identical
+# output.
+# ---------------------------------------------------------------------------
+
+
+def _shuffled_determinism_scenario(*, reversed_order: bool):
+    """Build one rich scenario twice: forward and with every insertion order
+    reversed, including a dataset walked at TWO distinct versions — once as
+    a consumed input (``ds_shared@0.2.0``) and once as the root's ancestry
+    parent (``ds_shared@0.5.0``, reached via ``ds_root``'s ``ParentLink``).
+
+    Returns ``(ml, root_rid, kwargs)`` — the same shape the lineage goldens
+    module uses, so ``_canonical`` can compare the two runs' ``model_dump()``
+    byte-for-byte regardless of which order things were constructed in.
+    """
+    ml = _FakeML()
+
+    ds_shared = _ds(1)  # walked at TWO versions below.
+    ds_root = _ds(2)
+    asset = _as(1)
+
+    author_early, author_late = _ex(1), _ex(2)
+    prod_a, prod_b = _ex(4), _ex(5)
+    root_producer = _ex(6)
+    binder = _ex(7)
+
+    authors = (author_early, author_late) if not reversed_order else (author_late, author_early)
+    for author in authors:
+        ml.add_execution(author, description=f"authored by {author}")
+
+    # ds_shared walked at "0.2.0" (root_producer's consumed input) AND at
+    # "0.5.0" (ds_root's ancestry parent) — two distinct versions of the SAME
+    # dataset RID entering the closure, exercising ProvenanceDataset.versions'
+    # per-version-label sort.
+    ml.add_dataset(ds_shared, description="shared", producer=None)
+    version_rows = [
+        ("0.2.0", author_early, "2025-01-01T00:00:00Z"),
+        ("0.5.0", author_late, "2025-02-01T00:00:00Z"),
+    ]
+    for version, author, rct in reversed(version_rows) if reversed_order else version_rows:
+        ml.add_version_row(ds_shared, version, author, rct=rct)
+    ml.set_snapshot_available(ds_shared, "0.2.0", True)
+    ml.set_snapshot_available(ds_shared, "0.5.0", True)
+    ml.set_snapshot_version_rows(
+        ds_shared, "0.2.0", [_snapshot_row(ds_shared, "0.2.0", author_early, "2025-01-01T00:00:00Z")]
+    )
+    ml.set_snapshot_version_rows(
+        ds_shared,
+        "0.5.0",
+        [
+            _snapshot_row(ds_shared, "0.2.0", author_early, "2025-01-01T00:00:00Z"),
+            _snapshot_row(ds_shared, "0.5.0", author_late, "2025-02-01T00:00:00Z"),
+        ],
+    )
+    ml.set_versioned_producer(ds_shared, "0.2.0", author_early)
+    ml.set_parents_at(ds_shared, "0.5.0", [])  # a source: no further ancestry.
+
+    # A multi-producer asset (order shuffled between runs) consumed by the
+    # root producer.
+    producer_pair = (prod_b, prod_a) if not reversed_order else (prod_a, prod_b)
+    ml.add_asset(asset, "Execution_Asset", filename="w.pt", producers=list(producer_pair))
+    for prod in (prod_a, prod_b):
+        ml.add_execution(prod, description=f"producer {prod}")
+
+    # root_producer consumes BOTH the multi-producer asset AND ds_shared at
+    # its earlier version.
+    ml.add_execution(
+        root_producer,
+        description="root producer",
+        input_assets=[_StubAsset(asset, "w.pt", "Execution_Asset")],
+        input_datasets=[_StubDataset(ds_shared, "shared", "0.2.0", consumed_version="0.2.0")],
+    )
+
+    # A binding leg on the root pin, so an arc's `evidence` list also gets
+    # exercised under reversed construction.
+    ml.add_execution(binder, description="binder")
+    records = [
+        _binding_record(binder, feature_name="Label", element_type="Image"),
+        _binding_record(binder, feature_name="Annotation", element_type="Study"),
+    ]
+    if reversed_order:
+        records = list(reversed(records))
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_version_row(ds_root, "1.0.0", root_producer, rct="2025-03-01T00:00:00Z")
+    ml.set_snapshot_available(ds_root, "1.0.0", True)
+    ml.set_snapshot_version_rows(
+        ds_root, "1.0.0", [_snapshot_row(ds_root, "1.0.0", root_producer, "2025-03-01T00:00:00Z")]
+    )
+    ml.set_binding_scan(ds_root, "1.0.0", records, [])
+    # ds_root's ancestry parent is ds_shared@0.5.0 — the second walked
+    # version of the shared dataset.
+    ml.set_parents_at(ds_root, "1.0.0", [{"parent_rid": ds_shared, "parent_version_then": "0.5.0"}])
+
+    return ml, ds_root, {"version": "1.0.0"}
+
+
+def test_shuffled_insertion_order_yields_byte_identical_closure():
+    """The same scenario built with every insertion order reversed —
+    including the shared dataset walked at TWO versions inserted in
+    reverse — produces byte-identical ``model_dump()`` output. This is
+    ``ClosureBuilder.finalize()``'s determinism contract (spec §4)."""
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_forward, root_forward, kwargs_forward = _shuffled_determinism_scenario(reversed_order=False)
+    ml_reversed, root_reversed, kwargs_reversed = _shuffled_determinism_scenario(reversed_order=True)
+
+    closure_forward = ml_forward.lookup_provenance(root_forward, **kwargs_forward)
+    closure_reversed = ml_reversed.lookup_provenance(root_reversed, **kwargs_reversed)
+
+    got_forward = _canonical(closure_forward.model_dump(mode="json"))
+    got_reversed = _canonical(closure_reversed.model_dump(mode="json"))
+
+    assert got_forward == got_reversed
+    # Not a vacuous comparison: the scenario actually produced non-trivial
+    # content in every collection finalize() sorts.
+    ds_shared_rid = _ds(1)
+    assert set(closure_forward.datasets[ds_shared_rid].versions) == {"0.2.0", "0.5.0"}
+    assert len(closure_forward.assets[_as(1)].producers) == 2
+    binding_arcs = [a for e in closure_forward.executions.values() for a in e.arcs if a.kind == ArcKind.member_binding]
+    assert any(len(a.evidence) >= 1 for a in binding_arcs)

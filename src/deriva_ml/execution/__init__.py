@@ -52,6 +52,21 @@ from deriva_ml.execution.multirun_config import (
     list_multirun_configs,
     multirun_config,
 )
+from deriva_ml.execution.provenance import (
+    AncestryState,
+    ArcInputType,
+    ArcKind,
+    DatasetVersionFacts,
+    GapKind,
+    ParentLink,
+    ProvenanceArc,
+    ProvenanceAsset,
+    ProvenanceClosure,
+    ProvenanceDataset,
+    ProvenanceExecution,
+    ProvenanceGap,
+    RootType,
+)
 from deriva_ml.execution.runner import create_model_config, reset_multirun_state, run_model
 from deriva_ml.execution.workflow import Workflow
 
@@ -108,4 +123,18 @@ __all__ = [
     "RootDescriptor",
     "VersionAttribution",
     "WorkflowSummary",
+    # Provenance closure models (lookup_provenance)
+    "AncestryState",
+    "ArcInputType",
+    "ArcKind",
+    "DatasetVersionFacts",
+    "GapKind",
+    "ParentLink",
+    "ProvenanceArc",
+    "ProvenanceAsset",
+    "ProvenanceClosure",
+    "ProvenanceDataset",
+    "ProvenanceExecution",
+    "ProvenanceGap",
+    "RootType",
 ]

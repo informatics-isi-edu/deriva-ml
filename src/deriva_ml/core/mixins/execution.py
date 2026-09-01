@@ -1406,9 +1406,9 @@ class ExecutionMixin:
 
         Where :meth:`lookup_lineage` walks one producing-execution chain and
         stops at lineage edges, this walks the **transitive closure**: every
-        discovered execution is itself expanded, consumed assets become
-        first-class closure members with all their recorded producers, and
-        everything the walk could not resolve is reported as a typed
+        discovered execution is itself expanded, consumed assets and walked
+        dataset versions become first-class closure members, and everything
+        the walk could not resolve is reported as a typed
         :class:`~deriva_ml.execution.provenance.ProvenanceGap` rather than
         silently dropped.
 
@@ -1417,6 +1417,17 @@ class ExecutionMixin:
         gaps; they are never compensated for (ruling 2). The
         unknown-provenance sentinel is never a closure member: encountering
         it terminates that branch with a ``sentinel_origin`` gap.
+
+        An execution can be in the closure for more than one reason at
+        once — it consumed an input, authored a dataset version, and bound
+        feature values, say — and each reason is recorded as its own
+        :class:`~deriva_ml.execution.provenance.ProvenanceArc` on
+        :attr:`~deriva_ml.execution.provenance.ProvenanceExecution.arcs`.
+        Arcs form a **set with no ranking**: there is no "strongest" arc
+        deciding why an execution is present (design ruling 4) — a consumer
+        that wants "the" reason must pick a policy itself. Gaps are
+        orthogonal to arcs: a gap documents a place the walk could not
+        fully resolve, independent of which (if any) executions were found.
 
         Args:
             rid: RID of any Dataset, Asset, Feature value, or Execution —
@@ -1430,12 +1441,25 @@ class ExecutionMixin:
                 root is an error.
             max_executions: Defensive cap on distinct executions expanded.
                 Strictly typed: booleans, strings, and floats are rejected at
-                the call boundary, not silently coerced.
+                the call boundary, not silently coerced. A proportional
+                internal dataset-version budget (``4 * max_executions``)
+                bounds ``datasets_visited`` the same way, so a large
+                ancestry graph with few executions cannot walk unboundedly.
 
         Returns:
-            A :class:`~deriva_ml.execution.provenance.ProvenanceClosure`.
-            ``traversal_complete`` is False iff a bound was hit — it is
-            **not** a claim of gap-freedom, which is ``not closure.gaps``.
+            A :class:`~deriva_ml.execution.provenance.ProvenanceClosure`
+            whose ``executions`` / ``datasets`` / ``assets`` maps and
+            ``gaps`` list are fully sorted for deterministic output
+            (``model_dump()`` is byte-identical across repeated calls on the
+            same catalog state). ``traversal_complete`` is False iff either
+            budget (``executions_visited`` vs ``max_executions``, or
+            ``datasets_visited`` vs its internal proportional budget) was
+            hit — it is **not** a claim of gap-freedom, which is
+            ``not closure.gaps`` and can be True or False independently of
+            ``traversal_complete``. ``cap_hit`` is the same signal as
+            ``not traversal_complete``, exposed under the name that matches
+            :attr:`~deriva_ml.execution.lineage.LineageResult`'s analogous
+            field.
 
         Raises:
             DerivaMLValidationError: If ``version`` is given for a
@@ -1459,6 +1483,13 @@ class ExecutionMixin:
                 ... )
                 >>> closure.root.version  # doctest: +SKIP
                 '1.2.0'
+
+            Inspect why one execution is in the closure and what it consumed
+            versus authored::
+
+                >>> execution = closure.executions[some_rid]  # doctest: +SKIP
+                >>> {arc.kind for arc in execution.arcs}  # doctest: +SKIP
+                {<ArcKind.consumption: 'consumption'>, <ArcKind.version_authorship: 'version_authorship'>}
         """
         from deriva_ml.core.mixins._provenance_engine import ClosureBuilder
 
@@ -1509,7 +1540,6 @@ class ExecutionMixin:
             engine.enqueue_execution(pending_rid, depth=pending_depth)
         engine.drain(depth_remaining=None)
 
-        executions = builder.build_executions()
         # An arc recorded against a RID that never became a closure member
         # needs an explanation. Three are already accounted for:
         #   - the RID failed to resolve (engine emitted ``unresolved_rid``);
@@ -1519,10 +1549,13 @@ class ExecutionMixin:
         #     ``cap_hit`` / ``traversal_complete=False`` already say the
         #     closure is partial, so calling it "unresolved" would be a lie.
         # Anything left over is an unexplained dangling arc, and gets
-        # reported rather than quietly dropped.
+        # reported rather than quietly dropped. This membership check runs
+        # BEFORE ``finalize()`` — it must observe every recorded arc and
+        # every gap emitted so far, and it itself emits a gap that
+        # ``finalize()`` needs to pick up.
         explained = {g.subject_rid for g in builder.gaps if g.kind in (GapKind.unresolved_rid, GapKind.sentinel_origin)}
         explained |= engine.truncated
-        for orphan in set(builder.arcs) - set(executions):
+        for orphan in set(builder.arcs) - set(builder.build_executions()):
             if orphan not in explained:
                 builder.on_gap(
                     GapKind.unresolved_rid,
@@ -1530,12 +1563,17 @@ class ExecutionMixin:
                     "arc recorded against an execution that never entered the closure",
                 )
 
+        # Single determinism seam (spec §4): every sorted collection in the
+        # closure is assembled here, once, after all walking and gap
+        # emission is done.
+        executions, datasets, assets, gaps = builder.finalize()
+
         return ProvenanceClosure(
             root=root_descriptor,
             executions=executions,
-            datasets=builder.build_datasets(),
-            assets=builder.build_assets(),
-            gaps=builder.build_gaps(),
+            datasets=datasets,
+            assets=assets,
+            gaps=gaps,
             executions_visited=engine.executions_visited,
             datasets_visited=engine.datasets_visited,
             traversal_complete=not engine.cap_hit,

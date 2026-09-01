@@ -364,7 +364,8 @@ class ClosureBuilder:
         """Return the deterministic arc list recorded for ``execution_rid``.
 
         Sorted by ``(kind, input_rid or "", consumed_by or "")`` per the
-        design's determinism rule.
+        design's determinism rule. Each arc's ``evidence`` is itself sorted
+        by ``(feature_name, element_type, execution_rid or "")``.
 
         Args:
             execution_rid: The execution whose arcs to read back.
@@ -376,10 +377,16 @@ class ClosureBuilder:
             >>> ClosureBuilder().arcs_for("1-ABCD")
             []
         """
-        return sorted(
+        arcs = sorted(
             self.arcs.get(execution_rid, {}).values(),
             key=lambda a: (str(a.kind), a.input_rid or "", a.consumed_by or ""),
         )
+        for arc in arcs:
+            arc.evidence = sorted(
+                arc.evidence,
+                key=lambda r: (r.feature_name, r.element_type, r.execution_rid or ""),
+            )
+        return arcs
 
     def enqueue(self, rid: str, depth: int) -> None:
         """Note an arc-discovered execution for the frontend to expand.
@@ -610,9 +617,14 @@ class ClosureBuilder:
     def build_assets(self) -> dict[str, ProvenanceAsset]:
         """Assemble the closure's asset map, deterministically ordered.
 
-        ``producers`` keeps its fetched order (RIDs carry no ordering
-        semantics, and the fetched order is the only honest record of what
-        the catalog returned); ``consumed_by`` is sorted.
+        During accumulation, ``producers`` keeps fetched order (RIDs carry
+        no ordering semantics on their own, and fetched order is the only
+        honest record of what the catalog returned — see
+        :meth:`register_asset`). At finalize, both ``producers`` and
+        ``consumed_by`` are sorted for output determinism: the fetched-order
+        requirement only governs accumulation and gap logic (e.g. which
+        sighting's order "wins" when an asset is seen more than once), which
+        has already happened by the time this runs.
 
         Returns:
             RID-keyed :class:`ProvenanceAsset` records, key-sorted.
@@ -624,6 +636,7 @@ class ClosureBuilder:
         out: dict[str, ProvenanceAsset] = {}
         for rid in sorted(self.assets):
             entry = self.assets[rid]
+            entry.producers = sorted(entry.producers)
             entry.consumed_by = sorted(entry.consumed_by)
             out[rid] = entry
         return out
@@ -639,6 +652,44 @@ class ClosureBuilder:
             []
         """
         return sorted(self.gaps, key=lambda g: (str(g.kind), g.subject_rid, g.detail))
+
+    def finalize(
+        self,
+    ) -> tuple[
+        dict[str, ProvenanceExecution],
+        dict[str, ProvenanceDataset],
+        dict[str, ProvenanceAsset],
+        list[ProvenanceGap],
+    ]:
+        """Assemble every closure collection, fully sorted, in one call.
+
+        This is the single determinism seam (spec §4): every sorted
+        collection in the closure — ``executions`` / ``datasets`` / ``assets``
+        key order, ``ProvenanceDataset.versions`` (by version label),
+        ``gaps``, each execution's ``arcs``, each arc's ``evidence``, each
+        dataset version's ``parents``, and each asset's ``producers`` /
+        ``consumed_by`` — is sorted here, so ``model_dump()`` output is byte-
+        identical across runs regardless of the order the walk discovered
+        things in. Call it exactly once, after the walk (and any post-walk
+        gap sweep, e.g. dangling-arc detection) has finished mutating the
+        builder — the individual ``build_*`` methods it delegates to are
+        idempotent, but gaps recorded after this call would not appear in
+        the returned ``gaps`` list.
+
+        Returns:
+            ``(executions, datasets, assets, gaps)`` — the four sorted
+            collections ``ProvenanceClosure`` is constructed from.
+
+        Example:
+            >>> ClosureBuilder().finalize()
+            ({}, {}, {}, [])
+        """
+        return (
+            self.build_executions(),
+            self.build_datasets(),
+            self.build_assets(),
+            self.build_gaps(),
+        )
 
 
 @dataclass
@@ -1002,8 +1053,23 @@ class WalkEngine(Generic[N]):
                 # non-sentinel execution recorded as having created this
                 # dataset", read at this snapshot.
                 facts = self._facts_for(dataset_rid, version)
+                origin_recorded = bool(author_rid) and not self.is_sentinel(author_rid)
                 if facts is not None:
-                    facts.origin_recorded = bool(author_rid) and not self.is_sentinel(author_rid)
+                    facts.origin_recorded = origin_recorded
+                if not origin_recorded:
+                    # A missing or sentinel-attributed origin row is its own
+                    # gap kind — distinct from `no_version_author` /
+                    # `sentinel_origin` below, which flag the ROW's author.
+                    # `origin_unrecorded` flags that the DATASET's origin
+                    # specifically (the first row at this snapshot) carries
+                    # no real provenance, which a consumer scanning gaps by
+                    # kind needs to find without inspecting every row gap.
+                    self.visitor.on_gap(
+                        GapKind.origin_unrecorded,
+                        dataset_rid,
+                        f"{dataset_rid} has no real (non-sentinel) origin recorded "
+                        f"at version {row.get('Version')} as observed at this snapshot",
+                    )
 
             if not author_rid:
                 self.visitor.on_gap(

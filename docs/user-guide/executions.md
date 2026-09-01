@@ -717,6 +717,122 @@ to fall back to.
 For the full method signature and the Pydantic model definitions, see
 [API Reference — Lineage](../api-reference/lineage.md).
 
+## Complete provenance: `lookup_provenance`
+
+`lookup_lineage` (above) walks one producing-execution chain — the
+data-flow story of how a single artifact came to exist. `lookup_provenance`
+answers a broader question: **everything schema-recorded that could have
+contributed to this artifact** — every execution reachable through any
+recorded relationship, every dataset version walked along the way, every
+consumed asset, and an honest account of what the walk could not resolve.
+The two calls share a walk engine and can disagree on how far they reach:
+`lookup_lineage` stops at the first producing chain; `lookup_provenance`
+expands *every* discovered execution, so an execution that only entered the
+picture as, say, the author of an input dataset's version — never itself a
+data-flow producer — shows up in `lookup_provenance` and would not in
+`lookup_lineage`. Neither call is a strict superset presentation of the
+other: they answer different questions and are built for different
+purposes — `lookup_lineage` for a compact, renderable trace of one
+artifact's ancestry; `lookup_provenance` for exhaustive closure analysis
+(audits, "what could this training run have depended on", debugging a
+suspect result).
+
+```python
+from deriva_ml import DerivaML
+
+ml = DerivaML(hostname="data.example.org", catalog_id="1")
+
+closure = ml.lookup_provenance("2-PRED1")   # the predictions.csv asset RID
+
+print(closure.root.type, closure.root.description)
+print(f"{len(closure.executions)} executions, {len(closure.datasets)} datasets, "
+      f"{len(closure.assets)} assets, {len(closure.gaps)} gaps")
+print(f"traversal_complete={closure.traversal_complete}")
+```
+
+**The closure shape.** `ProvenanceClosure` is flat, not a tree: `executions`,
+`datasets`, and `assets` are RID-keyed maps, and `gaps` is a flat list.
+Every collection is sorted deterministically (`model_dump()` is
+byte-identical across repeated calls against the same catalog state), so
+diffing two closures or checking one into a fixture file is meaningful.
+
+**Arcs: why an execution is in the closure — with no ranking.** Each
+`ProvenanceExecution.arcs` entry is a schema-recorded reason that execution
+is a closure member:
+
+| `ArcKind` | Fires when the execution... |
+|---|---|
+| `root` | is (or directly produced) the root artifact itself |
+| `consumption` | produced an input another closure member consumed |
+| `version_authorship` | authored a walked dataset version (≤ the pinned version) |
+| `member_binding` | bound feature values onto a walked dataset's members |
+
+An execution can carry more than one arc at once — nothing here elects a
+single "the" reason. Arcs are a **set with no strength ordering** between
+kinds: a `consumption` arc is not "stronger" or "more authoritative" than a
+`version_authorship` arc found on the same execution. Consumers that want a
+single explanation must apply their own policy on top of the arc list
+(e.g. "prefer `consumption` if present"); the closure itself refuses to
+make that call, because doing so would silently discard the other, equally
+real, reasons.
+
+**Gaps: honest, first-class holes — never silently patched over.** Where
+`lookup_lineage` quietly returns `None` for a missing producer,
+`lookup_provenance` reports a typed `ProvenanceGap` naming what could not be
+resolved and why. Gaps are orthogonal to arcs — a closure with gaps can
+still have `traversal_complete=True` (the walk finished; the *catalog* has
+holes), and a closure with zero gaps can still have
+`traversal_complete=False` (a budget stopped the walk before it found
+anything unresolvable). Check `not closure.gaps` for gap-freedom and
+`closure.traversal_complete` for walk-completeness separately — neither
+implies the other. The gap taxonomy (`GapKind`, 12 members) covers sentinel
+origins, unrecorded/unresolvable version authorship, missing or ambiguous
+feature-binding executions, broken snapshot chains, unpinned dataset
+inputs, missing or multiple asset producers, workflow-less executions, and
+RIDs that fail to resolve mid-walk. Filter by kind to answer targeted
+questions:
+
+```python
+sentinel_gaps = [g for g in closure.gaps if g.kind == "sentinel_origin"]
+unresolved = [g for g in closure.gaps if g.kind == "unresolved_rid"]
+```
+
+**Dataset facts are per-version, never merged across versions.**
+`closure.datasets[rid].versions` is keyed by version label; each
+`DatasetVersionFacts` records what was true **at that version's snapshot**
+— its authors (bounded at that version, later authors never leak in), its
+ancestry (`parents`, `ancestry_state`, `is_source`), and whether its origin
+was recorded. The same dataset walked at two different versions (e.g. once
+as a consumed input pinned at an older version, once as an ancestry parent
+at a newer one) gets two independent entries — reading `origin_recorded` or
+`parents` for one version never reflects a different version's facts.
+
+**Version pinning.** For a Dataset root, `version` pins the closure to
+`dataset@version`; omitted, the root resolves to the dataset's latest
+recorded version and the resolved pin is recorded in `closure.root.version`
+so the result is self-describing (the same rule `lookup_lineage` follows).
+Every arc that names a dataset input carries its own `input_version` —
+`None` means the consuming execution's edge carried no version pin, which
+is itself an `unpinned_input` gap; an unpinned edge is walked as a closure
+member but is never expanded through any version-snapshot-dependent arc
+(no authorship, no bindings, no ancestry), because there is no honest
+snapshot to read those facts from.
+
+**Budgets and `traversal_complete`.** `max_executions` bounds distinct
+executions expanded; a proportional internal dataset-version budget
+(`4 * max_executions`) bounds `datasets_visited` the same way, so a wide
+ancestry graph with few executions cannot walk unboundedly.
+`traversal_complete=False` means one of the two budgets was hit — the
+closure is a **partial but honest** answer, not a false completeness claim.
+`cap_hit` is the same signal under the name that matches
+`LineageResult.walked_complete`'s sibling field.
+
+For the full method signature and the Pydantic model definitions
+(`ProvenanceClosure`, `ProvenanceExecution`, `ProvenanceDataset`,
+`ProvenanceAsset`, `ProvenanceGap`, `ArcKind`, `GapKind`, and friends —
+all importable from `deriva_ml.execution`), see the docstrings on
+`DerivaML.lookup_provenance` and `deriva_ml.execution.provenance`.
+
 ## How to check a sweep's progress (multirun status summary)
 
 One query answers "is the sweep done?" — status counts across all of a
