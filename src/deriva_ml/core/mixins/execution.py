@@ -29,7 +29,7 @@ from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
-from deriva_ml.execution.provenance import ArcKind, GapKind, ProvenanceClosure
+from deriva_ml.execution.provenance import ArcInputType, ArcKind, GapKind, ProvenanceClosure
 from deriva_ml.execution.state_machine import (
     flush_pending_sync,
     reconcile_with_catalog,
@@ -1484,7 +1484,7 @@ class ExecutionMixin:
             )
         root_descriptor = root_descriptor.model_copy(update={"version": root_version})
 
-        seeds = self._closure_seeds(rid, root_descriptor, producer_rid, engine, builder)
+        seeds = self._closure_seeds(rid, root_descriptor, producer_rid, engine, builder, root_version)
 
         # Root arcs (depth 0) are recorded BEFORE expansion so a seed that
         # fails to expand still leaves the honest record of why it was
@@ -1511,12 +1511,17 @@ class ExecutionMixin:
 
         executions = builder.build_executions()
         # An arc recorded against a RID that never became a closure member
-        # needs an explanation. The engine already emitted one for the two
-        # known reasons — the RID failed to resolve (``unresolved_rid``) or
-        # it is the sentinel, which is excluded BY DESIGN and is not a hole
-        # (``sentinel_origin``). Anything left over is an unexplained
-        # dangling arc, and gets reported rather than quietly dropped.
+        # needs an explanation. Three are already accounted for:
+        #   - the RID failed to resolve (engine emitted ``unresolved_rid``);
+        #   - it is the sentinel, excluded BY DESIGN, not a hole (engine
+        #     emitted ``sentinel_origin``);
+        #   - the execution cap truncated it — it is perfectly resolvable and
+        #     ``cap_hit`` / ``traversal_complete=False`` already say the
+        #     closure is partial, so calling it "unresolved" would be a lie.
+        # Anything left over is an unexplained dangling arc, and gets
+        # reported rather than quietly dropped.
         explained = {g.subject_rid for g in builder.gaps if g.kind in (GapKind.unresolved_rid, GapKind.sentinel_origin)}
+        explained |= engine.truncated
         for orphan in set(builder.arcs) - set(executions):
             if orphan not in explained:
                 builder.on_gap(
@@ -1610,6 +1615,7 @@ class ExecutionMixin:
         producer_rid: RID | None,
         engine: "WalkEngine[str]",
         builder: "ClosureBuilder",
+        root_version: str | None = None,
     ) -> list[RID]:
         """Return the root-arc seed executions for a closure walk.
 
@@ -1619,12 +1625,25 @@ class ExecutionMixin:
         member producers has four schema-recorded root-adjacent facts, and
         dropping three of them would understate the closure.
 
+        Root-type specifics:
+
+        - **Dataset** — the origin author plus the member producers **of the
+          walked version**. Scanning members live would leak executions that
+          post-date the pin into a historical closure.
+        - **Asset** — ALL recorded producers (spec §6.2), never
+          ``_classify_rid``'s first-match choice, and the root asset itself
+          is registered as a closure member with the same producer-count gaps
+          a consumed asset gets.
+        - **Feature** — the binding execution; a null one is a gap.
+
         Args:
             rid: The root artifact's RID.
             root_descriptor: Its classification.
             producer_rid: The direct producer from ``_classify_rid``.
-            engine: The walk engine (for sentinel classification).
-            builder: Accumulator the sentinel/null-binding gaps land on.
+            engine: The walk engine (for sentinel classification and the
+                shared asset-producer reporting).
+            builder: Accumulator the root asset and root-level gaps land on.
+            root_version: The resolved Dataset-root pin, or None.
 
         Returns:
             Deduped seed execution RIDs, sorted for determinism.
@@ -1638,7 +1657,10 @@ class ExecutionMixin:
             seeds.add(producer_rid)
 
         if root_descriptor.type == "Dataset":
-            seeds |= self._producers_of_dataset_members(rid)
+            # Version-scoped: the members of the PIN, not of live state.
+            seeds |= self._producers_of_dataset_members(rid, version=root_version)
+        elif root_descriptor.type == "Asset":
+            seeds |= self._seed_asset_root(rid, engine, builder)
         elif root_descriptor.type == "Feature" and producer_rid is None:
             # A feature value IS the binding (member, value, execution); a
             # null execution column means the binding records no author.
@@ -1659,6 +1681,64 @@ class ExecutionMixin:
                 "root provenance terminates at the unknown-provenance Execution sentinel",
             )
         return sorted(seeds - sentinel_seeds)
+
+    def _seed_asset_root(
+        self,
+        rid: RID,
+        engine: "WalkEngine[str]",
+        builder: "ClosureBuilder",
+    ) -> set[RID]:
+        """Register an Asset root as a closure member and return its producers.
+
+        Applies spec §6.2 to the ROOT asset exactly as the walk applies it to
+        a consumed asset: every recorded Output row is followed (never
+        ``_classify_rid``'s first-match ``_producer_of_asset``), the asset
+        itself becomes a member of ``closure.assets`` even when it has no
+        producer at all, and the producer-count gaps come from the engine's
+        shared reporter rather than a second copy of the rules.
+
+        Args:
+            rid: The root asset's RID.
+            engine: Supplies the shared ``report_asset_producers`` path.
+            builder: Accumulator the asset and its gaps land on.
+
+        Returns:
+            Every recorded producing execution RID.
+
+        Example:
+            >>> ml._seed_asset_root(asset_rid, engine, builder)  # doctest: +SKIP
+            {'2-EXAA'}
+        """
+        from deriva_ml.core.mixins._provenance_engine import InputRef
+        from deriva_ml.execution.lineage import AssetSummary
+
+        resolved = self.resolve_rid(rid)
+        row = self._retrieve_rid(rid)
+
+        producer_rids: tuple[RID, ...] = ()
+        resolution_failed = False
+        try:
+            producer_rids = tuple(self._producers_of_asset(rid, resolved.table))
+        except Exception:
+            # Same degrade-but-report contract the consumed-asset leg uses:
+            # an unreadable producer association is a gap, never a silent
+            # "this asset has no producer".
+            resolution_failed = True
+
+        builder.register_asset(
+            InputRef(
+                kind=ArcInputType.asset,
+                rid=rid,
+                summary=AssetSummary(
+                    rid=rid,
+                    filename=row.get("Filename") or None,
+                    asset_table=resolved.table.name,
+                ),
+                producer_rids=producer_rids,
+            )
+        )
+        engine.report_asset_producers(rid, producer_rids, resolution_failed=resolution_failed)
+        return set(producer_rids)
 
     # -- private helpers -------------------------------------------------
 

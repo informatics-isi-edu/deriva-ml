@@ -255,19 +255,43 @@ def test_root_version_explicit_historical():
 
 def test_root_version_omitted_resolves_latest():
     """Latest by ``_version_row_sort_key`` (RCT-primary), NOT by list order or
-    RID order — the rows are scripted out of chronological order on purpose."""
+    RID order.
+
+    Rows are scripted OLDEST-first, mirroring the real
+    ``_dataset_version_rows`` contract (RCT-primary, earliest recorded
+    first). That ordering is what makes this test non-vacuous: an
+    implementation that shortcut to ``rows[0]`` would return the OLDEST
+    version and fail here, whereas newest-first scripting would let that
+    mutant pass.
+    """
     ml = _FakeML()
     ds1, exa, exb = _ds(1), _ex(1), _ex(2)
     ml.add_dataset(ds1, description="versioned")
-    # Appended newest-first: only an RCT-aware max picks 4.13.0.
-    ml.add_version_row(ds1, "4.13.0", exb, rct="2026-01-01T00:00:00Z")
     ml.add_version_row(ds1, "0.1.0", exa, rct="2025-01-01T00:00:00Z")
+    ml.add_version_row(ds1, "4.13.0", exb, rct="2026-01-01T00:00:00Z")
     ml.add_execution(exa, description="origin")
     ml.add_execution(exb, description="later")
 
     closure = ml.lookup_provenance(ds1)
 
     assert closure.root.version == "4.13.0"
+
+
+def test_root_version_omitted_uses_rct_order_not_label_order():
+    """The pin comes from ``_version_row_sort_key`` (RCT-primary), so the
+    latest RECORDED version wins even when its label sorts lower — a plain
+    PEP-440 max over labels would wrongly pick 4.13.0 here."""
+    ml = _FakeML()
+    ds1, exa, exb = _ds(1), _ex(1), _ex(2)
+    ml.add_dataset(ds1, description="versioned")
+    ml.add_version_row(ds1, "4.13.0", exa, rct="2025-01-01T00:00:00Z")
+    ml.add_version_row(ds1, "0.2.0", exb, rct="2026-01-01T00:00:00Z")
+    ml.add_execution(exa, description="origin")
+    ml.add_execution(exb, description="rollback")
+
+    closure = ml.lookup_provenance(ds1)
+
+    assert closure.root.version == "0.2.0"
 
 
 def test_root_version_unknown_raises_validation_error():
@@ -298,6 +322,27 @@ def test_dataset_with_no_version_rows_gap_and_degraded_walk():
     assert exa in closure.executions
 
 
+def test_pinned_root_scans_members_at_the_pin_not_live():
+    """A closure pinned to an old version must scan that version's members.
+    Scanning live would leak a post-pin execution into a historical answer."""
+    ml = _FakeML()
+    ds1, at_pin, post_pin = _ds(1), _ex(1), _ex(2)
+    ml.add_dataset(ds1, description="pinned", producer=None)
+    ml.add_version_row(ds1, "0.1.0", None, rct="2025-01-01T00:00:00Z")
+    ml.add_execution(at_pin, description="member producer at the pin")
+    ml.add_execution(post_pin, description="ran AFTER the pinned version")
+    ml.set_member_producers(ds1, {at_pin, post_pin})  # live membership
+    ml.set_versioned_member_producers(ds1, "0.1.0", {at_pin})  # membership at the pin
+
+    closure = ml.lookup_provenance(ds1, version="0.1.0")
+
+    assert set(closure.executions) == {at_pin}
+    assert post_pin not in closure.executions
+    # The seam was actually asked for the pinned version, not for live state.
+    member_scans = [c for c in ml.calls if c[0] == "_producers_of_dataset_members"]
+    assert member_scans == [("_producers_of_dataset_members", (ds1, "0.1.0"))]
+
+
 def test_version_kwarg_on_execution_root_raises():
     ml = _FakeML()
     exa = _ex(1)
@@ -323,6 +368,51 @@ def test_max_executions_strict_boundary(bad):
 
     with pytest.raises(ValidationError):
         ml.lookup_provenance(exa, max_executions=bad)
+
+
+def test_cap_truncation_emits_no_false_unresolved_gap_across_seeds():
+    """Two member-producer seeds, budget of one: the seed the cap dropped is
+    perfectly resolvable, so calling it ``unresolved_rid`` would be a lie.
+    ``cap_hit`` / ``traversal_complete=False`` are its explanation."""
+    ml = _FakeML()
+    ds_root, m1, m2 = _ds(1), _ex(1), _ex(2)
+    ml.add_dataset(ds_root, description="root", producer=None)
+    ml.add_execution(m1, description="member producer 1")
+    ml.add_execution(m2, description="member producer 2")
+    ml.set_member_producers(ds_root, {m1, m2})
+
+    closure = ml.lookup_provenance(ds_root, max_executions=1)
+
+    assert closure.cap_hit is True
+    assert closure.traversal_complete is False
+    assert closure.executions_visited == 1
+    assert _gaps_for(closure, GapKind.unresolved_rid) == []
+
+
+def test_cap_truncation_emits_no_false_unresolved_gap_mid_chain():
+    """A 3-deep chain truncated at 2: the third execution is resolvable and
+    was merely not reached, so it must not be reported as unresolved."""
+    ml = _FakeML()
+    ds0, ds1, ds2, ds3 = _ds(1), _ds(2), _ds(3), _ds(4)
+    exa, exb, exc = _ex(1), _ex(2), _ex(3)
+
+    ml.add_dataset(ds0, producer=None)
+    ml.add_dataset(ds1, producer=exa)
+    ml.add_dataset(ds2, producer=exb)
+    ml.add_dataset(ds3, producer=exc)
+    ml.add_execution(exa, description="a", input_datasets=[_StubDataset(ds0, consumed_version="0.1.0")])
+    ml.add_execution(exb, description="b", input_datasets=[_StubDataset(ds1, consumed_version="1.0.0")])
+    ml.add_execution(exc, description="c", input_datasets=[_StubDataset(ds2, consumed_version="2.0.0")])
+    ml.set_versioned_producer(ds1, "1.0.0", exa)
+    ml.set_versioned_producer(ds2, "2.0.0", exb)
+
+    closure = ml.lookup_provenance(ds3, max_executions=2)
+
+    assert closure.cap_hit is True
+    assert closure.traversal_complete is False
+    assert closure.executions_visited == 2
+    assert exa not in closure.executions  # truncated
+    assert _gaps_for(closure, GapKind.unresolved_rid) == []
 
 
 def test_cap_sets_traversal_complete_false():
@@ -540,6 +630,44 @@ def test_asset_two_producers_all_reported_plus_gap():
     assert _gaps_for(closure, GapKind.multiple_asset_producers, asset)
     # Both producers enter the closure with consumption arcs.
     assert {prod_a, prod_b} <= set(closure.executions)
+
+
+def test_asset_root_reports_all_producers_plus_gap():
+    """§6.2 applies to the ROOT asset too: a multi-producer asset root seeds
+    from ALL producers, registers the asset as a closure member, and raises
+    the multiplicity gap — never ``_classify_rid``'s first-match choice."""
+    ml = _FakeML()
+    asset, prod_a, prod_b = _as(1), _ex(1), _ex(2)
+    ml.add_asset(asset, "Execution_Asset", filename="w.pt", producers=[prod_b, prod_a])
+    ml.add_execution(prod_a, description="a")
+    ml.add_execution(prod_b, description="b")
+
+    closure = ml.lookup_provenance(asset)
+
+    assert closure.root.type == "Asset"
+    assert set(closure.executions) == {prod_a, prod_b}
+    # Both producers are root-adjacent facts, so both carry a root arc.
+    for producer in (prod_a, prod_b):
+        assert any(a.kind == ArcKind.root and a.depth == 0 for a in _arcs_of(closure, producer))
+    assert asset in closure.assets
+    assert closure.assets[asset].producers == [prod_b, prod_a]  # fetched order
+    assert _gaps_for(closure, GapKind.multiple_asset_producers, asset)
+
+
+def test_asset_root_with_zero_producers_is_a_member_with_gap():
+    """A producerless asset root still enters ``closure.assets`` and reports
+    ``no_asset_producer`` — an empty closure with no gap would be silent."""
+    ml = _FakeML()
+    asset = _as(1)
+    ml.add_asset(asset, "Execution_Asset", filename="orphan.csv", producers=[])
+
+    closure = ml.lookup_provenance(asset)
+
+    assert closure.executions == {}
+    assert asset in closure.assets
+    assert closure.assets[asset].producers == []
+    assert closure.assets[asset].consumed_by == []
+    assert _gaps_for(closure, GapKind.no_asset_producer, asset)
 
 
 def test_asset_zero_producers_gap():

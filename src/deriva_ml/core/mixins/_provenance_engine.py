@@ -432,7 +432,7 @@ class ClosureBuilder:
         question ``ArcKind.root``'s depth 0 answers.
         """
         if input_ref.kind == ArcInputType.asset:
-            self._record_asset(input_ref, consumer_rid)
+            self.register_asset(input_ref, consumer_rid)
         else:
             self.dataset_descriptions.setdefault(
                 input_ref.rid,
@@ -453,8 +453,26 @@ class ClosureBuilder:
                 input_version=input_ref.version,
             )
 
-    def _record_asset(self, input_ref: InputRef, consumer_rid: str) -> None:
-        """Merge one consumed asset into the closure's asset map."""
+    def register_asset(self, input_ref: InputRef, consumer_rid: str | None = None) -> None:
+        """Merge one asset into the closure's asset map.
+
+        Shared by the consumed-asset path (which passes the consuming
+        execution) and the Asset-root path (which passes ``None``, because a
+        root asset is a closure member by being the root, not by being
+        consumed).
+
+        Args:
+            input_ref: The asset's reference, carrying its summary and ALL
+                recorded producers in fetched order.
+            consumer_rid: The consuming execution, or None for a root asset.
+
+        Example:
+            >>> from deriva_ml.execution.provenance import ArcInputType
+            >>> builder = ClosureBuilder()
+            >>> builder.register_asset(InputRef(kind=ArcInputType.asset, rid="1-ABCD"))
+            >>> builder.assets["1-ABCD"].consumed_by
+            []
+        """
         from deriva_ml.execution.lineage import AssetSummary
 
         summary = input_ref.summary
@@ -469,7 +487,7 @@ class ClosureBuilder:
         for producer in input_ref.producer_rids:
             if producer not in entry.producers:
                 entry.producers.append(producer)
-        if consumer_rid not in entry.consumed_by:
+        if consumer_rid is not None and consumer_rid not in entry.consumed_by:
             entry.consumed_by.append(consumer_rid)
 
     def on_version_author(
@@ -648,6 +666,10 @@ class WalkEngine(Generic[N]):
         executions_visited: Count of distinct executions expanded.
         datasets_visited: Count of distinct dataset versions expanded.
         cap_hit: True once a cap stopped an expansion.
+        truncated: Execution RIDs the execution cap refused to expand. These
+            are resolvable — they were reached and then dropped for budget,
+            not because anything about them was broken — so a consumer must
+            not report them as unresolved. ``cap_hit`` is their explanation.
 
     Example:
         >>> from deriva_ml.execution.provenance import ArcKind
@@ -670,6 +692,7 @@ class WalkEngine(Generic[N]):
     in_progress: set[RID] = field(init=False)
     datasets_expanded: set[tuple[str, str | None]] = field(init=False)
     cap_hit: bool = field(init=False, default=False)
+    truncated: set[RID] = field(init=False)
     _queue: list[tuple[RID, int]] = field(init=False)
     _unpinned_quarantined: set[tuple[str, str | None]] = field(init=False)
 
@@ -696,6 +719,7 @@ class WalkEngine(Generic[N]):
         self.in_progress = set()
         self.datasets_expanded = set()
         self.cap_hit = False
+        self.truncated = set()
         self._queue = []
         self._unpinned_quarantined = set()
         self._sentinel_resolved = False
@@ -828,7 +852,7 @@ class WalkEngine(Generic[N]):
 
     # -- asset facts ------------------------------------------------------
 
-    def _report_asset_producers(
+    def report_asset_producers(
         self,
         asset_rid: str,
         producer_rids: tuple[str, ...],
@@ -850,7 +874,7 @@ class WalkEngine(Generic[N]):
 
         Example:
             >>> engine = WalkEngine(ml=None, visitor=TreeBuilder(), closure_mode=True)
-            >>> engine._report_asset_producers("1-ABCD", (), resolution_failed=False) is None
+            >>> engine.report_asset_producers("1-ABCD", (), resolution_failed=False) is None
             True
         """
         if resolution_failed:
@@ -937,10 +961,13 @@ class WalkEngine(Generic[N]):
         if rid in self.visited_global:
             return self.visitor.make_duplicate_node(rid, depth=depth)
 
-        # Defensive cap on total expansions.
+        # Defensive cap on total expansions. Record WHICH execution was
+        # dropped: it is perfectly resolvable, so a consumer must be able to
+        # tell "truncated for budget" from "could not be resolved".
         if len(self.visited_global) >= self.max_executions:
             self.flags["walked_complete"] = False
             self.cap_hit = True
+            self.truncated.add(rid)
             return None
 
         # Look up the execution and its inputs. Deliberately per-node (not
@@ -1053,7 +1080,7 @@ class WalkEngine(Generic[N]):
                     # keep walking the rest of the inputs.
                     resolution_failed = True
                 if self.closure_mode:
-                    self._report_asset_producers(
+                    self.report_asset_producers(
                         asset.asset_rid,
                         producer_rids,
                         resolution_failed=resolution_failed,
@@ -1187,9 +1214,11 @@ class WalkEngine(Generic[N]):
         while self._queue:
             if len(self.visited_global) >= self.max_executions:
                 # Budget exhausted with real work still queued: the
-                # traversal is provably incomplete.
+                # traversal is provably incomplete, and everything still
+                # queued was truncated rather than unresolvable.
                 self.flags["walked_complete"] = False
                 self.cap_hit = True
+                self.truncated |= {queued_rid for queued_rid, _ in self._queue}
                 return
             rid, depth = self._queue.pop(0)
             if rid in self.visited_global:
