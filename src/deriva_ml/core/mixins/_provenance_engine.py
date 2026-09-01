@@ -32,14 +32,30 @@ from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.execution.provenance import ArcInputType, ArcKind, GapKind
+from deriva_ml.execution.provenance import (
+    AncestryState,
+    ArcInputType,
+    ArcKind,
+    DatasetVersionFacts,
+    GapKind,
+    ProvenanceArc,
+    ProvenanceAsset,
+    ProvenanceDataset,
+    ProvenanceExecution,
+    ProvenanceGap,
+)
 
 if TYPE_CHECKING:
     from deriva_ml.execution.lineage import ExecutionSummary, LineageNode, VersionAttribution
-    from deriva_ml.execution.provenance import DatasetVersionFacts, ParentLink
+    from deriva_ml.execution.provenance import ParentLink
     from deriva_ml.feature import FeatureProducerRecord
 
-__all__ = ["InputRef", "WalkVisitor", "WalkEngine", "TreeBuilder"]
+__all__ = ["InputRef", "WalkVisitor", "WalkEngine", "TreeBuilder", "ClosureBuilder"]
+
+# Version key recorded for a dataset whose consumption edge carried no version
+# pin. Never a real version label (labels are PEP-440-ish strings), so it can
+# never collide with a walked version in ``ProvenanceDataset.versions``.
+UNPINNED_VERSION_KEY = "<unpinned>"
 
 N = TypeVar("N")
 
@@ -132,6 +148,15 @@ class WalkVisitor(Protocol[N]):
         """Observe one snapshot-resolved parent hop of a dataset version."""
         ...
 
+    def on_dataset_walked(self, *, dataset_rid: str, version: str) -> None:
+        """Observe that one ``(dataset, version)`` entered the walk.
+
+        Fires before any arc leg runs, so a visitor can register the version
+        as a member even when every leg then reports a gap. Must be
+        idempotent and must not discard facts an earlier leg recorded.
+        """
+        ...
+
     def on_dataset_facts(self, *, dataset_rid: str, facts: "DatasetVersionFacts") -> None:
         """Observe the assembled facts for one dataset version."""
         ...
@@ -219,11 +244,376 @@ class TreeBuilder:
     def on_parent_link(self, *, dataset_rid: str, link: "ParentLink") -> None:
         """No-op."""
 
+    def on_dataset_walked(self, *, dataset_rid: str, version: str) -> None:
+        """No-op."""
+
     def on_dataset_facts(self, *, dataset_rid: str, facts: "DatasetVersionFacts") -> None:
         """No-op."""
 
     def on_gap(self, kind: "GapKind", subject_rid: str, detail: str) -> None:
         """No-op."""
+
+
+class ClosureBuilder:
+    """Visitor that accumulates a flat provenance closure.
+
+    Implements :class:`WalkVisitor` with the node handle ``N = str`` — the
+    execution RID — because a closure is a set of facts keyed by RID, not a
+    tree: there is nothing to attach parents to, so ``make_node`` simply
+    returns the RID and ``attach_parents`` is a no-op.
+
+    Everything the builder accumulates is deduplicated and merged rather
+    than appended blindly:
+
+    - **Arcs** dedupe on :meth:`~deriva_ml.execution.provenance.ProvenanceArc.identity`
+      (``kind, consumed_by, input_rid, input_version``), keeping the
+      MINIMUM discovery depth and the union of ``evidence``.
+    - **Gaps** dedupe on ``(kind, subject_rid, detail)`` — the same hole
+      rediscovered on a second path is one hole.
+    - **Assets** merge producer lists (the first sighting's fetched order
+      wins) and accumulate consumers.
+    - **Dataset facts** are stored per ``(dataset_rid, version)`` and never
+      conflated across versions.
+
+    Example:
+        >>> from deriva_ml.execution.provenance import ArcKind
+        >>> builder = ClosureBuilder()
+        >>> builder.record_arc("1-ABCD", kind=ArcKind.root, depth=0)
+        >>> [a.depth for a in builder.arcs_for("1-ABCD")]
+        [0]
+        >>> builder.record_arc("1-ABCD", kind=ArcKind.root, depth=2)
+        >>> [a.depth for a in builder.arcs_for("1-ABCD")]
+        [0]
+    """
+
+    def __init__(self) -> None:
+        """Initialize an empty closure accumulator."""
+        self.executions: dict[str, "ExecutionSummary"] = {}
+        self.arcs: dict[str, dict[tuple, ProvenanceArc]] = {}
+        self.datasets: dict[str, dict[str, DatasetVersionFacts]] = {}
+        self.dataset_descriptions: dict[str, str | None] = {}
+        self.assets: dict[str, ProvenanceAsset] = {}
+        self.gaps: list[ProvenanceGap] = []
+        self._gap_keys: set[tuple] = set()
+        # Executions discovered through a non-tree arc but not yet expanded;
+        # the frontend hands these to the engine's queue.
+        self.pending: list[tuple[str, int]] = []
+
+    # -- accumulation primitives ------------------------------------------
+
+    def record_arc(
+        self,
+        execution_rid: str,
+        *,
+        kind: ArcKind,
+        depth: int,
+        consumed_by: str | None = None,
+        input_rid: str | None = None,
+        input_type: ArcInputType | None = None,
+        input_version: str | None = None,
+        evidence: "list[FeatureProducerRecord] | None" = None,
+    ) -> None:
+        """Record one arc onto ``execution_rid``, merging on arc identity.
+
+        A rediscovery of the same identity keeps the minimum ``depth`` and
+        unions ``evidence`` instead of appending a second arc.
+
+        Args:
+            execution_rid: The execution the arc attaches to.
+            kind: Why this execution is in the closure.
+            depth: Hops from the root at which the arc was discovered.
+            consumed_by: Consuming execution RID (consumption arcs).
+            input_rid: The concrete input RID.
+            input_type: Whether ``input_rid`` is a dataset or an asset.
+            input_version: The pinned dataset version consumed, if any.
+            evidence: ``member_binding`` justification records.
+
+        Example:
+            >>> from deriva_ml.execution.provenance import ArcKind
+            >>> builder = ClosureBuilder()
+            >>> builder.record_arc("1-ABCD", kind=ArcKind.root, depth=0)
+            >>> len(builder.arcs_for("1-ABCD"))
+            1
+        """
+        arc = ProvenanceArc(
+            kind=kind,
+            consumed_by=consumed_by,
+            input_rid=input_rid,
+            input_type=input_type,
+            input_version=input_version,
+            evidence=list(evidence or []),
+            depth=depth,
+        )
+        bucket = self.arcs.setdefault(execution_rid, {})
+        existing = bucket.get(arc.identity())
+        if existing is None:
+            bucket[arc.identity()] = arc
+            return
+        if arc.depth < existing.depth:
+            existing.depth = arc.depth
+        for record in arc.evidence:
+            if record not in existing.evidence:
+                existing.evidence.append(record)
+
+    def arcs_for(self, execution_rid: str) -> list[ProvenanceArc]:
+        """Return the deterministic arc list recorded for ``execution_rid``.
+
+        Sorted by ``(kind, input_rid or "", consumed_by or "")`` per the
+        design's determinism rule.
+
+        Args:
+            execution_rid: The execution whose arcs to read back.
+
+        Returns:
+            The sorted arcs; empty when the execution has none.
+
+        Example:
+            >>> ClosureBuilder().arcs_for("1-ABCD")
+            []
+        """
+        return sorted(
+            self.arcs.get(execution_rid, {}).values(),
+            key=lambda a: (str(a.kind), a.input_rid or "", a.consumed_by or ""),
+        )
+
+    def enqueue(self, rid: str, depth: int) -> None:
+        """Note an arc-discovered execution for the frontend to expand.
+
+        Args:
+            rid: Execution RID discovered through an arc.
+            depth: Depth at which it was discovered.
+
+        Example:
+            >>> builder = ClosureBuilder()
+            >>> builder.enqueue("1-ABCD", 1)
+            >>> builder.pending
+            [('1-ABCD', 1)]
+        """
+        self.pending.append((rid, depth))
+
+    # -- tree construction (degenerate: a closure has no tree) ------------
+
+    def make_node(self, rid: str, *, summary: "ExecutionSummary", inputs: list[InputRef], depth: int) -> str:
+        """Return the execution RID; the closure keys facts, not nodes."""
+        return rid
+
+    def make_cycle_node(self, rid: str, *, depth: int) -> str:
+        """Return the execution RID for a cycle marker."""
+        return rid
+
+    def make_duplicate_node(self, rid: str, *, depth: int) -> str:
+        """Return the execution RID for a diamond-duplicate marker."""
+        return rid
+
+    def attach_parents(self, node: str, parents: list[str]) -> None:
+        """No-op: closure membership is flat, so there is nothing to attach."""
+
+    # -- seeding ----------------------------------------------------------
+
+    def on_seed_candidate(self, rid: str, *, accepted: bool) -> None:
+        """No-op: seed-candidate iteration is a tree-shaping concern."""
+
+    # -- closure hooks ----------------------------------------------------
+
+    def on_execution(self, rid: str, *, summary: "ExecutionSummary", depth: int) -> None:
+        """Record an execution's summary as a closure member."""
+        self.executions.setdefault(rid, summary)
+
+    def on_consumption(self, *, consumer_rid: str, input_ref: InputRef, depth: int) -> None:
+        """Record one consumption edge: its arcs, and its input's facts.
+
+        Every recorded producer of the input gets a ``consumption`` arc
+        naming the concrete input, so a multi-producer asset attributes the
+        consumption to all of them (spec §6.2) rather than to a first match.
+
+        ``depth`` is the CONSUMER's depth; the arc records the PRODUCER's
+        depth (``depth + 1``), so an arc's depth always answers "how many
+        hops from the root is the execution this arc attaches to" — the same
+        question ``ArcKind.root``'s depth 0 answers.
+        """
+        if input_ref.kind == ArcInputType.asset:
+            self._record_asset(input_ref, consumer_rid)
+        else:
+            self.dataset_descriptions.setdefault(
+                input_ref.rid,
+                getattr(input_ref.summary, "description", None),
+            )
+        for producer in input_ref.producer_rids:
+            if producer == consumer_rid:
+                # An execution that both produced and consumed the same input
+                # is not its own provenance ancestor.
+                continue
+            self.record_arc(
+                producer,
+                kind=ArcKind.consumption,
+                depth=depth + 1,
+                consumed_by=consumer_rid,
+                input_rid=input_ref.rid,
+                input_type=input_ref.kind,
+                input_version=input_ref.version,
+            )
+
+    def _record_asset(self, input_ref: InputRef, consumer_rid: str) -> None:
+        """Merge one consumed asset into the closure's asset map."""
+        from deriva_ml.execution.lineage import AssetSummary
+
+        summary = input_ref.summary
+        if not isinstance(summary, AssetSummary):
+            summary = AssetSummary(rid=input_ref.rid, filename=None, asset_table="")
+        entry = self.assets.get(input_ref.rid)
+        if entry is None:
+            entry = ProvenanceAsset(asset=summary, producers=[], consumed_by=[])
+            self.assets[input_ref.rid] = entry
+        # Fetched order of the FIRST sighting is authoritative; later
+        # sightings only contribute producers the first one did not see.
+        for producer in input_ref.producer_rids:
+            if producer not in entry.producers:
+                entry.producers.append(producer)
+        if consumer_rid not in entry.consumed_by:
+            entry.consumed_by.append(consumer_rid)
+
+    def on_version_author(
+        self, *, dataset_rid: str, version: str, attribution: "VersionAttribution", depth: int
+    ) -> None:
+        """Record one walked version's author (Task 11 fills the arc leg)."""
+        facts = self.dataset_facts(dataset_rid, version)
+        if attribution not in facts.version_authors:
+            facts.version_authors.append(attribution)
+
+    def on_binding_record(self, *, dataset_rid: str, version: str, record: "FeatureProducerRecord", depth: int) -> None:
+        """Observe one feature-binding record (Task 12 fills the arc leg)."""
+
+    def on_parent_link(self, *, dataset_rid: str, link: "ParentLink") -> None:
+        """Record one snapshot-resolved parent hop (Task 13 fills the leg)."""
+        facts = self.dataset_facts(dataset_rid, link.child_version)
+        if link not in facts.parents:
+            facts.parents.append(link)
+
+    def on_dataset_walked(self, *, dataset_rid: str, version: str) -> None:
+        """Register a walked version as a closure member, non-destructively."""
+        self.dataset_facts(dataset_rid, version)
+
+    def on_dataset_facts(self, *, dataset_rid: str, facts: DatasetVersionFacts) -> None:
+        """Store the assembled facts for one dataset version."""
+        self.datasets.setdefault(dataset_rid, {})[facts.version] = facts
+
+    def dataset_facts(self, dataset_rid: str, version: str) -> DatasetVersionFacts:
+        """Return (creating if needed) the facts record for one version.
+
+        Args:
+            dataset_rid: The dataset the facts belong to.
+            version: The version label the facts describe.
+
+        Returns:
+            The mutable :class:`DatasetVersionFacts` for that version.
+
+        Example:
+            >>> builder = ClosureBuilder()
+            >>> builder.dataset_facts("1-ABCD", "1.0.0").ancestry_state
+            <AncestryState.not_walked: 'not_walked'>
+        """
+        versions = self.datasets.setdefault(dataset_rid, {})
+        facts = versions.get(version)
+        if facts is None:
+            facts = DatasetVersionFacts(
+                version=version,
+                parents=[],
+                ancestry_state=AncestryState.not_walked,
+                is_source=None,
+                origin_recorded=None,
+                version_authors=[],
+            )
+            versions[version] = facts
+        return facts
+
+    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str) -> None:
+        """Record an honest gap, deduped on ``(kind, subject_rid, detail)``."""
+        key = (kind, subject_rid, detail)
+        if key in self._gap_keys:
+            return
+        self._gap_keys.add(key)
+        self.gaps.append(ProvenanceGap(kind=kind, subject_rid=subject_rid, detail=detail))
+
+    # -- finalize ---------------------------------------------------------
+
+    def build_executions(self) -> dict[str, ProvenanceExecution]:
+        """Assemble the closure's execution map, deterministically ordered.
+
+        Only executions that were actually expanded (i.e. have a resolved
+        summary) become members: an arc recorded against a RID that never
+        resolved is represented by its ``unresolved_rid`` gap, not by a
+        half-empty member.
+
+        Returns:
+            RID-keyed :class:`ProvenanceExecution` records, key-sorted.
+
+        Example:
+            >>> ClosureBuilder().build_executions()
+            {}
+        """
+        return {
+            rid: ProvenanceExecution(execution=self.executions[rid], arcs=self.arcs_for(rid))
+            for rid in sorted(self.executions)
+        }
+
+    def build_datasets(self) -> dict[str, ProvenanceDataset]:
+        """Assemble the closure's dataset map, deterministically ordered.
+
+        Returns:
+            RID-keyed :class:`ProvenanceDataset` records, key-sorted, each
+            with version-sorted facts whose ``parents`` are sorted by
+            ``parent_rid``.
+
+        Example:
+            >>> ClosureBuilder().build_datasets()
+            {}
+        """
+        out: dict[str, ProvenanceDataset] = {}
+        for rid in sorted(self.datasets):
+            versions: dict[str, DatasetVersionFacts] = {}
+            for version in sorted(self.datasets[rid]):
+                facts = self.datasets[rid][version]
+                facts.parents = sorted(facts.parents, key=lambda p: p.parent_rid)
+                versions[version] = facts
+            out[rid] = ProvenanceDataset(
+                rid=rid,
+                description=self.dataset_descriptions.get(rid),
+                versions=versions,
+            )
+        return out
+
+    def build_assets(self) -> dict[str, ProvenanceAsset]:
+        """Assemble the closure's asset map, deterministically ordered.
+
+        ``producers`` keeps its fetched order (RIDs carry no ordering
+        semantics, and the fetched order is the only honest record of what
+        the catalog returned); ``consumed_by`` is sorted.
+
+        Returns:
+            RID-keyed :class:`ProvenanceAsset` records, key-sorted.
+
+        Example:
+            >>> ClosureBuilder().build_assets()
+            {}
+        """
+        out: dict[str, ProvenanceAsset] = {}
+        for rid in sorted(self.assets):
+            entry = self.assets[rid]
+            entry.consumed_by = sorted(entry.consumed_by)
+            out[rid] = entry
+        return out
+
+    def build_gaps(self) -> list[ProvenanceGap]:
+        """Return the recorded gaps in a deterministic order.
+
+        Returns:
+            Gaps sorted by ``(kind, subject_rid, detail)``.
+
+        Example:
+            >>> ClosureBuilder().build_gaps()
+            []
+        """
+        return sorted(self.gaps, key=lambda g: (str(g.kind), g.subject_rid, g.detail))
 
 
 @dataclass
@@ -246,6 +636,12 @@ class WalkEngine(Generic[N]):
         max_executions: Defensive cap on distinct executions expanded.
         dataset_budget: Optional cap on distinct dataset versions expanded;
             ``None`` means unbounded.
+        closure_mode: When True the engine reports what the tree path
+            silently swallows — sentinel terminations, RIDs that fail to
+            resolve mid-walk, unpinned dataset inputs, and workflow-less
+            executions all become visitor gaps, and every recorded asset
+            producer (not just the first) becomes a parent. Lineage leaves
+            this False so its observable contract stays byte-identical.
 
     Attributes:
         flags: ``cycle_detected`` / ``depth_capped`` / ``walked_complete``.
@@ -267,6 +663,7 @@ class WalkEngine(Generic[N]):
     arcs: frozenset[ArcKind] = frozenset()
     max_executions: int = 500
     dataset_budget: int | None = None
+    closure_mode: bool = False
 
     flags: dict[str, bool] = field(init=False)
     visited_global: set[RID] = field(init=False)
@@ -274,6 +671,7 @@ class WalkEngine(Generic[N]):
     datasets_expanded: set[tuple[str, str | None]] = field(init=False)
     cap_hit: bool = field(init=False, default=False)
     _queue: list[tuple[RID, int]] = field(init=False)
+    _unpinned_quarantined: set[tuple[str, str | None]] = field(init=False)
 
     def __init__(
         self,
@@ -283,6 +681,7 @@ class WalkEngine(Generic[N]):
         arcs: frozenset[ArcKind] = frozenset(),
         max_executions: int = 500,
         dataset_budget: int | None = None,
+        closure_mode: bool = False,
     ) -> None:
         """Initialize the engine; see the class docstring for arguments."""
         self.ml = ml
@@ -290,6 +689,7 @@ class WalkEngine(Generic[N]):
         self.arcs = arcs
         self.max_executions = max_executions
         self.dataset_budget = dataset_budget
+        self.closure_mode = closure_mode
 
         self.flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
         self.visited_global = set()
@@ -297,6 +697,52 @@ class WalkEngine(Generic[N]):
         self.datasets_expanded = set()
         self.cap_hit = False
         self._queue = []
+        self._unpinned_quarantined = set()
+        self._sentinel_resolved = False
+        self._sentinel_rid: RID | None = None
+
+    # -- sentinel ---------------------------------------------------------
+
+    def sentinel_rid(self) -> RID | None:
+        """RID of the unknown-provenance Execution sentinel, memoized per walk.
+
+        Resolved lazily and cached (including a ``None`` answer) so a walk
+        that touches many candidate producers pays at most one lookup.
+
+        Returns:
+            The sentinel Execution's RID, or None when the catalog has none.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._sentinel_resolved
+            False
+        """
+        if not self._sentinel_resolved:
+            self._sentinel_rid = self.ml._sentinel_execution_rid_or_none()
+            self._sentinel_resolved = True
+        return self._sentinel_rid
+
+    def is_sentinel(self, rid: RID) -> bool:
+        """True when ``rid`` is the unknown-provenance Execution sentinel.
+
+        Always False outside closure mode: lineage filters the sentinel in
+        the mixin's candidate list, and the engine must not change the tree
+        path's behavior.
+
+        Args:
+            rid: Execution RID to classify.
+
+        Returns:
+            Whether ``rid`` is the sentinel.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder(), closure_mode=False)
+            >>> engine.is_sentinel("1-ABCD")
+            False
+        """
+        if not self.closure_mode:
+            return False
+        return rid is not None and rid == self.sentinel_rid()
 
     # -- observable counters ---------------------------------------------
 
@@ -320,11 +766,17 @@ class WalkEngine(Generic[N]):
     def expand_dataset(self, dataset_rid: str, version: str | None, *, depth: int) -> None:
         """Expand the dataset-side arcs for one consumed dataset version.
 
-        Arc-gated and memoized per ``(dataset_rid, version)``. A walk with no
-        dataset arcs enabled (the lineage case) returns immediately, so the
-        lineage path pays nothing for closure machinery. ``version=None``
-        (an unpinned edge) reports an ``unpinned_input`` gap and does no
-        snapshot-dependent work.
+        Arc-gated and memoized per ``(dataset_rid, version)``. A walk that is
+        neither in closure mode nor has dataset arcs enabled (the lineage
+        case) returns immediately, so the lineage path pays nothing for
+        closure machinery.
+
+        ``version=None`` (an unpinned edge) reports an ``unpinned_input``
+        gap plus ``not_walked`` facts and does **no** snapshot-dependent
+        work — the quarantine of spec §6.1. An unpinned edge is a
+        *quarantine*, not an expansion: it is memoized under its own key so
+        the gap fires once, but it deliberately does **not** consume the
+        dataset budget, because nothing was walked.
 
         Args:
             dataset_rid: RID of the consumed dataset.
@@ -339,22 +791,28 @@ class WalkEngine(Generic[N]):
             >>> engine.datasets_visited
             0
         """
-        if not self._dataset_arcs_enabled:
+        if not (self.closure_mode or self._dataset_arcs_enabled):
             return
 
         key = (dataset_rid, version)
-        if key in self.datasets_expanded:
-            return
 
         if version is None:
             # Unpinned edge: honest gap, and no snapshot-dependent work is
             # possible because there is no version to pin a snapshot to.
-            self.datasets_expanded.add(key)
+            # Tracked in its own memo set so the quarantine never counts
+            # toward datasets_visited or the dataset budget.
+            if key in self._unpinned_quarantined:
+                return
+            self._unpinned_quarantined.add(key)
             self.visitor.on_gap(
                 GapKind.unpinned_input,
                 dataset_rid,
-                "consumption edge recorded no dataset version",
+                "consumption edge recorded no dataset version; no snapshot-dependent provenance was walked for it",
             )
+            self.visitor.on_dataset_walked(dataset_rid=dataset_rid, version=UNPINNED_VERSION_KEY)
+            return
+
+        if key in self.datasets_expanded:
             return
 
         if self.dataset_budget is not None and len(self.datasets_expanded) >= self.dataset_budget:
@@ -363,8 +821,58 @@ class WalkEngine(Generic[N]):
             return
 
         self.datasets_expanded.add(key)
-        # Arc legs (version authorship, member bindings, ancestry) are filled
-        # in by the closure tasks; the gating skeleton lives here.
+        # A walked (dataset, version) is a closure member in its own right.
+        # Its facts start "not walked" and are filled in by the dataset arc
+        # legs (authorship, bindings, ancestry) in later tasks.
+        self.visitor.on_dataset_walked(dataset_rid=dataset_rid, version=version)
+
+    # -- asset facts ------------------------------------------------------
+
+    def _report_asset_producers(
+        self,
+        asset_rid: str,
+        producer_rids: tuple[str, ...],
+        *,
+        resolution_failed: bool,
+    ) -> None:
+        """Emit the closure's producer-multiplicity gaps for one input asset.
+
+        Spec §6.2: zero recorded producers is a ``no_asset_producer`` gap;
+        more than one is malformed under the current writer contract, so all
+        are reported as producers **and** a ``multiple_asset_producers`` gap
+        is raised. A producer lookup that raised is reported as
+        ``unresolved_rid`` rather than silently reading as "zero producers".
+
+        Args:
+            asset_rid: The consumed asset's RID.
+            producer_rids: Every recorded producer, in fetched order.
+            resolution_failed: True when producer resolution raised.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder(), closure_mode=True)
+            >>> engine._report_asset_producers("1-ABCD", (), resolution_failed=False) is None
+            True
+        """
+        if resolution_failed:
+            self.visitor.on_gap(
+                GapKind.unresolved_rid,
+                asset_rid,
+                "producer resolution failed for this input asset",
+            )
+            return
+        if not producer_rids:
+            self.visitor.on_gap(
+                GapKind.no_asset_producer,
+                asset_rid,
+                "no Execution has an Output association with this asset",
+            )
+        elif len(producer_rids) > 1:
+            self.visitor.on_gap(
+                GapKind.multiple_asset_producers,
+                asset_rid,
+                f"{len(producer_rids)} executions record an Output association "
+                "with this asset; exactly one is expected",
+            )
 
     # -- execution expansion ----------------------------------------------
 
@@ -407,6 +915,17 @@ class WalkEngine(Generic[N]):
 
         ml = self.ml
 
+        # Sentinel discipline (closure only): the unknown-provenance sentinel
+        # is never a closure member and is never expanded — encountering it
+        # terminates that branch with an honest gap naming what it stopped.
+        if self.is_sentinel(rid):
+            self.visitor.on_gap(
+                GapKind.sentinel_origin,
+                rid,
+                "provenance terminates at the unknown-provenance Execution sentinel",
+            )
+            return None
+
         # Cycle on the active path: do not expand, set flag, return a
         # leaf-style marker.
         if rid in self.in_progress:
@@ -429,9 +948,16 @@ class WalkEngine(Generic[N]):
         # is no batch to fetch until the node is expanded.
         try:
             record = ml.lookup_execution(rid)
-        except DerivaMLException:
+        except DerivaMLException as exc:
             # An input pointed at an Execution that no longer exists;
-            # treat as missing rather than failing the whole walk.
+            # treat as missing rather than failing the whole walk. The tree
+            # path stays silent (byte-compat); the closure reports the hole.
+            if self.closure_mode:
+                self.visitor.on_gap(
+                    GapKind.unresolved_rid,
+                    rid,
+                    f"recorded execution RID could not be resolved: {exc}",
+                )
             return None
 
         self.visited_global.add(rid)
@@ -446,6 +972,16 @@ class WalkEngine(Generic[N]):
                     url=getattr(record.workflow, "url", None),
                     version=getattr(record.workflow, "version", None),
                     checksum=getattr(record.workflow, "checksum", None),
+                )
+
+            if wf_summary is None and self.closure_mode:
+                # Spec §6.6: the closure identifies the workflow record and
+                # its checksum; an execution with no workflow link is a hole
+                # in that identification, not a walk failure.
+                self.visitor.on_gap(
+                    GapKind.no_workflow,
+                    rid,
+                    "execution has no Workflow record; code identity is unrecorded",
                 )
 
             execution_summary = ExecutionSummary(
@@ -499,16 +1035,29 @@ class WalkEngine(Generic[N]):
 
             for asset in record.list_assets(asset_role="Input"):
                 producer_rids: tuple[str, ...] = ()
+                resolution_failed = False
                 try:
                     asset_table_obj = ml.model.name_to_table(asset.asset_table)
                     producer_rids = tuple(ml._producers_of_asset(asset.asset_rid, asset_table_obj))
                     producer = producer_rids[0] if producer_rids else None
                     if producer:
                         parent_rids.add(producer)
+                    if self.closure_mode:
+                        # Spec §6.2: the closure follows ALL Output rows,
+                        # never first-match. The tree keeps its
+                        # single-producer display choice (`producer` above)
+                        # untouched.
+                        parent_rids |= set(producer_rids) - {rid}
                 except Exception:
                     # If we can't resolve the producer of one asset,
                     # keep walking the rest of the inputs.
-                    pass
+                    resolution_failed = True
+                if self.closure_mode:
+                    self._report_asset_producers(
+                        asset.asset_rid,
+                        producer_rids,
+                        resolution_failed=resolution_failed,
+                    )
                 input_ref = InputRef(
                     kind=ArcInputType.asset,
                     rid=asset.asset_rid,
@@ -530,11 +1079,15 @@ class WalkEngine(Generic[N]):
 
             node = self.visitor.make_node(rid, summary=execution_summary, inputs=inputs, depth=depth)
 
-            # Recurse on parents.
+            # Recurse on parents. Closure mode sorts so recorded arc depths
+            # are deterministic across runs (set iteration order is
+            # PYTHONHASHSEED-dependent); lineage keeps raw set order because
+            # its golden captures pin the historical behavior.
             parents: list[N] = []
+            ordered_parents = sorted(parent_rids) if self.closure_mode else parent_rids
             if depth_remaining is None or depth_remaining > 0:
                 next_depth = None if depth_remaining is None else depth_remaining - 1
-                for pr in parent_rids:
+                for pr in ordered_parents:
                     child = self.expand_execution(pr, depth_remaining=next_depth, depth=depth + 1)
                     if child is not None:
                         parents.append(child)
@@ -589,6 +1142,11 @@ class WalkEngine(Generic[N]):
     def enqueue_execution(self, rid: RID, *, depth: int) -> None:
         """Queue an execution discovered by a closure arc for later expansion.
 
+        Already-expanded and already-queued RIDs are dropped, so a diamond
+        that rediscovers the same execution through several arcs enqueues it
+        once. The queue keeps the SHALLOWEST pending depth for a RID, so a
+        later, shallower discovery is not recorded at the deeper depth.
+
         Args:
             rid: Execution RID to expand later.
             depth: Depth to record for the queued node.
@@ -596,13 +1154,27 @@ class WalkEngine(Generic[N]):
         Example:
             >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
             >>> engine.enqueue_execution("1-ABCD", depth=1)
+            >>> engine.enqueue_execution("1-ABCD", depth=1)
+            >>> len(engine._queue)
+            1
         """
         if rid in self.visited_global:
             return
+        for index, (queued_rid, queued_depth) in enumerate(self._queue):
+            if queued_rid == rid:
+                if depth < queued_depth:
+                    self._queue[index] = (rid, depth)
+                return
         self._queue.append((rid, depth))
 
     def drain(self, *, depth_remaining: int | None) -> None:
         """Expand every queued execution, under the engine's caps.
+
+        Expanding a queued execution can itself enqueue more work (its own
+        consumption parents feed back through the visitor), so the loop runs
+        until the queue is genuinely empty. Once the execution cap is hit the
+        drain stops and leaves the remaining queue unexpanded — ``cap_hit``
+        is what tells the caller the closure is partial.
 
         Args:
             depth_remaining: Remaining parent levels each queued expansion may
@@ -613,6 +1185,12 @@ class WalkEngine(Generic[N]):
             >>> engine.drain(depth_remaining=0)
         """
         while self._queue:
+            if len(self.visited_global) >= self.max_executions:
+                # Budget exhausted with real work still queued: the
+                # traversal is provably incomplete.
+                self.flags["walked_complete"] = False
+                self.cap_hit = True
+                return
             rid, depth = self._queue.pop(0)
             if rid in self.visited_global:
                 continue

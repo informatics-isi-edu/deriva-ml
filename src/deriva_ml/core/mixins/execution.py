@@ -10,19 +10,26 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Iterable
 
 from packaging.version import InvalidVersion
 from packaging.version import Version as _PEP440Version
+from pydantic import Field, validate_call
 
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
-from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
+from deriva_ml.core.exceptions import (
+    DerivaMLException,
+    DerivaMLValidationError,
+    NoAssociationException,
+)
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.mixins._provenance_engine import TreeBuilder, WalkEngine
 from deriva_ml.core.sort import SortSpec, resolve_sort
+from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+from deriva_ml.execution.provenance import ArcKind, GapKind, ProvenanceClosure
 from deriva_ml.execution.state_machine import (
     flush_pending_sync,
     reconcile_with_catalog,
@@ -33,6 +40,7 @@ logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from deriva_ml.asset.aux_classes import AssetSpec
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder
     from deriva_ml.dataset.aux_classes import DatasetSpec
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord, MultirunStatusSummary
@@ -82,6 +90,12 @@ class BindingDiagnostic:
 # tk-023 lesson: never one unbounded .in_()/disjunction over a caller-sized
 # set) while keeping request count low for realistic author counts.
 _SUMMARY_CHUNK_SIZE = 25
+
+# Proportional internal dataset budget for a provenance closure (design §5,
+# open question 1 resolved to "proportional internal default, no public
+# knob"): a large ancestry graph containing few executions must not walk
+# unboundedly just because the execution budget is untouched.
+_DATASET_BUDGET_FACTOR = 4
 
 
 def _version_row_sort_key(row: dict[str, Any]) -> tuple:
@@ -1379,6 +1393,272 @@ class ExecutionMixin:
             cycle_detected=engine.flags["cycle_detected"],
             depth_capped=engine.flags["depth_capped"],
         )
+
+    @validate_call(config=VALIDATION_CONFIG)
+    def lookup_provenance(
+        self,
+        rid: RID,
+        *,
+        version: str | None = None,
+        max_executions: Annotated[int, Field(strict=True, ge=1)] = 500,
+    ) -> ProvenanceClosure:
+        """Compute the full provenance closure behind an artifact.
+
+        Where :meth:`lookup_lineage` walks one producing-execution chain and
+        stops at lineage edges, this walks the **transitive closure**: every
+        discovered execution is itself expanded, consumed assets become
+        first-class closure members with all their recorded producers, and
+        everything the walk could not resolve is reported as a typed
+        :class:`~deriva_ml.execution.provenance.ProvenanceGap` rather than
+        silently dropped.
+
+        The closure follows only **schema-recorded facts** — no config
+        mining, no heuristics (design ruling 1). Legacy holes surface as
+        gaps; they are never compensated for (ruling 2). The
+        unknown-provenance sentinel is never a closure member: encountering
+        it terminates that branch with a ``sentinel_origin`` gap.
+
+        Args:
+            rid: RID of any Dataset, Asset, Feature value, or Execution —
+                the same root typology :meth:`lookup_lineage` accepts.
+            version: Dataset roots only. When given, the closure is of
+                ``dataset@version`` and the version must appear in the
+                dataset's recorded history. When omitted, the root resolves
+                to the dataset's latest recorded version (RCT-primary order,
+                #367) and the resolved pin is recorded in ``root.version`` so
+                the result is self-describing. Passing it for a non-Dataset
+                root is an error.
+            max_executions: Defensive cap on distinct executions expanded.
+                Strictly typed: booleans, strings, and floats are rejected at
+                the call boundary, not silently coerced.
+
+        Returns:
+            A :class:`~deriva_ml.execution.provenance.ProvenanceClosure`.
+            ``traversal_complete`` is False iff a bound was hit — it is
+            **not** a claim of gap-freedom, which is ``not closure.gaps``.
+
+        Raises:
+            DerivaMLValidationError: If ``version`` is given for a
+                non-Dataset root, or names a version the dataset has no
+                recorded row for.
+            DerivaMLException: If ``rid`` does not exist or is not
+                lineage-shaped (e.g. a Workflow RID).
+
+        Example:
+            Trace everything that contributed to a trained model asset::
+
+                >>> closure = ml.lookup_provenance(asset_rid)  # doctest: +SKIP
+                >>> len(closure.executions)  # doctest: +SKIP
+                45
+                >>> [(g.kind, g.subject_rid) for g in closure.gaps]  # doctest: +SKIP
+
+            Pin the closure to a historical dataset version::
+
+                >>> closure = ml.lookup_provenance(  # doctest: +SKIP
+                ...     dataset_rid, version="1.2.0",
+                ... )
+                >>> closure.root.version  # doctest: +SKIP
+                '1.2.0'
+        """
+        from deriva_ml.core.mixins._provenance_engine import ClosureBuilder
+
+        root_descriptor, producer_rid = self._classify_rid(rid)
+
+        builder = ClosureBuilder()
+        engine: "WalkEngine[str]" = WalkEngine(
+            self,
+            builder,
+            arcs=frozenset({ArcKind.root, ArcKind.consumption}),
+            max_executions=max_executions,
+            dataset_budget=_DATASET_BUDGET_FACTOR * max_executions,
+            closure_mode=True,
+        )
+
+        # Root version resolution (spec §3) — Dataset roots only.
+        root_version: str | None = None
+        if root_descriptor.type == "Dataset":
+            root_version = self._resolve_root_version(rid, version, root_descriptor, builder)
+        elif version is not None:
+            raise DerivaMLValidationError(
+                f"'version' applies to Dataset roots only; RID '{rid}' is a {root_descriptor.type} root."
+            )
+        root_descriptor = root_descriptor.model_copy(update={"version": root_version})
+
+        seeds = self._closure_seeds(rid, root_descriptor, producer_rid, engine, builder)
+
+        # Root arcs (depth 0) are recorded BEFORE expansion so a seed that
+        # fails to expand still leaves the honest record of why it was
+        # tried — the arc is a schema-recorded fact, independent of whether
+        # the walk could follow it.
+        for seed in seeds:
+            builder.record_arc(seed, kind=ArcKind.root, depth=0)
+
+        for seed in seeds:
+            engine.expand_execution(seed, depth_remaining=None, depth=0)
+
+        # The root dataset's own pinned version is a walked version: its
+        # dataset-side arcs (authorship, bindings, ancestry) land in later
+        # tasks, but the gating call belongs here so the root pin is walked
+        # exactly like any consumed pin.
+        if root_descriptor.type == "Dataset" and root_version is not None:
+            engine.expand_dataset(rid, root_version, depth=0)
+
+        # Executions discovered through a non-tree arc (later tasks' legs)
+        # are drained under the same execution budget.
+        for pending_rid, pending_depth in builder.pending:
+            engine.enqueue_execution(pending_rid, depth=pending_depth)
+        engine.drain(depth_remaining=None)
+
+        executions = builder.build_executions()
+        # An arc recorded against a RID that never became a closure member
+        # needs an explanation. The engine already emitted one for the two
+        # known reasons — the RID failed to resolve (``unresolved_rid``) or
+        # it is the sentinel, which is excluded BY DESIGN and is not a hole
+        # (``sentinel_origin``). Anything left over is an unexplained
+        # dangling arc, and gets reported rather than quietly dropped.
+        explained = {g.subject_rid for g in builder.gaps if g.kind in (GapKind.unresolved_rid, GapKind.sentinel_origin)}
+        for orphan in set(builder.arcs) - set(executions):
+            if orphan not in explained:
+                builder.on_gap(
+                    GapKind.unresolved_rid,
+                    orphan,
+                    "arc recorded against an execution that never entered the closure",
+                )
+
+        return ProvenanceClosure(
+            root=root_descriptor,
+            executions=executions,
+            datasets=builder.build_datasets(),
+            assets=builder.build_assets(),
+            gaps=builder.build_gaps(),
+            executions_visited=engine.executions_visited,
+            datasets_visited=engine.datasets_visited,
+            traversal_complete=not engine.cap_hit,
+            cap_hit=engine.cap_hit,
+        )
+
+    def _resolve_root_version(
+        self,
+        rid: RID,
+        version: str | None,
+        root_descriptor: "RootDescriptor",
+        builder: "ClosureBuilder",
+    ) -> str | None:
+        """Resolve the root dataset's walked version pin (spec §3).
+
+        An explicit ``version`` is validated against the dataset's recorded
+        history; an omitted one resolves to the latest recorded version by
+        :func:`_version_row_sort_key` (the authorship-order helper — never a
+        RID sort, which carries no semantics). A dataset with no version rows
+        at all yields ``None`` plus a ``version_unresolvable`` gap, and the
+        walk proceeds only on arcs that need no snapshot.
+
+        The membership check runs against ``root_descriptor.version_history``
+        (already built by ``_classify_rid`` from the same rows) so the common
+        explicit-pin path costs no extra catalog read; only the "resolve the
+        latest" path refetches, because picking a maximum requires the
+        ``RCT`` column that the attribution trace does not carry.
+
+        Args:
+            rid: The root Dataset RID.
+            version: The caller's explicit pin, or None.
+            root_descriptor: The classification carrying ``version_history``.
+            builder: Accumulator the ``version_unresolvable`` gap lands on.
+
+        Returns:
+            The resolved version label, or None when none could be resolved.
+
+        Raises:
+            DerivaMLValidationError: If ``version`` names a version the
+                dataset has no recorded row for.
+
+        Example:
+            >>> ml._resolve_root_version(rid, "1.0.0", descriptor, builder)  # doctest: +SKIP
+            '1.0.0'
+        """
+        history = root_descriptor.version_history
+        if version is not None:
+            if not any(entry.version == version for entry in history):
+                raise DerivaMLValidationError(
+                    f"Dataset '{rid}' has no recorded version '{version}'. "
+                    f"Recorded versions: {[entry.version for entry in history]}"
+                )
+            return version
+
+        if not history:
+            builder.on_gap(
+                GapKind.version_unresolvable,
+                rid,
+                "dataset has no Dataset_Version rows; no version pin could be resolved",
+            )
+            return None
+
+        version_rows = self._dataset_version_rows(rid)
+        if not version_rows:
+            builder.on_gap(
+                GapKind.version_unresolvable,
+                rid,
+                "dataset has no Dataset_Version rows; no version pin could be resolved",
+            )
+            return None
+        return max(version_rows, key=_version_row_sort_key).get("Version") or None
+
+    def _closure_seeds(
+        self,
+        rid: RID,
+        root_descriptor: "RootDescriptor",
+        producer_rid: RID | None,
+        engine: "WalkEngine[str]",
+        builder: "ClosureBuilder",
+    ) -> list[RID]:
+        """Return the root-arc seed executions for a closure walk.
+
+        Unlike lineage's candidate iteration (which stops at the first seed
+        that expands, because a tree has one root), a closure seeds from
+        EVERY root-arc execution: an artifact with an origin author and three
+        member producers has four schema-recorded root-adjacent facts, and
+        dropping three of them would understate the closure.
+
+        Args:
+            rid: The root artifact's RID.
+            root_descriptor: Its classification.
+            producer_rid: The direct producer from ``_classify_rid``.
+            engine: The walk engine (for sentinel classification).
+            builder: Accumulator the sentinel/null-binding gaps land on.
+
+        Returns:
+            Deduped seed execution RIDs, sorted for determinism.
+
+        Example:
+            >>> ml._closure_seeds(rid, descriptor, producer, engine, builder)  # doctest: +SKIP
+            ['2-EXAA']
+        """
+        seeds: set[RID] = set()
+        if producer_rid is not None:
+            seeds.add(producer_rid)
+
+        if root_descriptor.type == "Dataset":
+            seeds |= self._producers_of_dataset_members(rid)
+        elif root_descriptor.type == "Feature" and producer_rid is None:
+            # A feature value IS the binding (member, value, execution); a
+            # null execution column means the binding records no author.
+            builder.on_gap(
+                GapKind.null_binding_execution,
+                rid,
+                "feature-value row records no binding execution",
+            )
+
+        # The sentinel is never a closure member, so it is never a seed —
+        # seeding from it would fabricate edges claiming it consumed the
+        # things it merely stands in for.
+        sentinel_seeds = {s for s in seeds if engine.is_sentinel(s)}
+        for sentinel in sentinel_seeds:
+            builder.on_gap(
+                GapKind.sentinel_origin,
+                sentinel,
+                "root provenance terminates at the unknown-provenance Execution sentinel",
+            )
+        return sorted(seeds - sentinel_seeds)
 
     # -- private helpers -------------------------------------------------
 
