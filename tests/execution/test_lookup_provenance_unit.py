@@ -1148,6 +1148,133 @@ def test_dataset_budget_stop_distinguishes_traversal_complete_from_walked_comple
     assert engine.flags["walked_complete"] is True
 
 
+def test_shared_author_of_two_datasets_does_not_self_truncate():
+    """Regression (I-1): a single execution authoring the versions of TWO
+    walked datasets — the common migration/backfill shape — must not be
+    counted against its own budget slot twice.
+
+    The second authorship sighting finds the author already QUEUED. Falling
+    through to the budget arithmetic there counts the queued entry against
+    itself, marking a fully-expanded execution as truncated and reporting a
+    complete closure as capped.
+    """
+    ml = _FakeML()
+    ds_root, ds_a, ds_b = _ds(1), _ds(2), _ds(3)
+    consumer, shared_author = _ex(1), _ex(2)
+
+    ml.add_execution(shared_author, description="one migration, two datasets")
+    ml.add_execution(
+        consumer,
+        description="consumes both",
+        input_datasets=[
+            _StubDataset(ds_a, "a", "1.0.0", consumed_version="1.0.0"),
+            _StubDataset(ds_b, "b", "1.0.0", consumed_version="1.0.0"),
+        ],
+    )
+    for ds in (ds_a, ds_b):
+        ml.add_dataset(ds, description="input", producer=None)
+        ml.set_snapshot_available(ds, "1.0.0", True)
+        ml.set_snapshot_version_rows(ds, "1.0.0", [_snapshot_row(ds, "1.0.0", shared_author, "2025-01-01T00:00:00Z")])
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    # Exactly two executions exist and exactly two fit the budget: the walk
+    # is complete, so nothing may be reported as truncated or capped.
+    closure = ml.lookup_provenance(ds_root, max_executions=2)
+
+    assert set(closure.executions) == {consumer, shared_author}
+    assert closure.executions_visited == 2
+    assert closure.cap_hit is False
+    assert closure.traversal_complete is True
+    assert _gaps_for(closure, GapKind.unresolved_rid) == []
+    # Both datasets attributed the shared author, so it carries two arcs.
+    assert {a.input_rid for a in _authorship_arcs(closure, shared_author)} == {ds_a, ds_b}
+
+
+def test_enqueue_or_truncate_requeue_does_not_consume_a_second_slot():
+    """Engine-level pin for the same defect: re-offering an ALREADY-QUEUED
+    RID is a no-op dedup (min-depth), never a budget event."""
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    engine: WalkEngine[str] = WalkEngine(_FakeML(), ClosureBuilder(), max_executions=1, closure_mode=True)
+    author = _ex(1)
+
+    engine.enqueue_or_truncate(author, depth=2)
+    assert engine.truncated == set()
+    assert engine.cap_hit is False
+
+    # The SAME rid offered again must dedup, not truncate itself.
+    engine.enqueue_or_truncate(author, depth=1)
+    assert engine.truncated == set()
+    assert engine.cap_hit is False
+    assert engine._queue == [(author, 1)]  # min-depth kept
+
+
+def test_authorship_attributions_carry_resolved_execution_summaries():
+    """Regression (I-2): ``VersionAttribution.execution`` must be POPULATED
+    for authors the closure resolved.
+
+    The field's contract is that None means "no author recorded, or the
+    author could not be resolved" — so leaving it None for a resolved
+    closure member makes consumers misread it as unresolvable. Resolution is
+    batched: one ``_execution_summaries`` call per dataset-version
+    expansion, never per row.
+    """
+    ml = _FakeML()
+    ds = _ds(1)
+    author_1, author_2 = _ex(1), _ex(2)
+    ml.add_execution(author_1, description="origin", workflow=_StubWorkflow(workflow_rid=_wf(1), name="migrator"))
+    ml.add_execution(author_2, description="bumped", workflow=_StubWorkflow(workflow_rid=_wf(2), name="bumper"))
+
+    rows = [
+        _snapshot_row(ds, "0.1.0", author_1, "2025-01-01T00:00:00Z"),
+        _snapshot_row(ds, "0.2.0", None, "2025-02-01T00:00:00Z"),
+        _snapshot_row(ds, "0.3.0", author_2, "2025-03-01T00:00:00Z"),
+    ]
+    _dataset_root_with_snapshot_authors(ml, ds, "0.3.0", rows)
+    ml.calls.clear()
+
+    closure = ml.lookup_provenance(ds, version="0.3.0")
+
+    authors = closure.datasets[ds].versions["0.3.0"].version_authors
+    by_version = {va.version: va for va in authors}
+
+    for version, rid in (("0.1.0", author_1), ("0.3.0", author_2)):
+        attribution = by_version[version]
+        assert attribution.execution_rid == rid
+        assert attribution.execution is not None, f"{version} author resolved but carries no summary"
+        assert attribution.execution.rid == rid
+    # The author-less row keeps a None summary: there is nothing to resolve.
+    assert by_version["0.2.0"].execution_rid is None
+    assert by_version["0.2.0"].execution is None
+
+    # Batched, not per-row. Two summary fetches happen in total: one from
+    # ``_classify_rid`` building the ROOT's version_history (pre-existing,
+    # unrelated to this leg) and exactly ONE from the authorship leg itself.
+    # A per-row implementation would issue one per bounded row instead.
+    fetches = [c for c in ml.calls if c[0] == "_execution_summaries"]
+    assert len(fetches) == 2, f"expected one classify fetch + one leg fetch, got {len(fetches)}: {fetches}"
+    # The leg's fetch asked for all three rows' authors in a single call
+    # (the None is the author-less row, which _execution_summaries drops).
+    leg_fetch = fetches[-1]
+    assert set(leg_fetch[1][0]) == {author_1, None, author_2}
+
+
+def test_authorship_unresolvable_author_keeps_none_summary():
+    """An author RID that resolves to no row keeps ``execution=None`` — which
+    is exactly what the field's "could not be resolved" contract means, and
+    is distinguishable from "no author recorded" by ``execution_rid``."""
+    ml = _FakeML()
+    ds, ghost = _ds(1), _ex(99)
+    rows = [_snapshot_row(ds, "0.1.0", ghost, "2025-01-01T00:00:00Z")]
+    _dataset_root_with_snapshot_authors(ml, ds, "0.1.0", rows)
+
+    closure = ml.lookup_provenance(ds, version="0.1.0")
+
+    attribution = closure.datasets[ds].versions["0.1.0"].version_authors[0]
+    assert attribution.execution_rid == ghost
+    assert attribution.execution is None
+
+
 def test_authorship_author_refused_for_budget_is_truncated_not_unresolved():
     """Carried finding (a): an author the EXECUTION budget refuses to enqueue
     is perfectly resolvable, so the dangling-arc sweep must not report it as

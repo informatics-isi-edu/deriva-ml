@@ -951,6 +951,14 @@ class WalkEngine(Generic[N]):
             return
         bounded = rows[: cutoff + 1]
 
+        # Resolve every author's summary in ONE batched fetch for the whole
+        # leg. `VersionAttribution.execution` is contractually None only when
+        # no author is recorded or the author could not be resolved, so a
+        # resolved closure member that carried None would be misread as
+        # unresolvable. Absence from the mapping IS the "could not resolve"
+        # answer, and is preserved as None.
+        summaries = self.ml._execution_summaries([row.get("Execution") for row in bounded])
+
         facts = None
         for index, row in enumerate(bounded):
             author_rid = row.get("Execution")
@@ -960,6 +968,7 @@ class WalkEngine(Generic[N]):
                 attribution=VersionAttribution(
                     version=row.get("Version") or "",
                     execution_rid=author_rid,
+                    execution=summaries.get(author_rid) if author_rid else None,
                     description=row.get("Description"),
                 ),
                 depth=depth,
@@ -1051,6 +1060,14 @@ class WalkEngine(Generic[N]):
         reached and dropped for budget. Recording it in ``truncated`` is what
         stops a later dangling-arc sweep from calling it ``unresolved_rid``.
 
+        A RID that is already expanded or already QUEUED costs no additional
+        budget: it holds one slot, not one per sighting. Re-offering it is a
+        dedup (keeping the minimum depth), never a budget event — a shared
+        version author, one migration execution authoring two walked
+        datasets' versions, is the ordinary case, and charging it twice would
+        report a fully-expanded execution as truncated and a complete closure
+        as capped.
+
         Args:
             rid: Execution RID discovered through a non-tree arc.
             depth: Depth to record for the queued node.
@@ -1062,6 +1079,10 @@ class WalkEngine(Generic[N]):
             True
         """
         if rid in self.visited_global:
+            return
+        if any(queued_rid == rid for queued_rid, _ in self._queue):
+            # Already holding a slot: dedup / lower the recorded depth.
+            self.enqueue_execution(rid, depth=depth)
             return
         if len(self.visited_global) + len(self._queue) >= self.max_executions:
             self.flags["walked_complete"] = False
