@@ -256,7 +256,7 @@ def test_svg_tooltip_text_is_escaped():
         root=RootDescriptor(rid=_rid(9), type="Execution", description=None),
         lineage=LineageNode(
             execution=ExecutionSummary(
-                rid=_rid(60), description='<img src=x onerror=alert(1)>', workflow=None, status="Failed"
+                rid=_rid(60), description="<img src=x onerror=alert(1)>", workflow=None, status="Failed"
             )
         ),
     )
@@ -277,9 +277,7 @@ def test_svg_draws_consumed_assets():
         execution=_exec_summary(50),
         consumed_assets=[AssetSummary(rid=_rid(51), filename="weights.keras", asset_table="Execution_Asset")],
     )
-    result = LineageResult(
-        root=RootDescriptor(rid=_rid(52), type="Execution", description=None), lineage=walk
-    )
+    result = LineageResult(root=RootDescriptor(rid=_rid(52), type="Execution", description=None), lineage=walk)
     page = lineage_result_to_html(result)
     svg = page[page.index("<svg") : page.index("</svg>")]
     assert "weights.keras" in svg
@@ -290,9 +288,31 @@ def test_svg_draws_consumed_assets():
 def test_svg_marks_already_shown_nodes():
     shown_twice = LineageNode(execution=_exec_summary(55), already_shown=True)
     walk = LineageNode(execution=_exec_summary(54), parents=[shown_twice])
-    result = LineageResult(
-        root=RootDescriptor(rid=_rid(53), type="Execution", description=None), lineage=walk
-    )
+    result = LineageResult(root=RootDescriptor(rid=_rid(53), type="Execution", description=None), lineage=walk)
     page = lineage_result_to_html(result)
     svg = page[page.index("<svg") : page.index("</svg>")]
     assert "already shown" in svg  # tooltip notes the collapse
+
+
+def test_svg_tooltips_are_css_drawn_not_native_only():
+    """Tooltips must render in viewers that never surface native SVG
+    <title> hover text (embedded preview panes). The figure draws its own
+    overlays, hidden until :hover, with no JavaScript."""
+    page = lineage_result_to_html(_dataset_result(), feature_producers=_producers())
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert ".tt{visibility:hidden" in svg  # overlays exist and start hidden
+    assert ":hover~#tt" in svg  # pure-CSS reveal, sibling combinator
+    assert svg.count('class="tt"') == svg.count("<title>")  # one overlay per titled node
+    assert "<script" not in svg
+
+
+def test_svg_tooltip_long_producer_list_truncates_to_summary():
+    many = {
+        _rid(30): [
+            {"execution_rid": _rid(100 + i), "feature_name": "F", "element_type": "Image", "value_count": i}
+            for i in range(30)
+        ]
+    }
+    page = lineage_result_to_html(_dataset_result(), feature_producers=many)
+    svg = page[page.index("<svg") : page.index("</svg>")]
+    assert "19 more" in svg  # 1 header + 30 rows -> 12 shown + summary line

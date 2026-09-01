@@ -285,9 +285,41 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
     parts = [
         f'<svg viewBox="0 0 {width} {height}" role="img" '
         f'aria-label="Lineage walk figure" '
-        f'style="max-width:100%;height:auto;background:#fff;'
+        f'style="max-width:100%;height:auto;overflow:visible;background:#fff;'
         f'border:1px solid #dde3ea;border-radius:8px">'
     ]
+
+    # CSS-drawn hover tooltips. Native SVG <title> hover text (kept for
+    # accessibility) is rendered by the browser chrome, which embedded
+    # preview panes never surface — so the figure draws its own overlays,
+    # hidden until :hover, revealed by a pure-CSS sibling rule. Overlays
+    # are appended after all content groups: that puts them last in
+    # z-order and after their hover targets, which the `~` combinator
+    # requires.
+    overlays: list[str] = []
+    hover_rules: list[str] = []
+
+    def hover_cls(lines: list[str], ax: float, ay: float) -> str:
+        """Register a tooltip overlay for `lines` anchored near (ax, ay);
+        returns the class attribute value for the hover target group."""
+        i = len(overlays)
+        shown = [ln if len(ln) <= 64 else ln[:63] + "…" for ln in lines[:12]]
+        if len(lines) > 12:
+            shown.append(f"… {len(lines) - 12} more (full list in the tables below)")
+        t_w = max(len(s) for s in shown) * 6.3 + 18
+        t_h = len(shown) * 13 + 12
+        tx = max(2.0, min(ax, width - t_w - 2))
+        tspans = "".join(f'<tspan x="{tx + 9}" dy="{13 if j else 0}">{_esc(s)}</tspan>' for j, s in enumerate(shown))
+        overlays.append(
+            f'<g class="tt" id="tt{i}">'
+            f'<rect x="{tx}" y="{ay}" width="{t_w:.0f}" height="{t_h}" rx="5" '
+            f'fill="#1c2430" opacity="0.95"/>'
+            f'<text x="{tx + 9}" y="{ay + 16}" font-size="10" fill="#fff" '
+            f'font-family="ui-monospace,monospace">{tspans}</text></g>'
+        )
+        hover_rules.append(f".hv{i}:hover~#tt{i}{{visibility:visible}}")
+        return f"hv{i}"
+
     centers: dict[int, tuple[float, float]] = {}
     for depth, col in enumerate(columns):
         x = pad + depth * (box_w + gap_x)
@@ -304,9 +336,10 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                 f"workflow: {wf}" + (f" v{wf_rec['version']}" if wf_rec.get("version") else ""),
                 wf_rec.get("url") or "",
             ]
-            tip = _esc(chr(10).join(x for x in tip_lines if x))
+            ex_lines = [x for x in tip_lines if x]
+            tip = _esc(chr(10).join(ex_lines))
             parts.append(
-                f"<g><title>{tip}</title>"
+                f'<g class="{hover_cls(ex_lines, x + 12, y + box_h + 6)}"><title>{tip}</title>'
                 f'<rect x="{x}" y="{y}" width="{box_w}" height="{box_h}" rx="8" '
                 f'fill="#eef2f6" stroke="#1c4f8a"'
                 f"{" stroke-dasharray='5 3'" if n.get('already_shown') else ''}/>"
@@ -326,9 +359,10 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                     d.get("description") or "",
                     f"consumed by {rid}",
                 ]
-                ds_tip = _esc(chr(10).join(x for x in ds_tip_lines if x))
+                ds_lines = [x for x in ds_tip_lines if x]
+                ds_tip = _esc(chr(10).join(ds_lines))
                 parts.append(
-                    f"<g><title>{ds_tip}</title>"
+                    f'<g class="{hover_cls(ds_lines, x + 20, dy + ds_h + 4)}"><title>{ds_tip}</title>'
                     f'<rect x="{x + 14}" y="{dy}" width="{box_w - 28}" height="{ds_h}" '
                     f'rx="11" fill="#e8eef7" stroke="#9db4d3"/>'
                     f'<text x="{x + 24}" y="{dy + 15}" font-size="10" '
@@ -344,7 +378,7 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                     ]
                     feat_tip = _esc(chr(10).join(feat_tip_lines))
                     parts.append(
-                        f"<g><title>{feat_tip}</title>"
+                        f'<g class="{hover_cls(feat_tip_lines, x + 34, dy + ds_h + 4)}"><title>{feat_tip}</title>'
                         f'<rect x="{x + 28}" y="{dy}" width="{box_w - 42}" height="{ds_h}" '
                         f'rx="4" fill="none" stroke="#a15c00" stroke-dasharray="4 3"/>'
                         f'<text x="{x + 36}" y="{dy + 15}" font-size="10" fill="#a15c00">'
@@ -353,19 +387,18 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                     dy += ds_h + 4
             for a in n.get("consumed_assets") or []:
                 a_label = _esc((a.get("filename") or a.get("rid") or "")[:24])
-                a_tip = _esc(
-                    chr(10).join(
-                        x
-                        for x in [
-                            a.get("filename") or "",
-                            f"{a.get('rid')} in {a.get('asset_table')}",
-                            f"consumed by {rid}",
-                        ]
-                        if x
-                    )
-                )
+                a_lines = [
+                    x
+                    for x in [
+                        a.get("filename") or "",
+                        f"{a.get('rid')} in {a.get('asset_table')}",
+                        f"consumed by {rid}",
+                    ]
+                    if x
+                ]
+                a_tip = _esc(chr(10).join(a_lines))
                 parts.append(
-                    f"<g><title>{a_tip}</title>"
+                    f'<g class="{hover_cls(a_lines, x + 20, dy + ds_h + 4)}"><title>{a_tip}</title>'
                     f'<rect x="{x + 14}" y="{dy}" width="{box_w - 28}" height="{ds_h}" '
                     f'rx="3" fill="#eef7ee" stroke="#4e8a5a"/>'
                     f'<text x="{x + 24}" y="{dy + 15}" font-size="10" '
@@ -381,21 +414,26 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
                 px, py = centers[id(parent)]
                 p_rid = (parent.get("execution") or {}).get("rid") or "?"
                 c_rid = (n.get("execution") or {}).get("rid") or "?"
-                arrow_tip = _esc(f"{p_rid} is an upstream producer of inputs consumed by {c_rid}")
+                arrow_text = f"{p_rid} is an upstream producer of inputs consumed by {c_rid}"
+                arrow_tip = _esc(arrow_text)
+                arrow_cls = hover_cls([arrow_text], (px + cx + box_w) / 2, (py + cy) / 2 + 10)
                 parts.append(
-                    f"<g><title>{arrow_tip}</title>"
+                    f'<g class="{arrow_cls}"><title>{arrow_tip}</title>'
                     f'<line x1="{px}" y1="{py}" x2="{cx + box_w}" y2="{cy}" '
                     f'stroke="#6b7686" stroke-width="1.5"/>'
                     f'<polygon points="{cx + box_w + 6},{cy} {cx + box_w + 14},{cy - 4} '
                     f'{cx + box_w + 14},{cy + 4}" fill="#6b7686"/></g>'
                 )
+    parts.append("<style>.tt{visibility:hidden;pointer-events:none}" + "".join(hover_rules) + "</style>")
+    parts.extend(overlays)
     parts.append("</svg>")
     return (
         "<h2>Walk figure</h2>"
         '<p class="note">Executions by depth (root leftmost; arrows point from producer '
-        "to consumer), consumed datasets (blue pills) and assets (green pills) under their consuming execution, dashed marks "
-        "where feature-producer candidates exist. Hover any element for its full record. The model records parents as a set, "
-        "so dataset&rarr;producer pairings are deliberately not drawn.</p>" + "".join(parts)
+        "to consumer), consumed datasets (blue pills) and assets (green pills) under their "
+        "consuming execution, dashed marks where feature-producer candidates exist. Hover "
+        "any element for its full record. The model records parents as a set, so "
+        "dataset&rarr;producer pairings are deliberately not drawn.</p>" + "".join(parts)
     )
 
 
