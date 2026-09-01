@@ -311,12 +311,18 @@ def _graph_svg(data: dict, feature_producers: dict[str, list[dict]] | None) -> s
         t_w = max(len(s) for s in shown) * 6.3 + 18
         t_h = len(shown) * 13 + 12
         tx = max(2.0, min(ax, width - t_w - 2))
-        tspans = "".join(f'<tspan x="{tx + 9}" dy="{13 if j else 0}">{_esc(s)}</tspan>' for j, s in enumerate(shown))
+        tspans = "".join(
+            f'<tspan x="{tx + 10}" dy="{13 if j else 0}"'
+            + (' font-weight="600" fill="#1c4f8a"' if j == 0 else "")
+            + f">{_esc(s)}</tspan>"
+            for j, s in enumerate(shown)
+        )
         overlays.append(
             f'<g class="tt" id="tt{i}">'
-            f'<rect x="{tx}" y="{ay}" width="{t_w:.0f}" height="{t_h}" rx="5" '
-            f'fill="#1c2430" opacity="0.95"/>'
-            f'<text x="{tx + 9}" y="{ay + 16}" font-size="10" fill="#fff" '
+            f'<rect x="{tx}" y="{ay}" width="{t_w:.0f}" height="{t_h}" rx="6" '
+            f'fill="#ffffff" stroke="#dde3ea" '
+            f'style="filter:drop-shadow(0 2px 6px rgba(28,36,48,.22))"/>'
+            f'<text x="{tx + 10}" y="{ay + 16}" font-size="10" fill="#1c2430" '
             f'font-family="ui-monospace,monospace">{tspans}</text></g>'
         )
         hover_rules.append(f".hv{i}:hover~#tt{i}{{visibility:visible}}")
