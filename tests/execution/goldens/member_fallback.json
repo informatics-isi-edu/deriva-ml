@@ -1,0 +1,45 @@
+{
+  "cycle_detected": false,
+  "depth_capped": false,
+  "executions_visited": 1,
+  "lineage": {
+    "already_shown": false,
+    "consumed_assets": [],
+    "consumed_datasets": [
+      {
+        "description": "source",
+        "rid": "1-0028",
+        "version": "0.1.0"
+      }
+    ],
+    "execution": {
+      "description": "upload",
+      "rid": "2-0028",
+      "status": "Uploaded",
+      "workflow": {
+        "name": "uploader",
+        "rid": "3-0028",
+        "url": null,
+        "version": null
+      }
+    },
+    "parents": []
+  },
+  "root": {
+    "description": "image set",
+    "origin_recorded": false,
+    "producing_execution": null,
+    "rid": "1-0029",
+    "type": "Dataset",
+    "version": "0.1.0",
+    "version_history": [
+      {
+        "description": null,
+        "execution": null,
+        "execution_rid": null,
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "walked_complete": true
+}

@@ -1,0 +1,82 @@
+{
+  "cycle_detected": true,
+  "depth_capped": false,
+  "executions_visited": 2,
+  "lineage": {
+    "already_shown": false,
+    "consumed_assets": [],
+    "consumed_datasets": [
+      {
+        "description": "cyclic a",
+        "rid": "1-001E",
+        "version": "0.1.0"
+      }
+    ],
+    "execution": {
+      "description": "cyclic exec a",
+      "rid": "2-001E",
+      "status": "Uploaded",
+      "workflow": null
+    },
+    "parents": [
+      {
+        "already_shown": false,
+        "consumed_assets": [],
+        "consumed_datasets": [
+          {
+            "description": "cyclic b",
+            "rid": "1-001F",
+            "version": "0.1.0"
+          }
+        ],
+        "execution": {
+          "description": "cyclic exec b",
+          "rid": "2-001F",
+          "status": "Uploaded",
+          "workflow": null
+        },
+        "parents": [
+          {
+            "already_shown": true,
+            "consumed_assets": [],
+            "consumed_datasets": [],
+            "execution": {
+              "description": null,
+              "rid": "2-001E",
+              "status": "Unknown",
+              "workflow": null
+            },
+            "parents": []
+          }
+        ]
+      }
+    ]
+  },
+  "root": {
+    "description": "cycle root",
+    "origin_recorded": true,
+    "producing_execution": {
+      "description": "cyclic exec a",
+      "rid": "2-001E",
+      "status": "Uploaded",
+      "workflow": null
+    },
+    "rid": "1-0020",
+    "type": "Dataset",
+    "version": "0.1.0",
+    "version_history": [
+      {
+        "description": null,
+        "execution": {
+          "description": "cyclic exec a",
+          "rid": "2-001E",
+          "status": "Uploaded",
+          "workflow": null
+        },
+        "execution_rid": "2-001E",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "walked_complete": true
+}

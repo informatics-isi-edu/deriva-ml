@@ -1,0 +1,65 @@
+{
+  "cycle_detected": false,
+  "depth_capped": false,
+  "executions_visited": 1,
+  "lineage": {
+    "already_shown": false,
+    "consumed_assets": [],
+    "consumed_datasets": [
+      {
+        "description": "mid dataset",
+        "rid": "1-003D",
+        "version": "0.1.0"
+      }
+    ],
+    "execution": {
+      "description": "top",
+      "rid": "2-003D",
+      "status": "Uploaded",
+      "workflow": {
+        "name": "top-stage",
+        "rid": "3-003D",
+        "url": null,
+        "version": null
+      }
+    },
+    "parents": []
+  },
+  "root": {
+    "description": "out dataset",
+    "origin_recorded": true,
+    "producing_execution": {
+      "description": "top",
+      "rid": "2-003D",
+      "status": "Uploaded",
+      "workflow": {
+        "name": "top-stage",
+        "rid": "3-003D",
+        "url": null,
+        "version": null
+      }
+    },
+    "rid": "1-003E",
+    "type": "Dataset",
+    "version": "0.1.0",
+    "version_history": [
+      {
+        "description": null,
+        "execution": {
+          "description": "top",
+          "rid": "2-003D",
+          "status": "Uploaded",
+          "workflow": {
+            "name": "top-stage",
+            "rid": "3-003D",
+            "url": null,
+            "version": null
+          }
+        },
+        "execution_rid": "2-003D",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "walked_complete": true
+}
