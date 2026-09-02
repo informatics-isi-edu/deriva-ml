@@ -26,7 +26,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from deriva_ml.core.exceptions import DerivaMLException, SnapshotUnavailable
-from deriva_ml.core.mixins.execution import BindingDiagnostic, ExecutionMixin
+from deriva_ml.core.mixins.execution import _SUMMARY_CHUNK_SIZE, BindingDiagnostic, ExecutionMixin
 from deriva_ml.execution.lineage import LineageNode, LineageResult
 from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.feature import FeatureProducerRecord
@@ -648,8 +648,82 @@ class _FakeML(ExecutionMixin):
         self.calls.append(("_producers_of_asset", (asset_rid, asset_table)))
         return list(self._asset_producers.get(asset_rid, []))
 
+    # -- batched frontier seams (#394) -------------------------------------
+    #
+    # The real ``ExecutionMixin`` implementations issue chunked
+    # ``RID=any(...)`` catalog queries; these answer the same questions from
+    # the same scripted state so the closure walk's batched path can be
+    # exercised offline. Each records ONE call for the whole frontier, which
+    # is what makes the request-count pins in the #394 tests meaningful:
+    # a per-node fallback records N per-node calls instead.
+    #
+    # ``_batch_chunk_size`` mirrors the production chunk (tk-023, 25); the
+    # harness records one entry per CHUNK, so a frontier of 30 records two.
+
+    _batch_chunk_size = _SUMMARY_CHUNK_SIZE
+
+    def _batch_chunks(self, rids: list[str]) -> list[list[str]]:
+        """Split a batch's RIDs into production-sized chunks."""
+        return [rids[i : i + self._batch_chunk_size] for i in range(0, len(rids), self._batch_chunk_size)] or [[]]
+
+    def _execution_records_batch(self, rids: list[str]) -> dict[str, Any]:  # type: ignore[override]
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        for chunk in self._batch_chunks(distinct):
+            self.calls.append(("_execution_records_batch", (tuple(chunk),)))
+        self._note_direct_seam_use("_execution_records_batch")
+        return {rid: self._executions[rid] for rid in distinct if rid in self._executions}
+
+    def _input_dataset_pairs_batch(self, rids: list[str]) -> dict[str, list[tuple[Any, str | None]]]:  # type: ignore[override]
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        for chunk in self._batch_chunks(distinct):
+            self.calls.append(("_input_dataset_pairs_batch", (tuple(chunk),)))
+        self._note_direct_seam_use("_input_dataset_pairs_batch")
+        return {rid: self._scripted_input_pairs(rid) for rid in distinct}
+
+    def _input_assets_batch(self, rids: list[str]) -> dict[str, list[Any]]:  # type: ignore[override]
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        for chunk in self._batch_chunks(distinct):
+            self.calls.append(("_input_assets_batch", (tuple(chunk),)))
+        self._note_direct_seam_use("_input_assets_batch")
+        out: dict[str, list[Any]] = {}
+        for rid in distinct:
+            rec = self._executions.get(rid)
+            out[rid] = rec.list_assets(asset_role="Input") if rec is not None else []
+        return out
+
+    def _producer_of_datasets_batch(  # type: ignore[override]
+        self, pairs: list[tuple[str, str | None]]
+    ) -> dict[tuple[str, str | None], str | None]:
+        wanted = list(dict.fromkeys(pairs))
+        datasets = list(dict.fromkeys(d for d, _v in wanted))
+        for chunk in self._batch_chunks(datasets):
+            self.calls.append(("_producer_of_datasets_batch", (tuple(chunk),)))
+        self._note_direct_seam_use("_producer_of_datasets_batch")
+        out: dict[tuple[str, str | None], str | None] = {}
+        for dataset_rid, version in wanted:
+            if version is not None:
+                out[(dataset_rid, version)] = self._versioned_dataset_producers.get((dataset_rid, str(version)))
+            else:
+                out[(dataset_rid, version)] = self._dataset_producers.get(dataset_rid)
+        return out
+
+    def _producers_of_assets_batch(self, items: list[tuple[str, Any]]) -> dict[str, list[str]]:  # type: ignore[override]
+        by_table: dict[str, list[str]] = {}
+        for asset_rid, asset_table in items:
+            by_table.setdefault(asset_table.name, []).append(asset_rid)
+        for table_name, asset_rids in sorted(by_table.items()):
+            for chunk in self._batch_chunks(list(dict.fromkeys(asset_rids))):
+                self.calls.append(("_producers_of_assets_batch", (table_name, tuple(chunk))))
+        self._note_direct_seam_use("_producers_of_assets_batch")
+        return {asset_rid: list(self._asset_producers.get(asset_rid, [])) for asset_rid, _table in items}
+
     def _producers_of_dataset_members(self, dataset_rid: str, version: Any = None) -> set[str]:  # type: ignore[override]
         self.calls.append(("_producers_of_dataset_members", (dataset_rid, version)))
+        # Member scans are the concurrent leg of a batched frontier read
+        # (#394) and are leased like every other worker read, so a scan
+        # calling this on the shared instance means the lease was bypassed —
+        # invisible to _HandleProbe by construction, hence this tracker.
+        self._note_direct_seam_use("_producers_of_dataset_members")
         scripted = self._member_scan_failures.get(dataset_rid)
         if scripted is not None:
             # Scripted read-side failure (#391b). Raised from the SAME seam

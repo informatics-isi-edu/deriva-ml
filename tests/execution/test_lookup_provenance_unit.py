@@ -3777,12 +3777,19 @@ def test_no_worker_handle_is_ever_entered_concurrently():
     its own occupancy, so a shared handle is observable. Verified to FAIL
     against the hash-mod implementation (mutate-and-revert), which is what
     makes it a real pin rather than a tautology.
+
+    Since #394 the frontier's ROW reads are batched per table on the main
+    thread and the concurrent leg is the per-``(dataset, version)``
+    member-producer scan, so the scenario gives every seed its own consumed
+    dataset — 24 independent scans over a pool of 8, the contended regime
+    this pin exists for. A parentless wide frontier would now issue no
+    concurrent read at all and make the pin vacuous.
     """
     _require_parallel_enabled()
 
     from deriva_ml.core.mixins._provenance_engine import WalkEngine
 
-    ml, root, _ = _wide_frontier_scenario(width=24)
+    ml, root, _ = _wide_frontier_scenario_with_parents(width=24, parents_each=1)
     ml.enable_parallel_expansion(True)
     # Hold each handle long enough that concurrent reads genuinely overlap.
     # Without this the scripted seams return in microseconds and a sharing

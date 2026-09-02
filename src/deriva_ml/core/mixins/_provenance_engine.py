@@ -903,6 +903,7 @@ class WalkEngine(Generic[N]):
     _pending_binding_pins: dict[str, dict[str, int]] = field(init=False)
     _binding_scanned: dict[str, str] = field(init=False)
     _readouts: dict[RID, ExecutionReadout] = field(init=False)
+    _member_scan_cache: dict[tuple[str, str | None], tuple[set, BaseException | None]] = field(init=False)
     _worker_handle_pool: "list[Any] | None" = field(init=False, default=None)
 
     def __init__(
@@ -948,6 +949,15 @@ class WalkEngine(Generic[N]):
         # entry; a miss falls back to reading inline, so every code path
         # works with an empty cache.
         self._readouts = {}
+        # Member-producer scans (#394): ``(dataset, version) -> (producers,
+        # error)``. The one frontier-read leg that cannot be collapsed into a
+        # per-table ``RID=any(...)`` query is at least run ONCE per distinct
+        # pair per walk instead of once per consuming execution — a fan-in
+        # where ten executions consume the same ``dataset@version`` used to
+        # pay for ten identical membership joins. The captured error is
+        # cached alongside the result so every consumer replays the same
+        # classification through ``member_producers_from``.
+        self._member_scan_cache = {}
         # Per-worker catalog handles, built lazily on the first frontier
         # wide enough to be worth parallelizing. ``None`` means "not built
         # yet"; an empty list means "tried, and this ml cannot supply them"
@@ -2032,6 +2042,258 @@ class WalkEngine(Generic[N]):
             asset_inputs=tuple(asset_inputs),
         )
 
+    # -- batched frontier reads (#394) -------------------------------------
+
+    def _batch_seam(self, name: str) -> Any:
+        """Return ``ml``'s batch seam ``name``, or None when it has none.
+
+        Every batched read is optional by construction: a stubbed ``ml``, an
+        older subclass, or a harness that overrides only the per-node seams
+        simply has no batch method, and :meth:`read_frontier` falls back to
+        per-node :meth:`read_execution` calls. That is what keeps the
+        batching a pure optimization rather than a second semantics.
+
+        Args:
+            name: The batch seam's method name.
+
+        Returns:
+            The bound method, or None.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._batch_seam("_execution_records_batch") is None
+            True
+        """
+        seam = getattr(self.ml, name, None)
+        return seam if callable(seam) else None
+
+    def _batched_reads_available(self) -> bool:
+        """True when ``ml`` exposes the whole batched-read seam set.
+
+        All-or-nothing deliberately: a partially batched frontier would
+        interleave batched and per-node reads for the same execution, which
+        is harder to reason about (and to pin) than either pure path, and
+        buys nothing — the per-node fallback is already correct.
+
+        Returns:
+            Whether :meth:`read_frontier` can take the batched path.
+
+        Example:
+            >>> WalkEngine(ml=None, visitor=TreeBuilder())._batched_reads_available()
+            False
+        """
+        return all(
+            self._batch_seam(name) is not None
+            for name in (
+                "_execution_records_batch",
+                "_input_dataset_pairs_batch",
+                "_input_assets_batch",
+                "_producer_of_datasets_batch",
+                "_producers_of_assets_batch",
+            )
+        )
+
+    def _member_scan(self, dataset_rid: str, version: str | None, handle: Any) -> tuple[set, BaseException | None]:
+        """Scan one ``(dataset, version)``'s member producers. **Read-only.**
+
+        The one leg of a frontier read that does NOT batch: it is a
+        per-``(dataset, version)`` server-side membership JOIN, not a row
+        lookup keyed by the frontier's execution RIDs, so there is no
+        ``RID=any(...)`` shape to collapse several of them into. What the
+        engine does instead is (a) run them concurrently on the leased pool
+        and (b) run each distinct pair at most ONCE per walk — several
+        frontier executions consuming the same ``dataset@version`` share one
+        scan, where the pre-#394 read side repeated it per consumer.
+
+        The failure is CAPTURED, never raised, so one pair's broken snapshot
+        cannot cancel a gather; the main thread classifies it later through
+        the unchanged :meth:`member_producers_from`.
+
+        Args:
+            dataset_rid: The consumed dataset.
+            version: The consumed version pin, or None.
+            handle: The leased catalog handle to read against.
+
+        Returns:
+            ``(producers, error)``.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._member_scan)
+            True
+        """
+        try:
+            return handle._producers_of_dataset_members(dataset_rid, version=version), None
+        except Exception as exc:  # noqa: BLE001 — deferred verbatim to the
+            # main thread, exactly as the per-node read side defers it.
+            return set(), exc
+
+    def read_frontier(self, rids: list[RID]) -> dict[RID, ExecutionReadout]:
+        """Read a whole frontier's read sides, batched per TABLE. **Read-only.**
+
+        The #394 restructuring. Where :meth:`read_execution` answers every
+        question for ONE execution (and therefore issues per-node queries
+        for each), this answers each question ONCE for the whole frontier:
+
+        - Execution rows + their Workflow rows and type terms — chunked
+          ``RID=any(...)`` per table (``_execution_records_batch``);
+        - ``Dataset_Execution`` input edges for every frontier RID, plus the
+          one ``Dataset_Version`` resolve for the union of pinned versions
+          (``_input_dataset_pairs_batch``);
+        - the input-asset association rows, one chunked query per
+          ``<Asset>_Execution`` table across the whole frontier — batching
+          runs PER ASSOCIATION TABLE because association tables vary per
+          asset table (``_input_assets_batch``);
+        - each consumed ``(dataset, version)``'s producing execution, from
+          one chunked ``Dataset_Version`` scan (``_producer_of_datasets_batch``);
+        - each input asset's ``Output`` producers, one chunked query per
+          association table (``_producers_of_assets_batch``).
+
+        What stays per-node is the member-producer scan — see
+        :meth:`_member_scan` for why — but it is deduped across the frontier
+        and run concurrently on the leased handle pool.
+
+        The assembled readouts are **the same readouts** the per-node path
+        produces: same dataclass, same field order, same captured errors, so
+        the apply path (:meth:`expand_execution`) is untouched and every
+        semantic pin over it stays valid.
+
+        A frontier RID the batch could not resolve to an Execution row falls
+        back to a per-node :meth:`read_execution`, which is what preserves
+        the exact ``lookup_error`` a missing execution has always produced.
+
+        Args:
+            rids: The frontier's execution RIDs, in walk order.
+
+        Returns:
+            ``rid -> ExecutionReadout`` for every RID in ``rids``.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine.read_frontier([])
+            {}
+        """
+        if not rids:
+            return {}
+        if not self._batched_reads_available():
+            return {rid: self.read_execution(rid) for rid in rids}
+
+        ml = self.ml
+        records = ml._execution_records_batch(list(rids))
+        resolved = [rid for rid in rids if rid in records]
+        pairs_by_execution = ml._input_dataset_pairs_batch(resolved)
+        assets_by_execution = ml._input_assets_batch(resolved)
+
+        # One producer lookup per distinct consumed (dataset, version) and
+        # one per distinct input asset, for the WHOLE frontier.
+        dataset_keys: list[tuple[str, str | None]] = []
+        for pairs in (pairs_by_execution.get(rid, []) for rid in resolved):
+            for ds, consumed_version in pairs:
+                key = (ds.dataset_rid, consumed_version)
+                if key not in dataset_keys:
+                    dataset_keys.append(key)
+        dataset_producers = ml._producer_of_datasets_batch(dataset_keys)
+
+        asset_items: list[tuple[str, Any]] = []
+        asset_table_failures: set[str] = set()
+        seen_assets: set[str] = set()
+        for assets in (assets_by_execution.get(rid, []) for rid in resolved):
+            for asset in assets:
+                if asset.asset_rid in seen_assets:
+                    continue
+                seen_assets.add(asset.asset_rid)
+                try:
+                    asset_items.append((asset.asset_rid, ml.model.name_to_table(asset.asset_table)))
+                except Exception:  # noqa: BLE001 — the per-node path degrades
+                    # an unresolvable asset table to ``resolution_failed``;
+                    # record it and do the same below.
+                    asset_table_failures.add(asset.asset_rid)
+        try:
+            asset_producers = ml._producers_of_assets_batch(asset_items) if asset_items else {}
+        except Exception:  # noqa: BLE001 — a whole-batch producer failure
+            # degrades every asset in it, matching the per-node contract that
+            # one unresolvable asset producer never stops the walk.
+            asset_producers = {}
+            asset_table_failures |= {asset_rid for asset_rid, _table in asset_items}
+
+        # The one un-batchable leg, run concurrently and deduped.
+        member_scans = self._run_member_scans(dataset_keys)
+
+        readouts: dict[RID, ExecutionReadout] = {}
+        for rid in rids:
+            record = records.get(rid)
+            if record is None:
+                # Not resolvable from the batch: fall back to the per-node
+                # read so the historical ``lookup_error`` is produced by the
+                # historical call.
+                readouts[rid] = self.read_execution(rid)
+                continue
+
+            dataset_inputs: list[tuple[Any, str | None, str | None, set, BaseException | None]] = []
+            for ds, consumed_version in pairs_by_execution.get(rid, []):
+                key = (ds.dataset_rid, consumed_version)
+                producers, error = member_scans.get(key, (set(), None))
+                dataset_inputs.append(
+                    (
+                        ds,
+                        consumed_version,
+                        dataset_producers.get(key),
+                        set(producers),
+                        error,
+                    )
+                )
+
+            asset_inputs: list[tuple[Any, tuple[str, ...], bool]] = []
+            for asset in assets_by_execution.get(rid, []):
+                failed = asset.asset_rid in asset_table_failures
+                producer_rids = () if failed else tuple(asset_producers.get(asset.asset_rid, ()))
+                asset_inputs.append((asset, producer_rids, failed))
+
+            readouts[rid] = ExecutionReadout(
+                rid=rid,
+                record=record,
+                dataset_inputs=tuple(dataset_inputs),
+                asset_inputs=tuple(asset_inputs),
+            )
+        return readouts
+
+    def _run_member_scans(
+        self, keys: list[tuple[str, str | None]]
+    ) -> dict[tuple[str, str | None], tuple[set, BaseException | None]]:
+        """Scan every distinct ``(dataset, version)``'s members, once each.
+
+        Results are memoized for the whole walk in :attr:`_member_scan_cache`
+        — the same ``dataset@version`` consumed by ten frontier executions
+        (the ordinary shape of a fan-in) is scanned ONCE, and a later
+        frontier that re-consumes it pays nothing. The cached value includes
+        the captured error, so a pair whose snapshot is broken replays the
+        identical exception to every consumer and each consumer's
+        :meth:`member_producers_from` emits the gap it always emitted.
+
+        Uncached pairs go through :meth:`_gather_leased`, the engine's single
+        concurrency primitive: one leased handle per scan, results applied in
+        input order, ``DERIVA_ML_PROVENANCE_WORKERS=1`` serializing.
+
+        Args:
+            keys: The distinct pairs the frontier consumes, in walk order.
+
+        Returns:
+            ``key -> (producers, error)`` for every requested key.
+
+        Example:
+            >>> WalkEngine(ml=None, visitor=TreeBuilder())._run_member_scans([])
+            {}
+        """
+        pending = [key for key in keys if key not in self._member_scan_cache]
+        if pending:
+            results = self._run_leased(
+                pending,
+                lambda key, handle: self._member_scan(key[0], key[1], handle),
+            )
+            for key, result in zip(pending, results, strict=True):
+                self._member_scan_cache[key] = result
+        return {key: self._member_scan_cache[key] for key in keys}
+
     def _take_readout(self, rid: RID) -> ExecutionReadout:
         """Return ``rid``'s prefetched readout, or read it inline on a miss.
 
@@ -2052,7 +2314,21 @@ class WalkEngine(Generic[N]):
             True
         """
         cached = self._readouts.pop(rid, None)
-        return cached if cached is not None else self.read_execution(rid)
+        if cached is not None:
+            return cached
+        if self.closure_mode and self._batched_reads_available():
+            # A closure miss still goes through the batched reader (as a
+            # frontier of one), so the closure walk has ONE read path and a
+            # missed execution shares the member-scan memo rather than
+            # re-issuing a membership join the frontier already ran.
+            #
+            # LINEAGE IS EXCLUDED, deliberately and permanently: its
+            # observable contract is pinned byte-for-byte by the goldens,
+            # and it never prefetches at all, so routing its inline reads
+            # through a different seam set would be all risk and no gain
+            # (#394 batches the closure's frontier, which lineage has none of).
+            return self.read_frontier([rid])[rid]
+        return self.read_execution(rid)
 
     def _prefetchable(self, rid: RID) -> bool:
         """True when ``rid`` may be prefetched for the coming frontier.
@@ -2667,6 +2943,23 @@ class WalkEngine(Generic[N]):
             0
         """
         frontier = self.frontier_rids(candidates)
+        if not frontier:
+            return 0
+
+        if self._batched_reads_available():
+            # #394: BATCHED path. One chunked query per table for the whole
+            # frontier beats N concurrent per-node reads on request count,
+            # and request count is what a closure is bound by — so it is
+            # taken even for a width-1 frontier (a one-element ``any()``
+            # disjunction is still fewer requests than the per-node reads it
+            # replaces) and even with no worker handles available, since the
+            # batch queries themselves are issued sequentially on the main
+            # thread. The only concurrency inside is the member-scan round,
+            # which leases handles when it can and serializes when it cannot.
+            for rid, readout in self.read_frontier(frontier).items():
+                self._readouts[rid] = readout
+            return len(frontier)
+
         if len(frontier) < 2 or _expansion_workers() < 2 or not self._worker_handles():
             # Nothing to overlap (or no safe per-worker handles): let
             # ``_take_readout`` read inline, exactly as the pre-#391b walk
