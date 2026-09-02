@@ -1179,3 +1179,20 @@ RELATION between different artifacts with no reliable causal direction
 trimmed for speed; the remaining runtime goes to parallel execution
 expansion instead, and the #392 arc-gating knob serves anyone wanting
 the narrow view.
+
+**2026-09-01 — Parallel expansion: reuse the deriva-py asyncio
+framework, not a third thread pool (Carl-approved design).** Codebase
+audit corrected an earlier wrong claim ("deriva-py is sync all the way
+down"): deriva-py ships `deriva.core.asyncio` — AsyncErmrestCatalog on
+httpx (retries, connection limits), AsyncErmrestSnapshot, async
+datapath, and clone.py's semaphore-bounded asyncio.gather fan-out
+(used by the bag loader deriva-ml already calls). deriva-ml also has a
+dormant notebook-safe `run_async` bridge (core/async_helpers.py) and
+two ad-hoc ThreadPoolExecutor sites (_reachability, #392 scan pool).
+Decision: orchestrate the closure's frontier expansion with the
+deriva-py async pattern (gather + Semaphore), offload existing sync
+mixin seams via executor (per-worker catalog handles — requests.Session
+is NOT thread-safe; the #392 scans solved this with per-scan handles),
+keep the public API sync via run_async, and migrate hot reads to
+native async incrementally — converging on ONE concurrency framework
+instead of three.
