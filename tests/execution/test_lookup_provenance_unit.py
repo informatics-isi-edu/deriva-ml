@@ -4905,3 +4905,142 @@ def test_unresolvable_snapshot_in_a_pooled_leg_still_emits_the_chain_break():
     # The other pins are unaffected — one broken leg never poisons a round.
     for dataset in walked[1:]:
         assert _gaps_for(closure, GapKind.snapshot_chain_break, dataset) == []
+
+
+# ---------------------------------------------------------------------------
+# Non-asset ``*_Execution`` tables (#394 live-A/B finding).
+# ---------------------------------------------------------------------------
+
+
+class _BatchAssetModel:
+    """Model stub for ``_input_assets_batch``: two ``*_Execution`` tables.
+
+    ``Image`` is a real asset table; ``File`` has a ``File_Execution``
+    association but is NOT asset-shaped — the eye-ai case that the live A/B
+    surfaced.
+    """
+
+    def __init__(self) -> None:
+        from unittest.mock import MagicMock
+
+        self._tables = {}
+        for name, schema in (("Image", "domain"), ("File", "deriva-ml")):
+            table = MagicMock()
+            table.name = name
+            table.schema.name = schema
+            self._tables[name] = table
+
+    def find_asset_execution_tables(self):
+        return [("deriva-ml", "File_Execution"), ("domain", "Image_Execution")]
+
+    def name_to_table(self, name):
+        return self._tables[name]
+
+    def is_asset(self, table):
+        return table.name == "Image"
+
+
+class _AnyColumns(dict):
+    """``columns[name]`` for any name — the batch builds predicates from it."""
+
+    def __missing__(self, key):
+        from unittest.mock import MagicMock
+
+        return MagicMock()
+
+
+class _BatchAssetPath:
+    """Datapath stub recording which tables the batch actually queried."""
+
+    def __init__(self, rows, queried, key):
+
+        self._rows = rows
+        self._queried = queried
+        self._key = key
+        # ``_rid_any`` builds ``columns[name] == value`` predicates; any
+        # object that supports ``==`` and ``|`` will do, since this stub
+        # ignores predicates and returns its scripted rows.
+        self.columns = _AnyColumns()
+
+    def filter(self, _pred):
+        return self
+
+    def entities(self):
+        return self
+
+    def fetch(self):
+        self._queried.append(self._key)
+        return list(self._rows)
+
+    def __getattr__(self, name):
+        from unittest.mock import MagicMock
+
+        return MagicMock()
+
+
+def test_batched_input_assets_skip_non_asset_execution_tables():
+    """A ``*_Execution`` table whose base table is not asset-shaped is skipped.
+
+    ``File`` on eye-ai carries a ``File_Execution`` association (source
+    files registered BY REFERENCE) but is not an asset table, so
+    ``lookup_asset`` refuses it and the per-node path drops the row with a
+    debug log. The batched reader never calls ``lookup_asset``, so without
+    an explicit ``is_asset`` guard it would start reporting File rows as
+    closure assets — which the live A/B caught as a one-asset, one-gap
+    divergence from ``main`` on ``lookup_provenance("7-ZW3P")``.
+
+    Pinned here rather than through ``_FakeML`` because the scripted
+    harness has no way to express "associated to an execution but not
+    asset-shaped": its ``add_asset`` registers the table as an asset by
+    construction, so the divergence is invisible to it.
+    """
+    from deriva_ml.core.mixins.execution import ExecutionMixin
+
+    class _Host(ExecutionMixin):
+        def __init__(self):
+            self.model = _BatchAssetModel()
+            self.ml_schema = "deriva-ml"
+            self.queried: list[str] = []
+
+        def pathBuilder(self):
+            host = self
+
+            class _Schemas(dict):
+                def __missing__(self, key):
+                    return _Schema(key)
+
+            class _Schema:
+                def __init__(self, schema):
+                    self.schema = schema
+                    self.tables = _Tables(schema)
+
+            class _Tables(dict):
+                def __init__(self, schema):
+                    super().__init__()
+                    self.schema = schema
+
+                def __missing__(self, table):
+                    rows = {
+                        "File_Execution": [{"Execution": "2-0001", "File": "6-FILE"}],
+                        "Image_Execution": [{"Execution": "2-0001", "Image": "4-IMG1"}],
+                        "Image": [{"RID": "4-IMG1", "Filename": "x.png", "URL": "u", "Length": 1, "MD5": "m"}],
+                        "File": [{"RID": "6-FILE", "Filename": "src.py"}],
+                    }.get(table, [])
+                    return _BatchAssetPath(rows, host.queried, table)
+
+            pb = type("PB", (), {})()
+            pb.schemas = _Schemas()
+            return pb
+
+    host = _Host()
+
+    assets = host._input_assets_batch(["2-0001"])
+
+    assert [a.asset_rid for a in assets["2-0001"]] == ["4-IMG1"], (
+        "a non-asset ``*_Execution`` table leaked into the batched input assets; "
+        "the per-node path drops it, so the batch must too"
+    )
+    # Non-vacuous: the File association WAS queried and then discarded on
+    # the is_asset guard, rather than never being reached at all.
+    assert "File_Execution" in host.queried
+    assert "File" not in host.queried, "the non-asset table's rows were fetched before the guard ran"

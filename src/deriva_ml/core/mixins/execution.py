@@ -2491,6 +2491,20 @@ class ExecutionMixin:
             # on that is the kind of assumption a catalog eventually breaks.
             try:
                 asset_table = self.model.name_to_table(asset_table_name)
+                if not self.model.is_asset(asset_table):
+                    # NOT an asset table, despite having an ``_Execution``
+                    # association. ``File`` on eye-ai is the live example:
+                    # source files registered BY REFERENCE get a
+                    # ``File_Execution`` row but no asset shape, so
+                    # ``lookup_asset`` refuses them ("RID X is not an
+                    # asset") and the per-node path drops them with a debug
+                    # log. Mirroring that guard here is what keeps the
+                    # batched read a pure optimization: without it the
+                    # batch, which never calls ``lookup_asset``, would start
+                    # reporting File rows as closure assets — a semantics
+                    # change (and a defensible one) that belongs in its own
+                    # issue, not in a perf PR.
+                    continue
                 asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
             except (KeyError, AttributeError, DerivaMLException):
                 # No such asset table (or it is absent from this path
