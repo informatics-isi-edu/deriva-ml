@@ -804,6 +804,7 @@ class WalkEngine(Generic[N]):
     _pending_binding_pins: dict[str, dict[str, int]] = field(init=False)
     _binding_scanned: set[str] = field(init=False)
     _readouts: dict[RID, ExecutionReadout] = field(init=False)
+    _worker_handle_pool: "list[Any] | None" = field(init=False, default=None)
 
     def __init__(
         self,
@@ -843,6 +844,12 @@ class WalkEngine(Generic[N]):
         # entry; a miss falls back to reading inline, so every code path
         # works with an empty cache.
         self._readouts = {}
+        # Per-worker catalog handles, built lazily on the first frontier
+        # wide enough to be worth parallelizing. ``None`` means "not built
+        # yet"; an empty list means "tried, and this ml cannot supply them"
+        # — the difference is what stops a failed attempt from being retried
+        # on every frontier.
+        self._worker_handle_pool = None
         self._sentinel_resolved = False
         self._sentinel_rid: RID | None = None
 
@@ -1882,9 +1889,8 @@ class WalkEngine(Generic[N]):
             >>> engine._worker_handles()
             []
         """
-        cached = getattr(self, "_worker_handle_pool", None)
-        if cached is not None:
-            return cached
+        if self._worker_handle_pool is not None:
+            return self._worker_handle_pool
 
         pool: list[Any] = []
         workers = _expansion_workers()
