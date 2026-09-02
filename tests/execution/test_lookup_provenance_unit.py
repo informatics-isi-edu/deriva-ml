@@ -2390,6 +2390,135 @@ def test_deferred_scan_gaps_carry_the_scanned_version_context():
     assert "ambiguous_hop" in scan_gaps[0].detail
 
 
+# ---------------------------------------------------------------------------
+# #391 C3 — the per-dataset scans in a round are independent, so they run on
+# a bounded worker pool. Every RESULT is applied to the (single-threaded)
+# ClosureBuilder afterwards, in sorted dataset order, so the closure stays
+# byte-deterministic regardless of which scan finished first.
+# ---------------------------------------------------------------------------
+
+
+def test_parallel_round_applies_every_scans_result():
+    """Three datasets scanned in one round: all three results are applied,
+    each binder entering with an arc naming its own dataset."""
+    ml = _FakeML()
+    ds_root = _ds(1)
+    inputs = [_ds(n) for n in (10, 11, 12)]
+    binders = [_ex(n) for n in (10, 11, 12)]
+    consumer = _ex(1)
+
+    for binder in binders:
+        ml.add_execution(binder, description=f"binder {binder}")
+    ml.add_execution(
+        consumer,
+        description="consumer of three inputs",
+        input_datasets=[_StubDataset(d, f"input {d}", "1.0.0", consumed_version="1.0.0") for d in inputs],
+    )
+    for dataset_rid, binder in zip(inputs, binders, strict=True):
+        _walkable_dataset(ml, dataset_rid, "1.0.0")
+        ml.set_binding_scan(dataset_rid, "1.0.0", [_binding_record(binder)], [])
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert set(binders) <= set(closure.executions)
+    for dataset_rid, binder in zip(inputs, binders, strict=True):
+        arcs = _binding_arcs(closure, binder)
+        assert [(a.input_rid, a.input_version) for a in arcs] == [(dataset_rid, "1.0.0")]
+    # Each dataset scanned exactly once, whichever order the pool ran them.
+    for dataset_rid in inputs:
+        assert len(_binding_scan_calls(ml, dataset_rid)) == 1
+
+
+def test_parallel_round_result_is_order_independent():
+    """A scan that finishes LAST must not change the closure: the same
+    scenario with the workers' completion order inverted (by making the
+    lexicographically-first dataset the slow one) is byte-identical."""
+    import time
+
+    from tests.execution.test_lineage_goldens import _canonical
+
+    def build(slow_dataset_index: int):
+        ml = _FakeML()
+        ds_root = _ds(1)
+        inputs = [_ds(n) for n in (10, 11, 12)]
+        binders = [_ex(n) for n in (10, 11, 12)]
+        consumer = _ex(1)
+        for binder in binders:
+            ml.add_execution(binder, description=f"binder {binder}")
+        ml.add_execution(
+            consumer,
+            description="consumer",
+            input_datasets=[_StubDataset(d, f"input {d}", "1.0.0", consumed_version="1.0.0") for d in inputs],
+        )
+        for dataset_rid, binder in zip(inputs, binders, strict=True):
+            _walkable_dataset(ml, dataset_rid, "1.0.0")
+            ml.set_binding_scan(dataset_rid, "1.0.0", [_binding_record(binder)], [])
+        ml.add_dataset(ds_root, description="root", producer=consumer)
+
+        slow = inputs[slow_dataset_index]
+        base = ml._find_feature_producers_impl
+
+        def delayed(dataset_rid, version=None):
+            if dataset_rid == slow:
+                time.sleep(0.05)
+            return base(dataset_rid, version)
+
+        ml._find_feature_producers_impl = delayed  # type: ignore[method-assign]
+        return ml, ds_root
+
+    ml_a, root_a = build(0)
+    ml_b, root_b = build(2)
+    dump_a = _canonical(ml_a.lookup_provenance(root_a).model_dump(mode="json"))
+    dump_b = _canonical(ml_b.lookup_provenance(root_b).model_dump(mode="json"))
+
+    assert dump_a == dump_b
+    # Not vacuous: the scenario really did produce binding arcs.
+    assert any(
+        arc.kind == ArcKind.member_binding
+        for member in ml_a.lookup_provenance(root_a).executions.values()
+        for arc in member.arcs
+    )
+
+
+def test_scan_failure_in_one_worker_does_not_lose_the_others():
+    """One dataset's scan raising must not abort the round: the other
+    datasets' results are still applied, and the failure is an honest
+    ``binding_scan_failed`` gap rather than a crash out of the walk."""
+    ml = _FakeML()
+    ds_root = _ds(1)
+    good, bad = _ds(10), _ds(11)
+    binder, consumer = _ex(10), _ex(1)
+
+    ml.add_execution(binder, description="binder of the good dataset")
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_datasets=[_StubDataset(d, f"input {d}", "1.0.0", consumed_version="1.0.0") for d in (good, bad)],
+    )
+    for dataset_rid in (good, bad):
+        _walkable_dataset(ml, dataset_rid, "1.0.0")
+    ml.set_binding_scan(good, "1.0.0", [_binding_record(binder)], [])
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    base = ml._find_feature_producers_impl
+
+    def exploding(dataset_rid, version=None):
+        if dataset_rid == bad:
+            raise RuntimeError("scan exploded")
+        return base(dataset_rid, version)
+
+    ml._find_feature_producers_impl = exploding  # type: ignore[method-assign]
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert binder in closure.executions
+    assert [a.input_rid for a in _binding_arcs(closure, binder)] == [good]
+    failures = _gaps_for(closure, GapKind.binding_scan_failed, bad)
+    assert len(failures) == 1
+    assert "scan exploded" in failures[0].detail
+
+
 def test_multi_version_discovery_still_charges_the_dataset_budget():
     """The dataset budget stays meaningful without ancestry: several
     (dataset, version) pairs still arise from execution-mediated discovery,

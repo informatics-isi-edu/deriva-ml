@@ -60,6 +60,13 @@ UNPINNED_VERSION_KEY = "<unpinned>"
 # (once, shared); enabling none of them means no snapshot is ever resolved.
 _SNAPSHOT_DEPENDENT_ARCS = frozenset({ArcKind.version_authorship, ArcKind.member_binding})
 
+# Worker pool size for a round's binding scans (#391 C3). Each scan is an
+# independent, snapshot-bound, HTTP-bound read, so the bound is about being
+# a polite catalog client rather than about CPU: a closure round rarely has
+# more than a handful of datasets, and a small fixed pool keeps the burst
+# predictable for the server.
+_BINDING_SCAN_WORKERS = 8
+
 N = TypeVar("N")
 
 
@@ -1137,6 +1144,20 @@ class WalkEngine(Generic[N]):
         Older walked pins get no binding arcs of their own; what the newest
         scan reports is the closure's as-of view of that dataset's bindings.
 
+        A round's scans are **independent snapshot-bound reads** — each
+        resolves its own snapshot handle and touches no shared state — so
+        they run concurrently on a bounded worker pool (#391 C3). The
+        catalog reads dominate a scan's wall time and are almost entirely
+        sequential HTTP otherwise.
+
+        Determinism is preserved by construction: workers only *read*, and
+        every result is applied to the visitor **single-threaded, in sorted
+        dataset order**, after the whole batch has completed. The
+        ``ClosureBuilder`` is never touched from a worker, so which scan
+        finished first cannot influence the closure. A scan that raises is
+        an honest ``binding_scan_failed`` gap for that dataset alone — it
+        never aborts the round or loses the other datasets' results.
+
         Because a scan can discover executions that walk NEW datasets and
         pins, the caller runs this in rounds (drain, scan, repeat) until it
         returns False.
@@ -1150,6 +1171,8 @@ class WalkEngine(Generic[N]):
             >>> engine.run_pending_binding_scans()
             False
         """
+        from concurrent.futures import ThreadPoolExecutor
+
         pending = {
             dataset_rid: pins
             for dataset_rid, pins in self._pending_binding_pins.items()
@@ -1158,15 +1181,41 @@ class WalkEngine(Generic[N]):
         if not pending:
             return False
 
-        # Applied in sorted dataset order so recorded depths (and therefore
-        # every downstream ordering the closure derives) are independent of
-        # discovery order.
+        batch = []
         for dataset_rid in sorted(pending):
-            pins = pending[dataset_rid]
             self._binding_scanned.add(dataset_rid)
-            version = self.max_walked_pin(dataset_rid, set(pins))
-            records, diagnostics = self.ml._find_feature_producers_impl(dataset_rid, version=version)
-            self._apply_binding_scan(dataset_rid, version, records, diagnostics, depth=pins[version])
+            version = self.max_walked_pin(dataset_rid, set(pending[dataset_rid]))
+            batch.append((dataset_rid, version, pending[dataset_rid][version]))
+
+        def scan(item: tuple[str, str, int]) -> tuple[Any, list[Any], Exception | None]:
+            """Read-only worker: never touches the visitor or engine state."""
+            dataset_rid, version, _depth = item
+            try:
+                records, diagnostics = self.ml._find_feature_producers_impl(dataset_rid, version=version)
+                return records, list(diagnostics), None
+            except Exception as exc:  # noqa: BLE001 — one dataset's failure
+                # must not abort the round; it becomes that dataset's gap.
+                return [], [], exc
+
+        if len(batch) == 1:
+            results = [scan(batch[0])]
+        else:
+            with ThreadPoolExecutor(max_workers=_BINDING_SCAN_WORKERS) as pool:
+                results = list(pool.map(scan, batch))
+
+        # SINGLE-THREADED apply, in sorted dataset order (``batch`` is built
+        # sorted and ``pool.map`` preserves input order), so recorded depths
+        # and every ordering derived from them are independent of both
+        # discovery order and worker completion order.
+        for (dataset_rid, version, depth), (records, diagnostics, error) in zip(batch, results, strict=True):
+            if error is not None:
+                self.visitor.on_gap(
+                    GapKind.binding_scan_failed,
+                    dataset_rid,
+                    f"binding scan of {dataset_rid}@{version} failed, so its member bindings are unrecorded: {error}",
+                )
+                continue
+            self._apply_binding_scan(dataset_rid, version, records, diagnostics, depth=depth)
         return True
 
     def _apply_binding_scan(
