@@ -1547,9 +1547,18 @@ sufficient justification for concurrency — the server-side cost of the
 individual query decides, and a leg of few-but-huge joins wants
 sequencing, not a pool.** Recorded rather than fixed: the full closure
 is unaffected (984 requests saved dominate) and the closure is
-byte-identical either way, so tuning the member-scan round's
-concurrency is a follow-up with its own measurement, not a change to
-smuggle into this PR.
+byte-identical either way.
+
+**Resolved in-PR after 5-run medians made it undeniable (5.5s main vs
+12.1s branch, 93 vs 95 requests — not variance).** The member-scan
+round now pools only at `_MEMBER_SCAN_POOL_THRESHOLD` (8, the default
+worker count) or above; below it the scans run sequentially on the
+caller's handle, which is also what the pre-#394 walk did for a width-1
+frontier. Structural pass went **12.1s -> 6.4s median** (main 5.5s);
+the wide case, where dedup and overlap both pay, is untouched. The
+generalizable rule: **a pooling decision is per-LEG and needs its own
+measurement — "these reads are independent" justifies correctness, not
+speed.**
 
 **Finding 3 — a handle is a whole connection, so size the pool to
 demand.** Chasing finding 2 surfaced a real (if smaller) cost:
