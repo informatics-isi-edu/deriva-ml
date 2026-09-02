@@ -628,8 +628,8 @@ class ClosureBuilder:
         collection in the closure — ``executions`` / ``datasets`` / ``assets``
         key order, ``ProvenanceDataset.versions`` (by version label),
         ``gaps``, each execution's ``arcs``, each arc's ``evidence``, and
-        each asset's ``producers`` /
-        ``consumed_by`` — is sorted here, so ``model_dump()`` output is byte-
+        each asset's ``producers`` / ``consumed_by`` — is sorted here, so
+        ``model_dump()`` output is byte-
         identical across runs regardless of the order the walk discovered
         things in. Call it exactly once, after the walk (and any post-walk
         gap sweep, e.g. dangling-arc detection) has finished mutating the
@@ -815,8 +815,8 @@ class WalkEngine(Generic[N]):
         closure machinery.
 
         ``version=None`` (an unpinned edge) reports an ``unpinned_input``
-        gap and does **no** snapshot-dependent
-        work — the quarantine of spec §6.1. An unpinned edge is a
+        gap and does **no** snapshot-dependent work — the quarantine of
+        spec §6.1. An unpinned edge is a
         *quarantine*, not an expansion: it is memoized under its own key so
         the gap fires once, but it deliberately does **not** consume the
         dataset budget, because nothing was walked.
