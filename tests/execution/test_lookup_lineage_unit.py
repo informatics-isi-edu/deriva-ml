@@ -98,6 +98,10 @@ class _HandleProbe:
             "_producer_of_dataset",
             "_producers_of_dataset_members",
             "_producers_of_asset",
+            # Binding scans are leased through the SAME pool as expansion
+            # reads (#391 round-2 review), so this seam must be instrumented
+            # too — otherwise a scan bypassing the lease is invisible.
+            "_find_feature_producers_impl",
         }
     )
 
@@ -330,6 +334,10 @@ class _FakeML(ExecutionMixin):
         self._handle_hold_seconds = 0.0
         # dataset_rid -> exception raised by _producers_of_dataset_members.
         self._member_scan_failures: dict[str, BaseException] = {}
+        # Concurrent use of a seam called directly on THIS instance rather
+        # than through a leased handle — see ``_note_direct_seam_use``.
+        self._direct_lock = threading.Lock()
+        self._direct_occupants = 0
         # Mock model.
         self.model = MagicMock()
         self.model.is_asset = lambda table: table.name in self._asset_table_names
@@ -662,6 +670,28 @@ class _FakeML(ExecutionMixin):
         """
         self._member_scan_failures[dataset_rid] = error
 
+    def _note_direct_seam_use(self, seam: str) -> None:
+        """Record a seam called on ``self`` (not through a leased handle).
+
+        A worker that bypasses the lease calls the seam on the shared
+        ``_FakeML`` directly, where no ``_HandleProbe`` can observe it — so
+        occupancy counting alone cannot catch it. Tracking direct concurrent
+        use here closes that blind spot: on the main thread it is normal, but
+        two threads inside a seam on ``self`` at once means the lease was
+        bypassed.
+        """
+        with self._direct_lock:
+            self._direct_occupants += 1
+            collided = self._direct_occupants > 1
+        try:
+            if collided:
+                self.handle_violations.append(("unleased_concurrent_use", seam))
+            if self._handle_hold_seconds:
+                time.sleep(self._handle_hold_seconds)
+        finally:
+            with self._direct_lock:
+                self._direct_occupants -= 1
+
     def _find_feature_producers_impl(  # type: ignore[override]
         self, dataset_rid: str, version: Any = None
     ) -> tuple[list[Any], list[BindingDiagnostic]]:
@@ -672,6 +702,9 @@ class _FakeML(ExecutionMixin):
         features.
         """
         self.calls.append(("_find_feature_producers_impl", (dataset_rid, version)))
+        # Detects a scan worker that bypassed the lease and called this on
+        # the shared instance — invisible to _HandleProbe by construction.
+        self._note_direct_seam_use("_find_feature_producers_impl")
         return self._binding_scans.get((dataset_rid, version), ([], []))
 
 

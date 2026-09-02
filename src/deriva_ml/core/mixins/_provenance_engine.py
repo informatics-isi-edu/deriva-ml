@@ -435,6 +435,45 @@ class ClosureBuilder:
             if record not in existing.evidence:
                 existing.evidence.append(record)
 
+    def drop_binding_arcs_for(self, dataset_rid: str) -> int:
+        """Remove every ``member_binding`` arc recorded against ``dataset_rid``.
+
+        Ruling 9 reports binding evidence **as of the maximum walked
+        snaptime**. When a later round walks a higher pin of an
+        already-scanned dataset, the dataset is rescanned at the new maximum
+        and the previous, lower as-of view must be REPLACED — not merged.
+        Monotonicity guarantees the newer view is a superset, so keeping both
+        would duplicate every surviving record and leave arcs carrying two
+        different ``input_version`` labels for one dataset, which is exactly
+        the "evidence as of one snaptime" contract broken.
+
+        Only arcs whose ``input_rid`` is this dataset are dropped: an
+        execution that also has consumption or authorship arcs keeps them,
+        and an execution that had ONLY the dropped arc is re-recorded by the
+        rescan if it still binds (and correctly disappears if it does not).
+
+        Args:
+            dataset_rid: The rescanned dataset.
+
+        Returns:
+            How many arcs were dropped.
+
+        Example:
+            >>> ClosureBuilder().drop_binding_arcs_for(f"1-{1:04X}")
+            0
+        """
+        dropped = 0
+        for bucket in self.arcs.values():
+            stale = [
+                identity
+                for identity, arc in bucket.items()
+                if arc.kind == ArcKind.member_binding and arc.input_rid == dataset_rid
+            ]
+            for identity in stale:
+                del bucket[identity]
+                dropped += 1
+        return dropped
+
     def arcs_for(self, execution_rid: str) -> list[ProvenanceArc]:
         """Return the deterministic arc list recorded for ``execution_rid``.
 
@@ -802,7 +841,7 @@ class WalkEngine(Generic[N]):
     _queue: list[tuple[RID, int]] = field(init=False)
     _unpinned_quarantined: set[tuple[str, str | None]] = field(init=False)
     _pending_binding_pins: dict[str, dict[str, int]] = field(init=False)
-    _binding_scanned: set[str] = field(init=False)
+    _binding_scanned: dict[str, str] = field(init=False)
     _readouts: dict[RID, ExecutionReadout] = field(init=False)
     _worker_handle_pool: "list[Any] | None" = field(init=False, default=None)
 
@@ -837,7 +876,12 @@ class WalkEngine(Generic[N]):
         # ``run_pending_binding_scans`` then scans each dataset ONCE at its
         # maximum walked snaptime.
         self._pending_binding_pins = {}
-        self._binding_scanned = set()
+        # ``dataset_rid -> the version its binding scan was run AT``. Not a
+        # bare "scanned" set: a later round can walk a HIGHER pin of an
+        # already-scanned dataset, and ruling 9 promises evidence as of the
+        # MAXIMUM walked snaptime — so the dataset must be rescanned when
+        # its max pin advances past what was scanned.
+        self._binding_scanned = {}
         # Frontier prefetch cache (#391b): ``rid -> ExecutionReadout`` for
         # executions whose read side has already been fetched (concurrently)
         # but not yet applied. ``expand_execution`` consumes and removes an
@@ -1229,6 +1273,94 @@ class WalkEngine(Generic[N]):
 
         return max(labels, key=order)
 
+    def _pin_advanced(self, dataset_rid: str, scanned: str, candidate: str) -> bool:
+        """True when ``candidate`` is a strictly NEWER pin than ``scanned``.
+
+        Decided by the same total order :meth:`max_walked_pin` uses, so
+        "which pin is newer" has exactly one definition in the engine.
+        Implemented by asking that method to choose between the two: if it
+        picks ``candidate`` over ``scanned``, the pin advanced.
+
+        Args:
+            dataset_rid: The dataset whose pins to compare.
+            scanned: The version its binding scan was last run at.
+            candidate: The maximum currently-walked pin.
+
+        Returns:
+            Whether a rescan is required.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._pin_advanced(f"1-{1:04X}", "1.0.0", "1.0.0")
+            False
+        """
+        if scanned == candidate:
+            return False
+        return self.max_walked_pin(dataset_rid, {scanned, candidate}) == candidate
+
+    def _run_leased(self, batch: list, worker: Any) -> list:
+        """Run ``worker(item, handle)`` over ``batch``, one leased handle each.
+
+        The shared execution path for every concurrent READ the walk makes.
+        Binding scans used to run on their own ``ThreadPoolExecutor`` calling
+        seams on ``self.ml``, which is the same unsynchronized
+        ``requests.Session`` / ``_snapshot_cache`` hazard the expansion lease
+        eliminated; routing both legs through this one runner closes that and
+        retires the deferred "two concurrency frameworks" item at the same
+        time.
+
+        Handles are leased from the SAME pool the expansion prefetch uses, so
+        the pool's depth remains the single global concurrency bound: an
+        expansion frontier and a scan round can never together exceed it,
+        because both draw from one queue.
+
+        Falls back to running the batch sequentially, in order, whenever no
+        handle pool can be built — which is also what
+        ``DERIVA_ML_PROVENANCE_WORKERS=1`` produces, so that knob now
+        serializes scans as well as expansion and is a true
+        sequential-equivalence control for BOTH legs.
+
+        Args:
+            batch: Work items, already in deterministic (sorted) order.
+            worker: ``(item, handle) -> result``; must be read-only.
+
+        Returns:
+            Results in the SAME order as ``batch``, never completion order.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._run_leased([], lambda item, handle: item)
+            []
+        """
+        if not batch:
+            return []
+        handles = self._worker_handles()
+        if len(batch) == 1 or not handles:
+            return [worker(item, self.ml) for item in batch]
+
+        import asyncio
+
+        async def drive() -> list:
+            loop = asyncio.get_running_loop()
+            leases: asyncio.Queue = asyncio.Queue()
+            for handle in handles:
+                leases.put_nowait(handle)
+
+            async def one(item: Any) -> Any:
+                handle = await leases.get()
+                try:
+                    return await loop.run_in_executor(None, lambda: worker(item, handle))
+                finally:
+                    # Released even on failure — a leaked lease would shrink
+                    # the pool for the rest of the walk and deadlock it.
+                    leases.put_nowait(handle)
+
+            return list(await asyncio.gather(*(one(item) for item in batch)))
+
+        from deriva_ml.core.async_helpers import run_async
+
+        return run_async(drive())
+
     def run_pending_binding_scans(self) -> bool:
         """Run one ROUND of deferred binding scans; True if any scan ran.
 
@@ -1265,40 +1397,44 @@ class WalkEngine(Generic[N]):
             >>> engine.run_pending_binding_scans()
             False
         """
-        from concurrent.futures import ThreadPoolExecutor
+        batch = []
+        for dataset_rid in sorted(self._pending_binding_pins):
+            pins = self._pending_binding_pins[dataset_rid]
+            if not pins:
+                continue
+            version = self.max_walked_pin(dataset_rid, set(pins))
+            scanned = self._binding_scanned.get(dataset_rid)
+            if scanned is not None and not self._pin_advanced(dataset_rid, scanned, version):
+                # Already scanned at this pin (or at a newer one): the
+                # existing as-of view already covers what is walked.
+                continue
+            self._binding_scanned[dataset_rid] = version
+            batch.append((dataset_rid, version, pins[version]))
 
-        pending = {
-            dataset_rid: pins
-            for dataset_rid, pins in self._pending_binding_pins.items()
-            if dataset_rid not in self._binding_scanned and pins
-        }
-        if not pending:
+        if not batch:
             return False
 
-        batch = []
-        for dataset_rid in sorted(pending):
-            self._binding_scanned.add(dataset_rid)
-            version = self.max_walked_pin(dataset_rid, set(pending[dataset_rid]))
-            batch.append((dataset_rid, version, pending[dataset_rid][version]))
+        def scan(item: tuple[str, str, int], handle: Any) -> tuple[Any, list[Any], Exception | None]:
+            """Read-only worker: never touches the visitor or engine state.
 
-        def scan(item: tuple[str, str, int]) -> tuple[Any, list[Any], Exception | None]:
-            """Read-only worker: never touches the visitor or engine state."""
+            Runs against a LEASED handle, never ``self.ml``: the scan calls
+            the same session-bound seams the expansion reads do, so sharing
+            one ``DerivaML`` across concurrent scans is the identical
+            unsynchronized-``requests.Session`` / ``_snapshot_cache`` hazard
+            the expansion lease exists to prevent (#391b review).
+            """
             dataset_rid, version, _depth = item
             try:
-                records, diagnostics = self.ml._find_feature_producers_impl(dataset_rid, version=version)
+                records, diagnostics = handle._find_feature_producers_impl(dataset_rid, version=version)
                 return records, list(diagnostics), None
             except Exception as exc:  # noqa: BLE001 — one dataset's failure
                 # must not abort the round; it becomes that dataset's gap.
                 return [], [], exc
 
-        if len(batch) == 1:
-            results = [scan(batch[0])]
-        else:
-            with ThreadPoolExecutor(max_workers=_BINDING_SCAN_WORKERS) as pool:
-                results = list(pool.map(scan, batch))
+        results = self._run_leased(batch, scan)
 
         # SINGLE-THREADED apply, in sorted dataset order (``batch`` is built
-        # sorted and ``pool.map`` preserves input order), so recorded depths
+        # sorted and the runner preserves input order), so recorded depths
         # and every ordering derived from them are independent of both
         # discovery order and worker completion order.
         for (dataset_rid, version, depth), (records, diagnostics, error) in zip(batch, results, strict=True):
@@ -1347,6 +1483,16 @@ class WalkEngine(Generic[N]):
             >>> engine._apply_binding_scan(f"1-{1:04X}", "1.0.0", [], [], depth=0) is None
             True
         """
+        # RESCAN at an advanced pin REPLACES the previous as-of view. Ruling
+        # 9 reports bindings as of ONE snaptime — the maximum walked — so a
+        # lower pin's arcs must not survive alongside the newer scan's.
+        # Monotonicity makes the new view a superset, so nothing real is
+        # lost; what is dropped is a duplicate carrying a stale
+        # ``input_version``.
+        dropper = getattr(self.visitor, "drop_binding_arcs_for", None)
+        if dropper is not None:
+            dropper(dataset_rid)
+
         for record in records:
             self.visitor.on_binding_record(dataset_rid=dataset_rid, version=version, record=record, depth=depth)
 
@@ -1444,6 +1590,20 @@ class WalkEngine(Generic[N]):
                 register = getattr(self.visitor, "register_asset", None)
                 if register is not None:
                     register(input_ref, consumer_rid)
+            else:
+                # Datasets need the SAME treatment as assets here. Only the
+                # asset half was handled, so a consumption-gated closure
+                # reported its consumed datasets with ``description=None``
+                # — the description is a property of the dataset being a
+                # member, not of the consumption ARC, so gating the arc must
+                # not blank it. Mirrors ``ClosureBuilder.on_consumption``'s
+                # dataset branch exactly.
+                descriptions = getattr(self.visitor, "dataset_descriptions", None)
+                if descriptions is not None:
+                    descriptions.setdefault(
+                        input_ref.rid,
+                        getattr(input_ref.summary, "description", None),
+                    )
             return
         self.visitor.on_consumption(consumer_rid=consumer_rid, input_ref=input_ref, depth=depth)
 
