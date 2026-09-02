@@ -1315,6 +1315,44 @@ class WalkEngine(Generic[N]):
         getter = getattr(self.visitor, "dataset_facts", None)
         return getter(dataset_rid, version) if getter is not None else None
 
+    def _on_consumption(self, *, consumer_rid: RID, input_ref: InputRef, depth: int) -> None:
+        """Emit one consumption edge, honoring the ``consumption`` arc gate.
+
+        The edge is always *traversed* — the producer of a consumed input
+        is how the walk reaches its parents at all, and gating traversal
+        would not narrow the closure so much as break it. What the gate
+        governs is whether the edge is RECORDED as a
+        :attr:`ArcKind.consumption` arc. A caller who excludes it is asking
+        for the root plus the other requested legs, and gets exactly that:
+        the executions are still reached, but no consumption arc claims
+        them (#391 C4).
+
+        Lineage (``arcs=frozenset()``) is unaffected: ``TreeBuilder``'s
+        hook is a no-op either way, so its observable contract is
+        untouched.
+
+        Args:
+            consumer_rid: The consuming execution.
+            input_ref: The concrete input consumed.
+            depth: Walk depth of the consumer.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> ref = InputRef(kind=ArcInputType.asset, rid=f"1-{1:04X}")
+            >>> engine._on_consumption(consumer_rid=f"2-{1:04X}", input_ref=ref, depth=0) is None
+            True
+        """
+        if ArcKind.consumption not in self.arcs and self.closure_mode:
+            # Still register the input as a closure member (a consumed
+            # dataset/asset is a member by being consumed, which is not the
+            # arc's claim), but record no consumption arc for it.
+            if input_ref.kind == ArcInputType.asset:
+                register = getattr(self.visitor, "register_asset", None)
+                if register is not None:
+                    register(input_ref, consumer_rid)
+            return
+        self.visitor.on_consumption(consumer_rid=consumer_rid, input_ref=input_ref, depth=depth)
+
     def _record_arc(self, execution_rid: RID, **kwargs: Any) -> None:
         """Record one arc on the visitor, when the visitor accumulates arcs.
 
@@ -1612,7 +1650,7 @@ class WalkEngine(Generic[N]):
                     producer_rids=(producer,) if producer else (),
                 )
                 inputs.append(input_ref)
-                self.visitor.on_consumption(consumer_rid=rid, input_ref=input_ref, depth=depth)
+                self._on_consumption(consumer_rid=rid, input_ref=input_ref, depth=depth)
                 # Never the execution we are currently expanding: if it produced
                 # the consumed version of a dataset it also consumed, listing it
                 # as its own parent re-enters `in_progress` and flags a false
@@ -1690,7 +1728,7 @@ class WalkEngine(Generic[N]):
                     producer_rids=producer_rids,
                 )
                 inputs.append(input_ref)
-                self.visitor.on_consumption(consumer_rid=rid, input_ref=input_ref, depth=depth)
+                self._on_consumption(consumer_rid=rid, input_ref=input_ref, depth=depth)
 
             # Root-seeded member-producers (and any other externally supplied
             # parents) are merged in before recursion so they get full

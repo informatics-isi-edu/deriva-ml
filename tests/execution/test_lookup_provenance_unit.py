@@ -2519,6 +2519,100 @@ def test_scan_failure_in_one_worker_does_not_lose_the_others():
     assert "scan exploded" in failures[0].detail
 
 
+# ---------------------------------------------------------------------------
+# #391 C4 — public arc gating. ``arcs=`` exposes the engine's existing gate
+# so a caller can take a fast STRUCTURAL pass, skipping the expensive
+# snapshot-dependent legs. ``None`` (the default) keeps every leg on.
+# ---------------------------------------------------------------------------
+
+
+def _arc_gating_scenario() -> tuple[_FakeML, str, str, str]:
+    """Root dataset consumed by an execution, with a binder on its input."""
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    consumer, binder, author = _ex(1), _ex(2), _ex(3)
+
+    ml.add_execution(binder, description="binder")
+    ml.add_execution(author, description="author of the input version")
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version="1.0.0")],
+    )
+    _walkable_dataset(ml, ds_input, "1.0.0", author=author)
+    ml.set_binding_scan(ds_input, "1.0.0", [_binding_record(binder)], [])
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+    return ml, ds_root, binder, author
+
+
+def test_arcs_none_is_the_full_walk():
+    """The default keeps every leg: both the binder and the version author
+    are closure members."""
+    ml, ds_root, binder, author = _arc_gating_scenario()
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert {binder, author} <= set(closure.executions)
+
+
+def test_arcs_excluding_member_binding_runs_no_binding_scan():
+    """Gating ``member_binding`` off provably skips the binding scan
+    entirely — the expensive leg — while the structural result stands."""
+    ml, ds_root, binder, author = _arc_gating_scenario()
+    structural = frozenset(
+        {
+            ArcKind.consumption,
+            ArcKind.version_authorship,
+            ArcKind.member_production,
+        }
+    )
+
+    closure = ml.lookup_provenance(ds_root, arcs=structural)
+
+    assert not _binding_scan_calls(ml)
+    assert binder not in closure.executions
+    # The structural legs still ran.
+    assert author in closure.executions
+    assert _authorship_arcs(closure, author)
+    assert closure.traversal_complete is True
+
+
+def test_arcs_root_is_always_included_even_when_omitted():
+    """``ArcKind.root`` is implicit: a caller that lists only the legs it
+    wants still gets the root arc, so the seed is never left unexplained."""
+    ml, ds_root, _binder, _author = _arc_gating_scenario()
+
+    closure = ml.lookup_provenance(ds_root, arcs=frozenset({ArcKind.consumption}))
+
+    root_arcs = [arc for member in closure.executions.values() for arc in member.arcs if arc.kind == ArcKind.root]
+    assert root_arcs
+    assert all(arc.depth == 0 for arc in root_arcs)
+
+
+def test_arcs_excluding_consumption_is_allowed_and_narrows_the_walk():
+    """Consumption may be excluded: the closure is then the root plus the
+    requested legs only. Documented, not forbidden."""
+    ml, ds_root, _binder, _author = _arc_gating_scenario()
+
+    closure = ml.lookup_provenance(ds_root, arcs=frozenset({ArcKind.version_authorship}))
+
+    # The root's producer is still the seed (root arc), but nothing is
+    # reached THROUGH a consumption edge.
+    consumption_arcs = [
+        arc for member in closure.executions.values() for arc in member.arcs if arc.kind == ArcKind.consumption
+    ]
+    assert consumption_arcs == []
+    assert closure.traversal_complete is True
+
+
+def test_arcs_rejects_an_unknown_member():
+    """Validation happens at the call boundary, via the enum."""
+    ml, ds_root, _binder, _author = _arc_gating_scenario()
+
+    with pytest.raises(ValidationError):
+        ml.lookup_provenance(ds_root, arcs=frozenset({"not_an_arc_kind"}))
+
+
 def test_multi_version_discovery_still_charges_the_dataset_budget():
     """The dataset budget stays meaningful without ancestry: several
     (dataset, version) pairs still arise from execution-mediated discovery,

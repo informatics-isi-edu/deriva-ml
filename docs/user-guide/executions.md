@@ -843,6 +843,31 @@ member but is never expanded through any version-snapshot-dependent arc
 (no authorship, no bindings), because there is no honest snapshot to read
 those facts from.
 
+**Arc gating: a fast structural pass.** `arcs=` selects which `ArcKind`
+legs the walk runs; `None` (the default) runs all of them. The
+`member_binding` leg is by far the most expensive — it issues a binding
+scan per dataset — so excluding it gives a much faster, purely structural
+closure and issues no binding scan at all:
+
+```python
+from deriva_ml.execution import ArcKind
+
+structural = frozenset({
+    ArcKind.consumption,
+    ArcKind.version_authorship,
+    ArcKind.member_production,
+})
+closure = ml.lookup_provenance(rid, arcs=structural)
+```
+
+`ArcKind.root` is always included implicitly, so the seed is never left
+unexplained. Excluding `consumption` is allowed, but narrows what is
+*recorded* rather than what is traversed: the walk still follows producers
+of consumed inputs — that is how it reaches anything at all — it just
+records no consumption arc, leaving the root plus your requested legs.
+Keep `consumption` for a meaningful causal closure. Unknown members are
+rejected at the call boundary.
+
 **Budgets and `traversal_complete`.** `max_executions` bounds distinct
 executions expanded; a proportional internal dataset-version budget
 (`4 * max_executions`) bounds `datasets_visited` the same way, so a walk

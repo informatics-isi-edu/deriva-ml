@@ -99,6 +99,20 @@ _SUMMARY_CHUNK_SIZE = 25
 # untouched.
 _DATASET_BUDGET_FACTOR = 4
 
+# The full arc set a closure walks when the caller gates nothing — i.e.
+# ``lookup_provenance(..., arcs=None)``, the default. Kept as an explicit
+# constant (rather than ``set(ArcKind)``) so adding a new ArcKind is a
+# deliberate decision about whether it belongs in the default walk.
+_ALL_ARC_KINDS = frozenset(
+    {
+        ArcKind.root,
+        ArcKind.consumption,
+        ArcKind.version_authorship,
+        ArcKind.member_binding,
+        ArcKind.member_production,
+    }
+)
+
 
 def _version_row_sort_key(row: dict[str, Any]) -> tuple:
     """Total sort key for a ``Dataset_Version`` row (spec: issue #367).
@@ -1403,6 +1417,7 @@ class ExecutionMixin:
         *,
         version: str | None = None,
         max_executions: Annotated[int, Field(strict=True, ge=1)] = 500,
+        arcs: frozenset[ArcKind] | None = None,
     ) -> ProvenanceClosure:
         """Compute the full provenance closure behind an artifact.
 
@@ -1461,6 +1476,22 @@ class ExecutionMixin:
                 bounds ``datasets_visited`` the same way, so a walk reaching
                 many dataset versions but few executions cannot walk
                 unboundedly.
+            arcs: Which :class:`~deriva_ml.execution.provenance.ArcKind`
+                legs to walk. ``None`` (the default) walks all of them.
+                Passing a subset gives a **cheaper, narrower** closure —
+                most usefully a fast structural pass that omits
+                ``member_binding``, whose per-dataset binding scans
+                dominate the walk's cost; with it excluded, no binding
+                scan is issued at all. ``ArcKind.root`` is always
+                included implicitly, so the seed is never left
+                unexplained. Excluding ``consumption`` is allowed and
+                narrows what is *recorded*, not what is traversed: the
+                walk still follows producers of consumed inputs (that is
+                how it reaches anything), but records no consumption arc
+                — the closure is then the root plus the requested legs.
+                For a meaningful causal closure, keep ``consumption``.
+                Unknown members are rejected at the call boundary by the
+                enum.
 
         Returns:
             A :class:`~deriva_ml.execution.provenance.ProvenanceClosure`
@@ -1503,6 +1534,15 @@ class ExecutionMixin:
                 >>> closure.root.version  # doctest: +SKIP
                 '1.2.0'
 
+            Take a fast structural pass, skipping the binding scans::
+
+                >>> from deriva_ml.execution import ArcKind
+                >>> structural = frozenset(  # doctest: +SKIP
+                ...     {ArcKind.consumption, ArcKind.version_authorship,
+                ...      ArcKind.member_production}
+                ... )
+                >>> closure = ml.lookup_provenance(rid, arcs=structural)  # doctest: +SKIP
+
             Inspect why one execution is in the closure and what it consumed
             versus authored::
 
@@ -1514,19 +1554,16 @@ class ExecutionMixin:
 
         root_descriptor, producer_rid = self._classify_rid(rid)
 
+        # ``ArcKind.root`` is implicit: the seed's own arc is what explains
+        # why the walk started at all, so a caller listing only the legs it
+        # wants never ends up with an unexplained seed.
+        enabled_arcs = frozenset(arcs) | {ArcKind.root} if arcs is not None else _ALL_ARC_KINDS
+
         builder = ClosureBuilder()
         engine: "WalkEngine[str]" = WalkEngine(
             self,
             builder,
-            arcs=frozenset(
-                {
-                    ArcKind.root,
-                    ArcKind.consumption,
-                    ArcKind.version_authorship,
-                    ArcKind.member_binding,
-                    ArcKind.member_production,
-                }
-            ),
+            arcs=enabled_arcs,
             max_executions=max_executions,
             dataset_budget=_DATASET_BUDGET_FACTOR * max_executions,
             closure_mode=True,
