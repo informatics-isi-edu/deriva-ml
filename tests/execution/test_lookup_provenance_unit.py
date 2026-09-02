@@ -30,6 +30,8 @@ repo-wide RID discipline).
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -38,7 +40,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLValidationError,
     SnapshotUnavailable,
 )
-from deriva_ml.core.mixins.execution import BindingDiagnostic
+from deriva_ml.core.mixins.execution import _ALL_ARC_KINDS, BindingDiagnostic
 from deriva_ml.execution.provenance import (
     ArcInputType,
     ArcKind,
@@ -1051,7 +1053,7 @@ def test_authorship_memoizes_snapshot_resolution_per_dataset_version():
 
     The invariant is per-expansion memoization, not a raw seam-call count.
     ``expand_dataset`` resolves the shared snapshot exactly once via
-    ``_strict_snapshot_or_gap`` and hands it to both snapshot-dependent
+    ``read_dataset_leg`` and hands it to both snapshot-dependent
     legs; what must never happen is two EXPANSIONS, which is what the
     per-leg call counts below pin directly.
     """
@@ -3777,12 +3779,19 @@ def test_no_worker_handle_is_ever_entered_concurrently():
     its own occupancy, so a shared handle is observable. Verified to FAIL
     against the hash-mod implementation (mutate-and-revert), which is what
     makes it a real pin rather than a tautology.
+
+    Since #394 the frontier's ROW reads are batched per table on the main
+    thread and the concurrent leg is the per-``(dataset, version)``
+    member-producer scan, so the scenario gives every seed its own consumed
+    dataset — 24 independent scans over a pool of 8, the contended regime
+    this pin exists for. A parentless wide frontier would now issue no
+    concurrent read at all and make the pin vacuous.
     """
     _require_parallel_enabled()
 
     from deriva_ml.core.mixins._provenance_engine import WalkEngine
 
-    ml, root, _ = _wide_frontier_scenario(width=24)
+    ml, root, _ = _wide_frontier_scenario_with_parents(width=24, parents_each=1)
     ml.enable_parallel_expansion(True)
     # Hold each handle long enough that concurrent reads genuinely overlap.
     # Without this the scripted seams return in microseconds and a sharing
@@ -4330,3 +4339,1200 @@ def test_rescan_gap_drop_is_scoped_to_the_rescanned_dataset():
     # ...and the OTHER dataset's failure gap is untouched by that drop.
     survivors = [g for g in _gaps_for(closure, GapKind.binding_scan_failed) if g.subject_rid == ds_other]
     assert len(survivors) == 1, "an unrelated dataset's scan gap was collaterally dropped by the rescan"
+
+
+# ---------------------------------------------------------------------------
+# Batched frontier reads (#394).
+#
+# The change under test replaced the closure walk's PER-NODE frontier reads
+# with per-TABLE chunked ``RID=any(...)`` batches: one query per table for
+# the whole frontier instead of one query per execution. The readout
+# dataclass and the apply path are untouched, so these tests are of two
+# kinds — REQUEST-COUNT pins (the point of the change) and EQUIVALENCE pins
+# (that the point was reached without changing the answer).
+# ---------------------------------------------------------------------------
+
+
+def _batch_calls(ml: _FakeML, seam: str) -> list:
+    """Every recorded invocation of one batch seam, in call order."""
+    return [c for c in ml.calls if c[0] == seam]
+
+
+def _wide_consumer_frontier(*, width: int, shared_input: bool = False) -> tuple[_FakeML, str, list[str]]:
+    """A root whose seed frontier is ``width`` executions that each consume.
+
+    Every seed is a member-producer of the root dataset (so they form ONE
+    frontier) and consumes a dataset of its own — or, with
+    ``shared_input=True``, the SAME dataset as every other seed, which is
+    the fan-in shape that exercises member-scan dedup.
+
+    Returns ``(ml, root_dataset_rid, seed_execution_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    seeds = []
+    members = set()
+    for index in range(width):
+        seed = _ex(100 + index)
+        input_dataset = _ds(2) if shared_input else _ds(200 + index)
+        input_producer = _ex(300 + index)
+        ml.add_execution(input_producer, description=f"input producer {index}")
+        if input_dataset not in ml._dataset_producers:
+            ml.add_dataset(input_dataset, description=f"input {index}", producer=input_producer)
+            ml.set_versioned_producer(input_dataset, "1.0.0", input_producer)
+        ml.add_execution(
+            seed,
+            description=f"seed {index}",
+            input_datasets=[_StubDataset(input_dataset, f"input {index}", "1.0.0", consumed_version="1.0.0")],
+        )
+        members.add(seed)
+        seeds.append(seed)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(seeds)
+
+
+def test_frontier_input_rows_are_read_in_one_batched_call_not_one_per_node():
+    """A 5-wide frontier issues ONE input-rows read, not five.
+
+    This is the #394 claim in its most direct form: the walk's guiding
+    principle is that fewer queries is the win, and the per-node read side
+    asked every question once per execution. The batch seam records one
+    call per CHUNK, so a frontier well under the chunk size records exactly
+    one — and the per-node seam it replaced must not be called at all for
+    those executions.
+
+    Mutation-verified: reverting ``read_frontier`` to a per-node loop makes
+    the first assertion fail with five calls.
+    """
+    ml, root, seeds = _wide_consumer_frontier(width=5)
+
+    ml.lookup_provenance(root)
+
+    seed_batches = [c for c in _batch_calls(ml, "_input_dataset_pairs_batch") if set(seeds) <= set(c[1][0])]
+    assert len(seed_batches) == 1, (
+        f"the 5-wide seed frontier issued {len(seed_batches)} input-rows batches, expected exactly one: "
+        f"{[c[1] for c in seed_batches]}"
+    )
+    # One call carries all five seeds together (the root's own producer
+    # rides along in the same frontier, which is the point — one query).
+    assert set(seeds) <= set(seed_batches[0][1][0])
+    # The per-node seam is not used for a batched frontier at all.
+    per_node = [c for c in ml.calls if c[0] == "_input_dataset_pairs" and c[1][0] in set(seeds)]
+    assert per_node == [], f"batched frontier still issued per-node input reads: {per_node}"
+
+
+def test_frontier_execution_rows_and_asset_rows_are_batched_too():
+    """Execution rows and input-asset rows batch on the same frontier.
+
+    Batching only the dataset edges would leave the walk paying per-node
+    for the Execution row (four-ish round trips each) and for the asset
+    association scan — the two other legs #394 collapses.
+    """
+    ml, root, seeds = _wide_consumer_frontier(width=5)
+
+    ml.lookup_provenance(root)
+
+    for seam in ("_execution_records_batch", "_input_assets_batch"):
+        batches = [c for c in _batch_calls(ml, seam) if set(seeds) <= set(c[1][0])]
+        assert len(batches) == 1, f"{seam} issued {len(batches)} batches for the 5-wide frontier, expected one"
+
+    # And the per-node execution read is bypassed for those RIDs.
+    assert [c for c in ml.calls if c[0] == "lookup_execution" and c[1][0] in set(seeds)] == []
+
+
+def test_frontier_wider_than_the_chunk_size_splits_into_chunks():
+    """A frontier past ``_SUMMARY_CHUNK_SIZE`` chunks rather than issuing
+    one unbounded ``RID=any(...)``.
+
+    tk-023: an unbounded RID disjunction is a URL-length hazard, so the
+    batch is chunked at 25 exactly as ``_execution_summaries`` is. A
+    26-wide frontier must therefore show TWO chunks — not one giant query,
+    and not 26 per-node reads.
+    """
+    from deriva_ml.core.mixins.execution import _SUMMARY_CHUNK_SIZE
+
+    width = _SUMMARY_CHUNK_SIZE + 1
+    ml, root, seeds = _wide_consumer_frontier(width=width)
+
+    ml.lookup_provenance(root)
+
+    seed_chunks = [c for c in _batch_calls(ml, "_input_dataset_pairs_batch") if set(c[1][0]) & set(seeds)]
+    assert len(seed_chunks) == 2, (
+        f"a {width}-wide frontier produced {len(seed_chunks)} chunks, expected 2 "
+        f"(sizes {[len(c[1][0]) for c in seed_chunks]})"
+    )
+    assert [len(c[1][0]) for c in seed_chunks][0] == _SUMMARY_CHUNK_SIZE
+    assert all(len(c[1][0]) <= _SUMMARY_CHUNK_SIZE for c in _batch_calls(ml, "_input_dataset_pairs_batch")), (
+        "a batch exceeded the chunk size, which is the URL-length hazard tk-023 forbids"
+    )
+
+
+def test_batched_readouts_equal_per_node_readouts_field_for_field():
+    """A batch-assembled readout IS the per-node readout.
+
+    The apply path (and therefore every semantic pin over it) reads only
+    the ``ExecutionReadout``, so "the batch changed nothing" is exactly the
+    claim that the two readouts are equal field for field — record identity
+    aside, which is a fresh object either way.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, seeds = _wide_consumer_frontier(width=4)
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), closure_mode=True)
+
+    batched = engine.read_frontier(list(seeds))
+    per_node = {rid: engine.read_execution(rid) for rid in seeds}
+
+    assert sorted(batched) == sorted(per_node)
+    for rid in seeds:
+        left, right = batched[rid], per_node[rid]
+        assert left.rid == right.rid
+        assert left.lookup_error is None and right.lookup_error is None
+        assert [(d.dataset_rid, v, p, sorted(m), e) for d, v, p, m, e in left.dataset_inputs] == [
+            (d.dataset_rid, v, p, sorted(m), e) for d, v, p, m, e in right.dataset_inputs
+        ]
+        assert [(a.asset_rid, a.asset_table, a.filename, pr, f) for a, pr, f in left.asset_inputs] == [
+            (a.asset_rid, a.asset_table, a.filename, pr, f) for a, pr, f in right.asset_inputs
+        ]
+        # The record the apply path actually reads.
+        assert (left.record.description, left.record.status) == (right.record.description, right.record.status)
+
+
+def test_batched_closure_is_byte_identical_to_the_per_node_closure():
+    """Whole-closure equivalence between the batched and per-node read paths.
+
+    The per-node path is reached by hiding the batch seams from the engine
+    (the same all-or-nothing detection a stubbed ``ml`` or an older
+    subclass hits), so this compares two genuinely different read
+    implementations over the same scripted catalog.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_batched, root_batched, _ = _wide_consumer_frontier(width=6)
+    ml_per_node, root_per_node, _ = _wide_consumer_frontier(width=6)
+    for seam in ("_execution_records_batch", "_input_dataset_pairs_batch", "_input_assets_batch"):
+        setattr(ml_per_node, seam, None)
+
+    closure_batched = ml_batched.lookup_provenance(root_batched)
+    closure_per_node = ml_per_node.lookup_provenance(root_per_node)
+
+    assert _canonical(closure_batched.model_dump(mode="json")) == _canonical(closure_per_node.model_dump(mode="json"))
+    # Non-vacuous on both sides: one path batched, the other did not.
+    assert _batch_calls(ml_batched, "_input_dataset_pairs_batch")
+    assert _batch_calls(ml_per_node, "_input_dataset_pairs_batch") == []
+    assert [c for c in ml_per_node.calls if c[0] == "_input_dataset_pairs"] != []
+
+
+def test_batched_closure_equals_the_workers_one_closure(monkeypatch):
+    """``DERIVA_ML_PROVENANCE_WORKERS=1`` still produces the same closure.
+
+    The batched path's only concurrency is the member-scan round, so the
+    sequential-equivalence control has to keep working across it.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_default, root_default, _ = _wide_consumer_frontier(width=6)
+    ml_default.enable_parallel_expansion(True)
+    default = _canonical(ml_default.lookup_provenance(root_default).model_dump(mode="json"))
+
+    monkeypatch.setenv("DERIVA_ML_PROVENANCE_WORKERS", "1")
+    ml_single, root_single, _ = _wide_consumer_frontier(width=6)
+    ml_single.enable_parallel_expansion(True)
+    single = _canonical(ml_single.lookup_provenance(root_single).model_dump(mode="json"))
+
+    assert single == default
+
+
+def test_member_scan_runs_once_per_dataset_version_across_the_frontier():
+    """A ``(dataset, version)`` consumed by the whole frontier is scanned ONCE.
+
+    Member-producer scans are the one frontier leg that cannot collapse
+    into a ``RID=any(...)`` query — they are per-``(dataset, version)``
+    membership JOINs — so what #394 buys there is dedup: six executions
+    consuming the same ``dataset@version`` used to pay for six identical
+    joins.
+
+    Two mechanisms have to hold for that, and this pins both:
+
+    - WITHIN one frontier, the distinct pairs are collapsed before the
+      scan round runs (mutation: dropping the distinctness makes this
+      report six scans);
+    - ACROSS frontiers, ``_member_scan_cache`` remembers the answer, so a
+      later round that re-consumes the pair pays nothing (mutation:
+      dropping the cache lookup makes this report two).
+    """
+    ml, root, seeds = _wide_consumer_frontier(width=6, shared_input=True)
+    # A LATER frontier that re-consumes the same pair: the shared input's
+    # own producer consumes it too, so it is walked in a second round.
+    ml._executions[_ex(300)]._input_datasets = [_StubDataset(_ds(2), "input 0", "1.0.0", consumed_version="1.0.0")]
+
+    ml.lookup_provenance(root)
+
+    scans = [c for c in ml.calls if c[0] == "_producers_of_dataset_members" and c[1] == (_ds(2), "1.0.0")]
+    assert len(scans) == 1, f"the shared (dataset, version) was scanned {len(scans)} times, expected once"
+    # Non-vacuous: every seed really did consume it, and the later
+    # re-consumer was itself expanded (so its frontier really ran).
+    assert len(seeds) == 6
+
+
+def test_width_one_frontier_still_batches_without_special_casing():
+    """A frontier of one takes the batched path too.
+
+    A one-element ``any()`` disjunction is still fewer requests than the
+    per-node reads it replaces (one Execution scan instead of resolve +
+    retrieve + workflow + types), and the post-#391b profile says the
+    reference root's walk is mostly width-1 chains — so special-casing
+    width 1 back to the per-node path would forfeit the change's main
+    target.
+    """
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    root_producer, upstream = _ex(1), _ex(2)
+    ml.add_execution(upstream, description="upstream")
+    ml.add_dataset(ds_input, description="input", producer=upstream)
+    ml.set_versioned_producer(ds_input, "1.0.0", upstream)
+    ml.add_execution(
+        root_producer,
+        description="root producer",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert sorted(closure.executions) == sorted([root_producer, upstream])
+    singleton = [c for c in _batch_calls(ml, "_execution_records_batch") if c[1][0] == (upstream,)]
+    assert singleton, (
+        "a width-1 frontier fell back to the per-node read; "
+        f"batches seen: {[c[1] for c in _batch_calls(ml, '_execution_records_batch')]}"
+    )
+    assert [c for c in ml.calls if c[0] == "lookup_execution" and c[1][0] == upstream] == []
+
+
+def test_unresolvable_frontier_rid_falls_back_to_the_per_node_read():
+    """A RID the batch cannot resolve keeps its historical error path.
+
+    The batch reports absence, never an error of its own — inventing one
+    would change the ``unresolved_rid`` gap text that a closure consumer
+    reads. So an absent RID falls back to ``read_execution``, which raises
+    (and captures) exactly the ``DerivaMLException`` it always did.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    ghost = _ex(99)
+    ml.add_dataset(ds_root, description="root", producer=ghost)
+    ml.add_version_row(ds_root, "1.0.0", ghost, rct="2025-01-01T00:00:00Z")
+
+    closure = ml.lookup_provenance(ds_root)
+
+    unresolved = _gaps_for(closure, GapKind.unresolved_rid, ghost)
+    assert unresolved, "an unresolvable frontier RID produced no unresolved_rid gap"
+    assert "could not be resolved" in unresolved[0].detail
+    # It really did try the batch first (and got nothing back), then fell
+    # back to the per-node read that raises the historical exception.
+    attempted = [c for c in _batch_calls(ml, "_execution_records_batch") if ghost in c[1][0]]
+    assert attempted, "the ghost RID never reached the batched reader"
+
+
+def test_member_scan_failure_is_replayed_to_every_consumer_of_the_pair():
+    """A cached member-scan failure classifies identically for each consumer.
+
+    The memo caches ``(producers, error)``, so a broken snapshot consumed
+    by several frontier executions replays the same exception to each and
+    every consumer's ``member_producers_from`` emits the gap it always
+    emitted — one deduped ``snapshot_chain_break``, not a hole for the
+    first consumer and silence for the rest.
+    """
+    ml, root, _ = _wide_consumer_frontier(width=4, shared_input=True)
+    ml.set_member_scan_failure(_ds(2), SnapshotUnavailable("scripted snapshot failure"))
+
+    closure = ml.lookup_provenance(root)
+
+    breaks = [g for g in _gaps_for(closure, GapKind.snapshot_chain_break, _ds(2)) if "member-producer scan" in g.detail]
+    assert len(breaks) == 1, f"expected one deduped member-scan chain-break gap, got {[g.detail for g in breaks]}"
+    assert "scripted snapshot failure" in breaks[0].detail
+
+
+# ---------------------------------------------------------------------------
+# Pooled dataset legs (#394, change 2).
+#
+# ``expand_dataset``'s reads — the strict snapshot resolution, the
+# snapshot-scoped Dataset_Version rows, and the author-summary fetch — ran
+# strictly sequentially between frontier rounds (~24s over 43 pairs on the
+# reference root, the largest un-parallelized leg after #391b). They now go
+# through the SAME leased handle pool as the expansion reads and the binding
+# scans, applied single-threaded in sorted pair order.
+# ---------------------------------------------------------------------------
+
+
+def _many_walked_pins_scenario(*, count: int) -> tuple[_FakeML, str, list[str]]:
+    """A root whose one frontier walks ``count`` distinct ``(dataset, version)``.
+
+    Each member-producer of the root consumes its own pinned, snapshot-
+    resolvable dataset with a recorded authoring execution — so one round
+    has ``count`` independent dataset legs to read, wider than the handle
+    pool, which is the contended regime a lease has to survive.
+
+    Returns ``(ml, root_dataset_rid, walked_dataset_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    members = set()
+    walked = []
+    for index in range(count):
+        dataset = _ds(600 + index)
+        consumer = _ex(600 + index)
+        author = _ex(700 + index)
+        rct = f"2025-01-{(index % 28) + 1:02d}T00:00:00Z"
+        ml.add_execution(author, description=f"author {index}")
+        ml.add_dataset(dataset, description=f"walked {index}", producer=author)
+        ml.add_version_row(dataset, "1.0.0", author, rct=rct)
+        ml.set_snapshot_available(dataset, "1.0.0", True)
+        ml.set_snapshot_version_rows(dataset, "1.0.0", [_snapshot_row(dataset, "1.0.0", author, rct)])
+        ml.set_versioned_producer(dataset, "1.0.0", author)
+        ml.add_execution(
+            consumer,
+            description=f"consumer {index}",
+            input_datasets=[_StubDataset(dataset, f"walked {index}", "1.0.0", consumed_version="1.0.0")],
+        )
+        members.add(consumer)
+        walked.append(dataset)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(walked)
+
+
+def test_dataset_legs_never_share_a_worker_handle():
+    """Pooled dataset legs are LEASED like every other concurrent read.
+
+    The legs' reads are ``lookup_dataset(...).strict_version_snapshot_catalog``,
+    ``_dataset_version_rows_at`` and ``_execution_summaries`` — all
+    session-bound, all now running concurrently — so sharing a handle
+    between two of them is the same unsynchronized ``requests.Session`` /
+    ``_snapshot_cache`` hazard the expansion lease and the scan lease each
+    had to fix on their own leg.
+
+    The harness had to be extended for this pin to be able to FAIL: the
+    probe now instruments those three seams, and the handle travels with the
+    Dataset object ``lookup_dataset`` returns, so the snapshot resolution
+    reached through it is attributed to the leased handle rather than
+    escaping unobserved. Mutation-verified: running the legs on a plain
+    thread pool over ``self.ml`` reports concurrent unleased use.
+    """
+    _require_parallel_enabled()
+
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+
+    ml, root, walked = _many_walked_pins_scenario(count=24)
+    ml.enable_parallel_expansion(True)
+    ml._handle_hold_seconds = 0.01
+
+    leg_rounds: list[int] = []
+    original = WalkEngine.prefetch_dataset_legs
+
+    def _recording(self, pairs):
+        count = original(self, pairs)
+        if count:
+            leg_rounds.append(count)
+        return count
+
+    WalkEngine.prefetch_dataset_legs = _recording  # type: ignore[method-assign]
+    try:
+        closure = ml.lookup_provenance(root)
+    finally:
+        WalkEngine.prefetch_dataset_legs = original  # type: ignore[method-assign]
+
+    assert list(ml.handle_violations) == [], (
+        f"a handle was entered concurrently {len(ml.handle_violations)} time(s) during the dataset legs: "
+        f"{list(ml.handle_violations)[:5]} — legs are bypassing the lease"
+    )
+    # Non-vacuous on both axes: a pooled round really ran, and it was wider
+    # than the pool, so leases genuinely had to be recycled.
+    assert max(leg_rounds, default=0) > ml._handle_serial >= 2, (
+        f"widest leg round {max(leg_rounds, default=0)} vs pool {ml._handle_serial}; leases were never contended"
+    )
+    # And the legs actually produced their arcs.
+    assert len(closure.datasets) >= len(walked)
+
+
+def test_pooled_dataset_legs_equal_the_sequential_legs(monkeypatch):
+    """A pooled-leg closure is byte-identical to a ``WORKERS=1`` one.
+
+    ``DERIVA_ML_PROVENANCE_WORKERS=1`` serializes ``_run_leased``, which is
+    the single primitive the legs go through — so it is a true
+    sequential-equivalence control for this leg, not just for expansion and
+    scans.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_pooled, root_pooled, _ = _many_walked_pins_scenario(count=12)
+    ml_pooled.enable_parallel_expansion(True)
+    pooled = _canonical(ml_pooled.lookup_provenance(root_pooled).model_dump(mode="json"))
+
+    monkeypatch.setenv("DERIVA_ML_PROVENANCE_WORKERS", "1")
+    ml_serial, root_serial, _ = _many_walked_pins_scenario(count=12)
+    ml_serial.enable_parallel_expansion(True)
+    serial = _canonical(ml_serial.lookup_provenance(root_serial).model_dump(mode="json"))
+
+    assert pooled == serial
+    # Non-vacuous: the authorship leg really ran and recorded arcs.
+    authorship = [
+        arc
+        for execution in ml_pooled.lookup_provenance(root_pooled).executions.values()
+        for arc in execution.arcs
+        if arc.kind == ArcKind.version_authorship
+    ]
+    assert authorship, "no version_authorship arc was recorded, so the leg equivalence pin is vacuous"
+
+
+def test_pooled_dataset_legs_equal_the_unprefetched_legs():
+    """A prefetched leg produces the same closure as an inline-read leg.
+
+    The prefetch is a pure read-ahead: ``expand_dataset`` consumes a cached
+    leg on a hit and reads inline on a miss. Disabling the prefetch
+    entirely therefore has to leave the closure untouched — which is the
+    property that let this land without editing a single existing
+    dataset-leg test.
+    """
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_prefetched, root_prefetched, _ = _many_walked_pins_scenario(count=8)
+    prefetched = _canonical(ml_prefetched.lookup_provenance(root_prefetched).model_dump(mode="json"))
+
+    ml_inline, root_inline, _ = _many_walked_pins_scenario(count=8)
+    original = WalkEngine.prefetch_dataset_legs
+    WalkEngine.prefetch_dataset_legs = lambda self, pairs: 0  # type: ignore[method-assign]
+    try:
+        inline = _canonical(ml_inline.lookup_provenance(root_inline).model_dump(mode="json"))
+    finally:
+        WalkEngine.prefetch_dataset_legs = original  # type: ignore[method-assign]
+
+    assert prefetched == inline
+
+
+def test_dataset_leg_prefetch_skips_pins_it_must_not_read():
+    """The prefetch never reads a pin the expansion would refuse to walk.
+
+    It mirrors ``expand_dataset``'s own pre-I/O guards: unpinned edges (a
+    quarantine, never a snapshot read), already-walked pairs, and a walk
+    with no snapshot-dependent arc enabled. Reading any of those would be a
+    request bought for nothing — and, for the unpinned case, would violate
+    the §6.1 quarantine the walk exists to enforce.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, walked = _many_walked_pins_scenario(count=3)
+    builder = ClosureBuilder()
+    engine: WalkEngine = WalkEngine(ml, builder, arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    # Unpinned pairs are filtered out entirely.
+    assert engine.prefetch_dataset_legs([(walked[0], None)]) == 0
+    # Already-walked pairs are not re-read.
+    engine.datasets_expanded.add((walked[0], "1.0.0"))
+    assert engine.prefetch_dataset_legs([(walked[0], "1.0.0")]) == 0
+    # A fresh pin IS read...
+    assert engine.prefetch_dataset_legs([(walked[1], "1.0.0")]) == 1
+    # ...but only once: the second offer finds it cached.
+    assert engine.prefetch_dataset_legs([(walked[1], "1.0.0")]) == 0
+
+    # A walk with no snapshot-dependent arc reads nothing at all.
+    structural: WalkEngine = WalkEngine(
+        ml, ClosureBuilder(), arcs=frozenset({ArcKind.root, ArcKind.consumption}), closure_mode=True
+    )
+    assert structural.prefetch_dataset_legs([(walked[2], "1.0.0")]) == 0
+
+
+def test_dataset_leg_read_never_mutates_engine_or_visitor():
+    """``read_dataset_leg`` is what workers run, so it must be read-only.
+
+    Pinned structurally rather than by review, for the same reason
+    ``read_execution``'s equivalent pin exists: one stray ``visitor.on_gap``
+    on the read side would be a data race the equivalence tests could pass
+    through by luck.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, walked = _many_walked_pins_scenario(count=2)
+    builder = ClosureBuilder()
+    engine: WalkEngine = WalkEngine(ml, builder, arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    before = (
+        set(engine.visited_global),
+        set(engine.datasets_expanded),
+        engine.cap_hit,
+        dict(engine.flags),
+    )
+
+    leg = engine.read_dataset_leg(walked[0], "1.0.0", ml)
+
+    assert leg.dataset_rid == walked[0] and leg.version == "1.0.0"
+    assert leg.snapshot is not None and leg.snapshot_error is None
+    assert leg.rows, "the leg read no version rows, so the pin is vacuous"
+    assert (
+        set(engine.visited_global),
+        set(engine.datasets_expanded),
+        engine.cap_hit,
+        dict(engine.flags),
+    ) == before
+    assert builder.finalize() == ({}, {}, {}, [])
+
+
+def test_unresolvable_snapshot_in_a_pooled_leg_still_emits_the_chain_break():
+    """A leg whose snapshot does not resolve reports the SAME gap it always did.
+
+    The failure is captured on the read side and classified on the main
+    thread by ``_snapshot_from_leg``, whose wording mirrors
+    the pre-#394 inline resolver's verbatim — so moving the read onto a worker
+    cannot change gap text, gap identity, or gap dedup.
+    """
+    ml, root, walked = _many_walked_pins_scenario(count=3)
+    ml.enable_parallel_expansion(True)
+    ml.set_snapshot_available(walked[0], "1.0.0", False)
+
+    closure = ml.lookup_provenance(root)
+
+    breaks = _gaps_for(closure, GapKind.snapshot_chain_break, walked[0])
+    assert len(breaks) == 1, f"expected one chain-break gap, got {[g.detail for g in breaks]}"
+    assert "has no resolvable catalog snapshot" in breaks[0].detail
+    # The other pins are unaffected — one broken leg never poisons a round.
+    for dataset in walked[1:]:
+        assert _gaps_for(closure, GapKind.snapshot_chain_break, dataset) == []
+
+
+# ---------------------------------------------------------------------------
+# Non-asset ``*_Execution`` tables (#394 live-A/B finding).
+# ---------------------------------------------------------------------------
+
+
+class _StubFKey:
+    """One association foreign key: its columns and the table it targets."""
+
+    def __init__(self, column_name: str, pk_table: Any) -> None:
+        from unittest.mock import MagicMock
+
+        column = MagicMock()
+        column.name = column_name
+        self.foreign_key_columns = [column]
+        self.pk_table = pk_table
+
+
+class _BatchAssetModel:
+    """Model stub for ``_input_assets_batch``.
+
+    Carries three tables and their association FKs:
+
+    - ``domain:Image`` — a real asset table;
+    - ``deriva-ml:File`` — has a ``File_Execution`` association but is NOT
+      asset-shaped (the eye-ai case the live A/B surfaced);
+    - ``other:Image`` — a SECOND, same-named asset table in another schema,
+      which is what makes bare-name resolution ambiguous.
+
+    ``name_to_table`` deliberately reproduces the real model's
+    "domain schemas in sorted order, first match wins" behavior, so a
+    name-only resolution picks ``domain:Image`` — the WRONG table when the
+    association actually targets ``other:Image``.
+    """
+
+    def __init__(self, *, ambiguous: bool = False) -> None:
+        from unittest.mock import MagicMock
+
+        self.ambiguous = ambiguous
+        self._tables: dict[tuple[str, str], Any] = {}
+        for schema, name in (("domain", "Image"), ("deriva-ml", "File"), ("other", "Image")):
+            table = MagicMock()
+            table.name = name
+            table.schema.name = schema
+            self._tables[(schema, name)] = table
+
+        # ``model.model.schemas[s].tables[t]`` — the association lookup path.
+        self.model = MagicMock()
+        self.model.schemas = {}
+        assoc_targets = {
+            ("deriva-ml", "File_Execution"): ("deriva-ml", "File"),
+            # The association under test targets the OTHER schema's Image
+            # when ambiguous, so name-first resolution lands on the wrong one.
+            ("domain", "Image_Execution"): ("other", "Image") if ambiguous else ("domain", "Image"),
+        }
+        for (schema, assoc_name), target in assoc_targets.items():
+            assoc = MagicMock()
+            assoc.name = assoc_name
+            assoc.foreign_keys = [
+                _StubFKey(assoc_name.replace("_Execution", ""), self._tables[target]),
+                _StubFKey("Execution", MagicMock()),
+            ]
+            schema_stub = self.model.schemas.setdefault(schema, MagicMock())
+            if not isinstance(getattr(schema_stub, "tables", None), dict):
+                schema_stub.tables = {}
+            schema_stub.tables[assoc_name] = assoc
+
+    def find_asset_execution_tables(self):
+        return [("deriva-ml", "File_Execution"), ("domain", "Image_Execution")]
+
+    def name_to_table(self, name):
+        """First match in sorted-schema order — the real model's behavior."""
+        for schema in sorted({s for s, _t in self._tables}):
+            if (schema, name) in self._tables:
+                return self._tables[(schema, name)]
+        raise KeyError(name)
+
+    def is_asset(self, table):
+        return table.name == "Image"
+
+
+class _AnyColumns(dict):
+    """``columns[name]`` for any name — the batch builds predicates from it."""
+
+    def __missing__(self, key):
+        from unittest.mock import MagicMock
+
+        return MagicMock()
+
+
+class _BatchAssetPath:
+    """Datapath stub recording which tables the batch actually queried."""
+
+    def __init__(self, rows, queried, key, raises: bool = False):
+        self._rows = rows
+        self._queried = queried
+        self._key = key
+        self._raises = raises
+        # ``_rid_any`` builds ``columns[name] == value`` predicates; any
+        # object that supports ``==`` and ``|`` will do, since this stub
+        # ignores predicates and returns its scripted rows.
+        self.columns = _AnyColumns()
+
+    def filter(self, _pred):
+        return self
+
+    def entities(self):
+        return self
+
+    def fetch(self):
+        self._queried.append(self._key)
+        if self._raises:
+            raise DerivaMLException(f"scripted catalog failure on {self._key}")
+        return list(self._rows)
+
+    def __getattr__(self, name):
+        from unittest.mock import MagicMock
+
+        return MagicMock()
+
+
+def _batch_asset_host(*, ambiguous: bool = False, failing_groups: "set[str] | None" = None) -> Any:
+    """Build an ``ExecutionMixin`` host over the batch-asset stubs.
+
+    Rows are keyed by ``(schema, table)`` — NOT by bare table name — so a
+    resolution that lands in the wrong schema fetches nothing, which is
+    exactly the production failure mode being pinned. The asset row for
+    ``Image`` lives only in whichever schema the association targets.
+
+    Args:
+        ambiguous: Point ``Image_Execution`` at ``other:Image`` while a
+            same-named ``domain:Image`` also exists.
+        failing_groups: Association table names whose asset-row fetch raises.
+    """
+    from deriva_ml.core.mixins.execution import ExecutionMixin
+
+    image_schema = "other" if ambiguous else "domain"
+    rows_by_key = {
+        ("deriva-ml", "File_Execution"): [{"Execution": "2-0001", "File": "6-FILE"}],
+        ("domain", "Image_Execution"): [{"Execution": "2-0001", "Image": "4-IMG1"}],
+        (image_schema, "Image"): [{"RID": "4-IMG1", "Filename": "x.png", "URL": "u", "Length": 1, "MD5": "m"}],
+        ("deriva-ml", "File"): [{"RID": "6-FILE", "Filename": "src.py"}],
+    }
+
+    class _Host(ExecutionMixin):
+        def __init__(self):
+            self.model = _BatchAssetModel(ambiguous=ambiguous)
+            self.ml_schema = "deriva-ml"
+            self.queried: list[str] = []
+
+        def pathBuilder(self):
+            host = self
+
+            class _Schemas(dict):
+                def __missing__(self, schema):
+                    return _Schema(schema)
+
+            class _Schema:
+                def __init__(self, schema):
+                    self.schema = schema
+                    self.tables = _Tables(schema)
+
+            class _Tables(dict):
+                def __init__(self, schema):
+                    super().__init__()
+                    self.schema = schema
+
+                def __missing__(self, table):
+                    return _BatchAssetPath(
+                        rows_by_key.get((self.schema, table), []),
+                        host.queried,
+                        table,
+                        raises=table in (failing_groups or set()),
+                    )
+
+            pb = type("PB", (), {})()
+            pb.schemas = _Schemas()
+            return pb
+
+    return _Host()
+
+
+class _BatchAssetHost:
+    """Default (non-ambiguous, non-failing) batch-asset host."""
+
+    def __new__(cls):
+        return _batch_asset_host()
+
+
+def test_batched_input_assets_skip_non_asset_execution_tables():
+    """A ``*_Execution`` table whose base table is not asset-shaped is skipped.
+
+    ``File`` on eye-ai carries a ``File_Execution`` association (source
+    files registered BY REFERENCE) but is not an asset table, so
+    ``lookup_asset`` refuses it and the per-node path drops the row with a
+    debug log. The batched reader never calls ``lookup_asset``, so without
+    an explicit ``is_asset`` guard it would start reporting File rows as
+    closure assets — which the live A/B caught as a one-asset, one-gap
+    divergence from ``main`` on ``lookup_provenance("7-ZW3P")``.
+
+    Pinned here rather than through ``_FakeML`` because the scripted
+    harness has no way to express "associated to an execution but not
+    asset-shaped": its ``add_asset`` registers the table as an asset by
+    construction, so the divergence is invisible to it.
+    """
+    host = _BatchAssetHost()
+
+    assets = host._input_assets_batch(["2-0001"])
+
+    assert [a.asset_rid for a in assets["2-0001"]] == ["4-IMG1"], (
+        "a non-asset ``*_Execution`` table leaked into the batched input assets; "
+        "the per-node path drops it, so the batch must too"
+    )
+    # Non-vacuous: the File association WAS queried and then discarded on
+    # the is_asset guard, rather than never being reached at all.
+    assert "File_Execution" in host.queried
+    assert "File" not in host.queried, "the non-asset table's rows were fetched before the guard ran"
+
+
+def test_handle_pool_is_sized_to_demand_not_built_eagerly():
+    """The pool never exceeds what a round actually asks for.
+
+    A handle is a whole extra catalog connection (a ``DerivaML``
+    construction with its own session), so building the full worker count
+    for a round of three is a real cost paid for nothing. The live A/B
+    measured it: after #394's batching shrank the reference root's
+    structural-pass rounds, an eagerly-built pool of 8 turned a 5.4s walk
+    into 13.5s while issuing the same 95 requests — all of the regression
+    was connection setup.
+
+    Growth is monotone across rounds and handles are reused, never rebuilt.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    _require_parallel_enabled()
+
+    ml, _root, _ = _many_walked_pins_scenario(count=24)
+    ml.enable_parallel_expansion(True)
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    # A round of three builds three handles, not eight.
+    engine._run_leased([1, 2, 3], lambda item, handle: item)
+    assert ml._handle_serial == 3, f"a 3-item round built {ml._handle_serial} handles, expected 3"
+
+    # A wider round grows the pool to the worker cap, reusing what exists.
+    engine._run_leased(list(range(24)), lambda item, handle: item)
+    assert ml._handle_serial == 8, f"pool grew to {ml._handle_serial}, expected the worker cap of 8"
+
+    # A later narrow round rebuilds nothing.
+    engine._run_leased([1, 2], lambda item, handle: item)
+    assert ml._handle_serial == 8, "a narrow round rebuilt handles instead of reusing the pool"
+
+
+def test_absent_handle_factory_is_not_retried_every_round():
+    """A factory that cannot produce a handle is asked once, then latched.
+
+    Without the latch, every round of a walk on an offline (or stubbed)
+    instance would re-attempt the construction — cheap in the harness,
+    a repeated failed connection attempt in the field.
+
+    Skipped under ``DERIVA_ML_PROVENANCE_WORKERS=1``, like every sibling
+    concurrency pin: that path returns from ``_worker_handles`` at the
+    ``workers < 2`` guard *before* the factory is ever consulted, so there
+    is no construction attempt to latch and nothing for this test to
+    observe. Asking for a pool at all is what the knob turns off.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    _require_parallel_enabled()
+
+    ml, _root, _ = _many_walked_pins_scenario(count=4)
+    # Parallel expansion disabled: ``_provenance_worker_handle`` returns None.
+    attempts = {"n": 0}
+    original = ml._provenance_worker_handle
+
+    def counting():
+        attempts["n"] += 1
+        return original()
+
+    ml._provenance_worker_handle = counting  # type: ignore[method-assign]
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    for _ in range(5):
+        engine._run_leased([1, 2, 3], lambda item, handle: item)
+
+    assert attempts["n"] == 1, f"a refusing handle factory was retried {attempts['n']} times, expected once"
+
+
+def test_narrow_member_scan_rounds_run_sequentially_not_pooled():
+    """A small member-scan round is NOT pooled — concurrency loses there.
+
+    A member-producer scan is a server-side membership JOIN the server does
+    not parallelize. Measured on eye-ai: the ``Image_Execution`` join costs
+    ~2.1s run alone and ~5.7s when three run at once, so pooling a round of
+    three turned the structural pass from a 5.5s median walk into 12.1s at
+    an unchanged request count (93 vs 95).
+
+    So the leg pools only at ``_MEMBER_SCAN_POOL_THRESHOLD`` or above.
+    Pinned by handle construction, which is the observable consequence:
+    a narrow round leases nothing and reads on the caller's own handle.
+
+    This is deliberately a DIFFERENT judgment from the binding scans, which
+    measured a 4.5x win from the same pool (#391 C3) — see
+    ``_member_scans_should_pool``.
+    """
+    from deriva_ml.core.mixins._provenance_engine import (
+        _MEMBER_SCAN_POOL_THRESHOLD,
+        ClosureBuilder,
+        WalkEngine,
+    )
+
+    _require_parallel_enabled()
+
+    narrow = _MEMBER_SCAN_POOL_THRESHOLD - 1
+    ml, _root, walked = _many_walked_pins_scenario(count=_MEMBER_SCAN_POOL_THRESHOLD + 4)
+    ml.enable_parallel_expansion(True)
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    engine._run_member_scans([(walked[i], "1.0.0") for i in range(narrow)])
+    assert ml._handle_serial == 0, (
+        f"a {narrow}-pair member-scan round leased {ml._handle_serial} handles; "
+        "narrow rounds must run sequentially on the caller's handle"
+    )
+    # It really did scan them — sequentially, not by skipping the work.
+    scans = [c for c in ml.calls if c[0] == "_producers_of_dataset_members"]
+    assert len(scans) == narrow
+
+    # At the threshold the round DOES pool. Fresh engine so every pair is
+    # uncached — ``pending`` is what the threshold is measured against, and
+    # re-offering already-scanned pairs would leave it below the line.
+    wide: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+    wide._run_member_scans([(dataset, "1.0.0") for dataset in walked[:_MEMBER_SCAN_POOL_THRESHOLD]])
+    assert ml._handle_serial > 0, "a round at the threshold did not pool"
+
+
+# ---------------------------------------------------------------------------
+# Codex review round (#394): budget-bound leg prefetch, and batched-path
+# parity on failure and cross-schema shapes.
+# ---------------------------------------------------------------------------
+
+
+def test_dataset_leg_prefetch_is_bounded_by_the_remaining_dataset_budget():
+    """The leg prefetch never reads more legs than the budget can accept.
+
+    ``expand_dataset`` refuses a new pin once ``dataset_budget`` is spent, so
+    a frontier offering more new pinned datasets than there are remaining
+    slots must not have EVERY leg read: those reads are a strict-snapshot
+    resolution plus a version-history fetch plus an author-summary batch
+    apiece, and a tightly capped walk would issue hundreds of them only to
+    throw the answers away.
+
+    The bound mirrors the execution side's ``frontier_rids`` rule — never
+    fetch past what the walk can actually spend.
+
+    Mutation-verified: restoring the unbounded comprehension reads all 12
+    legs under a budget of 3.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, walked = _many_walked_pins_scenario(count=12)
+    budget = 3
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True, dataset_budget=budget)
+
+    read = engine.prefetch_dataset_legs([(dataset, "1.0.0") for dataset in walked])
+
+    assert read <= budget, f"prefetched {read} legs with only {budget} dataset slots remaining"
+    # And it really was bounded rather than empty — the walk still gets the
+    # legs it can spend.
+    assert read == budget
+    leg_reads = [c for c in ml.calls if c[0] == "_dataset_version_rows_at"]
+    assert len(leg_reads) == budget, f"issued {len(leg_reads)} leg reads for {budget} slots"
+
+    # Slots already spent are charged: with the budget exhausted, nothing is
+    # prefetched at all.
+    engine.datasets_expanded |= {(dataset, "1.0.0") for dataset in walked[:budget]}
+    assert engine.prefetch_dataset_legs([(dataset, "2.0.0") for dataset in walked]) == 0
+
+
+def test_capped_dataset_walk_is_identical_with_and_without_the_leg_prefetch():
+    """Bounding the prefetch changes what is READ, never what is WALKED.
+
+    The budget interacts with truncation bookkeeping (``cap_hit``,
+    ``datasets_visited``), so the bound has to be provably invisible in the
+    result: a capped closure must be byte-identical to the same capped
+    closure with the prefetch disabled entirely.
+    """
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_prefetched, root_prefetched, _ = _many_walked_pins_scenario(count=12)
+    prefetched = ml_prefetched.lookup_provenance(root_prefetched, max_executions=3)
+
+    ml_inline, root_inline, _ = _many_walked_pins_scenario(count=12)
+    original = WalkEngine.prefetch_dataset_legs
+    WalkEngine.prefetch_dataset_legs = lambda self, pairs: 0  # type: ignore[method-assign]
+    try:
+        inline = ml_inline.lookup_provenance(root_inline, max_executions=3)
+    finally:
+        WalkEngine.prefetch_dataset_legs = original  # type: ignore[method-assign]
+
+    assert _canonical(prefetched.model_dump(mode="json")) == _canonical(inline.model_dump(mode="json"))
+    # Non-vacuous: the cap really did bite.
+    assert prefetched.cap_hit is True
+
+
+def test_batched_asset_table_resolves_by_fk_not_by_ambiguous_name():
+    """Two same-named asset tables: the association's FK decides, not the name.
+
+    ``name_to_table`` searches domain schemas in sorted order and returns
+    the FIRST match, so with an ``Image`` in two schemas a name-only
+    resolution picks ``domain:Image`` even when ``Image_Execution`` actually
+    targets ``other:Image``. The subsequent row fetch then matches none of
+    the association's RIDs and **every asset in the group vanishes from the
+    closure with no error at all** — a silent wrong answer, the worst kind.
+
+    Identity is ``(schema, table)``, never a bare name (#385).
+
+    Mutation-verified: resolving by name drops the asset entirely.
+    """
+    host = _batch_asset_host(ambiguous=True)
+
+    assets = host._input_assets_batch(["2-0001"])
+
+    assert [a.asset_rid for a in assets["2-0001"]] == ["4-IMG1"], (
+        "the ambiguous asset-table name resolved to the wrong schema, so the "
+        "association's assets silently vanished from the batch"
+    )
+    assert assets["2-0001"][0].filename == "x.png"
+    # It read the table the FK names, not the one the name-sort picks first.
+    assert "Image" in host.queried
+
+
+def test_batched_asset_producers_survive_a_failing_sibling_group():
+    """One asset table's failure does not poison the whole frontier's assets.
+
+    The per-node path degraded per read: one asset's producer lookup raising
+    left every other asset's producers intact. The batched path grouped all
+    asset tables into one call, so a single group's failure marked EVERY
+    asset in the frontier ``resolution_failed`` — turning one table's
+    outage into a frontier-wide loss of producer facts.
+
+    Mutation-verified: reverting to a whole-batch except-clause wipes the
+    healthy group's producers too.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml = _FakeML()
+    ds_root = _ds(1)
+    consumer, healthy_producer = _ex(1), _ex(2)
+    healthy_asset, failing_asset = _as(1), _as(2)
+
+    ml.add_execution(healthy_producer, description="produced the healthy asset")
+    ml.add_asset(healthy_asset, "Image", filename="ok.png", producer=healthy_producer)
+    ml.add_asset(failing_asset, "Broken", filename="bad.bin", producer=None)
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_assets=[
+            _StubAsset(healthy_asset, "ok.png", "Image"),
+            _StubAsset(failing_asset, "bad.bin", "Broken"),
+        ],
+    )
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    # Only the Broken group's producer batch fails.
+    original = ml._producers_of_assets_batch
+
+    def failing_group(items):
+        if any(table.name == "Broken" for _rid, table in items):
+            raise DerivaMLException("scripted producer failure for the Broken table")
+        return original(items)
+
+    ml._producers_of_assets_batch = failing_group  # type: ignore[method-assign]
+
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+    readout = engine.read_frontier([consumer])[consumer]
+
+    by_rid = {asset.asset_rid: (producers, failed) for asset, producers, failed in readout.asset_inputs}
+    assert by_rid[healthy_asset] == ((healthy_producer,), False), (
+        f"a sibling group's failure wiped the healthy asset's producers: {by_rid[healthy_asset]}"
+    )
+    assert by_rid[failing_asset][1] is True, "the failing group was not marked as failed"
+
+
+def test_hidden_workflow_row_reports_unresolved_not_no_workflow():
+    """An Execution whose Workflow row is unreadable stays UNRESOLVED.
+
+    ``lookup_execution`` calls ``lookup_workflow``, which raises when the
+    Workflow row is missing or hidden by ACL — so the per-node path reports
+    the execution as ``unresolved_rid``. The batched path fetched workflow
+    rows separately, so a Workflow RID absent from the batch results simply
+    produced ``workflow=None`` and a ``no_workflow`` gap: it masked a
+    *reference the walk could not read* as a *reference that was never
+    recorded*, which are different provenance facts.
+
+    Mutation-verified: substituting None yields a ``no_workflow`` gap and no
+    ``unresolved_rid``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    hidden_workflow_user = _ex(1)
+
+    ml.add_dataset(ds_root, description="root", producer=hidden_workflow_user)
+    ml.add_execution(
+        hidden_workflow_user,
+        description="carries a Workflow RID whose row cannot be read",
+        workflow=_StubWorkflow(workflow_rid=_wf(9), name="hidden"),
+    )
+    # The Execution row references the workflow, but the batched workflow
+    # fetch cannot see it (ACL-hidden / deleted row).
+    ml.set_hidden_workflow(_wf(9))
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert _gaps_for(closure, GapKind.unresolved_rid, hidden_workflow_user), (
+        "an unreadable Workflow row was masked as a resolved execution; "
+        f"gaps were {[(g.kind, g.subject_rid) for g in closure.gaps]}"
+    )
+    assert not _gaps_for(closure, GapKind.no_workflow, hidden_workflow_user), (
+        "an unreadable Workflow reference was reported as 'no workflow recorded', which is a different provenance fact"
+    )
+    assert hidden_workflow_user not in closure.executions
+
+
+def test_batch_read_failure_falls_back_to_per_node_reads():
+    """A failed BATCH request degrades to per-node reads, never aborts.
+
+    The per-node path degraded per read: one execution's failing lookup left
+    the rest of the walk intact. Batching made a single failed request the
+    failure of a whole frontier — and, because the frontier is a read-AHEAD,
+    of executions the walk had not even reached yet. A transient 503 on one
+    chunked query would take down a closure that the sequential walk would
+    have completed.
+
+    Leaving the readouts unassembled sends them down the historical per-node
+    path during expansion, so the closure completes and equals the
+    all-per-node closure.
+
+    Mutation-verified: removing the guard propagates the exception out of
+    ``lookup_provenance``.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_failing, root_failing, _ = _wide_consumer_frontier(width=3)
+    ml_failing.set_batch_failure("_execution_records_batch", DerivaMLException("scripted batch outage"))
+
+    closure = ml_failing.lookup_provenance(root_failing)
+
+    # The per-node fallback really ran (the batch was attempted and failed).
+    assert _batch_calls(ml_failing, "_execution_records_batch"), "the batch was never attempted"
+    assert [c for c in ml_failing.calls if c[0] == "_input_dataset_pairs"], (
+        "the batch failed but no per-node fallback read was issued"
+    )
+
+    # And the result equals the all-per-node closure.
+    ml_per_node, root_per_node, _ = _wide_consumer_frontier(width=3)
+    for seam in ("_execution_records_batch", "_input_dataset_pairs_batch", "_input_assets_batch"):
+        setattr(ml_per_node, seam, None)
+    per_node = ml_per_node.lookup_provenance(root_per_node)
+
+    assert _canonical(closure.model_dump(mode="json")) == _canonical(per_node.model_dump(mode="json"))
+    assert closure.executions, "the closure came back empty, so the fallback pin is vacuous"
+
+
+def test_batched_execution_records_omit_unreadable_workflow_rows():
+    """The batch OMITS a record whose Workflow row it could not read.
+
+    Seam-level companion to
+    ``test_hidden_workflow_row_reports_unresolved_not_no_workflow``. That
+    test pins the closure-level verdict but cannot mutation-verify the
+    production guard, because ``_FakeML`` overrides
+    ``_execution_records_batch`` wholesale and mirrors the guard in the
+    harness — a probe can only see what routes through it. This exercises
+    the real implementation.
+
+    A record substituted with ``workflow=None`` would report ``no_workflow``
+    ("code identity is unrecorded") where the per-node ``lookup_execution``
+    raises and yields ``unresolved_rid`` ("a recorded reference could not be
+    read"). Omitting it routes the RID to the per-node path, which produces
+    the historical verdict.
+
+    Mutation-verified: dropping the guard returns the record with a null
+    workflow.
+    """
+    from deriva_ml.core.mixins.execution import ExecutionMixin
+
+    readable, hidden = _ex(1), _ex(2)
+    rows = {
+        "Execution": [
+            {"RID": readable, "Workflow": _wf(1), "Status": "Uploaded", "Description": "ok"},
+            # References a Workflow row the Workflow fetch cannot see.
+            {"RID": hidden, "Workflow": _wf(9), "Status": "Uploaded", "Description": "hidden wf"},
+        ],
+        "Workflow": [{"RID": _wf(1), "Name": "trainer", "URL": "u", "Version": "1", "Checksum": "c"}],
+        "Workflow_Workflow_Type": [],
+    }
+
+    class _Host(ExecutionMixin):
+        def __init__(self):
+            from unittest.mock import MagicMock
+
+            self.model = MagicMock()
+            self.ml_schema = "deriva-ml"
+            self.queried: list[str] = []
+
+        def pathBuilder(self):
+            host = self
+
+            class _Tables(dict):
+                def __missing__(self, table):
+                    return _BatchAssetPath(rows.get(table, []), host.queried, table)
+
+            class _Schema:
+                tables = _Tables()
+
+            pb = type("PB", (), {})()
+            pb.schemas = {"deriva-ml": _Schema()}
+            return pb
+
+    records = _Host()._execution_records_batch([readable, hidden])
+
+    assert readable in records, "a readable execution was dropped"
+    assert records[readable].workflow is not None
+    assert hidden not in records, (
+        "an execution whose Workflow row could not be read was returned with a "
+        "substituted workflow; it must be omitted so the per-node path reports "
+        "it unresolved rather than reporting 'no workflow recorded'"
+    )

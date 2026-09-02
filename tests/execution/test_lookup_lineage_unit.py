@@ -26,7 +26,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from deriva_ml.core.exceptions import DerivaMLException, SnapshotUnavailable
-from deriva_ml.core.mixins.execution import BindingDiagnostic, ExecutionMixin
+from deriva_ml.core.mixins.execution import _SUMMARY_CHUNK_SIZE, BindingDiagnostic, ExecutionMixin
 from deriva_ml.execution.lineage import LineageNode, LineageResult
 from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.feature import FeatureProducerRecord
@@ -102,6 +102,15 @@ class _HandleProbe:
             # reads (#391 round-2 review), so this seam must be instrumented
             # too — otherwise a scan bypassing the lease is invisible.
             "_find_feature_producers_impl",
+            # Dataset legs (#394) are the third leg leased through that
+            # pool: the strict snapshot resolution (reached through
+            # ``lookup_dataset``), the snapshot-scoped version-row read, and
+            # the author-summary fetch. Un-instrumented, a leg bypassing the
+            # lease would be invisible for exactly the reason the round-2
+            # review recorded — a probe can only see what routes through it.
+            "lookup_dataset",
+            "_dataset_version_rows_at",
+            "_execution_summaries",
         }
     )
 
@@ -129,12 +138,85 @@ class _HandleProbe:
                 # it is not what the test is measuring (the occupancy
                 # counter above is).
                 with self._shared_lock:
-                    return target(*args, **kwargs)
+                    result = target(*args, **kwargs)
             finally:
                 with self._occupancy_lock:
                     self._occupants -= 1
+            if name == "lookup_dataset":
+                # ``strict_version_snapshot_catalog`` is reached THROUGH the
+                # handle returned here, so the handle it belongs to has to
+                # travel with it — otherwise the snapshot resolution (a real
+                # catalog read on the leg's critical path) would run outside
+                # any probe and a lease bypass there would be unobservable.
+                result = _ProbedDatasetHandle(result, self)
+            return result
 
         return proxied
+
+    def _bracket(self, seam: str) -> Any:
+        """Occupancy bracket for a read reached through this handle.
+
+        Returns:
+            A context manager recording concurrent entry, holding the handle
+            for the configured interval, and serializing scripted state.
+        """
+        return _ProbeOccupancy(self, seam)
+
+
+class _ProbeOccupancy:
+    """Context manager entering one ``_HandleProbe``'s occupancy.
+
+    Extracted so a read reached INDIRECTLY through a handle (the strict
+    snapshot resolution, reached via ``lookup_dataset(...)``) is counted the
+    same way a direct seam call is. Without it a leg could bypass the lease
+    on that read and no probe would see it — the round-2 harness lesson
+    ("a probe can only see what routes through it") applied to the #394
+    dataset leg.
+    """
+
+    def __init__(self, probe: "_HandleProbe", seam: str) -> None:
+        self._probe = probe
+        self._seam = seam
+
+    def __enter__(self) -> "_ProbeOccupancy":
+        probe = self._probe
+        with probe._occupancy_lock:
+            probe._occupants += 1
+            collided = probe._occupants > 1
+        if collided:
+            probe._owner.handle_violations.append(("concurrent_entry", probe._index))
+        if probe._owner._handle_hold_seconds:
+            time.sleep(probe._owner._handle_hold_seconds)
+        probe._shared_lock.acquire()
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        probe = self._probe
+        probe._shared_lock.release()
+        with probe._occupancy_lock:
+            probe._occupants -= 1
+
+
+class _ProbedDatasetHandle:
+    """A ``_StubDatasetHandle`` whose reads run inside its probe's occupancy.
+
+    ``lookup_dataset`` through a leased handle returns this, so the strict
+    snapshot resolution it fronts is attributed to the handle that was
+    leased — making a lease bypass on the dataset leg observable.
+    """
+
+    def __init__(self, inner: "_StubDatasetHandle", probe: "_HandleProbe") -> None:
+        self._inner = inner
+        self._probe = probe
+        self.dataset_rid = inner.dataset_rid
+
+    def strict_version_snapshot_catalog(self, version: Any) -> Any:
+        with self._probe._bracket("strict_version_snapshot_catalog"):
+            return self._inner.strict_version_snapshot_catalog(version)
+
+    def list_dataset_parents(self) -> list[str]:
+        with self._probe._bracket("list_dataset_parents"):
+            return self._inner.list_dataset_parents()
 
 
 @dataclass
@@ -251,6 +333,10 @@ class _StubDatasetHandle:
 
     def strict_version_snapshot_catalog(self, version: Any) -> Any:
         self._owner.calls.append(("Dataset.strict_version_snapshot_catalog", (self.dataset_rid, str(version))))
+        # Reached directly on the shared instance rather than through a
+        # leased handle — normal on the main thread, a lease bypass when two
+        # threads are inside at once (#394 dataset legs).
+        self._owner._note_direct_seam_use("strict_version_snapshot_catalog")
         key = (self.dataset_rid, str(version))
         if not self._owner._snapshot_available.get(key, False):
             raise SnapshotUnavailable(f"Dataset {self.dataset_rid} version {version} has no recorded snapshot")
@@ -334,6 +420,12 @@ class _FakeML(ExecutionMixin):
         self._handle_hold_seconds = 0.0
         # dataset_rid -> exception raised by _producers_of_dataset_members.
         self._member_scan_failures: dict[str, BaseException] = {}
+        # Workflow RIDs referenced by an Execution row but unreadable (ACL
+        # hidden / deleted). See ``set_hidden_workflow``.
+        self._hidden_workflows: set[str] = set()
+        # Batch seam names scripted to raise, for batch-failure fallback
+        # tests. See ``set_batch_failure``.
+        self._batch_failures: dict[str, BaseException] = {}
         # Concurrent use of a seam called directly on THIS instance rather
         # than through a leased handle — see ``_note_direct_seam_use``.
         self._direct_lock = threading.Lock()
@@ -503,7 +595,24 @@ class _FakeML(ExecutionMixin):
     def lookup_execution(self, rid: str) -> _StubExecutionRecord:
         if rid not in self._executions:
             raise DerivaMLException(f"No such execution {rid}")
-        return self._executions[rid]
+        record = self._executions[rid]
+        workflow = record.workflow
+        if workflow is not None and workflow.workflow_rid in self._hidden_workflows:
+            # Production parity: ``lookup_execution`` resolves the Workflow
+            # through ``lookup_workflow``, which RAISES on a missing or
+            # ACL-hidden row — so the whole execution fails to resolve. The
+            # batched path must reach the same verdict, not substitute None.
+            raise DerivaMLException(f"Workflow with RID '{workflow.workflow_rid}' not found in the catalog")
+        return record
+
+    def set_hidden_workflow(self, workflow_rid: str) -> None:
+        """Script a Workflow row that is referenced but cannot be read.
+
+        Models an ACL-hidden or deleted Workflow row: the Execution row still
+        carries the FK, but neither ``lookup_workflow`` nor the batched
+        workflow fetch can see it.
+        """
+        self._hidden_workflows.add(workflow_rid)
 
     def lookup_dataset(self, rid: str) -> _StubDatasetHandle:  # type: ignore[override]
         """Seam consumed by ``_find_feature_producers_impl`` and by the
@@ -582,6 +691,7 @@ class _FakeML(ExecutionMixin):
         exactly the leak the snapshot-faithfulness pin guards against).
         """
         self.calls.append(("_dataset_version_rows_at", (dataset_rid, str(version))))
+        self._note_direct_seam_use("_dataset_version_rows_at")
         return list(self._snapshot_version_rows.get((dataset_rid, str(version)), []))
 
     def _sentinel_execution_rid_or_none(self) -> str | None:  # type: ignore[override]
@@ -648,8 +758,109 @@ class _FakeML(ExecutionMixin):
         self.calls.append(("_producers_of_asset", (asset_rid, asset_table)))
         return list(self._asset_producers.get(asset_rid, []))
 
+    # -- batched frontier seams (#394) -------------------------------------
+    #
+    # The real ``ExecutionMixin`` implementations issue chunked
+    # ``RID=any(...)`` catalog queries; these answer the same questions from
+    # the same scripted state so the closure walk's batched path can be
+    # exercised offline. Each records ONE call for the whole frontier, which
+    # is what makes the request-count pins in the #394 tests meaningful:
+    # a per-node fallback records N per-node calls instead.
+    #
+    # ``_batch_chunk_size`` mirrors the production chunk (tk-023, 25); the
+    # harness records one entry per CHUNK, so a frontier of 30 records two.
+
+    _batch_chunk_size = _SUMMARY_CHUNK_SIZE
+
+    def _batch_chunks(self, rids: list[str]) -> list[list[str]]:
+        """Split a batch's RIDs into production-sized chunks."""
+        return [rids[i : i + self._batch_chunk_size] for i in range(0, len(rids), self._batch_chunk_size)] or [[]]
+
+    def set_batch_failure(self, seam: str, error: BaseException) -> None:
+        """Script a batch seam to raise, for batch-failure fallback tests."""
+        self._batch_failures[seam] = error
+
+    def _raise_scripted_batch_failure(self, seam: str) -> None:
+        error = self._batch_failures.get(seam)
+        if error is not None:
+            raise error
+
+    def _execution_records_batch(self, rids: list[str]) -> dict[str, Any]:  # type: ignore[override]
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        for chunk in self._batch_chunks(distinct):
+            self.calls.append(("_execution_records_batch", (tuple(chunk),)))
+        self._note_direct_seam_use("_execution_records_batch")
+        self._raise_scripted_batch_failure("_execution_records_batch")
+        out = {}
+        for rid in distinct:
+            record = self._executions.get(rid)
+            if record is None:
+                continue
+            workflow = record.workflow
+            if workflow is not None and workflow.workflow_rid in self._hidden_workflows:
+                # Mirrors the production seam's guard: the Execution row
+                # resolves but its Workflow row does not, so the record is
+                # OMITTED and the engine falls back to the per-node read
+                # (which raises, yielding ``unresolved_rid``). Note this
+                # harness copy is the reason the engine-level test cannot
+                # mutation-verify the production guard — that pin lives on
+                # ``_execution_records_batch`` itself, in
+                # ``test_batched_execution_records_omit_unreadable_workflow_rows``.
+                continue
+            out[rid] = record
+        return out
+
+    def _input_dataset_pairs_batch(self, rids: list[str]) -> dict[str, list[tuple[Any, str | None]]]:  # type: ignore[override]
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        for chunk in self._batch_chunks(distinct):
+            self.calls.append(("_input_dataset_pairs_batch", (tuple(chunk),)))
+        self._note_direct_seam_use("_input_dataset_pairs_batch")
+        return {rid: self._scripted_input_pairs(rid) for rid in distinct}
+
+    def _input_assets_batch(self, rids: list[str]) -> dict[str, list[Any]]:  # type: ignore[override]
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        for chunk in self._batch_chunks(distinct):
+            self.calls.append(("_input_assets_batch", (tuple(chunk),)))
+        self._note_direct_seam_use("_input_assets_batch")
+        out: dict[str, list[Any]] = {}
+        for rid in distinct:
+            rec = self._executions.get(rid)
+            out[rid] = rec.list_assets(asset_role="Input") if rec is not None else []
+        return out
+
+    def _producer_of_datasets_batch(  # type: ignore[override]
+        self, pairs: list[tuple[str, str | None]]
+    ) -> dict[tuple[str, str | None], str | None]:
+        wanted = list(dict.fromkeys(pairs))
+        datasets = list(dict.fromkeys(d for d, _v in wanted))
+        for chunk in self._batch_chunks(datasets):
+            self.calls.append(("_producer_of_datasets_batch", (tuple(chunk),)))
+        self._note_direct_seam_use("_producer_of_datasets_batch")
+        out: dict[tuple[str, str | None], str | None] = {}
+        for dataset_rid, version in wanted:
+            if version is not None:
+                out[(dataset_rid, version)] = self._versioned_dataset_producers.get((dataset_rid, str(version)))
+            else:
+                out[(dataset_rid, version)] = self._dataset_producers.get(dataset_rid)
+        return out
+
+    def _producers_of_assets_batch(self, items: list[tuple[str, Any]]) -> dict[str, list[str]]:  # type: ignore[override]
+        by_table: dict[str, list[str]] = {}
+        for asset_rid, asset_table in items:
+            by_table.setdefault(asset_table.name, []).append(asset_rid)
+        for table_name, asset_rids in sorted(by_table.items()):
+            for chunk in self._batch_chunks(list(dict.fromkeys(asset_rids))):
+                self.calls.append(("_producers_of_assets_batch", (table_name, tuple(chunk))))
+        self._note_direct_seam_use("_producers_of_assets_batch")
+        return {asset_rid: list(self._asset_producers.get(asset_rid, [])) for asset_rid, _table in items}
+
     def _producers_of_dataset_members(self, dataset_rid: str, version: Any = None) -> set[str]:  # type: ignore[override]
         self.calls.append(("_producers_of_dataset_members", (dataset_rid, version)))
+        # Member scans are the concurrent leg of a batched frontier read
+        # (#394) and are leased like every other worker read, so a scan
+        # calling this on the shared instance means the lease was bypassed —
+        # invisible to _HandleProbe by construction, hence this tracker.
+        self._note_direct_seam_use("_producers_of_dataset_members")
         scripted = self._member_scan_failures.get(dataset_rid)
         if scripted is not None:
             # Scripted read-side failure (#391b). Raised from the SAME seam

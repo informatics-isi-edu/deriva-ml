@@ -152,6 +152,35 @@ def _version_row_sort_key(row: dict[str, Any]) -> tuple:
         return (rct, 1, _PEP440Version("0"), label)
 
 
+def _parse_execution_timestamp(raw: Any) -> "datetime | None":
+    """Parse an ERMrest ISO-8601 timestamp, or None when it is unusable.
+
+    Extracted from :meth:`ExecutionMixin.lookup_execution` so the batched
+    reader (:meth:`ExecutionMixin._execution_records_batch`) parses
+    ``Start`` / ``Stop`` exactly the way the per-execution reader always
+    has — the two must not drift, or a batched readout would carry a
+    different record than an inline one.
+
+    Args:
+        raw: The catalog's timestamp text, or None.
+
+    Returns:
+        The parsed ``datetime``, or None when ``raw`` is empty or malformed.
+
+    Example:
+        >>> _parse_execution_timestamp("2026-01-01T00:00:00Z").year
+        2026
+        >>> _parse_execution_timestamp("not a timestamp") is None
+        True
+    """
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
 class ExecutionMixin:
     """Mixin providing execution management operations.
 
@@ -500,23 +529,10 @@ class ExecutionMixin:
 
         execution_data = self._retrieve_rid(execution_rid)
 
-        # Parse timestamps if present
-        start_time = None
-        stop_time = None
-        if execution_data.get("Start"):
-            from datetime import datetime
-
-            try:
-                start_time = datetime.fromisoformat(execution_data["Start"].replace("Z", "+00:00"))
-            except (ValueError, AttributeError):
-                pass
-        if execution_data.get("Stop"):
-            from datetime import datetime
-
-            try:
-                stop_time = datetime.fromisoformat(execution_data["Stop"].replace("Z", "+00:00"))
-            except (ValueError, AttributeError):
-                pass
+        # Parse timestamps if present. Shared with the batched reader so the
+        # two paths cannot drift (see ``_parse_execution_timestamp``).
+        start_time = _parse_execution_timestamp(execution_data.get("Start"))
+        stop_time = _parse_execution_timestamp(execution_data.get("Stop"))
 
         # Look up the workflow if present
         workflow_rid = execution_data.get("Workflow")
@@ -2188,6 +2204,516 @@ class ExecutionMixin:
                 description=row.get("Description"),
                 workflow=wf_summary,
                 status=row.get("Status") or "Unknown",
+            )
+        return out
+
+    # -- batched frontier reads (#394) -------------------------------------
+    #
+    # Each of these answers ONE question for a whole frontier of executions
+    # with per-TABLE chunked ``RID=any(...)`` queries instead of one query
+    # per node. Chunking is ``_SUMMARY_CHUNK_SIZE`` (tk-023: never an
+    # unbounded RID disjunction). The per-node seams they replace are kept —
+    # they are still the fallback for a stubbed ``ml`` and the sequential
+    # path — so every one of these is an optimization, never a semantic
+    # change: the values they produce are the values the per-node seams
+    # produce, only fetched together.
+
+    def _rid_chunks(self, rids: "list[RID]") -> "Iterable[list[RID]]":
+        """Split ``rids`` into ``_SUMMARY_CHUNK_SIZE``-sized chunks.
+
+        Args:
+            rids: RIDs to chunk, in caller order.
+
+        Yields:
+            Successive chunks, each at most ``_SUMMARY_CHUNK_SIZE`` long.
+
+        Example:
+            >>> len(list(ExecutionMixin._rid_chunks(None, [f"1-{n:04X}" for n in range(30)])))
+            2
+        """
+        for start in range(0, len(rids), _SUMMARY_CHUNK_SIZE):
+            yield rids[start : start + _SUMMARY_CHUNK_SIZE]
+
+    @staticmethod
+    def _rid_any(table_path: Any, column: str, wanted: "list[RID]") -> Any:
+        """Build a ``column == any(wanted)`` disjunction predicate.
+
+        Args:
+            table_path: The datapath table the predicate is built on.
+            column: Column name to match.
+            wanted: Values to match, at least one; caller chunks the list.
+
+        Returns:
+            The datapath predicate.
+
+        Example:
+            >>> callable(ExecutionMixin._rid_any)
+            True
+        """
+        pred = table_path.columns[column] == wanted[0]
+        for value in wanted[1:]:
+            pred = pred | (table_path.columns[column] == value)
+        return pred
+
+    def _execution_records_batch(self, rids: "list[RID]") -> "dict[RID, ExecutionRecord]":
+        """Resolve ``ExecutionRecord``s for a whole frontier, batched.
+
+        The batched sibling of :meth:`lookup_execution`. Where that issues
+        four-ish round trips per execution (``resolve_rid``,
+        ``_retrieve_rid``, the Workflow row, its type terms), this issues a
+        chunked Execution scan, a chunked Workflow scan, and one chunked
+        Workflow_Type scan for the whole frontier.
+
+        RIDs that resolve to no Execution row are simply ABSENT from the
+        result. The caller (the provenance engine) treats absence as "read
+        it per-node", which is what preserves the exact
+        ``DerivaMLException`` a bad RID has always produced — this method
+        never invents an error of its own.
+
+        Args:
+            rids: Execution RIDs to resolve. Duplicates collapse.
+
+        Returns:
+            Mapping of execution RID to its live ``ExecutionRecord``.
+
+        Example:
+            >>> records = ml._execution_records_batch(["1-ABCD"])  # doctest: +SKIP
+            >>> records["1-ABCD"].status  # doctest: +SKIP
+            <ExecutionStatus.Uploaded: 'Uploaded'>
+        """
+        from deriva_ml.execution.execution_record import ExecutionRecord
+        from deriva_ml.execution.workflow import Workflow
+
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        if not distinct:
+            return {}
+
+        pb = self.pathBuilder()
+        exec_path = pb.schemas[self.ml_schema].tables["Execution"]
+        exec_rows: dict[RID, dict[str, Any]] = {}
+        for chunk in self._rid_chunks(distinct):
+            for row in exec_path.filter(self._rid_any(exec_path, "RID", chunk)).entities().fetch():
+                exec_rows[row["RID"]] = row
+
+        wf_rids = list(dict.fromkeys(row.get("Workflow") for row in exec_rows.values() if row.get("Workflow")))
+        workflows: dict[RID, "Workflow"] = {}
+        if wf_rids:
+            wf_path = pb.schemas[self.ml_schema].tables["Workflow"]
+            wf_rows: dict[RID, dict[str, Any]] = {}
+            for chunk in self._rid_chunks(wf_rids):
+                for row in wf_path.filter(self._rid_any(wf_path, "RID", chunk)).entities().fetch():
+                    wf_rows[row["RID"]] = row
+            types = self._workflow_types_batch(list(wf_rows))
+            for wf_rid, row in wf_rows.items():
+                workflow = Workflow(
+                    name=row.get("Name"),
+                    url=row.get("URL"),
+                    workflow_type=types.get(wf_rid, []),
+                    version=row.get("Version"),
+                    description=row.get("Description"),
+                    workflow_rid=wf_rid,
+                    checksum=row.get("Checksum"),
+                )
+                workflow._ml_instance = self  # type: ignore[attr-defined]
+                workflows[wf_rid] = workflow
+
+        out: dict[RID, "ExecutionRecord"] = {}
+        for rid, row in exec_rows.items():
+            wf_rid = row.get("Workflow")
+            if wf_rid and wf_rid not in workflows:
+                # The Execution row REFERENCES a Workflow whose row this
+                # batch could not read — deleted, or hidden by ACL. The
+                # per-node ``lookup_execution`` resolves the workflow through
+                # ``lookup_workflow``, which RAISES on that shape, so the
+                # execution is reported ``unresolved_rid``. Substituting
+                # ``workflow=None`` here would instead yield a ``no_workflow``
+                # gap, which is a DIFFERENT provenance fact: "code identity is
+                # unrecorded" versus "a recorded reference could not be read".
+                # Omitting the record makes the engine fall back to the
+                # per-node read, which produces the historical verdict.
+                continue
+            out[rid] = ExecutionRecord(
+                execution_rid=rid,
+                workflow=workflows.get(wf_rid) if wf_rid else None,
+                status=ExecutionStatus(row.get("Status") or "Created"),
+                description=row.get("Description"),
+                start_time=_parse_execution_timestamp(row.get("Start")),
+                stop_time=_parse_execution_timestamp(row.get("Stop")),
+                duration=row.get("Execution_Duration"),
+                download_duration=row.get("Download_Duration"),
+                upload_duration=row.get("Upload_Duration"),
+                _ml_instance=self,
+                _logger=getattr(self, "_logger", None),
+            )
+        return out
+
+    def _workflow_types_batch(self, wf_rids: "list[RID]") -> "dict[RID, list[str]]":
+        """Workflow type terms for several workflows, in chunked queries.
+
+        Args:
+            wf_rids: Workflow RIDs whose ``Workflow_Type`` terms to read.
+
+        Returns:
+            Mapping of workflow RID to its type-term names (possibly empty).
+            A catalog whose ``Workflow`` table carries the type as a plain
+            column rather than an association yields an empty mapping.
+
+        Example:
+            >>> ml._workflow_types_batch(["2-WFAA"])  # doctest: +SKIP
+            {'2-WFAA': ['Manual']}
+        """
+        if not wf_rids:
+            return {}
+        pb = self.pathBuilder()
+        try:
+            type_path = pb.schemas[self.ml_schema].tables["Workflow_Workflow_Type"]
+        except KeyError:
+            return {}
+        out: dict[RID, list[str]] = {}
+        for chunk in self._rid_chunks(wf_rids):
+            try:
+                rows = list(type_path.filter(self._rid_any(type_path, "Workflow", chunk)).entities().fetch())
+            except (KeyError, AttributeError):
+                return {}
+            for row in rows:
+                term = row.get("Workflow_Type")
+                if term:
+                    out.setdefault(row["Workflow"], []).append(term)
+        return out
+
+    def _input_dataset_pairs_batch(self, rids: "list[RID]") -> "dict[RID, list[tuple[Any, str | None]]]":
+        """``(Dataset, consumed_version)`` pairs for a whole frontier, batched.
+
+        The batched sibling of :meth:`_input_dataset_pairs`. One chunked
+        ``Dataset_Execution`` scan filtered on the Execution FK covers every
+        frontier node; the ``Dataset_Version`` FK values are resolved once
+        for the union rather than once per node; and each distinct Dataset
+        is looked up once even when several frontier executions consumed it.
+
+        The per-execution list order is the catalog's fetch order for that
+        execution's rows — the same order :meth:`_input_dataset_pairs`
+        returns, because both read the same rows from the same table.
+
+        Args:
+            rids: Execution RIDs whose input edges to read.
+
+        Returns:
+            Mapping of execution RID to its ``(Dataset, version)`` pairs.
+            An execution with no input datasets maps to an empty list.
+
+        Example:
+            >>> pairs = ml._input_dataset_pairs_batch(["2-EXAA"])  # doctest: +SKIP
+            >>> [(d.dataset_rid, v) for d, v in pairs["2-EXAA"]]  # doctest: +SKIP
+            [('1-DSAA', '1.0.0')]
+        """
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        out: dict[RID, list[tuple[Any, str | None]]] = {rid: [] for rid in distinct}
+        if not distinct:
+            return out
+
+        pb = self.pathBuilder()
+        edge_path = pb.schemas[self.ml_schema].tables["Dataset_Execution"]
+        edges: list[dict[str, Any]] = []
+        for chunk in self._rid_chunks(distinct):
+            edges.extend(edge_path.filter(self._rid_any(edge_path, "Execution", chunk)).entities().fetch())
+        edges = [e for e in edges if e.get("Dataset") and e.get("Execution") in out]
+        if not edges:
+            return out
+
+        version_rids = list(dict.fromkeys(e["Dataset_Version"] for e in edges if e.get("Dataset_Version")))
+        rid_to_version: dict[RID, str | None] = {}
+        if version_rids:
+            version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+            for chunk in self._rid_chunks(version_rids):
+                for row in version_path.filter(self._rid_any(version_path, "RID", chunk)).entities().fetch():
+                    rid_to_version[row["RID"]] = row.get("Version")
+
+        # One Dataset handle per distinct dataset, shared by every frontier
+        # execution that consumed it.
+        datasets: dict[RID, Any] = {}
+        for edge in edges:
+            dataset_rid = edge["Dataset"]
+            if dataset_rid not in datasets:
+                datasets[dataset_rid] = self.lookup_dataset(dataset_rid)
+
+        for edge in edges:
+            version_rid = edge.get("Dataset_Version")
+            consumed = rid_to_version.get(version_rid) if version_rid else None
+            out[edge["Execution"]].append((datasets[edge["Dataset"]], consumed))
+        return out
+
+    def _assoc_asset_table(self, schema_name: str, assoc_table_name: str, asset_column: str) -> Any:
+        """Resolve the asset table an ``<Asset>_Execution`` association points at.
+
+        The association's own foreign key is the authority on which table it
+        associates, schema and all. Resolving by bare NAME instead
+        (``name_to_table("Image")``) searches domain schemas in sorted order
+        and returns the FIRST match, so two schemas each holding an
+        ``Image`` asset table resolve to whichever sorts first — and if that
+        is not the association's actual target, the subsequent row fetch
+        matches none of the association's RIDs and every asset in that group
+        disappears from the closure silently. Identity is
+        ``(schema, table)``, never a bare name (#385).
+
+        Falls back to the name lookup only when the association carries no
+        usable FK on ``asset_column`` — a shape deriva-ml does not create,
+        where a best-effort answer still beats no answer.
+
+        Args:
+            schema_name: Schema holding the association table.
+            assoc_table_name: The ``<Asset>_Execution`` table's name.
+            asset_column: The association's FK column naming the asset.
+
+        Returns:
+            The asset ``Table`` object the association actually references.
+
+        Raises:
+            DerivaMLTableNotFound: If neither the FK nor the name resolves.
+
+        Example:
+            >>> ml._assoc_asset_table("domain", "Image_Execution", "Image").name  # doctest: +SKIP
+            'Image'
+        """
+        assoc_table = self.model.model.schemas[schema_name].tables[assoc_table_name]
+        for fkey in assoc_table.foreign_keys:
+            if any(column.name == asset_column for column in fkey.foreign_key_columns):
+                return fkey.pk_table
+        return self.model.name_to_table(asset_column)
+
+    def _input_assets_batch(self, rids: "list[RID]") -> "dict[RID, list[Any]]":
+        """Input ``Asset`` objects for a whole frontier, batched per table.
+
+        The batched sibling of ``ExecutionRecord.list_assets(asset_role=
+        "Input")``. The per-node path issues one query per
+        ``<Asset>_Execution`` association table **per execution** and then a
+        full ``lookup_asset`` (resolve + row fetch + type terms) per asset.
+        This issues one chunked query per association table for the WHOLE
+        frontier, then one chunked row fetch per asset table, and builds the
+        ``Asset`` objects directly.
+
+        **The asset table is resolved from the association's own foreign
+        key** (schema-qualified), never by stripping the association's name
+        — same-named asset tables in two domain schemas resolve to the
+        association's true FK target, matching what ``lookup_asset`` derives
+        from the asset RID. An association whose FK target cannot be
+        resolved, or resolves to a non-asset table, is skipped rather than
+        guessed at, so the failure mode is a missing group, never a wrong
+        one.
+
+        **Constraint: ``asset_types`` is deliberately left EMPTY**, and this
+        is only safe because the provenance readout consumes exactly
+        ``asset_rid`` / ``filename`` / ``asset_table`` — the three fields
+        ``WalkEngine.expand_execution`` copies into an ``AssetSummary``.
+        Fetching type terms would be a request per asset table bought for
+        nothing. **If ``AssetSummary`` ever grows a field this method does
+        not populate, this method must populate it too** — otherwise the
+        batched path ships empty values where the per-node path shipped real
+        ones, which is precisely the class of silent divergence the #394
+        live A/B caught once already (the ``is_asset`` guard below). Any
+        caller needing full ``Asset`` fidelity must use ``lookup_asset``.
+
+        Args:
+            rids: Execution RIDs whose input assets to read.
+
+        Returns:
+            Mapping of execution RID to its input assets, association-table
+            order then fetch order — the same order the per-node path
+            produces, because both iterate ``find_asset_execution_tables()``.
+
+        Example:
+            >>> assets = ml._input_assets_batch(["2-EXAA"])  # doctest: +SKIP
+            >>> [a.asset_rid for a in assets["2-EXAA"]]  # doctest: +SKIP
+            ['4-IMG1']
+        """
+        from deriva_ml.asset.asset import Asset
+
+        distinct = list(dict.fromkeys(r for r in rids if r))
+        out: dict[RID, list[Any]] = {rid: [] for rid in distinct}
+        if not distinct:
+            return out
+
+        pb = self.pathBuilder()
+        for schema_name, table_name in self.model.find_asset_execution_tables():
+            asset_table_name = table_name.replace("_Execution", "")
+            assoc_path = pb.schemas[schema_name].tables[table_name]
+            rows: list[dict[str, Any]] = []
+            for chunk in self._rid_chunks(distinct):
+                rows.extend(
+                    assoc_path.filter(self._rid_any(assoc_path, "Execution", chunk))
+                    .filter(assoc_path.Asset_Role == "Input")
+                    .entities()
+                    .fetch()
+                )
+            rows = [r for r in rows if r.get(asset_table_name) and r.get("Execution") in out]
+            if not rows:
+                continue
+
+            asset_rids = list(dict.fromkeys(r[asset_table_name] for r in rows))
+            asset_rows: dict[RID, dict[str, Any]] = {}
+            # Resolve the asset table from the ASSOCIATION'S OWN FOREIGN KEY,
+            # never by bare name. ``name_to_table`` searches domain schemas
+            # in sorted order and returns the FIRST match, so two schemas
+            # holding a same-named asset table (e.g. two domains each with an
+            # ``Image``) silently resolve to the wrong one — the row fetch
+            # then finds none of the association's RIDs and every asset in
+            # the group VANISHES from the closure with no error. The FK
+            # target is the table's true identity, schema and all (the same
+            # schema-qualified-identity lesson as #385).
+            try:
+                asset_table = self._assoc_asset_table(schema_name, table_name, asset_table_name)
+                if not self.model.is_asset(asset_table):
+                    # NOT an asset table, despite having an ``_Execution``
+                    # association. ``File`` on eye-ai is the live example:
+                    # source files registered BY REFERENCE get a
+                    # ``File_Execution`` row but no asset shape, so
+                    # ``lookup_asset`` refuses them ("RID X is not an
+                    # asset") and the per-node path drops them with a debug
+                    # log. Mirroring that guard here is what keeps the
+                    # batched read a pure optimization: without it the
+                    # batch, which never calls ``lookup_asset``, would start
+                    # reporting File rows as closure assets — a semantics
+                    # change (and a defensible one) that belongs in its own
+                    # issue, not in a perf PR.
+                    continue
+                asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
+            except (KeyError, AttributeError, DerivaMLException):
+                # No such asset table (or it is absent from this path
+                # builder): the per-node path degraded each ``lookup_asset``
+                # with a debug log; skip the whole group the same way.
+                continue
+            for chunk in self._rid_chunks(asset_rids):
+                for row in asset_path.filter(self._rid_any(asset_path, "RID", chunk)).entities().fetch():
+                    asset_rows[row["RID"]] = row
+
+            for row in rows:
+                asset_rid = row[asset_table_name]
+                asset_row = asset_rows.get(asset_rid)
+                if asset_row is None:
+                    # The association names an asset row the table does not
+                    # have. The per-node path swallowed the resulting
+                    # ``lookup_asset`` failure with a debug log; do the same.
+                    continue
+                out[row["Execution"]].append(
+                    Asset(
+                        catalog=self,  # type: ignore[arg-type]
+                        asset_rid=asset_rid,
+                        asset_table=asset_table_name,
+                        filename=asset_row.get("Filename", ""),
+                        url=asset_row.get("URL", ""),
+                        length=asset_row.get("Length", 0),
+                        md5=asset_row.get("MD5", ""),
+                        description=asset_row.get("Description", ""),
+                        asset_types=[],
+                    )
+                )
+        return out
+
+    def _producers_of_assets_batch(self, items: "list[tuple[RID, Any]]") -> "dict[RID, list[RID]]":
+        """Every ``Output`` producer of several assets, batched per table.
+
+        The batched sibling of :meth:`_producers_of_asset`. Assets are
+        grouped by their asset table (association tables differ per asset
+        table), and each group's ``<Asset>_Execution`` table is queried once
+        per chunk of asset RIDs rather than once per asset.
+
+        Per-asset producer order is the catalog's fetch order within the
+        group's rows, matching the per-node seam's contract (RIDs carry no
+        ordering semantics; fetched order is the honest record).
+
+        Args:
+            items: ``(asset_rid, asset_table)`` pairs, where ``asset_table``
+                is a model table object.
+
+        Returns:
+            Mapping of asset RID to its deduped producer RIDs. An asset
+            whose table has no ``<Asset>_Execution`` association maps to an
+            empty list.
+
+        Example:
+            >>> ml._producers_of_assets_batch([(rid, table)])  # doctest: +SKIP
+            {'4-IMG1': ['2-EXAA']}
+        """
+        out: dict[RID, list[RID]] = {}
+        by_table: dict[str, tuple[Any, list[RID]]] = {}
+        for asset_rid, asset_table in items:
+            if asset_rid in out:
+                continue
+            out[asset_rid] = []
+            entry = by_table.setdefault(asset_table.name, (asset_table, []))
+            entry[1].append(asset_rid)
+
+        pb = self.pathBuilder()
+        for asset_table, asset_rids in by_table.values():
+            try:
+                assoc_table, asset_fk, _exec_fk = self.model.find_association(asset_table, "Execution")
+            except NoAssociationException:
+                continue
+            assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
+            seen: dict[RID, set[RID]] = {rid: set() for rid in asset_rids}
+            for chunk in self._rid_chunks(asset_rids):
+                rows = (
+                    assoc_path.filter(self._rid_any(assoc_path, asset_fk, chunk))
+                    .filter(assoc_path.Asset_Role == "Output")
+                    .entities()
+                    .fetch()
+                )
+                for row in rows:
+                    asset_rid = row.get(asset_fk)
+                    execution_rid = row.get("Execution")
+                    if asset_rid not in seen or not execution_rid or execution_rid in seen[asset_rid]:
+                        continue
+                    seen[asset_rid].add(execution_rid)
+                    out[asset_rid].append(execution_rid)
+        return out
+
+    def _producer_of_datasets_batch(
+        self, pairs: "list[tuple[RID, str | None]]"
+    ) -> "dict[tuple[RID, str | None], RID | None]":
+        """Producing executions for several ``(dataset, version)`` pairs.
+
+        The batched sibling of :meth:`_producer_of_dataset`. Every pair's
+        answer comes from the same table (``Dataset_Version``), so the whole
+        frontier's datasets are fetched in chunked ``Dataset=any(...)``
+        queries and each pair is then answered from the in-memory rows —
+        with exactly the semantics the per-node seam documents: a pinned
+        version reads that row's ``Execution``; an unpinned pair reads the
+        ORIGIN (first row in :func:`_version_row_sort_key` order, #367).
+
+        Args:
+            pairs: ``(dataset_rid, version)`` pairs; ``version`` may be None.
+
+        Returns:
+            Mapping of each pair to its producing-execution RID, or None.
+
+        Example:
+            >>> ml._producer_of_datasets_batch([("1-DSAA", "1.0.0")])  # doctest: +SKIP
+            {('1-DSAA', '1.0.0'): '2-EXAA'}
+        """
+        wanted = list(dict.fromkeys(pairs))
+        if not wanted:
+            return {}
+        dataset_rids = list(dict.fromkeys(dataset_rid for dataset_rid, _version in wanted))
+
+        pb = self.pathBuilder()
+        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        rows_by_dataset: dict[RID, list[dict[str, Any]]] = {rid: [] for rid in dataset_rids}
+        for chunk in self._rid_chunks(dataset_rids):
+            for row in version_path.filter(self._rid_any(version_path, "Dataset", chunk)).entities().fetch():
+                bucket = rows_by_dataset.get(row.get("Dataset"))
+                if bucket is not None:
+                    bucket.append(row)
+
+        out: dict[tuple[RID, str | None], RID | None] = {}
+        for dataset_rid, version in wanted:
+            rows = rows_by_dataset.get(dataset_rid, [])
+            if version is None:
+                ordered = sorted(rows, key=_version_row_sort_key)
+                out[(dataset_rid, version)] = ordered[0].get("Execution") if ordered else None
+                continue
+            want = str(version)
+            out[(dataset_rid, version)] = next(
+                (row.get("Execution") for row in rows if (row.get("Version") or "") == want),
+                None,
             )
         return out
 
