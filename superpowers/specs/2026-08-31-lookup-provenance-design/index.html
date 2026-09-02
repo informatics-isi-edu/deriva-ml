@@ -1,0 +1,2641 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-08-31-lookup-provenance-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>lookup_provenance: the complete provenance closure (issue #383) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lookup_provenance-the-complete-provenance-closure-issue-383" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              lookup_provenance: the complete provenance closure (issue #383)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-constraints-the-six-rulings-none-are-open-for-re-litigation-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Constraints (the six rulings — none are open for re-litigation here)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-public-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Public API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-result-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Result model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-architecture-one-engine-two-frontends-ruling-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Architecture: one engine, two frontends (ruling 5)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-semantics-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Semantics detail
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Semantics detail">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-consumption-arc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Consumption arc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-asset-facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Asset facts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-version-authorship-arc-bounded-at-the-walked-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Version-authorship arc — bounded at the walked version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-member-binding-arc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Member-binding arc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-ancestry-removed-see-ruling-8-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Ancestry — REMOVED (see ruling 8, §2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-workflow-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 Workflow identity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#67-rootdescriptortype-migration-to-roottype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.7 RootDescriptor.type migration to RootType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-non-goals-stay-downstream-per-the-issues-boundary-section" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Non-goals (stay downstream, per the issue's boundary section)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-open-questions-for-this-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Open questions for this review
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-codex-round-1-disposition-2026-08-31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Codex round 1 disposition (2026-08-31)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="lookup_provenance-the-complete-provenance-closure-issue-383"><code>lookup_provenance</code>: the complete provenance closure (issue #383)</h1>
+<p><strong>Status:</strong> approved (Carl, 2026-09-01) — v2.2 after Codex round 1
+(16/17 P1s and 4/4 P2s accepted; see §10) plus idiom rulings (§4).
+Open question §9.1 resolved to the stated leaning (proportional internal
+dataset budget, no public knob); §9.2 (docs/CLI framing) deferred to the
+documentation step of implementation.
+<strong>Depends on:</strong> #385/#386 (shipped, v1.61.0) — <code>find_feature_producers</code> with
+FK-reachable member scope and version-snapshot scoping.
+<strong>Contract basis:</strong> <code>docs/reference/provenance-contract.md</code> (binding definition,
+PR #384) and the six boundary rulings recorded on #383 and in
+<code>tacit-knowledge.md</code> ("The boundary interview").</p>
+<h2 id="1-problem">1. Problem</h2>
+<p><code>lookup_lineage</code> answers <em>"what is this artifact's recorded data-flow
+lineage?"</em> and stops at lineage edges. A provenance reviewer asks a bigger
+question — <em>"everything that contributed to this artifact"</em> — which requires a
+<strong>transitive closure</strong>: every discovered execution is itself expanded, the
+feature arc is followed, and input-dataset ancestry is walked to its sources.
+The gap is concrete: on eye-ai's reference training execution,
+<code>lookup_lineage</code> reaches 2 executions; the downstream hand-built closure
+(<code>deriva-ml-model-deploy/src/standalone/inventory.py</code>) reaches 45.</p>
+<p>Every primitive that closure composes now lives in deriva-ml (lineage walk
+with origin semantics, <code>find_feature_producers</code>, <code>list_dataset_parents</code>,
+workflow identity, sentinel classification). The composition — structural
+fact-finding over deriva-ml's own schema — belongs upstream too.</p>
+<h2 id="2-constraints-the-six-rulings-none-are-open-for-re-litigation-here">2. Constraints (the six rulings — none are open for re-litigation here)</h2>
+<ol>
+<li><strong>Capture, not mining.</strong> The closure follows only schema-recorded facts.
+   Hydra <code>key=RID</code> config mining is <strong>not</strong> an arc (it remains a downstream
+   audit heuristic for legacy runs).</li>
+<li><strong>Legacy is history.</strong> Completeness is defined against contract-era
+   records. Legacy holes surface as reported gaps (<code>origin_recorded=False</code>,
+   sentinel terminations, null-execution bindings) — never compensated for.</li>
+<li><strong>A feature value is the binding (member, value, execution).</strong> A dataset
+   at version vN <em>contains</em> its members' bindings at vN's snapshot, with
+   FK-reachable member scope. Binding executions are provenance <strong>by
+   construction</strong> — facts, not candidates.</li>
+<li><strong>No arc-strength ordering.</strong> Arc kinds form an unordered typology
+   distinguished by attachment point, each with measurables (depth, counts)
+   and orthogonal gap flags. Any ranking is downstream presentation.</li>
+<li><strong>One arc-gated engine, two frontends, from day one.</strong> <code>lookup_lineage</code>
+   and <code>lookup_provenance</code> share a single traversal core; neither calls the
+   other; the engine walks only the arcs its caller requests (no cost
+   inversion); <code>lookup_lineage</code>'s observable contract stays byte-identical.</li>
+<li><strong>[SUPERSEDED by ruling 8 — see below]</strong> Ancestry hops resolve at
+   snapshots, unbounded to source. (The snapshot-resolution discipline this
+   ruling established still governs every remaining snapshot read.)</li>
+<li><strong>(post-final-review) <code>member_production</code></strong> — fifth arc kind; see §10.</li>
+<li><strong>Ancestry expansion is OUT (Carl, 2026-09-01, issue #389).</strong> Provenance
+   is execution-mediated: consumed inputs, version authors, binding writers,
+   and their recursive inputs. <code>Dataset_Dataset</code> containment is structure,
+   not causation — redundant under proper capture (a split execution's
+   consumption arc records the parent), compensation on legacy data
+   (forbidden by ruling 2), and directionally unreliable (collections
+   invert it). The closure does not walk parents; <code>list_dataset_parents</code>
+   remains the structural query. §6.5's leg, <code>ParentLink</code>, <code>AncestryState</code>,
+   and the ancestry fields of <code>DatasetVersionFacts</code> are removed.</li>
+</ol>
+<h2 id="3-public-api">3. Public API</h2>
+<pre><code class="language-python">closure = ml.lookup_provenance(rid, version=None, max_executions=500)
+</code></pre>
+<ul>
+<li><code>rid</code> — Dataset, Asset, Feature-value, or Execution root (same root
+  typology as <code>lookup_lineage</code>, resolved by <code>_classify_rid</code>). Feature-value
+  roots are in scope for v1: their closure is the binding's execution plus
+  that execution's closure.</li>
+<li><code>version</code> — Dataset roots only (rejected with <code>DerivaMLValidationError</code>
+  for other root types). <strong>Root version resolution rule:</strong> if given, the
+  closure is of <code>D@version</code>; if omitted, the root resolves to the dataset's
+  <strong>latest recorded version at call time</strong> and the resolved pin is recorded
+  in <code>root.version</code> so the output is self-describing. A root version that
+  cannot be resolved (no version rows) is a <code>version_unresolvable</code> gap and
+  the walk proceeds only on arcs that do not require a snapshot.</li>
+<li><code>max_executions</code> — global execution budget shared with the lineage walk's
+  cap semantics; validated via <code>@validate_call</code> with <code>Field(ge=1)</code> (zero,
+  negative, bool, and non-int rejected at the boundary).</li>
+<li>Returns a <strong><code>ProvenanceClosure</code></strong> (Pydantic, <code>model_dump()</code>-serializable,
+  same conventions as the lineage models).</li>
+</ul>
+<p>Naming settled per the issue: <code>lookup_*</code> because it is a single-RID bundled
+read (the <code>find_*</code>/<code>lookup_*</code> verb convention), sibling of <code>lookup_lineage</code>.</p>
+<h2 id="4-result-model">4. Result model</h2>
+<p>All models live in <code>execution/provenance.py</code> (new), importing shared
+summaries (<code>ExecutionSummary</code>, <code>DatasetSummary</code>, <code>AssetSummary</code>,
+<code>WorkflowSummary</code>, <code>VersionAttribution</code>) from <code>execution/lineage.py</code>.</p>
+<p><strong>Idiom decisions (Carl, 2026-09-01):</strong></p>
+<ul>
+<li><strong>Public result models are Pydantic <code>BaseModel</code></strong> (per the CLAUDE.md class-
+  idiom rule: serialized across a boundary, user-facing return types,
+  composing with the all-Pydantic lineage models). Engine-internal
+  bookkeeping (visited-set entries, walk events inside
+  <code>_provenance_engine.py</code>) may be <code>@dataclass</code> — it has no public surface.</li>
+<li><strong>Closed vocabularies are <code>StrEnum</code>, not <code>Literal</code></strong> — consumers dispatch
+  on them (filter arcs by kind, group gaps by kind), so the vocabulary must
+  be importable and autocompletable, with typos failing at authoring time.
+  <code>StrEnum</code> members compare equal to their strings and <code>model_dump()</code>
+  serializes them as plain strings, so the JSON envelope is unaffected.
+  Exported from <code>execution/provenance.py</code>:</li>
+</ul>
+<p>The rule has a principled stopping point: <strong>enums are for vocabularies
+  deriva-ml itself closes.</strong> Catalog-sourced open vocabularies —
+  <code>ExecutionSummary.status</code>, <code>element_type</code> / table names, <code>asset_table</code> —
+  deliberately stay <code>str</code>: enum-validating them would make records from
+  older or foreign catalogs fail model validation on values deriva-ml
+  doesn't control.</p>
+<pre><code class="language-python">class RootType(StrEnum):        # replaces RootDescriptor.type's Literal (in scope, §6.7)
+    dataset = &quot;Dataset&quot;
+    asset = &quot;Asset&quot;
+    feature = &quot;Feature&quot;
+    execution = &quot;Execution&quot;
+
+class ArcKind(StrEnum):
+    root = &quot;root&quot;
+    consumption = &quot;consumption&quot;
+    version_authorship = &quot;version_authorship&quot;
+    member_binding = &quot;member_binding&quot;
+    member_production = &quot;member_production&quot;   # ruling 7 (§10) — produced a member (asset)
+                                              # of the walked dataset@version; mid-walk only
+                                              # (root-seed member producers keep `root`)
+
+class ArcInputType(StrEnum):
+    dataset = &quot;dataset&quot;
+    asset = &quot;asset&quot;
+
+class AncestryState(StrEnum):
+    resolved = &quot;resolved&quot;
+    chain_break = &quot;chain_break&quot;
+    not_walked = &quot;not_walked&quot;
+
+class GapKind(StrEnum):
+    sentinel_origin = &quot;sentinel_origin&quot;
+    origin_unrecorded = &quot;origin_unrecorded&quot;
+    null_binding_execution = &quot;null_binding_execution&quot;
+    no_workflow = &quot;no_workflow&quot;
+    snapshot_chain_break = &quot;snapshot_chain_break&quot;
+    unpinned_input = &quot;unpinned_input&quot;
+    version_unresolvable = &quot;version_unresolvable&quot;
+    no_version_author = &quot;no_version_author&quot;
+    no_asset_producer = &quot;no_asset_producer&quot;
+    multiple_asset_producers = &quot;multiple_asset_producers&quot;
+    unresolved_rid = &quot;unresolved_rid&quot;
+    binding_scan_failed = &quot;binding_scan_failed&quot;
+</code></pre>
+<pre><code class="language-python">class ProvenanceArc(BaseModel):
+    &quot;&quot;&quot;One schema-recorded reason an execution is in the closure.
+
+    Arc identity (for dedup) is the tuple of all fields EXCEPT depth:
+    (kind, consumed_by, input_rid, input_version). A rediscovery with
+    identical identity updates depth to the MINIMUM discovery depth and is
+    not appended again; a rediscovery with a different identity is a new
+    arc. `evidence` is merged (deduped by record equality) on identity match.
+    &quot;&quot;&quot;
+    kind: ArcKind      # see enum above; comments per member:
+                       #   root — the root artifact itself / its direct producer
+                       #   consumption — produced an input some closure member consumed
+                       #   version_authorship — authored a version (&lt;= walked version) of a walked dataset
+                       #   member_binding — bound feature values onto a walked dataset@version's members
+                       #   member_production — produced a member (asset) of a walked dataset@version
+    consumed_by: str | None = None    # consuming execution RID (consumption)
+    input_rid: str | None = None      # the CONCRETE input: dataset or asset RID
+    input_type: ArcInputType | None = None
+    input_version: str | None = None  # dataset inputs: the pinned version (None = unpinned, see gaps)
+    evidence: list[FeatureProducerRecord] = []   # member_binding only; sorted (feature_name, element_type, execution_rid)
+    depth: int                        # MINIMUM hops from root at which this arc was found
+
+class ProvenanceExecution(BaseModel):
+    execution: ExecutionSummary       # incl. workflow identity (see §6.6)
+    arcs: list[ProvenanceArc]         # unordered typology (ruling 4); sorted for determinism by (kind, input_rid or &quot;&quot;, consumed_by or &quot;&quot;)
+
+class DatasetVersionFacts(BaseModel):
+    &quot;&quot;&quot;Facts observed AT one version's snapshot. Never merged across versions.&quot;&quot;&quot;
+    version: str
+    parents: list[ParentLink]         # snapshot-resolved (ruling 6); sorted by parent_rid
+    ancestry_state: AncestryState
+    is_source: bool | None            # True/False only when ancestry_state == &quot;resolved&quot;; else None
+    origin_recorded: bool | None      # tri-state, as observed at this snapshot
+    version_authors: list[VersionAttribution]  # bounded at this version (§6.3)
+
+class ProvenanceDataset(BaseModel):
+    rid: str
+    description: str | None           # live display metadata, labeled as such
+    versions: dict[str, DatasetVersionFacts]   # keyed by version label — per-snapshot facts never conflated
+
+class ParentLink(BaseModel):
+    parent_rid: str
+    child_version: str                # the version whose snaptime resolved the hop
+    parent_version_then: str | None   # parent's then-current version (None = itself a gap)
+
+class ProvenanceAsset(BaseModel):
+    asset: AssetSummary
+    producers: list[str]              # ALL producing execution RIDs (empty = gap; &gt;1 = also a gap, see below)
+    consumed_by: list[str]            # closure executions that consumed it
+
+class ProvenanceGap(BaseModel):
+    &quot;&quot;&quot;First-class honest-gap record (ruling 2). Orthogonal to arcs.&quot;&quot;&quot;
+    kind: GapKind      # see enum above (12 kinds)
+    subject_rid: str
+    detail: str
+
+class ProvenanceClosure(BaseModel):
+    root: RootDescriptor              # reused from lineage.py; root.version = resolved pin (§3)
+    executions: dict[str, ProvenanceExecution]   # keyed by execution RID
+    datasets: dict[str, ProvenanceDataset]       # keyed by dataset RID; facts per-version inside
+    assets: dict[str, ProvenanceAsset]           # keyed by asset RID
+    gaps: list[ProvenanceGap]
+    executions_visited: int
+    datasets_visited: int
+    traversal_complete: bool          # False iff any bound was hit (NOT a claim of gap-freedom;
+                                      # gap-freedom is `not gaps`, deliberately separate)
+    cap_hit: bool
+</code></pre>
+<p>Model notes:</p>
+<ul>
+<li><strong>Sentinel discipline:</strong> the sentinel execution (and the unknown-provenance
+  File sentinel, where present) is never a closure member and never expanded;
+  encountering it emits a <code>sentinel_origin</code> gap naming what it terminated.</li>
+<li><strong>Determinism, fully specified:</strong> <code>executions</code> / <code>datasets</code> / <code>assets</code>
+  key order, <code>gaps</code>, every <code>arcs</code> list, <code>evidence</code>, <code>parents</code>,
+  <code>version_authors</code>, <code>producers</code>, and <code>consumed_by</code> are all sorted at
+  finalize with stated keys, so <code>model_dump()</code> output diffs cleanly.</li>
+<li><strong>"Strongest arc" does not exist</strong> (ruling 4); arcs are a set with defined
+  identity and minimum-depth semantics (see <code>ProvenanceArc</code> docstring).</li>
+</ul>
+<h2 id="5-architecture-one-engine-two-frontends-ruling-5">5. Architecture: one engine, two frontends (ruling 5)</h2>
+<p>New internal module <code>core/mixins/_provenance_engine.py</code>. The engine owns
+everything both walks share; frontends differ only in which arcs they enable
+and how they accumulate.</p>
+<pre><code class="language-python">class _WalkEngine:
+    &quot;&quot;&quot;Arc-gated traversal over provenance arcs.
+
+    Owns: root classification handoff, input resolution (pinned and
+    unpinned), producer lookup (dataset-version authorship and asset Output
+    rows — ALL of them), sentinel classification, per-domain visited
+    tracking, the execution and dataset budgets, and chunked summary
+    fetches (tk-023).
+
+    The visitor receives, per event: the discovered node, the arc through
+    which it was found, the CURRENT DEPTH, the ACTIVE PATH (for tree
+    duplicate-marking and ancestry cycle detection), and — for root
+    seeding — each candidate seed in order with accept/reject feedback
+    (preserving lookup_lineage's candidate-retry and member-producer
+    fallback behavior). This event surface is what the existing
+    lookup_lineage walk needs to be reproduced exactly; the TreeBuilder
+    is written against it first and validated against golden outputs
+    (§8) before the ClosureBuilder is started.
+    &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li><strong>Visited/cycle bookkeeping is per-domain, not one set:</strong> executions are
+  keyed by RID; dataset expansion (bindings, authorship, ancestry) is keyed
+  by <code>(dataset RID, version)</code>; ancestry cycle detection additionally checks
+  the <strong>active ancestry path</strong> (a <code>Dataset_Dataset</code> cycle across versions
+  must terminate the branch with a gap, not loop).</li>
+<li><strong>Two budgets:</strong> <code>max_executions</code> bounds executions visited;
+  <code>datasets_visited</code> is bounded by a proportional internal dataset budget
+  (default <code>4 × max_executions</code>) so a large ancestry graph containing few
+  executions cannot walk unboundedly. Hitting either sets
+  <code>traversal_complete=False</code> and <code>cap_hit=True</code>.</li>
+<li>The engine's arc gate is typed: <code>arcs: frozenset[ArcKind]</code>, never bare
+  strings.</li>
+<li><strong><code>lookup_lineage</code></strong> = engine with <code>arcs={ArcKind.consumption}</code> feeding a
+  <strong>TreeBuilder</strong> that reproduces today's <code>LineageNode</code> tree — including
+  <code>already_shown</code> collapse, member-producer fallback seeding, candidate
+  iteration, and unpinned-input display behavior. Byte-identical output is
+  an acceptance criterion verified by golden captures (§8), not just by the
+  existing suite passing.</li>
+<li><strong><code>lookup_provenance</code></strong> = engine with all arcs feeding a <strong>ClosureBuilder</strong>
+  accumulating the dict-shaped closure. Expansion rule: every execution
+  entering through ANY arc is itself expanded. Feature and ancestry work
+  runs once per <code>(dataset, version)</code> and is memoized within the call.</li>
+<li>Neither frontend calls the other. The engine has no public surface.</li>
+</ul>
+<h2 id="6-semantics-detail">6. Semantics detail</h2>
+<h3 id="61-consumption-arc">6.1 Consumption arc</h3>
+<p><code>Dataset_Execution</code> (input) and <code>{Asset}_Execution</code> Input rows. Every
+consumption arc carries the <strong>concrete input</strong> (<code>input_rid</code>, <code>input_type</code>,
+<code>input_version</code>). <strong>Unpinned dataset inputs</strong> (no <code>Dataset_Version</code>) emit an
+<code>unpinned_input</code> gap, enter the closure as an execution+dataset with
+<code>ancestry_state="not_walked"</code>, and are <strong>not</strong> expanded through any
+snapshot-dependent arc (no bindings, no ancestry, no version authorship) —
+never a silent live-state read.</p>
+<h3 id="62-asset-facts">6.2 Asset facts</h3>
+<p>Consumed assets are first-class closure members (<code>assets</code> map), including
+producerless ones. Producer resolution follows <strong>all</strong> Output rows for the
+asset — never first-match: zero producers ⇒ <code>no_asset_producer</code> gap; more
+than one ⇒ all reported as producers <strong>and</strong> a <code>multiple_asset_producers</code>
+gap (malformed multiplicity under the current writer contract). This
+requires fixing <code>_producer_of_asset()</code>'s first-match behavior — that fix is
+in scope and lands in the engine, with <code>lookup_lineage</code>'s frontend
+preserving its current single-producer display choice to keep the contract
+byte-identical.</p>
+<h3 id="63-version-authorship-arc-bounded-at-the-walked-version">6.3 Version-authorship arc — bounded at the walked version</h3>
+<p>For a walked <code>D@vN</code>, authors of versions <strong>up to and including vN</strong> in the
+RCT-primary total order (#367) enter the closure; later versions' authors do
+not (snapshot closure — live history must not leak future authors into a
+pinned closure). A version row with no execution attribution emits
+<code>no_version_author</code>. Attachment point is the version row (construction),
+kept distinct from member bindings (content) per ruling 3's corollary.</p>
+<h3 id="64-member-binding-arc">6.4 Member-binding arc</h3>
+<p>Per walked <code>(dataset, version)</code>, the engine calls an <strong>internal
+diagnostic-returning variant</strong> of the #385 machinery: it returns
+<code>(records, diagnostics)</code> where diagnostics distinguish "no bindings" from
+"failed to inspect" (planner ambiguity skips, snapshot-absent tables,
+per-feature query failures). The public <code>find_feature_producers</code> keeps its
+degrade-quietly contract and becomes a thin wrapper discarding diagnostics.
+In the closure, failures surface as <code>binding_scan_failed</code> gaps; records are
+carried verbatim as arc evidence; null-execution rows become
+<code>null_binding_execution</code> gaps. <strong>In-scope doc fix:</strong> <code>FeatureProducerRecord</code>'s
+docstring still says "provenance candidates" — stale against ruling 3;
+reword to binding-fact language.</p>
+<h3 id="65-ancestry-removed-see-ruling-8-2">6.5 Ancestry — REMOVED (see ruling 8, §2)</h3>
+<p>This section previously specified a <code>Dataset_Dataset</code> ancestry leg.
+<strong>Ruling 8 (Carl, 2026-09-01, issue #389) removed it</strong>: provenance is
+execution-mediated, so a parent dataset enters the closure only through
+the consumption arc of the execution that authored the child version.
+Containment is structure, not causation — see ruling 8 in §2 for the three
+accepted arguments (redundancy under proper capture, forbidden legacy
+compensation, unreliable causal direction). <code>ParentLink</code>, <code>AncestryState</code>,
+and <code>DatasetVersionFacts.{parents, ancestry_state, is_source}</code> are gone
+from the result model; <code>list_dataset_parents</code> remains the structural query.
+The strict snapshot resolver this section introduced
+(<code>strict_version_snapshot_catalog</code>) <strong>stays</strong> — it now gates only §6.3
+(version authorship) and §6.4 (member bindings), which is where the
+remaining <code>snapshot_chain_break</code> gaps come from.</p>
+<p>The section number is retained so §6.6 and later references keep numbering.</p>
+<h3 id="66-workflow-identity">6.6 Workflow identity</h3>
+<p><code>WorkflowSummary</code> today carries name/url/<strong>version</strong>, and version is
+documented as possibly stale relative to what a given execution ran (#377
+caveat). A provenance closure needs the identity deriva-ml actually
+dedupes workflows by: <strong>checksum</strong>. In scope: add <code>checksum: str | None</code> to
+<code>WorkflowSummary</code> (additive; populated by both frontends' summary fetch).
+Executions with no workflow record emit <code>no_workflow</code> gaps. The spec's
+completeness claim is correspondingly precise: the closure identifies the
+workflow <em>record</em> and its checksum — not a git-state attestation beyond
+what capture recorded.</p>
+<h3 id="67-rootdescriptortype-migration-to-roottype">6.7 <code>RootDescriptor.type</code> migration to <code>RootType</code></h3>
+<p>The shipped <code>RootDescriptor.type</code> is a <code>Literal</code> with the same four values.
+In scope: convert it to <code>RootType</code> (defined in <code>provenance.py</code>, imported by
+<code>lineage.py</code>). The change is runtime-compatible — members carry the
+identical string values, compare equal to the strings existing callers
+use, and <code>model_dump()</code> output is unchanged — so <code>lookup_lineage</code>'s
+byte-identical guarantee holds through it (the golden captures in §8
+prove it rather than assert it).</p>
+<h2 id="7-non-goals-stay-downstream-per-the-issues-boundary-section">7. Non-goals (stay downstream, per the issue's boundary section)</h2>
+<ul>
+<li>Arc-strength ranking or any ordering of arcs (ruling 4).</li>
+<li>Config-asserted dependencies / Hydra mining (ruling 1).</li>
+<li>Bakeability judgments, BlackBox-workflow name policy, CI gating.</li>
+<li>Rendering: <code>deriva-ml-lineage --closure</code> HTML is a <strong>follow-up issue</strong> —
+  drawing a closure (a DAG with typed arcs) is a different figure from the
+  lineage tree and deserves its own design pass. This spec ships the model
+  and API; the JSON envelope gains a <code>provenance</code> slot only when that
+  follow-up lands.</li>
+</ul>
+<h2 id="8-validation">8. Validation</h2>
+<ol>
+<li><strong>Golden byte-equivalence for the refactor:</strong> before the engine
+   extraction, capture golden <code>model_dump()</code> outputs of <code>lookup_lineage</code>
+   for the pinned scenario matrix — simple root, diamond, cycle, failed
+   lookup, member-producer fallback, depth cap, cap truncation — from the
+   existing offline harnesses. After the extraction, the TreeBuilder output
+   must compare equal to the goldens. The existing lineage suite passing
+   unmodified is necessary but not sufficient.</li>
+<li><strong>Offline closure tests:</strong> seam-mocked unit tests per arc kind, per gap
+   kind (all twelve), arc-identity dedup and minimum-depth, per-domain
+   visited separation, ancestry cycle termination, both budgets,
+   <code>traversal_complete</code> semantics, unpinned-input quarantine, strict
+   snapshot resolver raising on NULL, determinism of every sorted
+   collection — generated RIDs asserted only against flow-through values.</li>
+<li><strong>Live reconciliation (manual/scripted, not a committed test):</strong> run
+   <code>lookup_provenance</code> on the eye-ai reference training execution — the
+   artifact is <strong>resolved by catalog lookup at run time</strong> (per the RID
+   rule, its identifier is never a literal in committed test code) — and
+   reconcile against the deploy inventory's ground truth (45 executions /
+   17 workflows / 14 datasets / 5 gaps), expecting <strong>principled differences
+   only</strong>: sentinel by identity not name-matching, feature arcs as facts
+   with binding evidence, ancestry versions snapshot-resolved, and the new
+   gap kinds surfacing what the heuristic detector missed. Every difference
+   must be explainable by a ruling; the reconciliation is recorded in
+   tacit-knowledge.md.</li>
+</ol>
+<h2 id="9-open-questions-for-this-review">9. Open questions for this review</h2>
+<ol>
+<li><strong>Dataset budget default:</strong> is <code>4 × max_executions</code> the right proportional
+   bound for <code>datasets_visited</code>, or should it be an independent parameter?
+   (Leaning: proportional internal default; a second public knob is YAGNI
+   until a real catalog proves otherwise.)</li>
+<li><strong>Docs/CLI framing</strong> (carried over, still unresolved from the interview):
+   should the user guide and CLI lead with <code>lookup_provenance</code> as the
+   primary entry point and present <code>lookup_lineage</code> as the focused
+   data-flow view — or keep lineage primary? Pure documentation framing,
+   but it decides the README examples.</li>
+</ol>
+<h2 id="10-codex-round-1-disposition-2026-08-31">10. Codex round 1 disposition (2026-08-31)</h2>
+<p>17 P1 / 4 P2 findings; 16 P1s and all P2s accepted and folded in above
+(assets as members + concrete inputs, all-producers asset traversal, root
+version rule, vN-bounded authorship, strict snapshot resolver, unpinned
+quarantine, 12-kind gap taxonomy, diagnostic binding primitive,
+FeatureProducerRecord doc fix, workflow checksum, ancestry de-arced,
+tri-state ancestry/<code>is_source</code>, per-domain visited + dataset budget, arc
+identity/min-depth, richer engine event surface, per-version dataset facts,
+<code>traversal_complete</code> rename, full determinism, boundary validation, golden
+captures). Partially rejected: "hard-coded RID in validation" — §8.3
+describes a manual live reconciliation against a named production artifact
+(documentation, like the repo's memory notes), but the legitimate kernel is
+accepted: any committed/scripted form resolves the artifact by catalog
+lookup, never a literal.</p>
+<p><strong>Ruling 7, post-final-review (owner decision):</strong> <code>ArcKind.member_production</code>
+added — the asset analogue of <code>member_binding</code>, so a mid-walk producer of a
+consumed dataset's members no longer enters the closure with empty arcs
+(root-seed member producers keep <code>ArcKind.root</code>).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

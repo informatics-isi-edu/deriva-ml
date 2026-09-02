@@ -1,0 +1,3316 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-08-30-dataset-origin-lineage/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Dataset Origin + Version-Attribution Trace Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dataset-origin-version-attribution-trace-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dataset Origin + Version-Attribution Trace Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#global-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Constraints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Global Constraints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-_dataset_version_rows-single-fetch-total-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: _dataset_version_rows() — single fetch + total ordering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-models-versionattribution-rootdescriptor-fields-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Models — VersionAttribution, RootDescriptor fields, exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-_execution_summaries-batched-author-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: _execution_summaries() — batched author resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-non-raising-sentinel-lookup-with-positive-only-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Non-raising sentinel lookup with positive-only cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-origin-resolution-_producer_of_dataset-_classify_rid-dataset-branch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Origin resolution — _producer_of_dataset + _classify_rid dataset branch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-6-walk-seeding-sentinel-exclusion-no-overwrite-degradation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Walk seeding — sentinel exclusion, no overwrite, degradation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-7-create_schemapy-comment-correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: create_schema.py comment correction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-8-documentation-lookup_lineage-docstring-user-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Documentation — lookup_lineage docstring + user guide
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-9-mcp-compatibility-verification-read-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: MCP compatibility verification (read-only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-10-full-verification-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: Full verification + PR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review-notes-spec-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-review notes (spec ↔ plan)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="dataset-origin-version-attribution-trace-implementation-plan">Dataset Origin + Version-Attribution Trace Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> <code>lookup_lineage()</code> on a dataset reports the <em>origin</em> (first-recorded version author) instead of the last writer, plus a full version-attribution trace on the root — closing issue #367.</p>
+<p><strong>Architecture:</strong> No schema change. A new <code>_dataset_version_rows()</code> helper fetches+orders the version history once (RCT-primary total order); the dataset branch of <code>_classify_rid()</code> derives origin, <code>origin_recorded</code>, and <code>version_history</code> from that single fetch, with author summaries resolved by a new batched <code>_execution_summaries()</code> helper. Walk seeding is separated from origin attribution: the unknown-provenance sentinel never seeds the walk, and the walk-root overwrite of <code>root.producing_execution</code> no longer applies to Dataset roots.</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, Pydantic v2, deriva-py datapath, <code>packaging</code> (already a dependency), pytest with MagicMock offline fixtures.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-08-30-dataset-origin-lineage-design.md</code> (approved; survived two Codex review rounds — read it before starting).</p>
+<h2 id="global-constraints">Global Constraints</h2>
+<ul>
+<li>Run everything from <code>/Users/carl/GitHub/DerivaML/deriva-ml</code> with <code>cd</code> chained into the same Bash call (CWD is not persistent).</li>
+<li>All test/lint commands: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest ...</code> / <code>uv run ruff check ...</code> — never bare <code>pytest</code>/<code>python</code>.</li>
+<li><strong>No hand-written RID literals in new tests.</strong> Generate RIDs programmatically in fixtures (see <code>_rid()</code> helper in Task 1) and assert only against values that flowed through the code under test. RID comparisons are equality-only.</li>
+<li>Every behavioral test must be shown to FAIL before its implementation lands (the plan's test-first steps do this; do not skip the "verify it fails" steps).</li>
+<li>Docstrings: Google style with Args/Returns/Raises/Example. Pure-Python doctest examples run for real; catalog-touching examples need <code># doctest: +SKIP</code>.</li>
+<li>Existing behavior pinned: version-pinned resolution (<code>_producer_of_dataset(version=...)</code>), non-Dataset root behavior, and tk-018 member-producer walk seeding all stay unchanged except where the spec says otherwise.</li>
+<li>Branch: work continues on <code>feat/dataset-origin-lineage-367</code> (already exists, spec committed there). All changes land via one PR at the end.</li>
+</ul>
+<hr />
+<h3 id="task-1-_dataset_version_rows-single-fetch-total-ordering">Task 1: <code>_dataset_version_rows()</code> — single fetch + total ordering</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (add module-level <code>_version_row_sort_key</code> and method <code>_dataset_version_rows</code>, near <code>_producer_of_dataset</code> ~line 1322)
+- Test: <code>tests/execution/test_dataset_version_rows.py</code> (new)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>self.pathBuilder()</code>, <code>self.ml_schema</code> (existing mixin surface).
+- Produces: <code>_dataset_version_rows(self, dataset_rid: RID) -&gt; list[dict[str, Any]]</code> — ALL <code>Dataset_Version</code> rows for the dataset, sorted earliest→latest by the total order <code>(RCT, parseable-flag, parsed PEP 440 Version, raw label)</code>. Later tasks index <code>rows[0]</code> for origin and iterate for the trace. Also <code>_version_row_sort_key(row: dict) -&gt; tuple</code> (module-level, unit-testable).</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_dataset_version_rows.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for ExecutionMixin._dataset_version_rows ordering (issue #367).
+
+Offline: the pathBuilder is a dict-backed mock. RIDs are generated
+programmatically by _rid() — never hand-written literals — and assertions
+compare only values that flowed through the helper.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from deriva_ml.core.mixins.execution import ExecutionMixin, _version_row_sort_key
+
+
+def _rid(n: int) -&gt; str:
+    &quot;&quot;&quot;Programmatic RID-shaped string (pattern [A-Z\\d]{1,4} segments).&quot;&quot;&quot;
+    return f&quot;1-{n:04X}&quot;
+
+
+def _mixin_with_version_rows(rows: list[dict]):
+    &quot;&quot;&quot;ExecutionMixin whose Dataset_Version fetch returns `rows`.&quot;&quot;&quot;
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.ml_schema = &quot;deriva-ml&quot;
+    version_path = MagicMock()
+    version_path.filter.return_value.entities.return_value.fetch.return_value = list(rows)
+    schema = MagicMock()
+    schema.tables = {&quot;Dataset_Version&quot;: version_path}
+    pb = MagicMock()
+    pb.schemas = {&quot;deriva-ml&quot;: schema}
+    ml.pathBuilder = lambda: pb
+    return ml
+
+
+def _row(rct: str, version: str, exec_n: int | None, ver_rid: int = 0) -&gt; dict:
+    return {
+        &quot;RID&quot;: _rid(1000 + ver_rid),
+        &quot;RCT&quot;: rct,
+        &quot;Version&quot;: version,
+        &quot;Execution&quot;: _rid(exec_n) if exec_n is not None else None,
+        &quot;Description&quot;: f&quot;notes for {version}&quot;,
+    }
+
+
+def test_rct_primary_beats_version_label():
+    &quot;&quot;&quot;A later-created row with a LOWER version label sorts after.&quot;&quot;&quot;
+    early = _row(&quot;2025-01-01T00:00:00Z&quot;, &quot;1.0.0&quot;, 1, ver_rid=1)
+    late_low_label = _row(&quot;2026-01-01T00:00:00Z&quot;, &quot;0.9.0&quot;, 2, ver_rid=2)
+    ml = _mixin_with_version_rows([late_low_label, early])
+    out = ml._dataset_version_rows(_rid(500))
+    assert [r[&quot;RID&quot;] for r in out] == [early[&quot;RID&quot;], late_low_label[&quot;RID&quot;]]
+
+
+def test_rct_tie_falls_back_to_pep440_label():
+    t = &quot;2025-01-01T00:00:00Z&quot;
+    v2 = _row(t, &quot;0.2.0&quot;, 2, ver_rid=2)
+    v10 = _row(t, &quot;0.10.0&quot;, 3, ver_rid=3)
+    ml = _mixin_with_version_rows([v10, v2])
+    out = ml._dataset_version_rows(_rid(500))
+    assert [r[&quot;Version&quot;] for r in out] == [&quot;0.2.0&quot;, &quot;0.10.0&quot;]  # numeric, not lexical
+
+
+def test_unparseable_labels_sort_after_parseable_within_rct_tie():
+    t = &quot;2025-01-01T00:00:00Z&quot;
+    good = _row(t, &quot;0.1.0&quot;, 1, ver_rid=1)
+    bad = _row(t, &quot;not-a-version&quot;, 2, ver_rid=2)
+    ml = _mixin_with_version_rows([bad, good])
+    out = ml._dataset_version_rows(_rid(500))
+    assert out[0][&quot;Version&quot;] == &quot;0.1.0&quot;
+
+
+def test_two_unparseable_labels_fall_back_to_raw_string_order():
+    t = &quot;2025-01-01T00:00:00Z&quot;
+    a = _row(t, &quot;aaa-bad&quot;, 1, ver_rid=1)
+    b = _row(t, &quot;bbb-bad&quot;, 2, ver_rid=2)
+    ml = _mixin_with_version_rows([b, a])
+    out = ml._dataset_version_rows(_rid(500))
+    assert [r[&quot;Version&quot;] for r in out] == [&quot;aaa-bad&quot;, &quot;bbb-bad&quot;]
+
+
+def test_normalize_equal_labels_resolve_by_raw_string():
+    &quot;&quot;&quot;'1.0' and '1.0.0' parse equal — raw string breaks the tie, no crash.&quot;&quot;&quot;
+    t = &quot;2025-01-01T00:00:00Z&quot;
+    short = _row(t, &quot;1.0&quot;, 1, ver_rid=1)
+    long = _row(t, &quot;1.0.0&quot;, 2, ver_rid=2)
+    ml = _mixin_with_version_rows([long, short])
+    out = ml._dataset_version_rows(_rid(500))
+    assert [r[&quot;Version&quot;] for r in out] == [&quot;1.0&quot;, &quot;1.0.0&quot;]
+
+
+def test_missing_rct_sorts_first():
+    &quot;&quot;&quot;A row with no usable RCT is treated as epoch-minimum.&quot;&quot;&quot;
+    no_rct = {&quot;RID&quot;: _rid(1001), &quot;RCT&quot;: None, &quot;Version&quot;: &quot;5.0.0&quot;, &quot;Execution&quot;: None, &quot;Description&quot;: None}
+    dated = _row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, 1, ver_rid=2)
+    ml = _mixin_with_version_rows([dated, no_rct])
+    out = ml._dataset_version_rows(_rid(500))
+    assert out[0][&quot;RID&quot;] == no_rct[&quot;RID&quot;]
+
+
+def test_single_fetch_per_call():
+    ml = _mixin_with_version_rows([_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, 1)])
+    pb = ml.pathBuilder()
+    ml._dataset_version_rows(_rid(500))
+    assert pb.schemas[&quot;deriva-ml&quot;].tables[&quot;Dataset_Version&quot;].filter.call_count == 1
+
+
+def test_sort_key_is_module_level_and_total():
+    &quot;&quot;&quot;Direct key checks: flag separates parseable from not at equal RCT.&quot;&quot;&quot;
+    t = &quot;2025-01-01T00:00:00Z&quot;
+    k_good = _version_row_sort_key({&quot;RCT&quot;: t, &quot;Version&quot;: &quot;1.0.0&quot;})
+    k_bad = _version_row_sort_key({&quot;RCT&quot;: t, &quot;Version&quot;: &quot;junk&quot;})
+    assert k_good &lt; k_bad
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_dataset_version_rows.py -q -p no:randomly</code>
+Expected: FAIL — <code>ImportError: cannot import name '_version_row_sort_key'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/execution.py</code>, add near the top of the module (after existing imports):</p>
+<pre><code class="language-python">from packaging.version import InvalidVersion, Version as _PEP440Version
+</code></pre>
+<p>Add a module-level function (place directly above the <code>ExecutionMixin</code> class or near <code>_producer_of_dataset</code>'s section):</p>
+<pre><code class="language-python">def _version_row_sort_key(row: dict[str, Any]) -&gt; tuple:
+    &quot;&quot;&quot;Total sort key for a ``Dataset_Version`` row (spec: issue #367).
+
+    Ordering is ``(RCT, parseable-flag, parsed PEP 440 version, raw label)``:
+
+    - ``RCT`` primary: chronology of *recording*, which is the question the
+      origin resolution asks. ERMrest emits RCT as ISO-8601 UTC text, so
+      lexicographic comparison is chronological; a missing RCT sorts first
+      (epoch-minimum) and defers to the tiebreaks.
+    - Parseable labels sort before unparseable ones within an RCT tie; among
+      parseable ones PEP 440 order applies (``0.2.0`` &lt; ``0.10.0``).
+    - The raw label string is the final tiebreak, making the order total even
+      for two unparseable labels or labels that normalize equal
+      (``1.0`` vs ``1.0.0``).
+
+    Args:
+        row: A ``Dataset_Version`` row dict (``RCT``, ``Version`` keys used).
+
+    Returns:
+        A tuple comparable against any other row's key.
+
+    Example:
+        &gt;&gt;&gt; _version_row_sort_key({&quot;RCT&quot;: &quot;2025-01-01T00:00:00Z&quot;, &quot;Version&quot;: &quot;1.0.0&quot;}) &lt; \
+        ...     _version_row_sort_key({&quot;RCT&quot;: &quot;2026-01-01T00:00:00Z&quot;, &quot;Version&quot;: &quot;0.1.0&quot;})
+        True
+    &quot;&quot;&quot;
+    rct = row.get(&quot;RCT&quot;) or &quot;&quot;
+    label = row.get(&quot;Version&quot;) or &quot;&quot;
+    try:
+        return (rct, 0, _PEP440Version(label), label)
+    except InvalidVersion:
+        # Constant Version(&quot;0&quot;) in slot 3: never compared against a parseable
+        # row's key (flag differs), and equal among unparseable rows so the
+        # raw label decides.
+        return (rct, 1, _PEP440Version(&quot;0&quot;), label)
+</code></pre>
+<p>Add the method to <code>ExecutionMixin</code> (directly above <code>_producer_of_dataset</code>):</p>
+<pre><code class="language-python">def _dataset_version_rows(self, dataset_rid: RID) -&gt; list[dict[str, Any]]:
+    &quot;&quot;&quot;All ``Dataset_Version`` rows for ``dataset_rid``, earliest first.
+
+    Single catalog fetch; sorted by :func:`_version_row_sort_key` (RCT-primary
+    total order). The first row's ``Execution`` is the dataset's origin
+    attribution; the full list becomes the lineage root's version history.
+
+    Args:
+        dataset_rid: Dataset whose version history to fetch.
+
+    Returns:
+        Row dicts (system columns included), sorted earliest → latest.
+        Empty list if the dataset has no version rows.
+
+    Example:
+        &gt;&gt;&gt; rows = ml._dataset_version_rows(&quot;1-DSAA&quot;)  # doctest: +SKIP
+        &gt;&gt;&gt; origin_rid = rows[0][&quot;Execution&quot;] if rows else None  # doctest: +SKIP
+    &quot;&quot;&quot;
+    pb = self.pathBuilder()
+    version_path = pb.schemas[self.ml_schema].tables[&quot;Dataset_Version&quot;]
+    rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
+    return sorted(rows, key=_version_row_sort_key)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_dataset_version_rows.py -q -p no:randomly</code>
+Expected: 8 passed.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/execution.py tests/execution/test_dataset_version_rows.py &amp;&amp; git commit -m &quot;feat(lineage): _dataset_version_rows with RCT-primary total ordering (#367)&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-models-versionattribution-rootdescriptor-fields-exports">Task 2: Models — <code>VersionAttribution</code>, <code>RootDescriptor</code> fields, exports</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/lineage.py</code> (add <code>VersionAttribution</code> after <code>AssetSummary</code> ~line 106; extend <code>RootDescriptor</code> ~line 139; update <code>RootDescriptor</code> and <code>LineageResult</code> docstrings)
+- Modify: <code>src/deriva_ml/execution/__init__.py</code> (import ~line 40, <code>__all__</code> ~line 104)
+- Test: <code>tests/execution/test_lineage_models.py</code> (new)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: existing <code>ExecutionSummary</code>, <code>RID</code>, Pydantic base pattern in <code>lineage.py</code>.
+- Produces: <code>VersionAttribution(version: str, execution_rid: RID | None, execution: ExecutionSummary | None, description: str | None)</code>; <code>RootDescriptor.origin_recorded: bool | None = None</code>; <code>RootDescriptor.version_history: list[VersionAttribution]</code> (default empty). Task 5 constructs these.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_lineage_models.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Model + export pins for the #367 lineage additions.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+
+def _rid(n: int) -&gt; str:
+    return f&quot;1-{n:04X}&quot;
+
+
+def test_version_attribution_importable_from_package():
+    from deriva_ml.execution import VersionAttribution  # noqa: F401
+
+
+def test_version_attribution_in_all():
+    import deriva_ml.execution as pkg
+
+    assert &quot;VersionAttribution&quot; in pkg.__all__
+
+
+def test_root_descriptor_new_fields_default():
+    from deriva_ml.execution.lineage import RootDescriptor
+
+    root = RootDescriptor(rid=_rid(1), type=&quot;Asset&quot;, description=None)
+    assert root.origin_recorded is None
+    assert root.version_history == []
+
+
+def test_version_attribution_carries_raw_rid_separately():
+    from deriva_ml.execution import VersionAttribution
+
+    entry = VersionAttribution(
+        version=&quot;0.1.0&quot;, execution_rid=_rid(2), execution=None, description=None
+    )
+    assert entry.execution_rid == _rid(2)
+    assert entry.execution is None  # recorded but unresolved
+
+
+def test_model_dump_is_additive():
+    &quot;&quot;&quot;Serialized root carries the new keys alongside every old one.&quot;&quot;&quot;
+    from deriva_ml.execution.lineage import RootDescriptor
+
+    d = RootDescriptor(rid=_rid(1), type=&quot;Dataset&quot;, description=None).model_dump()
+    for key in (&quot;rid&quot;, &quot;type&quot;, &quot;description&quot;, &quot;producing_execution&quot;,
+                &quot;origin_recorded&quot;, &quot;version_history&quot;):
+        assert key in d
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lineage_models.py -q -p no:randomly</code>
+Expected: FAIL — <code>ImportError: cannot import name 'VersionAttribution'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/lineage.py</code>, after <code>AssetSummary</code> and before <code>LineageNode</code>:</p>
+<pre><code class="language-python">class VersionAttribution(BaseModel):
+    &quot;&quot;&quot;One entry in a dataset root's version-attribution trace.
+
+    The trace lists every ``Dataset_Version`` row for the dataset,
+    earliest recorded first, so a consumer can see who authored each
+    version — distinguishing the origin (first entry) from later
+    touchers such as migrations or backfills.
+
+    Attributes:
+        version: The version label as stored (e.g. ``&quot;4.13.0&quot;``).
+        execution_rid: Raw ``Execution`` column value — the recorded
+            author RID, or None if the row carries no author. Kept
+            separate from ``execution`` so &quot;no author recorded&quot; and
+            &quot;author could not be resolved&quot; are distinguishable.
+        execution: Resolved summary of the author, or None when
+            ``execution_rid`` is None or the lookup could not resolve it.
+        description: The version's release notes.
+    &quot;&quot;&quot;
+
+    model_config = ConfigDict(extra=&quot;forbid&quot;)
+
+    version: str
+    execution_rid: RID | None = None
+    execution: ExecutionSummary | None = None
+    description: str | None = None
+</code></pre>
+<p>Extend <code>RootDescriptor</code> — add after <code>producing_execution</code>:</p>
+<pre><code class="language-python">    origin_recorded: bool | None = None
+    version_history: list[VersionAttribution] = Field(default_factory=list)
+</code></pre>
+<p>Replace the <code>RootDescriptor</code> docstring's <code>producing_execution</code> attribute line and add the new attributes (full docstring body):</p>
+<pre><code class="language-python">    &quot;&quot;&quot;The artifact lineage was requested for.
+
+    Attributes:
+        rid: The root artifact's RID.
+        type: Artifact kind — Dataset, Asset, Feature, or Execution.
+        description: The artifact's description, if any.
+        producing_execution: For datasets, the ORIGIN — the author of the
+            first-recorded ``Dataset_Version`` row (the unknown-provenance
+            sentinel included, when that is what the row records). For other
+            types, the immediate producing execution. May be None when no
+            producer is recorded or the recorded RID cannot be resolved; for
+            datasets the raw recorded RID then remains available at
+            ``version_history[0].execution_rid``. This is origin
+            *attribution* and no longer necessarily equals the walk root
+            ``LineageResult.lineage.execution`` (see that model's docstring).
+        origin_recorded: Datasets only — True when a real (non-sentinel)
+            origin execution is recorded (even if its summary could not be
+            resolved); False when the origin is the unknown-provenance
+            sentinel, the first version row carries no execution, or the
+            dataset has no version rows; None for non-Dataset roots (not
+            applicable).
+        version_history: Datasets only — the full version-attribution trace,
+            earliest recorded first. Empty for non-Dataset roots.
+    &quot;&quot;&quot;
+</code></pre>
+<p>Update <code>LineageResult</code>'s docstring: replace any sentence stating the lineage is rooted at the root's immediate producer with:</p>
+<pre><code>        lineage: The walked graph. Its root node is the walk seed — for
+            datasets this is the origin execution when it is real and
+            expandable, otherwise a member-producer representative (the
+            unknown-provenance sentinel never seeds the walk). It therefore
+            does not necessarily equal ``root.producing_execution``, which is
+            origin attribution.
+</code></pre>
+<p>In <code>src/deriva_ml/execution/__init__.py</code>: add <code>VersionAttribution</code> to the <code>from deriva_ml.execution.lineage import (...)</code> block (alphabetical, after <code>RootDescriptor</code>) and to <code>__all__</code> (alphabetical).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lineage_models.py tests/execution/test_lookup_lineage_unit.py -q -p no:randomly</code>
+Expected: all pass (existing lineage unit tests must not break — new fields are optional with defaults).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/execution/lineage.py src/deriva_ml/execution/__init__.py tests/execution/test_lineage_models.py &amp;&amp; git commit -m &quot;feat(lineage): VersionAttribution model + RootDescriptor origin fields (#367)&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-_execution_summaries-batched-author-resolution">Task 3: <code>_execution_summaries()</code> — batched author resolution</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (new method + module constant, place after <code>_dataset_version_rows</code>)
+- Test: <code>tests/execution/test_execution_summaries_batch.py</code> (new)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>self.pathBuilder()</code>, <code>self.ml_schema</code>; <code>ExecutionSummary</code> / <code>WorkflowSummary</code> from <code>deriva_ml.execution.lineage</code>.
+- Produces: <code>_execution_summaries(self, rids: Iterable[RID | None]) -&gt; dict[RID, ExecutionSummary]</code> — deduped, chunked (<code>_SUMMARY_CHUNK_SIZE = 25</code>) Execution fetch plus one chunked Workflow-name fetch; missing RIDs simply absent from the dict. Task 5 calls this once per dataset root.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_execution_summaries_batch.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Query-count + shape pins for ExecutionMixin._execution_summaries (#367).
+
+Offline. RIDs are programmatically generated; the mock pathBuilder records
+filter() calls so the tests assert request counts, not URL syntax.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from deriva_ml.core.mixins.execution import _SUMMARY_CHUNK_SIZE, ExecutionMixin
+
+
+def _rid(n: int) -&gt; str:
+    return f&quot;1-{n:04X}&quot;
+
+
+class _Recorder:
+    &quot;&quot;&quot;Table mock: records filter() calls, returns scripted rows.&quot;&quot;&quot;
+
+    def __init__(self, rows_by_rid: dict):
+        self.rows_by_rid = rows_by_rid
+        self.filter_calls = 0
+        # Predicate operands: table.RID == rid must yield an object carrying
+        # the rid so fetch can resolve which rows were requested. A MagicMock
+        # __eq__ returning a tagged object does this.
+        self.RID = MagicMock()
+        self._requested: list[list[str]] = []
+        self.RID.__eq__ = lambda _self, other: _Pred([other])
+
+    def filter(self, pred):
+        self.filter_calls += 1
+        self._requested.append(pred.rids)
+        result = MagicMock()
+        rows = [self.rows_by_rid[r] for r in pred.rids if r in self.rows_by_rid]
+        result.entities.return_value.fetch.return_value = rows
+        return result
+
+
+class _Pred:
+    def __init__(self, rids):
+        self.rids = list(rids)
+
+    def __or__(self, other):
+        return _Pred(self.rids + other.rids)
+
+
+def _mixin(exec_rows: dict, wf_rows: dict):
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.ml_schema = &quot;deriva-ml&quot;
+    exec_table = _Recorder(exec_rows)
+    wf_table = _Recorder(wf_rows)
+    schema = MagicMock()
+    schema.tables = {&quot;Execution&quot;: exec_table, &quot;Workflow&quot;: wf_table}
+    pb = MagicMock()
+    pb.schemas = {&quot;deriva-ml&quot;: schema}
+    ml.pathBuilder = lambda: pb
+    return ml, exec_table, wf_table
+
+
+def _exec_row(n: int, wf_n: int | None = None) -&gt; dict:
+    return {
+        &quot;RID&quot;: _rid(n),
+        &quot;Description&quot;: f&quot;exec {n}&quot;,
+        &quot;Status&quot;: &quot;Completed&quot;,
+        &quot;Workflow&quot;: _rid(wf_n) if wf_n is not None else None,
+    }
+
+
+def test_empty_and_all_none_issue_zero_queries():
+    ml, exec_table, wf_table = _mixin({}, {})
+    assert ml._execution_summaries([]) == {}
+    assert ml._execution_summaries([None, None]) == {}
+    assert exec_table.filter_calls == 0
+    assert wf_table.filter_calls == 0
+
+
+def test_duplicates_dedupe_to_one_lookup_entry():
+    row = _exec_row(1)
+    ml, exec_table, _ = _mixin({row[&quot;RID&quot;]: row}, {})
+    out = ml._execution_summaries([row[&quot;RID&quot;], row[&quot;RID&quot;], row[&quot;RID&quot;]])
+    assert exec_table.filter_calls == 1
+    assert list(out) == [row[&quot;RID&quot;]]
+
+
+def test_chunk_boundary_two_requests():
+    rows = {(_r := _exec_row(i))[&quot;RID&quot;]: _r for i in range(_SUMMARY_CHUNK_SIZE + 1)}
+    ml, exec_table, _ = _mixin(rows, {})
+    out = ml._execution_summaries(list(rows))
+    assert exec_table.filter_calls == 2
+    assert len(out) == _SUMMARY_CHUNK_SIZE + 1
+
+
+def test_workflow_names_batched_not_per_execution():
+    wf = {&quot;RID&quot;: _rid(900), &quot;Name&quot;: &quot;training workflow&quot;}
+    rows = {(_r := _exec_row(i, wf_n=900))[&quot;RID&quot;]: _r for i in range(1, 4)}
+    ml, exec_table, wf_table = _mixin(rows, {wf[&quot;RID&quot;]: wf})
+    out = ml._execution_summaries(list(rows))
+    assert wf_table.filter_calls == 1  # 3 executions, 1 distinct workflow, 1 query
+    assert all(s.workflow is not None and s.workflow.name == &quot;training workflow&quot; for s in out.values())
+
+
+def test_unresolvable_rid_absent_from_result():
+    row = _exec_row(1)
+    ml, _, _ = _mixin({row[&quot;RID&quot;]: row}, {})
+    out = ml._execution_summaries([row[&quot;RID&quot;], _rid(999)])
+    assert _rid(999) not in out
+    assert row[&quot;RID&quot;] in out
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_summaries_batch.py -q -p no:randomly</code>
+Expected: FAIL — <code>ImportError: cannot import name '_SUMMARY_CHUNK_SIZE'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/execution.py</code>, module level:</p>
+<pre><code class="language-python"># Chunk size for batched RID-disjunction fetches. Bounds URL length (the
+# tk-023 lesson: never one unbounded .in_()/disjunction over a caller-sized
+# set) while keeping request count low for realistic author counts.
+_SUMMARY_CHUNK_SIZE = 25
+</code></pre>
+<p>Method on <code>ExecutionMixin</code>:</p>
+<pre><code class="language-python">def _execution_summaries(self, rids: &quot;Iterable[RID | None]&quot;) -&gt; dict[RID, &quot;ExecutionSummary&quot;]:
+    &quot;&quot;&quot;Resolve ExecutionSummary objects for a set of execution RIDs, batched.
+
+    Dedupes and drops None, then fetches Execution rows in chunks of
+    ``_SUMMARY_CHUNK_SIZE`` (one RID-equality disjunction per chunk), then
+    resolves the distinct Workflow names the same way — never a
+    per-execution N+1. RIDs that resolve to no row are absent from the
+    result; callers treat absence as &quot;could not resolve&quot;.
+
+    Args:
+        rids: Execution RIDs (Nones ignored, duplicates collapsed).
+
+    Returns:
+        Mapping of execution RID to its ExecutionSummary.
+
+    Example:
+        &gt;&gt;&gt; summaries = ml._execution_summaries([&quot;2-ABC&quot;, &quot;2-DEF&quot;])  # doctest: +SKIP
+        &gt;&gt;&gt; summaries[&quot;2-ABC&quot;].status  # doctest: +SKIP
+        'Completed'
+    &quot;&quot;&quot;
+    from deriva_ml.execution.lineage import ExecutionSummary, WorkflowSummary
+
+    distinct = list(dict.fromkeys(r for r in rids if r))
+    if not distinct:
+        return {}
+
+    pb = self.pathBuilder()
+
+    def _chunked_rows(table_path: Any, wanted: list[RID]) -&gt; list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for i in range(0, len(wanted), _SUMMARY_CHUNK_SIZE):
+            chunk = wanted[i : i + _SUMMARY_CHUNK_SIZE]
+            pred = table_path.RID == chunk[0]
+            for r in chunk[1:]:
+                pred = pred | (table_path.RID == r)
+            rows.extend(table_path.filter(pred).entities().fetch())
+        return rows
+
+    exec_path = pb.schemas[self.ml_schema].tables[&quot;Execution&quot;]
+    exec_rows = _chunked_rows(exec_path, distinct)
+
+    wf_rids = list(dict.fromkeys(row.get(&quot;Workflow&quot;) for row in exec_rows if row.get(&quot;Workflow&quot;)))
+    wf_names: dict[RID, str | None] = {}
+    if wf_rids:
+        wf_path = pb.schemas[self.ml_schema].tables[&quot;Workflow&quot;]
+        for wrow in _chunked_rows(wf_path, wf_rids):
+            wf_names[wrow[&quot;RID&quot;]] = wrow.get(&quot;Name&quot;)
+
+    out: dict[RID, ExecutionSummary] = {}
+    for row in exec_rows:
+        wf_rid = row.get(&quot;Workflow&quot;)
+        wf_summary = WorkflowSummary(rid=wf_rid, name=wf_names.get(wf_rid)) if wf_rid else None
+        out[row[&quot;RID&quot;]] = ExecutionSummary(
+            rid=row[&quot;RID&quot;],
+            description=row.get(&quot;Description&quot;),
+            workflow=wf_summary,
+            status=row.get(&quot;Status&quot;) or &quot;Unknown&quot;,
+        )
+    return out
+</code></pre>
+<p>(<code>Iterable</code> comes from <code>typing</code>/<code>collections.abc</code> — add to the module's imports if not present.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_summaries_batch.py -q -p no:randomly</code>
+Expected: 5 passed.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/execution.py tests/execution/test_execution_summaries_batch.py &amp;&amp; git commit -m &quot;feat(lineage): batched _execution_summaries with chunked workflow resolution (#367)&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-non-raising-sentinel-lookup-with-positive-only-cache">Task 4: Non-raising sentinel lookup with positive-only cache</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (new method <code>_sentinel_execution_rid_or_none</code>; reimplement <code>unknown_provenance_execution_rid</code> ~line 75 on top of it)
+- Test: <code>tests/execution/test_sentinel_lookup.py</code> (new)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>SENTINEL_EXECUTION_DESCRIPTION</code> from <code>deriva_ml.core.constants</code>; <code>self.pathBuilder()</code>.
+- Produces: <code>_sentinel_execution_rid_or_none(self) -&gt; RID | None</code> — None when the sentinel row is absent (catalog never adopted the contract), positive result cached on <code>self._sentinel_exec_rid</code>; transport errors propagate. <code>unknown_provenance_execution_rid()</code> keeps its exact public contract (raises <code>DerivaMLException</code> on absence).</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_sentinel_lookup.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Pins for the non-raising sentinel lookup + positive-only cache (#367).&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+
+from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.mixins.execution import ExecutionMixin
+
+
+def _rid(n: int) -&gt; str:
+    return f&quot;1-{n:04X}&quot;
+
+
+def _mixin_with_sentinel_rows(rows: list[dict]):
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.ml_schema = &quot;deriva-ml&quot;
+    exe = MagicMock()
+    exe.filter.return_value.entities.return_value = iter(rows)
+    schema = MagicMock()
+    schema.Execution = exe
+    pb = MagicMock()
+    pb.schemas = {&quot;deriva-ml&quot;: schema}
+    ml.pathBuilder = lambda: pb
+    return ml, exe
+
+
+def test_absent_returns_none_without_raising():
+    ml, _ = _mixin_with_sentinel_rows([])
+    assert ml._sentinel_execution_rid_or_none() is None
+
+
+def test_absence_is_not_cached():
+    ml, exe = _mixin_with_sentinel_rows([])
+    ml._sentinel_execution_rid_or_none()
+    exe.filter.return_value.entities.return_value = iter([{&quot;RID&quot;: _rid(7)}])
+    assert ml._sentinel_execution_rid_or_none() == _rid(7)  # re-queried
+
+
+def test_positive_result_cached_no_second_query():
+    ml, exe = _mixin_with_sentinel_rows([{&quot;RID&quot;: _rid(7)}])
+    first = ml._sentinel_execution_rid_or_none()
+    second = ml._sentinel_execution_rid_or_none()
+    assert first == second == _rid(7)
+    assert exe.filter.call_count == 1
+
+
+def test_transport_error_propagates():
+    ml, exe = _mixin_with_sentinel_rows([])
+    exe.filter.side_effect = ConnectionError(&quot;catalog unreachable&quot;)
+    with pytest.raises(ConnectionError):
+        ml._sentinel_execution_rid_or_none()
+
+
+def test_public_raising_wrapper_unchanged():
+    ml, _ = _mixin_with_sentinel_rows([])
+    with pytest.raises(DerivaMLException, match=&quot;sentinel&quot;):
+        ml.unknown_provenance_execution_rid()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_sentinel_lookup.py -q -p no:randomly</code>
+Expected: FAIL — <code>AttributeError: ... has no attribute '_sentinel_execution_rid_or_none'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/execution.py</code>, add above <code>unknown_provenance_execution_rid</code>:</p>
+<pre><code class="language-python">def _sentinel_execution_rid_or_none(self) -&gt; RID | None:
+    &quot;&quot;&quot;RID of the unknown-provenance Execution sentinel, or None if absent.
+
+    Non-raising variant used by lineage classification: absence (a catalog
+    that never adopted the provenance contract) is a normal answer, not an
+    error, so it returns None rather than raising — transport and auth
+    failures still propagate. The positive result is cached on the instance
+    (``self._sentinel_exec_rid``); absence is never cached, because contract
+    adoption can happen during the instance lifetime.
+
+    Returns:
+        The sentinel Execution's RID, or None when no sentinel row exists.
+
+    Example:
+        &gt;&gt;&gt; rid = ml._sentinel_execution_rid_or_none()  # doctest: +SKIP
+    &quot;&quot;&quot;
+    cached = getattr(self, &quot;_sentinel_exec_rid&quot;, None)
+    if cached is not None:
+        return cached
+    from deriva_ml.core.constants import SENTINEL_EXECUTION_DESCRIPTION
+
+    pb = self.pathBuilder()
+    exe = pb.schemas[self.ml_schema].Execution
+    rows = list(exe.filter(exe.Description == SENTINEL_EXECUTION_DESCRIPTION).entities())
+    if not rows:
+        return None
+    self._sentinel_exec_rid = rows[0][&quot;RID&quot;]
+    return self._sentinel_exec_rid
+</code></pre>
+<p>Reimplement the body of <code>unknown_provenance_execution_rid</code> (keep its docstring):</p>
+<pre><code class="language-python">    rid = self._sentinel_execution_rid_or_none()
+    if rid is None:
+        raise DerivaMLException(
+            &quot;Unknown-provenance Execution sentinel not found; catalog was not &quot;
+            &quot;initialized with provenance-contract sentinels.&quot;
+        )
+    return rid
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_sentinel_lookup.py -q -p no:randomly</code>
+Expected: 5 passed.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/execution.py tests/execution/test_sentinel_lookup.py &amp;&amp; git commit -m &quot;feat(lineage): non-raising sentinel lookup with positive-only cache (#367)&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-origin-resolution-_producer_of_dataset-_classify_rid-dataset-branch">Task 5: Origin resolution — <code>_producer_of_dataset</code> + <code>_classify_rid</code> dataset branch</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (<code>_producer_of_dataset</code> ~line 1322: replace the <code>max(rows)</code> unversioned branch; <code>_classify_rid</code> Dataset branch ~line 1277: build full origin state)
+- Test: <code>tests/execution/test_lookup_lineage_unit.py</code> (extend — this module owns root-classification behavior)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>_dataset_version_rows</code> (Task 1), <code>_execution_summaries</code> (Task 3), <code>_sentinel_execution_rid_or_none</code> (Task 4), <code>VersionAttribution</code> (Task 2).
+- Produces: <code>_classify_rid</code> Dataset branch returns a fully-populated <code>RootDescriptor</code> (origin <code>producing_execution</code>, <code>origin_recorded</code>, <code>version_history</code>) and a <strong>walk-seed</strong> <code>producer_rid</code> that is None when the origin is absent or the sentinel. <code>_producer_of_dataset(rid)</code> (unversioned) returns the FIRST-recorded row's <code>Execution</code>; the <code>version=</code> path is untouched.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/execution/test_lookup_lineage_unit.py</code> (follow that module's existing stub conventions; RIDs via a local <code>_gen_rid(n)</code> helper, programmatically generated):</p>
+<pre><code class="language-python"># ---------------------------------------------------------------------------
+# #367: origin resolution (first-recorded, not last-writer)
+# ---------------------------------------------------------------------------
+
+
+def _gen_rid(n: int) -&gt; str:
+    return f&quot;1-{n:04X}&quot;
+
+
+_version_row_ids = iter(range(0x100, 0xFFF))
+
+
+def _version_row(rct: str, version: str, exec_rid: str | None) -&gt; dict:
+    return {&quot;RID&quot;: _gen_rid(next(_version_row_ids)), &quot;RCT&quot;: rct,
+            &quot;Version&quot;: version, &quot;Execution&quot;: exec_rid, &quot;Description&quot;: None}
+
+
+def _origin_ml(version_rows, sentinel_rid=None, summaries=None):
+    &quot;&quot;&quot;ExecutionMixin stub wired for the dataset branch of _classify_rid.&quot;&quot;&quot;
+    ml = ExecutionMixin.__new__(ExecutionMixin)
+    ml.ml_schema = &quot;deriva-ml&quot;
+    ml.resolve_rid = lambda rid: _StubResolved(table=_StubTable(name=&quot;Dataset&quot;, columns=[]))
+    ml._retrieve_rid = lambda rid: {&quot;RID&quot;: rid, &quot;Description&quot;: &quot;a dataset&quot;}
+    ml._dataset_version_rows = lambda rid: list(version_rows)
+    ml._sentinel_execution_rid_or_none = lambda: sentinel_rid
+    ml._execution_summaries = lambda rids: dict(summaries or {})
+    return ml
+
+
+def test_unversioned_producer_is_first_recorded_not_latest():
+    origin_exec, migration_exec = _gen_rid(10), _gen_rid(11)
+    rows = [
+        _version_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, origin_exec),
+        _version_row(&quot;2026-01-01T00:00:00Z&quot;, &quot;4.13.0&quot;, migration_exec),
+    ]
+    ml = _origin_ml(rows)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed == origin_exec
+    assert descriptor.origin_recorded is True
+    assert descriptor.version_history[0].execution_rid == origin_exec
+    assert descriptor.version_history[-1].execution_rid == migration_exec
+
+
+def test_sentinel_origin_reported_but_never_walk_seed():
+    sentinel = _gen_rid(66)
+    rows = [_version_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, sentinel)]
+    ml = _origin_ml(rows, sentinel_rid=sentinel)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None            # sentinel never seeds the walk
+    assert descriptor.origin_recorded is False
+
+
+def test_no_execution_on_first_row():
+    rows = [_version_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, None)]
+    ml = _origin_ml(rows)
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None
+    assert descriptor.origin_recorded is False
+    assert descriptor.producing_execution is None
+    assert descriptor.version_history[0].execution_rid is None
+
+
+def test_no_version_rows():
+    ml = _origin_ml([])
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert walk_seed is None
+    assert descriptor.origin_recorded is False
+    assert descriptor.version_history == []
+
+
+def test_recorded_but_unresolvable_origin_keeps_recorded_true():
+    origin_exec = _gen_rid(10)
+    rows = [_version_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, origin_exec)]
+    ml = _origin_ml(rows, summaries={})  # summary resolution came back empty
+    descriptor, walk_seed = ml._classify_rid(_gen_rid(1))
+    assert descriptor.origin_recorded is True
+    assert descriptor.producing_execution is None
+    assert descriptor.version_history[0].execution_rid == origin_exec
+    assert walk_seed == origin_exec
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lookup_lineage_unit.py -q -p no:randomly -k "367 or first_recorded or sentinel_origin or unresolvable or no_version_rows or no_execution_on_first"</code>
+Expected: the five new tests FAIL (current code resolves via <code>_producer_of_dataset</code> → <code>max(rows)</code> and never sets <code>origin_recorded</code>/<code>version_history</code>).</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement</strong></li>
+</ul>
+<p>In <code>_producer_of_dataset</code>, replace the unversioned branch (delete the local <code>_key</code> function and <code>latest = max(rows, key=_key)</code>):</p>
+<pre><code class="language-python">        # Unversioned: the ORIGIN — the first-recorded row's author (issue
+        # #367). Last-writer-wins was the old behavior and reported whatever
+        # touched the dataset most recently (e.g. a data migration) as &quot;the
+        # producer&quot;.
+        ordered = sorted(rows, key=_version_row_sort_key)
+        return ordered[0].get(&quot;Execution&quot;)
+</code></pre>
+<p>(Keep the single fetch already in the method; sorting reuses Task 1's key. The <code>version=</code> branch is untouched.)</p>
+<p>Replace the <code>_classify_rid</code> Dataset branch (currently <code>producer_rid = self._producer_of_dataset(rid)</code> and a bare <code>RootDescriptor</code>) with:</p>
+<pre><code class="language-python">        if table_name == &quot;Dataset&quot;:
+            from deriva_ml.execution.lineage import VersionAttribution
+
+            row = self._retrieve_rid(rid)
+            version_rows = self._dataset_version_rows(rid)
+            origin_rid = version_rows[0].get(&quot;Execution&quot;) if version_rows else None
+            sentinel_rid = self._sentinel_execution_rid_or_none()
+            origin_is_sentinel = origin_rid is not None and origin_rid == sentinel_rid
+            author_summaries = self._execution_summaries(r.get(&quot;Execution&quot;) for r in version_rows)
+            history = [
+                VersionAttribution(
+                    version=r.get(&quot;Version&quot;) or &quot;&quot;,
+                    execution_rid=r.get(&quot;Execution&quot;),
+                    execution=author_summaries.get(r.get(&quot;Execution&quot;)),
+                    description=r.get(&quot;Description&quot;),
+                )
+                for r in version_rows
+            ]
+            descriptor = RootDescriptor(
+                rid=rid,
+                type=&quot;Dataset&quot;,
+                description=row.get(&quot;Description&quot;),
+                producing_execution=author_summaries.get(origin_rid) if origin_rid else None,
+                origin_recorded=bool(origin_rid) and not origin_is_sentinel,
+                version_history=history,
+            )
+            # Walk seed: the origin only when real and non-sentinel. The
+            # sentinel never seeds the walk — lineage terminates at it, and
+            # seeding from it would fabricate edges claiming it consumed the
+            # member producers (spec: walk seed vs. origin attribution).
+            walk_seed = origin_rid if (origin_rid and not origin_is_sentinel) else None
+            return (descriptor, walk_seed)
+</code></pre>
+<p>Note: <code>_classify_rid</code>'s single caller is <code>lookup_lineage</code>; the sole other consumer of the unversioned <code>_producer_of_dataset</code> was this branch, so the two changes land together.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass, and that nothing else broke</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lookup_lineage_unit.py tests/execution/test_dataset_version_rows.py tests/execution/test_producers_of_dataset_members.py tests/execution/test_forward_lineage.py -q -p no:randomly</code>
+Expected: all pass. If an existing lookup_lineage unit test stubs <code>_producer_of_dataset</code> and asserts dataset-root behavior, update its stub to the new seam (<code>_dataset_version_rows</code> + <code>_execution_summaries</code> + <code>_sentinel_execution_rid_or_none</code>) — the walk-shape assertions themselves must keep passing unmodified.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/execution.py tests/execution/test_lookup_lineage_unit.py &amp;&amp; git commit -m &quot;feat(lineage): dataset root resolves origin, not last writer (#367)&quot;
+</code></pre>
+<hr />
+<h3 id="task-6-walk-seeding-sentinel-exclusion-no-overwrite-degradation">Task 6: Walk seeding — sentinel exclusion, no overwrite, degradation</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (<code>lookup_lineage</code> walk-seeding block ~lines 1190–1232)
+- Test: <code>tests/execution/test_lookup_lineage_unit.py</code> (extend)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>(descriptor, walk_seed)</code> from Task 5's <code>_classify_rid</code>; existing <code>_producers_of_dataset_members</code>, <code>_walk_node</code>.
+- Produces: final <code>lookup_lineage</code> behavior — <code>root.producing_execution</code> never overwritten for Dataset roots; member-producer seeding when <code>walk_seed</code> is None <strong>or</strong> the seed proves unexpandable; non-Dataset roots keep today's overwrite.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/execution/test_lookup_lineage_unit.py</code>. These drive <code>lookup_lineage</code> end-to-end over stubs, following the module's existing full-walk test pattern (stub <code>resolve_rid</code>, <code>_retrieve_rid</code>, <code>lookup_execution</code>, <code>_producers_of_dataset_members</code>, plus the Task-5 seams):</p>
+<pre><code class="language-python">def _walkable_ml(version_rows, member_producers, known_execs, sentinel_rid=None, summaries=None):
+    &quot;&quot;&quot;Full lookup_lineage stub: dataset root + walkable executions.&quot;&quot;&quot;
+    ml = _origin_ml(version_rows, sentinel_rid=sentinel_rid, summaries=summaries)
+    ml._producers_of_dataset_members = lambda rid, version=None: set(member_producers)
+    ml._input_dataset_pairs = lambda rid: []
+
+    def fake_lookup_execution(rid):
+        if rid not in known_execs:
+            raise DerivaMLException(f&quot;no execution {rid}&quot;)
+        rec = MagicMock()
+        rec.description = f&quot;exec {rid}&quot;
+        rec.workflow = None
+        rec.status = ExecutionStatus.completed
+        rec.list_assets = lambda **kw: []  # consumed-asset iteration is on the record
+        return rec
+
+    ml.lookup_execution = fake_lookup_execution
+    return ml
+
+
+def test_member_fallback_seeds_walk_but_is_not_origin():
+    member = _gen_rid(30)
+    rows = [_version_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, None)]  # no origin
+    ml = _walkable_ml(rows, {member}, {member})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member          # walk seeded
+    assert result.root.producing_execution is None         # origin NOT overwritten
+    assert result.root.origin_recorded is False
+
+
+def test_sentinel_origin_walk_seeds_from_member_producers():
+    sentinel, member = _gen_rid(66), _gen_rid(30)
+    rows = [_version_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, sentinel)]
+    ml = _walkable_ml(rows, {member}, {member}, sentinel_rid=sentinel)
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member          # not the sentinel
+    assert result.root.origin_recorded is False
+
+
+def test_unexpandable_origin_degrades_to_member_seeding():
+    origin, member = _gen_rid(10), _gen_rid(30)
+    rows = [_version_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, origin)]
+    ml = _walkable_ml(rows, {member}, known_execs={member})  # origin not expandable
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage is not None
+    assert result.lineage.execution.rid == member
+    assert result.root.origin_recorded is True             # origin still recorded
+
+
+def test_normal_recorded_origin_walks_from_origin():
+    origin, member = _gen_rid(10), _gen_rid(30)
+    rows = [_version_row(&quot;2025-01-01T00:00:00Z&quot;, &quot;0.1.0&quot;, origin)]
+    ml = _walkable_ml(rows, {member}, {origin, member})
+    result = ml.lookup_lineage(_gen_rid(1))
+    assert result.lineage.execution.rid == origin
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lookup_lineage_unit.py -q -p no:randomly -k "member_fallback or sentinel_origin_walk or unexpandable or normal_recorded"</code>
+Expected: FAIL — <code>test_member_fallback...</code> fails on the overwrite (producing_execution set to the member); <code>test_unexpandable...</code> fails with <code>lineage is None</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement</strong></li>
+</ul>
+<p>In <code>lookup_lineage</code>, restructure the block between classification and result assembly (current lines ~1190–1232):</p>
+<pre><code class="language-python">        # Member-producer discovery (tk-018): executions that produced member
+        # assets are data-flow parents even when the dataset itself has no
+        # usable walk seed.
+        member_producers: set[RID] = set()
+        extra_parent_rids: set[RID] = set()
+        if root_descriptor.type == &quot;Dataset&quot;:
+            member_producers = self._producers_of_dataset_members(rid)
+            if producer_rid is not None:
+                extra_parent_rids = member_producers - {producer_rid}
+            elif member_producers:
+                ordered = sorted(member_producers)
+                producer_rid = ordered[0]
+                extra_parent_rids = set(ordered[1:])
+
+        if producer_rid is None:
+            return LineageResult(root=root_descriptor)
+
+        visited_global: set[RID] = set()
+        in_progress: set[RID] = set()
+        flags = {&quot;cycle_detected&quot;: False, &quot;depth_capped&quot;: False, &quot;walked_complete&quot;: True}
+
+        lineage_root_node = self._walk_node(
+            execution_rid=producer_rid,
+            depth_remaining=depth,
+            max_executions=max_executions,
+            visited_global=visited_global,
+            in_progress=in_progress,
+            flags=flags,
+            extra_parent_rids=extra_parent_rids or None,
+        )
+
+        # Degradation (spec: walk seed vs. origin attribution): a recorded
+        # origin that cannot be expanded must not erase independently
+        # resolvable member lineage.
+        if (
+            lineage_root_node is None
+            and root_descriptor.type == &quot;Dataset&quot;
+            and member_producers
+            and producer_rid not in member_producers
+        ):
+            ordered = sorted(member_producers)
+            lineage_root_node = self._walk_node(
+                execution_rid=ordered[0],
+                depth_remaining=depth,
+                max_executions=max_executions,
+                visited_global=visited_global,
+                in_progress=in_progress,
+                flags=flags,
+                extra_parent_rids=set(ordered[1:]) or None,
+            )
+
+        # Non-Dataset roots keep the historical behavior: the root's
+        # producing_execution is the walk-root summary. Dataset roots carry
+        # origin attribution from _classify_rid and are never overwritten —
+        # the walk root may legitimately differ (member-producer seeding).
+        if lineage_root_node is not None and root_descriptor.type != &quot;Dataset&quot;:
+            root_descriptor = root_descriptor.model_copy(update={&quot;producing_execution&quot;: lineage_root_node.execution})
+</code></pre>
+<p>(The <code>sorted(member_producers)</code> calls mirror the pre-existing deterministic-representative idiom — determinism only, no RID-order semantics.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Run the full lineage suite</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lookup_lineage_unit.py tests/execution/test_forward_lineage.py tests/execution/test_producers_of_dataset_members.py tests/execution/test_dataset_version_rows.py tests/execution/test_execution_summaries_batch.py tests/execution/test_sentinel_lookup.py tests/execution/test_lineage_models.py -q -p no:randomly</code>
+Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/execution.py tests/execution/test_lookup_lineage_unit.py &amp;&amp; git commit -m &quot;feat(lineage): separate walk seed from origin; sentinel never seeds (#367)&quot;
+</code></pre>
+<hr />
+<h3 id="task-7-create_schemapy-comment-correction">Task 7: <code>create_schema.py</code> comment correction</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/schema/create_schema.py</code> (~line 286, <code>Dataset_Version.Execution</code> ColumnDef comment)</p>
+<p><strong>Interfaces:</strong>
+- Consumes/Produces: nothing programmatic — a contract-surface comment fix. The schema-doc validator (<code>deriva-ml-validate-schema</code>) checks names/types/FKs, not comments, so <code>docs/reference/schema.md</code> needs no change — but run the validator to prove it.</p>
+<ul>
+<li>[ ] <strong>Step 1: Fix the comment</strong></li>
+</ul>
+<p>Replace:</p>
+<pre><code class="language-python">                comment=(
+                    &quot;RID of the execution that produced this version (NULL &quot;
+                    &quot;for the initial release row, which has no producing &quot;
+                    &quot;execution).&quot;
+                ),
+</code></pre>
+<p>with:</p>
+<pre><code class="language-python">                comment=(
+                    &quot;RID of the execution that authored this version. On the &quot;
+                    &quot;initial release row this is the execution that created &quot;
+                    &quot;the dataset (its origin); on later rows, whatever &quot;
+                    &quot;execution triggered the version bump. NULL when no &quot;
+                    &quot;authoring execution was recorded (pre-contract rows are &quot;
+                    &quot;backfilled to the unknown-provenance sentinel).&quot;
+                ),
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run the schema-doc validator</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run deriva-ml-validate-schema</code>
+Expected: <code>schema.md and create_schema.py agree.</code></p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/schema/create_schema.py &amp;&amp; git commit -m &quot;fix(schema): Dataset_Version.Execution comment contradicted provenance contract (#367)&quot;
+</code></pre>
+<hr />
+<h3 id="task-8-documentation-lookup_lineage-docstring-user-guide">Task 8: Documentation — <code>lookup_lineage</code> docstring + user guide</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (<code>lookup_lineage</code> docstring ~lines 1109–1175)
+- Modify: <code>docs/user-guide/executions.md</code> (lineage result-shape prose around line 654's "No producer" paragraph)
+- Modify: <code>docs/user-guide/reproducibility.md</code> (only if it describes the dataset-producer semantics — grep first; skip with a note if it merely mentions the method name)</p>
+<p><strong>Interfaces:</strong> none — documentation of Tasks 5–6 behavior.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update the <code>lookup_lineage</code> docstring</strong></li>
+</ul>
+<p>In the docstring: remove/replace any sentence promising the latest version's author; add to the Returns section:</p>
+<pre><code>            For a Dataset root, ``root.producing_execution`` is the ORIGIN —
+            the author of the first-recorded ``Dataset_Version`` row — not
+            the latest writer. ``root.origin_recorded`` says whether that
+            origin is a real recorded execution (False when it is the
+            unknown-provenance sentinel or absent), and
+            ``root.version_history`` lists every version's author, earliest
+            first, so migrations and backfills appear as touchers rather
+            than as &quot;the producer&quot;. The walk (``result.lineage``) seeds from
+            the origin when it is real and expandable, otherwise from member
+            producers; the unknown-provenance sentinel never seeds the walk.
+            ``depth=0`` bounds recursion but still resolves the root node
+            and member producers — cheap, not free.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Update <code>docs/user-guide/executions.md</code></strong></li>
+</ul>
+<p>In the lineage section (the "<strong>No producer.</strong>" paragraph at ~line 654 and the surrounding result-shape description): rewrite to state (a) dataset producer = origin (first-recorded author), (b) <code>origin_recorded</code> tri-state meaning, (c) <code>version_history</code> trace with the migration-as-toucher example from #367 (a data migration appears as the v4.13.0 author in the trace, not as the producer), (d) sentinel origins read "origin unrecorded" and never seed the walk. Keep the document's existing voice; do not paste RID literals from the issue — describe shapes generically.</p>
+<ul>
+<li>[ ] <strong>Step 3: Check reproducibility.md</strong></li>
+</ul>
+<p>Run: <code>grep -n "producing_execution\|producer" docs/user-guide/reproducibility.md</code>
+If it describes producer semantics, align the wording the same way; if it only name-drops <code>lookup_lineage</code>, leave it.</p>
+<ul>
+<li>[ ] <strong>Step 4: Doctest + docs build check</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest --doctest-modules src/deriva_ml/core/mixins/execution.py src/deriva_ml/execution/lineage.py -q -p no:randomly</code>
+Expected: pass (skips are fine).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/execution.py docs/user-guide/executions.md docs/user-guide/reproducibility.md &amp;&amp; git commit -m &quot;docs(lineage): origin semantics, version_history, walk-seed rules (#367)&quot;
+</code></pre>
+<hr />
+<h3 id="task-9-mcp-compatibility-verification-read-only">Task 9: MCP compatibility verification (read-only)</h3>
+<p><strong>Files:</strong>
+- Read: <code>/Users/carl/GitHub/DerivaML/deriva-ml-mcp/</code> (the lineage tool wrapper — locate via <code>grep -rn "get_lineage\|lookup_lineage" ../deriva-ml-mcp/src</code>)</p>
+<p><strong>Interfaces:</strong> none — pre-release verification from the spec's Compatibility section.</p>
+<ul>
+<li>[ ] <strong>Step 1: Inspect the MCP wrapper</strong></li>
+</ul>
+<p>Run: <code>grep -rn "lookup_lineage\|get_lineage" /Users/carl/GitHub/DerivaML/deriva-ml-mcp/src | head -20</code>, then read the wrapper. Confirm it serializes via <code>model_dump()</code>/dict passthrough and does not re-validate the result against its own frozen Pydantic schema with <code>extra="forbid"</code>. Also grep its tests for lineage snapshot fixtures: <code>grep -rln "producing_execution" /Users/carl/GitHub/DerivaML/deriva-ml-mcp/tests</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Record the finding</strong></li>
+</ul>
+<p>Write the outcome (compatible / needs a follow-up change in deriva-ml-mcp) into the PR description in Task 10. If the wrapper re-validates strictly, file an issue on deriva-ml-mcp — do not modify that repo in this PR.</p>
+<hr />
+<h3 id="task-10-full-verification-pr">Task 10: Full verification + PR</h3>
+<p><strong>Files:</strong> none new.</p>
+<ul>
+<li>[ ] <strong>Step 1: Lint + format changed files</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src/deriva_ml/core/mixins/execution.py src/deriva_ml/execution/lineage.py src/deriva_ml/execution/__init__.py src/deriva_ml/schema/create_schema.py tests/execution/ &amp;&amp; uv run ruff format --check src/deriva_ml/core/mixins/execution.py src/deriva_ml/execution/lineage.py src/deriva_ml/execution/__init__.py src/deriva_ml/schema/create_schema.py tests/execution/</code>
+Expected: clean (run <code>ruff format</code> without <code>--check</code> if formatting drifted, then re-run).</p>
+<ul>
+<li>[ ] <strong>Step 2: Offline unit suites</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/ tests/local_db/ tests/model/ tests/asset/ -q -p no:randomly --timeout=300</code>
+Expected: no NEW failures versus the pre-change baseline (record the baseline first if unsure: <code>git stash &amp;&amp; &lt;same command&gt; &amp;&amp; git stash pop</code>). Catalog-connection errors from a stopped local Deriva are pre-existing and expected.</p>
+<ul>
+<li>[ ] <strong>Step 3: Live smoke (only if <code>DERIVA_HOST</code> catalog is running)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/test_lookup_lineage_live.py -q --timeout=600</code>
+Expected: pass. Skip with a note in the PR if no catalog is available.</p>
+<ul>
+<li>[ ] <strong>Step 4: Push and open the PR</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git push -u origin feat/dataset-origin-lineage-367
+gh pr create --title &quot;feat(lineage): dataset origin + version-attribution trace (#367)&quot; --body &quot;Closes #367. Implements docs/superpowers/specs/2026-08-30-dataset-origin-lineage-design.md (two Codex review rounds). Root producing_execution = first-recorded version author (RCT-primary total order); origin_recorded tri-state; version_history trace on the root; sentinel never seeds the walk; batched author summaries; create_schema.py comment contradiction fixed. MCP-compat verification: &lt;Task 9 outcome&gt;. Each behavioral test verified failing against the unfixed code.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Post-merge reminder (do not do this from the branch)</strong></li>
+</ul>
+<p>After merge, on <code>main</code>: <code>uv run bump-version minor</code> (adds public API surface: <code>VersionAttribution</code>, new <code>RootDescriptor</code> fields). Verify the deriva-py pin is current first, per CLAUDE.md.</p>
+<hr />
+<h2 id="self-review-notes-spec-plan">Self-review notes (spec ↔ plan)</h2>
+<ul>
+<li>Spec "Ordering rule (total)" → Task 1 (all four key components + missing-RCT rule + tests 1–8).</li>
+<li>Spec "Result shape" → Task 2 (model, tri-state, raw RID, exports, docstrings) + Task 5 (population).</li>
+<li>Spec "Walk seed vs. origin attribution" (all four seeding rules) → Tasks 5–6.</li>
+<li>Spec "Resolution mechanics" (single fetch, batching, chunking, reuse) → Tasks 1, 3, 5.</li>
+<li>Spec "Sentinel classification" → Task 4 (+ Task 5 usage).</li>
+<li>Spec "Compatibility" → Tasks 7 (schema comment), 8 (docs), 9 (MCP verification).</li>
+<li>Spec test list items 1–13 map to: 1→T5, 2/3→T1, 4→T5+T6, 5/6/7→T5, 8→T2+T3, 9→T6, 10→T3, 11→T4, 12→T4, 13→T2.</li>
+<li>Out-of-scope items (Dataset_Dataset pinning, clone RCT, ambiguity state) have no tasks — intentional.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

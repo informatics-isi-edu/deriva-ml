@@ -1,0 +1,2611 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-09-01-lookup-provenance/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>lookup_provenance Implementation Plan (issue #383) — v2 - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lookup_provenance-implementation-plan-issue-383-v2" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              lookup_provenance Implementation Plan (issue #383) — v2
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/fk-traversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FK Traversal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bag-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag Export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/denormalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (formal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/denormalization-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Denormalization (implementation contract)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/bag-based-upload-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bag-based upload engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#global-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Constraints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Global Constraints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-golden-byte-equivalence-captures-for-lookup_lineage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Golden byte-equivalence captures for lookup_lineage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-provenancepy-enums-and-result-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: provenance.py — enums and result models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-rootdescriptortype-roottype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: RootDescriptor.type → RootType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-workflowsummarychecksum-both-construction-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: WorkflowSummary.checksum — BOTH construction paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-_producers_of_asset-all-output-rows-fetched-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: _producers_of_asset — all Output rows, fetched order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-6-diagnostic-returning-binding-primitive-featureproducerrecord-doc-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Diagnostic-returning binding primitive + FeatureProducerRecord doc fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-7-strict-snapshot-resolver-strict-parents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Strict snapshot resolver + strict parents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-8-_fakeml-harness-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: _FakeML harness extension
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-9-engine-extraction-treebuilder-the-goldens-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Engine extraction + TreeBuilder (the goldens gate)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-10-lookup_provenance-consumption-closure-skeleton" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: lookup_provenance — consumption closure skeleton
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-11-version-authorship-arc-snapshot-read-bounded-walked-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: Version-authorship arc — snapshot-read, bounded ≤ walked version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-12-member-binding-arc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 12: Member-binding arc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-13-snapshot-strict-ancestry-dataset-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 13: Snapshot-strict ancestry + dataset budget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-14-determinism-finalize-gap-coverage-checklist-exports-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 14: Determinism finalize, gap-coverage checklist, exports, docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-15-full-regression-live-reconciliation-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 15: Full regression, live reconciliation, PR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#codex-plan-review-round-2026-09-01-disposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Codex plan-review round (2026-09-01) — disposition
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="lookup_provenance-implementation-plan-issue-383-v2"><code>lookup_provenance</code> Implementation Plan (issue #383) — v2</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Status:</strong> v2 after Codex plan review (19 P1s accepted, 1 accepted-with-amendment, 4 P2s accepted; disposition in §Codex round at bottom).</p>
+<p><strong>Goal:</strong> One call — <code>ml.lookup_provenance(rid)</code> — returning the complete provenance closure of an artifact (<code>ProvenanceClosure</code>), built on a single arc-gated walk engine shared with <code>lookup_lineage</code>, whose observable contract stays byte-identical.</p>
+<p><strong>Architecture:</strong> <code>_provenance_engine.WalkEngine</code> owns ALL traversal — execution expansion, root-seed candidate iteration, per-<code>(dataset, version)</code> arc expansion (authorship / bindings / ancestry, each gated by the requested arc set and memoized), the pending-execution queue, sentinel classification, per-domain visited tracking, and both budgets. Frontends are pure accumulators over visitor events: <code>TreeBuilder</code> rebuilds today's <code>LineageNode</code> tree (golden byte captures prove equivalence), <code>ClosureBuilder</code> accumulates the closure dicts. All per-<code>(dataset, version)</code> facts are read through a STRICT snapshot resolver — no live fallback anywhere in the closure (lineage's existing live-display behaviors are preserved behind its frontend for byte-compat).</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, Pydantic v2 (<code>BaseModel</code>, <code>@validate_call</code> with <code>Field(strict=True, ge=1)</code>), <code>StrEnum</code>, pytest with the extended <code>_FakeML</code> seam-override harness.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-08-31-lookup-provenance-design.md</code> (approved v2.2). The six rulings in its §2 are non-negotiable constraints.</p>
+<h2 id="global-constraints">Global Constraints</h2>
+<ul>
+<li>Branch: <code>feat/383-lookup-provenance</code>; all work lands via ONE PR to <code>main</code>. Never commit to <code>main</code> directly.</li>
+<li>Every command: <code>cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run &lt;cmd&gt;</code> (chain <code>cd</code> in the same Bash call; never bare <code>pytest</code>).</li>
+<li>TDD: every behavioral change shows its test failing first.</li>
+<li>RIDs in tests are generated (<code>_rid(n)</code>-style) and asserted only against flow-through values — never human-written literals. <strong>RID ordering carries no semantics</strong> — never let a sort over RIDs pick a "first" producer or "newest" anything; sorting is permitted ONLY as an output-determinism step at finalize.</li>
+<li><code>lookup_lineage</code> observable output must remain BYTE-identical: goldens (Task 1) compare canonical serialized BYTES and run in every subsequent task. Sole permitted regeneration: Task 4 (reviewed diff).</li>
+<li>Enums are <code>StrEnum</code> for vocabularies deriva-ml closes; catalog-sourced strings (<code>status</code>, <code>element_type</code>, <code>asset_table</code>) stay <code>str</code>.</li>
+<li>Public models are Pydantic; engine internals may be <code>@dataclass</code>.</li>
+<li>Google docstrings with <code>Example:</code> blocks; catalog-touching examples carry <code># doctest: +SKIP</code>.</li>
+<li>Lint before every commit: <code>uv run ruff check --fix src tests &amp;&amp; uv run ruff format src tests</code>.</li>
+<li>tk-023: no unbounded <code>.in_()</code>/disjunctions. <strong>Chunking ownership (documented spec deviation):</strong> closure-side summary enrichment uses the chunked <code>_execution_summaries</code>; lineage's existing per-node <code>lookup_execution</code> fetches are preserved verbatim for byte-compat. The engine owns chunking wherever summaries are batch-fetched.</li>
+<li><strong>Snapshot strictness (rulings 3/6, extended by Codex):</strong> every per-<code>(dataset, version)</code> fact in the closure — version authors, origin flag, bindings, parents — is read through <code>strict_version_snapshot_catalog</code>. <code>SnapshotUnavailable</code> ⇒ gap + skip that expansion; NEVER a live read. Lineage's live-display fallbacks stay lineage-frontend-only.</li>
+</ul>
+<hr />
+<h3 id="task-1-golden-byte-equivalence-captures-for-lookup_lineage">Task 1: Golden byte-equivalence captures for <code>lookup_lineage</code></h3>
+<p>Locks the pre-refactor behavior. Goldens are canonical-bytes JSON files committed to the repo, produced by the CURRENT implementation, byte-compared after every later task.</p>
+<p><strong>Files:</strong>
+- Create: <code>tests/execution/test_lineage_goldens.py</code>
+- Create: <code>tests/execution/goldens/</code> (8 JSON files, generated)</p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>_FakeML</code> from <code>tests/execution/test_lookup_lineage_unit.py</code> (import — do not copy). Read its builder signatures (<code>tests/execution/test_lookup_lineage_unit.py:117-310</code>) before writing scenarios; the scenario SHAPES below are the requirement, call syntax follows the harness.
+- Produces: <code>pytest tests/execution/test_lineage_goldens.py</code> as the gate every later task runs; <code>_canonical(dump) -&gt; bytes</code> helper reused by Task 14's determinism tests.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the golden module</strong></li>
+</ul>
+<p>Eight scenarios: <code>simple_chain</code>, <code>two_level</code>, <code>diamond</code> (one producer reached via two distinct input datasets), <code>cycle</code>, <code>depth_cap</code> (<code>depth=0</code> on two_level), <code>member_fallback</code> (dataset with no recorded producer, member producers set), <code>cap_truncation</code> (6-chain, <code>max_executions=3</code>), <strong><code>failed_lookup</code></strong> (an execution whose <code>lookup_execution</code> raises / whose input references an unresolvable RID — construct via the harness's unresolved-RID path; read how <code>_FakeML.resolve_rid</code> signals unknown RIDs and script one mid-chain).</p>
+<p>Byte-canonical comparison — this exact helper, used for BOTH writing and comparing:</p>
+<pre><code class="language-python">def _canonical(dump: dict) -&gt; bytes:
+    return (json.dumps(dump, indent=2, sort_keys=True, ensure_ascii=False) + &quot;\n&quot;).encode()
+
+
+@pytest.mark.parametrize(&quot;name&quot;, sorted(SCENARIOS))
+def test_lookup_lineage_matches_golden(name: str):
+    ml, root, kwargs = SCENARIOS[name]()
+    got = _canonical(ml.lookup_lineage(root, **kwargs).model_dump(mode=&quot;json&quot;))
+    golden_path = GOLDEN_DIR / f&quot;{name}.json&quot;
+    if os.environ.get(&quot;UPDATE_LINEAGE_GOLDENS&quot;):
+        GOLDEN_DIR.mkdir(exist_ok=True)
+        golden_path.write_bytes(got)
+    assert golden_path.exists(), &quot;golden missing — UPDATE_LINEAGE_GOLDENS=1 (pre-refactor only)&quot;
+    assert got == golden_path.read_bytes(), f&quot;lookup_lineage BYTES diverged from golden '{name}'&quot;
+</code></pre>
+<p>(<code>sort_keys=True</code> on both sides makes the comparison canonical yet still byte-strict for values, list order, and structure — a serialization-order regression in list content fails; dict-key order is normalized identically on both sides by construction.)</p>
+<ul>
+<li>[ ] <strong>Step 2: Generate goldens; verify both modes</strong></li>
+</ul>
+<p>Run: <code>UPDATE_LINEAGE_GOLDENS=1 DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lineage_goldens.py -q -p no:randomly</code> then again WITHOUT the env var. Expected: 8 passed both times; 8 files exist.</p>
+<ul>
+<li>
+<p>[ ] <strong>Step 3: Sanity-check goldens are meaningful</strong> — <code>two_level.json</code> has two nested execution nodes + version-pinned consumed dataset; <code>failed_lookup.json</code> shows the defensive path's actual output (whatever it is today — that IS the contract); <code>diamond.json</code> shows the duplicate-marker node. Empty-walk goldens mean a wrong builder call: fix, regenerate, re-verify.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 4: Commit</strong></p>
+</li>
+</ul>
+<pre><code class="language-bash">git checkout -b feat/383-lookup-provenance
+git add tests/execution/test_lineage_goldens.py tests/execution/goldens/
+git commit -m &quot;test(lineage): golden byte-equivalence captures ahead of engine extraction (#383)&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-provenancepy-enums-and-result-models">Task 2: <code>provenance.py</code> — enums and result models</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/execution/provenance.py</code>
+- Test: <code>tests/execution/test_provenance_models.py</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>ExecutionSummary</code>, <code>DatasetSummary</code>, <code>AssetSummary</code>, <code>VersionAttribution</code>, <code>RootDescriptor</code> from <code>deriva_ml.execution.lineage</code>; <code>FeatureProducerRecord</code> from <code>deriva_ml.feature</code>.
+- Produces (used by all later tasks): <code>ArcKind</code>, <code>ArcInputType</code>, <code>AncestryState</code>, <code>GapKind</code> (StrEnums; <code>RootType</code> placeholder here, moved by Task 3); <code>ParentLink</code>, <code>ProvenanceArc</code>, <code>ProvenanceExecution</code>, <code>DatasetVersionFacts</code>, <code>ProvenanceDataset</code>, <code>ProvenanceAsset</code>, <code>ProvenanceGap</code>, <code>ProvenanceClosure</code> — fields exactly as spec §4.
+- <strong><code>ProvenanceArc.identity()</code> returns <code>(self.kind, self.consumed_by, self.input_rid, self.input_version)</code></strong> — the spec's exact tuple; <code>input_type</code> and <code>evidence</code> excluded (input_type is derivable from input_rid; evidence merges on identity match).</p>
+<p><strong>Import-cycle rule (locked):</strong> <code>provenance.py</code> imports from <code>lineage.py</code>, so <code>RootType</code> is DEFINED in <code>lineage.py</code> (Task 3) and RE-EXPORTED from <code>provenance.py</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — as plan v1 plus the corrected identity test:</li>
+</ul>
+<pre><code class="language-python">def test_arc_identity_is_spec_tuple():
+    from deriva_ml.execution.provenance import ArcInputType, ArcKind, ProvenanceArc
+
+    a = ProvenanceArc(kind=ArcKind.consumption, consumed_by=_rid(1), input_rid=_rid(2),
+                      input_type=ArcInputType.dataset, input_version=&quot;1.0.0&quot;, depth=1)
+    assert a.identity() == (ArcKind.consumption, _rid(1), _rid(2), &quot;1.0.0&quot;)
+    b = a.model_copy(update={&quot;depth&quot;: 5, &quot;input_type&quot;: None})
+    assert a.identity() == b.identity()          # depth and input_type excluded
+    assert a.model_copy(update={&quot;input_version&quot;: &quot;2.0.0&quot;}).identity() != a.identity()
+</code></pre>
+<p>plus <code>test_enums_are_strenums_with_string_equality</code> (assert <code>len(GapKind) == 12</code>), <code>test_closure_dumps_to_plain_json</code>, <code>test_is_source_requires_resolved_ancestry</code> (all as v1).</p>
+<ul>
+<li>[ ] <strong>Step 2: Run → fail (<code>ModuleNotFoundError</code>), implement per spec §4 (models exactly as spec; <code>DatasetVersionFacts</code> validator; Google docstrings with runnable pure-Python examples), run → pass incl. doctests</strong> (<code>uv run pytest tests/execution/test_provenance_models.py src/deriva_ml/execution/provenance.py -q -p no:randomly</code>).</li>
+<li>[ ] <strong>Step 3: Commit</strong> — <code>feat(provenance): closure result models and StrEnum vocabularies (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-3-rootdescriptortype-roottype">Task 3: <code>RootDescriptor.type</code> → <code>RootType</code></h3>
+<p><strong>Files:</strong> modify <code>src/deriva_ml/execution/lineage.py:215</code> + imports; <code>provenance.py</code> re-export; test in <code>tests/execution/test_lineage_models.py</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing compat test</strong> (use generated RIDs — no literals):</li>
+</ul>
+<pre><code class="language-python">def test_root_type_enum_is_string_compatible():
+    from deriva_ml.execution.lineage import RootDescriptor, RootType
+
+    rid = f&quot;1-{1:04X}&quot;
+    r = RootDescriptor(rid=rid, type=&quot;Dataset&quot;, description=None)   # str input validates
+    assert r.type == &quot;Dataset&quot; and r.type == RootType.dataset
+    assert r.model_dump(mode=&quot;json&quot;)[&quot;type&quot;] == &quot;Dataset&quot;
+    from deriva_ml.execution.provenance import RootType as ReExported
+    assert ReExported is RootType
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run → fail (<code>ImportError</code>), implement (<code>RootType(StrEnum)</code> in lineage.py, field <code>type: RootType</code>, provenance.py re-export replaces placeholder), run → pass.</strong></li>
+<li>[ ] <strong>Step 3: Gate:</strong> goldens + <code>test_lookup_lineage_unit.py</code> + <code>test_lineage_models.py</code> + <code>test_forward_lineage.py</code> + <code>test_lineage_html.py</code> all pass unmodified, zero golden diffs.</li>
+<li>[ ] <strong>Step 4: Commit</strong> — <code>feat(lineage): RootType StrEnum replaces the type Literal — runtime-compatible (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-4-workflowsummarychecksum-both-construction-paths">Task 4: <code>WorkflowSummary.checksum</code> — BOTH construction paths</h3>
+<p>Checksum must flow wherever <code>WorkflowSummary</code> is built: (a) <code>_execution_summaries</code> (execution.py:1510, batched Workflow-row fetch — add <code>Checksum</code> to the fetched columns), and (b) <strong>the walk's per-node path</strong> (execution.py:2098 area — <code>_walk_node</code> builds the summary from <code>record.workflow</code>; find every <code>WorkflowSummary(</code> construction site via <code>grep -rn "WorkflowSummary(" src/</code> and populate <code>checksum</code> in each).</p>
+<p><strong>Files:</strong> modify <code>lineage.py</code> (<code>checksum: str | None = None</code>), <code>execution.py</code> (both paths), extend <code>_FakeML</code>'s workflow stubs with a <code>Checksum</code>/checksum attribute, tests in <code>test_lineage_models.py</code> + <code>test_lookup_lineage_unit.py</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — (a) <code>_execution_summaries</code> populates checksum from the scripted Workflow row; (b) a full <code>lookup_lineage</code> walk on the harness yields nodes whose <code>execution.workflow.checksum</code> equals the scripted value (this pins the per-node path Codex flagged — without (b), lineage nodes silently emit <code>None</code>).</li>
+<li>[ ] <strong>Step 2: Run → fail, implement both paths, run → pass.</strong></li>
+<li>[ ] <strong>Step 3: Regenerate goldens ONCE</strong> (<code>UPDATE_LINEAGE_GOLDENS=1</code>), review the diff: ONLY <code>"checksum": ...</code> insertions (null or scripted values) — anything else is a regression; revert and fix. Commit the diff.</li>
+<li>[ ] <strong>Step 4: Commit</strong> — <code>feat(lineage): WorkflowSummary.checksum on both construction paths (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-5-_producers_of_asset-all-output-rows-fetched-order">Task 5: <code>_producers_of_asset</code> — all Output rows, fetched order</h3>
+<p><strong>Files:</strong> modify <code>execution.py:1640</code>; test <code>tests/execution/test_asset_producers.py</code> (new).</p>
+<p><strong>Interfaces:</strong>
+- Produces: <code>_producers_of_asset(self, asset_rid: RID, asset_table: Any) -&gt; list[RID]</code> — ALL executions with an Output association row, <strong>in fetched order</strong> (deduped, first occurrence kept). <code>_producer_of_asset</code> becomes <code>next(iter(self._producers_of_asset(...)), None)</code> — <strong>identical to today's rows[0] choice</strong>, so lineage behavior is byte-preserved even for malformed multi-producer data. NO sorting here — RID order carries no semantics; the closure sorts its output lists only at finalize (Task 14).</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — two Output rows → both returned in fetched order and <code>_producer_of_asset</code> returns the fetched-first; zero rows → <code>[]</code>/<code>None</code>; duplicate rows deduped keeping first.</li>
+<li>[ ] <strong>Step 2: Run → fail, implement, run → pass. Goldens green (behavior identical by construction).</strong></li>
+<li>[ ] <strong>Step 3: Commit</strong> — <code>feat(provenance): _producers_of_asset returns every recorded producer, fetched order (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-6-diagnostic-returning-binding-primitive-featureproducerrecord-doc-fix">Task 6: Diagnostic-returning binding primitive + <code>FeatureProducerRecord</code> doc fix</h3>
+<p><strong>Files:</strong> modify <code>execution.py:1667</code> (split <code>find_feature_producers</code> → <code>_find_feature_producers_impl</code> + thin wrapper), <code>feature.py</code> docstring; extend <code>tests/execution/test_find_feature_producers.py</code>.</p>
+<p><strong>Interfaces:</strong>
+- Produces: <code>_find_feature_producers_impl(self, dataset_rid, version=None) -&gt; tuple[list[FeatureProducerRecord], list[BindingDiagnostic]]</code>;</p>
+<pre><code class="language-python">@dataclass(frozen=True)
+class BindingDiagnostic:
+    kind: str          # &quot;ambiguous_hop&quot; | &quot;snapshot_absent&quot; | &quot;query_failed&quot; | &quot;discovery_failed&quot;
+    subject: str
+    detail: str
+</code></pre>
+<p>Every silent-degrade branch appends a diagnostic. Public wrapper returns <code>records</code> only — byte-identical.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — ambiguous-hop → records + <code>ambiguous_hop</code> diag; missing table → <code>snapshot_absent</code>; per-feature query failure → <code>query_failed</code>; <strong>discovery-level failure → <code>discovery_failed</code></strong> (the current function has two discovery failure branches — read <code>execution.py:1667-1798</code> and script one, e.g. <code>find_features</code> raising); happy path → <code>(records, [])</code>; wrapper output <code>== impl(...)[0]</code>.</li>
+<li>[ ] <strong>Step 2: Run → fail, implement split, run → pass; existing 12 binding tests unmodified.</strong></li>
+<li>[ ] <strong>Step 3: Reword <code>FeatureProducerRecord</code> docstring</strong> (binding facts per ruling 3, cite <code>docs/reference/provenance-contract.md</code>); doctest collection green.</li>
+<li>[ ] <strong>Step 4: Commit</strong> — <code>feat(provenance): binding scan diagnostics; FeatureProducerRecord doc says facts (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-7-strict-snapshot-resolver-strict-parents">Task 7: Strict snapshot resolver + strict parents</h3>
+<p><strong>Files:</strong> modify <code>src/deriva_ml/dataset/dataset.py</code> (near line 3011); test <code>tests/execution/test_strict_snapshot.py</code> (new).</p>
+<p><strong>Current-behavior facts (verified — do not re-derive wrong):</strong> with a NULL snapshot, <code>_version_snapshot_catalog_id()</code> returns the BARE catalog id (dataset.py:3064) and <code>_version_snapshot_catalog()</code> still calls <code>catalog_snapshot(&lt;bare id&gt;)</code> — the live fallback is via a bare-id snapshot handle, not by returning <code>self._ml_instance</code> on that path (the direct return happens only for falsy versions, dataset.py:3033).</p>
+<p><strong>Interfaces:</strong>
+- Produces on <code>Dataset</code>: <code>SnapshotUnavailable(DerivaMLException)</code>; <code>strict_version_snapshot_catalog(self, version) -&gt; DerivaMLCatalog</code> raising <code>SnapshotUnavailable</code> when (a) the version row's snapshot is empty/None, OR (b) <code>catalog_snapshot(...)</code> raises (unreadable snapshot — wrap and re-raise as <code>SnapshotUnavailable</code>); <code>strict_parents_at(self, version) -&gt; list[dict]</code> with keys <code>parent_rid</code>, <code>parent_version_then</code>.
+- <strong><code>parent_version_then</code> resolution rule:</strong> mirror <code>list_dataset_parents</code>' existing version semantics (dataset.py:2363-2420) — the snapshot row's version FK/pointer first, with its documented fallback — NOT "max version-history row". Read <code>list_dataset_parents</code> before implementing and reuse its resolution helper (extract one if needed) so the two cannot drift.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — NULL snapshot → <code>SnapshotUnavailable</code> (and a companion test pinning that <code>_version_snapshot_catalog</code> on the same stub calls <code>catalog_snapshot</code> with the BARE id — the behavioral difference, correctly stated); <code>catalog_snapshot</code> raising → <code>SnapshotUnavailable</code>; happy path → snapshot-bound instance with <code>"&lt;id&gt;@&lt;snap&gt;"</code>; <code>strict_parents_at</code> returns <code>parent_rid</code>/<code>parent_version_then</code> per the resolution rule (script a parent whose max-history row differs from its version-FK row and assert the FK row wins).</li>
+<li>[ ] <strong>Step 2: Run → fail, implement, run → pass.</strong></li>
+<li>[ ] <strong>Step 3: Commit</strong> — <code>feat(dataset): strict snapshot resolver — no live fallback for provenance (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-8-_fakeml-harness-extension">Task 8: <code>_FakeML</code> harness extension</h3>
+<p>The closure tests (Tasks 10–13) need seams the harness lacks. Extend it HERE, with its own tests, so later tasks only consume.</p>
+<p><strong>Files:</strong> modify <code>tests/execution/test_lookup_lineage_unit.py</code> (<code>_FakeML</code> + stubs); smoke tests appended in the same file.</p>
+<p><strong>Interfaces — produces on <code>_FakeML</code> (all additive; existing tests untouched):</strong>
+- Multi-row version history: <code>add_version_row(dataset_rid, version, execution, *, rct, snapshot)</code> feeding <code>_dataset_version_rows</code> AND a per-snapshot view; <code>set_snapshot_version_rows(dataset_rid, version, rows)</code> for snapshot-read authorship (Task 11).
+- Snapshot seams: <code>lookup_dataset(rid)</code> returning a stub <code>Dataset</code> whose <code>strict_version_snapshot_catalog(version)</code> returns a marker or raises <code>SnapshotUnavailable</code> per scripting (<code>set_snapshot_available(dataset_rid, version, ok: bool)</code>), and whose <code>strict_parents_at(version)</code> returns scripted <code>[{parent_rid, parent_version_then}]</code> (<code>set_parents_at(dataset_rid, version, parents)</code>).
+- Multi-producer assets: <code>add_asset(..., producers=[...])</code> backing <code>_producers_of_asset</code> (fetched order = list order); <code>_producer_of_asset</code> override derives first element (mirroring Task 5).
+- Binding seam: <code>set_binding_scan(dataset_rid, version, records, diagnostics)</code> backing <code>_find_feature_producers_impl</code>.
+- Workflow checksum on the stub workflow rows (consumed by Task 4's tests — coordinate: if Task 4 already added it, skip).
+- <strong>Call recording:</strong> <code>ml.calls: list[tuple[str, tuple]]</code> — every seam override appends <code>(method_name, args)</code>. This powers the quarantine tests ("assert NO snapshot-dependent call happened").</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the extensions + smoke tests</strong> (each seam scripted then read back through the override), run new + ALL existing lineage tests + goldens → green.</li>
+<li>[ ] <strong>Step 2: Commit</strong> — <code>test(harness): _FakeML closure seams — snapshots, multi-producers, bindings, call recording (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-9-engine-extraction-treebuilder-the-goldens-gate">Task 9: Engine extraction + TreeBuilder (the goldens gate)</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/core/mixins/_provenance_engine.py</code>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (<code>lookup_lineage</code> + <code>_walk_node</code> + seed iteration move)
+- Test: goldens + entire existing lineage suite, unmodified</p>
+<p><strong>Interfaces:</strong></p>
+<pre><code class="language-python">@dataclass(frozen=True)
+class InputRef:
+    kind: ArcInputType
+    rid: str
+    version: str | None = None       # datasets: pinned version (None = unpinned)
+    summary: Any = None              # DatasetSummary | AssetSummary display object
+    producer_rids: tuple[str, ...] = ()   # ALL recorded producers, fetched order (assets);
+                                          # datasets: the resolved producer(s) for this pin
+
+
+class WalkVisitor(Protocol[N]):
+    # Tree construction:
+    def make_node(self, rid: str, *, summary: &quot;ExecutionSummary&quot;, inputs: list[InputRef], depth: int) -&gt; N: ...
+    def make_cycle_node(self, rid: str, *, depth: int) -&gt; N: ...
+    def make_duplicate_node(self, rid: str, *, depth: int) -&gt; N: ...
+    def attach_parents(self, node: N, parents: list[N]) -&gt; None: ...
+    # Seeding (spec §5 event surface — engine iterates candidates, visitor observes):
+    def on_seed_candidate(self, rid: str, *, accepted: bool) -&gt; None: ...
+    # Closure hooks (TreeBuilder: no-ops):
+    def on_execution(self, rid: str, *, summary: &quot;ExecutionSummary&quot;, depth: int) -&gt; None: ...
+    def on_consumption(self, *, consumer_rid: str, input_ref: InputRef, depth: int) -&gt; None: ...
+    def on_version_author(self, *, dataset_rid: str, version: str, attribution: &quot;VersionAttribution&quot;, depth: int) -&gt; None: ...
+    def on_binding_record(self, *, dataset_rid: str, version: str, record: &quot;FeatureProducerRecord&quot;, depth: int) -&gt; None: ...
+    def on_parent_link(self, *, dataset_rid: str, link: &quot;ParentLink&quot;, depth: int) -&gt; None: ...
+    def on_dataset_facts(self, *, dataset_rid: str, facts: &quot;DatasetVersionFacts&quot;) -&gt; None: ...
+    def on_gap(self, kind: &quot;GapKind&quot;, subject_rid: str, detail: str) -&gt; None: ...
+
+
+class WalkEngine(Generic[N]):
+    def __init__(self, ml: Any, visitor: WalkVisitor[N], *, arcs: frozenset[ArcKind],
+                 max_executions: int, dataset_budget: int | None = None) -&gt; None: ...
+    flags: dict[str, bool]           # cycle_detected / depth_capped / walked_complete
+    executions_visited: int
+    datasets_visited: int
+    cap_hit: bool
+    def expand_execution(self, rid: str, *, depth_remaining: int | None, depth: int = 0) -&gt; N | None: ...
+    def run_seed_candidates(self, candidates: list[str], *, depth_remaining: int | None) -&gt; N | None:
+        &quot;&quot;&quot;Iterate seeds in order; on_seed_candidate per attempt; return first accepted tree.&quot;&quot;&quot;
+    def enqueue_execution(self, rid: str, *, depth: int) -&gt; None: ...   # closure discoveries
+    def drain(self, *, depth_remaining: int | None) -&gt; None: ...        # expand queue under caps
+    def expand_dataset(self, dataset_rid: str, version: str | None, *, depth: int) -&gt; None:
+        &quot;&quot;&quot;Arc-gated, memoized per (rid, version): authorship / bindings / ancestry
+        per the enabled arcs. version=None (unpinned) ⇒ unpinned_input gap + NO
+        snapshot-dependent work (closure mode). No-op entirely when no dataset
+        arcs are enabled (lineage mode) — zero cost inversion.&quot;&quot;&quot;
+</code></pre>
+<p><strong>Extraction is a mechanical lift.</strong> Transformation table for <code>_walk_node</code> (execution.py:2030) and the seed loop (execution.py:1288-1374):</p>
+<table>
+<thead>
+<tr>
+<th>current code</th>
+<th>engine code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>self._input_dataset_pairs / _producer_of_dataset / _producer_of_asset / _execution_summaries / lookup_execution / _sentinel_execution_rid_or_none / _producers_of_dataset_members</code></td>
+<td>same calls on <code>self._ml</code> — <code>_FakeML</code> overrides keep working untouched</td>
+</tr>
+<tr>
+<td>per-node <code>lookup_execution(...)</code> fetch</td>
+<td>preserved verbatim (chunk-ownership deviation, see Global Constraints)</td>
+</tr>
+<tr>
+<td>asset producer: <code>self._producer_of_asset(...)</code></td>
+<td><code>self._ml._producers_of_asset(...)</code> → <code>InputRef.producer_rids</code> (full tuple); the tree path uses <code>producer_rids[0] if producer_rids else None</code> — identical choice to today</td>
+</tr>
+<tr>
+<td><code>LineageNode(...)</code> construction / cycle / duplicate markers</td>
+<td><code>visitor.make_node / make_cycle_node / make_duplicate_node</code></td>
+</tr>
+<tr>
+<td>recursion + <code>parents=</code></td>
+<td>recurse + <code>attach_parents</code></td>
+</tr>
+<tr>
+<td>seed-candidate loop in <code>lookup_lineage</code></td>
+<td><code>engine.run_seed_candidates(...)</code>; the CANDIDATE LIST is still computed in the mixin (origin resolution, member fallback, sentinel filtering — that logic is root classification, which stays)</td>
+</tr>
+<tr>
+<td>unpinned-input live-display fallback (execution.py:2120 area)</td>
+<td>preserved INSIDE the tree path (lineage byte-compat); the closure path never reaches it (<code>expand_dataset</code> handles closure-side unpinned semantics)</td>
+</tr>
+<tr>
+<td><code>visited_global</code> / <code>in_progress</code> / <code>flags</code> params</td>
+<td>engine instance state</td>
+</tr>
+</tbody>
+</table>
+<p><code>TreeBuilder</code> implements the visitor: <code>make_node</code> builds <code>LineageNode(execution=summary, consumed_datasets=[i.summary for i in inputs if i.kind == ArcInputType.dataset], consumed_assets=[...], ...)</code>; closure hooks are <code>pass</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Move code per the table.</strong> The goldens are this task's failing-test discipline.</li>
+<li>[ ] <strong>Step 2: Gate:</strong> record the pre-task baseline profile of <code>uv run pytest tests/execution/ -q -p no:randomly -k "not live"</code>, run after, require identical profile; goldens green with zero file diffs (<code>git status</code> clean under <code>tests/execution/goldens/</code>).</li>
+<li>[ ] <strong>Step 3: Delete <code>_walk_node</code> from the mixin;</strong> <code>grep -rn "_walk_node" src tests</code> hits only the engine.</li>
+<li>[ ] <strong>Step 4: Commit</strong> — <code>refactor(lineage): arc-gated WalkEngine + TreeBuilder — goldens prove byte-identical (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-10-lookup_provenance-consumption-closure-skeleton">Task 10: <code>lookup_provenance</code> — consumption closure skeleton</h3>
+<p><strong>Files:</strong> modify <code>execution.py</code> (public method), <code>_provenance_engine.py</code> (<code>ClosureBuilder</code>); create <code>tests/execution/test_lookup_provenance_unit.py</code>.</p>
+<p><strong>Interfaces:</strong>
+- Produces: <code>lookup_provenance(self, rid: RID, *, version: str | None = None, max_executions: int = 500) -&gt; ProvenanceClosure</code>.
+  - <code>max_executions: Annotated[int, Field(strict=True, ge=1)]</code> under <code>@validate_call</code> — <strong>strict</strong>, because the repo's <code>VALIDATION_CONFIG</code> is non-strict and plain <code>Field(ge=1)</code> accepts <code>True</code> and <code>"2"</code> (verified empirically in review).
+  - Root typology via <code>_classify_rid</code>; <strong>root-version rule (spec §3)</strong>: explicit <code>version</code> validated against <code>_dataset_version_rows</code> (absent → <code>DerivaMLValidationError</code>); omitted → latest recorded version (max by <code>_version_row_sort_key</code> — the EXISTING authorship-order helper, not a RID sort); resolved pin recorded in <code>root.version</code>; no version rows at all → <code>version_unresolvable</code> gap, non-snapshot arcs only. <code>version</code> on non-Dataset roots → <code>DerivaMLValidationError</code>.
+  - <strong>Root arcs:</strong> the root execution (Execution root) or the root artifact's direct producer gets <code>ArcKind.root</code> (depth 0). Every other arc kind enters via later tasks' expansions.
+  - <strong>Feature-value roots (spec §3, v1):</strong> <code>_classify_rid</code> already resolves them; closure = binding execution (root arc) + its expansion. Null binding execution → <code>null_binding_execution</code> gap + empty executions; sentinel binding execution → <code>sentinel_origin</code> gap; unresolvable → <code>unresolved_rid</code> gap.
+  - Consumption arcs with concrete inputs; assets map with ALL producers (fetched order) + <code>no_asset_producer</code> / <code>multiple_asset_producers</code> gaps; executions with no workflow → <code>no_workflow</code> gap; RIDs that fail to resolve mid-walk → <code>unresolved_rid</code> gap (the tree path's defensive-None branch becomes a gap emission in closure mode); sentinel → <code>sentinel_origin</code>, never expanded; unpinned dataset input → <code>unpinned_input</code> gap + <code>AncestryState.not_walked</code> facts + zero snapshot-dependent calls; pending queue drained under the cap.
+- <code>ClosureBuilder</code> implements <code>WalkVisitor[str]</code> (node handle = execution RID): accumulates dicts; arc-identity dedup (<code>ProvenanceArc.identity()</code>, min depth, evidence merged).</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> (all of these; use Task 8 seams + <code>ml.calls</code> recording):</li>
+</ul>
+<pre><code class="language-text">test_dataset_root_two_level_closure_reaches_all_executions   # + each has a consumption arc w/ concrete input rid+version
+test_root_arc_on_execution_root                              # ArcKind.root, depth 0
+test_root_arc_on_dataset_root_producer
+test_feature_value_root_closure                              # binding exec + its ancestry
+test_feature_value_root_null_execution_gap
+test_feature_value_root_sentinel_gap
+test_root_version_explicit_historical                        # root.version == requested pin
+test_root_version_omitted_resolves_latest                    # by _version_row_sort_key, recorded in root.version
+test_root_version_unknown_raises_validation_error
+test_dataset_with_no_version_rows_gap_and_degraded_walk      # version_unresolvable
+test_version_kwarg_on_execution_root_raises
+test_max_executions_strict_boundary                          # 0, -1, True, &quot;2&quot;, 2.5 all rejected
+test_diamond_two_distinct_consumption_arcs                   # different input_rid ⇒ TWO arcs on the shared producer
+test_same_identity_rediscovery_dedups_min_depth              # same (kind, consumer, input, version) at depths 1 and 3 ⇒ one arc, depth 1
+test_asset_two_producers_all_reported_plus_gap               # fetched order preserved; multiple_asset_producers gap
+test_asset_zero_producers_gap                                # no_asset_producer
+test_execution_without_workflow_gap                          # no_workflow
+test_unresolved_rid_gap_mid_walk                             # failed_lookup-style scenario ⇒ unresolved_rid gap, walk continues
+test_sentinel_never_expanded_gap_emitted
+test_unpinned_input_quarantined_no_snapshot_calls            # gap + not_walked + ml.calls contains NO version-rows /
+                                                             #   binding / parents / snapshot call for that dataset
+test_cap_sets_traversal_complete_false
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run → fail (<code>AttributeError: lookup_provenance</code>), implement, run → pass. Goldens green.</strong></li>
+<li>[ ] <strong>Step 3: Commit</strong> — <code>feat(provenance): lookup_provenance — consumption closure, roots, assets, gaps, strict budget (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-11-version-authorship-arc-snapshot-read-bounded-walked-version">Task 11: Version-authorship arc — snapshot-read, bounded ≤ walked version</h3>
+<p><strong>Files:</strong> modify <code>_provenance_engine.py</code> (<code>WalkEngine.expand_dataset</code> authorship leg); extend <code>tests/execution/test_lookup_provenance_unit.py</code>.</p>
+<p><strong>Semantics (spec §6.3, snapshot-faithful per Codex):</strong> for each walked pinned <code>(dataset, version)</code>:
+1. Resolve the strict snapshot (<code>lookup_dataset(rid).strict_version_snapshot_catalog(version)</code>); <code>SnapshotUnavailable</code> → <code>GapKind.snapshot_chain_break</code> (detail <code>"authorship read skipped: no snapshot"</code>), no authorship facts, done.
+2. Read the version rows AT that snapshot (harness seam: <code>set_snapshot_version_rows</code>), sort by <code>_version_row_sort_key</code>, truncate after the walked version's row (absent at snapshot → <code>version_unresolvable</code> gap).
+3. Rows → <code>VersionAttribution</code>s into <code>DatasetVersionFacts.version_authors</code>; <strong><code>DatasetVersionFacts.origin_recorded</code> = whether the FIRST row's author is a real (non-sentinel, non-null) execution — evaluated from the snapshot rows</strong> (this populates the field Codex flagged as orphaned); each author gets an <code>ArcKind.version_authorship</code> arc + enqueue; author-less row → <code>no_version_author</code> gap; sentinel author → <code>sentinel_origin</code> gap, not enqueued.
+4. Memoized per <code>(dataset_rid, version)</code> across all dataset legs.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — walked at 0.2.0 with snapshot rows 0.1.0/0.2.0/0.3.0 → authors of 0.1.0+0.2.0 only; snapshot rows DIFFER from live rows (script both; assert the snapshot values win — the snapshot-faithfulness pin); <code>origin_recorded</code> True/False/None cases from snapshot rows; author-less → <code>no_version_author</code>; unknown walked version at snapshot → <code>version_unresolvable</code>; <code>SnapshotUnavailable</code> → chain-break gap and NO authorship arcs; authors are themselves expanded.</li>
+<li>[ ] <strong>Step 2: Run → fail, implement, run → pass. Goldens green.</strong></li>
+<li>[ ] <strong>Step 3: Commit</strong> — <code>feat(provenance): snapshot-read version-authorship arc bounded at the walked version (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-12-member-binding-arc">Task 12: Member-binding arc</h3>
+<p><strong>Files:</strong> modify <code>_provenance_engine.py</code> (bindings leg); extend <code>tests/execution/test_lookup_provenance_unit.py</code>.</p>
+<p><strong>Semantics (spec §6.4):</strong> per walked pinned <code>(dataset, version)</code> with an available strict snapshot: <code>records, diagnostics = ml._find_feature_producers_impl(dataset_rid, version=version)</code> (already snapshot-scoped internally per #385); records with executions → <code>ArcKind.member_binding</code> arcs (evidence attached) + enqueue; <code>execution_rid=None</code> → <code>null_binding_execution</code> gap; each diagnostic → <code>binding_scan_failed</code> gap. Skipped (with the chain-break gap already emitted by Task 11's leg) when the strict snapshot is unavailable. Memoized.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — binding producers enter with evidence and are expanded; null-execution → gap; scripted diagnostic → <code>binding_scan_failed</code> while surviving records still arc (degrade-with-honesty); two datasets sharing a binding execution → one <code>ProvenanceExecution</code>, two <code>member_binding</code> arcs (different <code>input_rid</code>); <strong>evidence-merge</strong>: same arc identity rediscovered with overlapping record lists → one arc, records deduped by equality, min depth; snapshot-unavailable dataset → NO binding scan call (<code>ml.calls</code>).</li>
+<li>[ ] <strong>Step 2: Run → fail, implement, run → pass. Goldens green.</strong></li>
+<li>[ ] <strong>Step 3: Commit</strong> — <code>feat(provenance): member-binding arc with evidence merge and diagnostics as gaps (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-13-snapshot-strict-ancestry-dataset-budget">Task 13: Snapshot-strict ancestry + dataset budget</h3>
+<p><strong>Files:</strong> modify <code>_provenance_engine.py</code> (ancestry leg + budget); extend <code>tests/execution/test_lookup_provenance_unit.py</code>.</p>
+<p><strong>Semantics (spec §6.5):</strong> per walked pinned <code>(dataset, version)</code>: <code>strict_parents_at(version)</code> via the stub/real Dataset; <code>SnapshotUnavailable</code> → <code>snapshot_chain_break</code>, <code>ancestry_state=chain_break</code>, <code>is_source=None</code>, stop branch. Success: rows → <code>ParentLink(parent_rid, child_version=version, parent_version_then)</code>; <code>parent_version_then=None</code> → <code>snapshot_chain_break</code> on that link (branch stops there); each resolved parent expanded via <code>expand_dataset(parent_rid, parent_version_then, depth+1)</code>; <code>ancestry_state=resolved</code>; <code>is_source = not parents</code>. Ancestry cycles: an active-ancestry-path set of dataset RIDs; revisit on the active path → <code>snapshot_chain_break</code> gap with <code>detail="ancestry cycle"</code>, branch stops. Budget: <code>datasets_visited</code> counts distinct <code>(dataset, version)</code> expansions; exceeding <code>dataset_budget</code> (default <code>4 * max_executions</code>) sets <code>cap_hit=True</code>, <code>traversal_complete=False</code>, stops dataset expansion.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — 3-deep chain resolves to a source (<code>is_source=True</code>, <code>ParentLink</code> versions chained); snapshot-less mid-chain → chain break + <code>is_source=None</code>; <code>parent_version_then=None</code> link → chain break at that link; ancestry cycle terminates with the cycle-detail gap; parent datasets' authors enter the closure (Tasks 11+13 integration); wide ancestry fan with small <code>max_executions</code> trips the dataset budget without hanging.</li>
+<li>[ ] <strong>Step 2: Run → fail, implement, run → pass. Goldens green.</strong></li>
+<li>[ ] <strong>Step 3: Commit</strong> — <code>feat(provenance): snapshot-strict ancestry to source, dataset budget (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-14-determinism-finalize-gap-coverage-checklist-exports-docs">Task 14: Determinism finalize, gap-coverage checklist, exports, docs</h3>
+<p><strong>Files:</strong> modify <code>_provenance_engine.py</code> (<code>ClosureBuilder.finalize()</code>), <code>src/deriva_ml/execution/__init__.py</code> (mirror the lineage export block for the provenance names), <code>docs/user-guide/executions.md</code>; extend <code>tests/execution/test_lookup_provenance_unit.py</code>.</p>
+<p><strong>Finalize sort keys (spec §4):</strong> <code>executions</code>/<code>datasets</code>/<code>assets</code> rebuilt sorted by key; <strong><code>ProvenanceDataset.versions</code> sorted by version label</strong>; <code>gaps</code> by <code>(kind, subject_rid, detail)</code>; <code>arcs</code> by <code>(kind, input_rid or "", consumed_by or "")</code>; <code>evidence</code> by <code>(feature_name, element_type, execution_rid or "")</code>; <code>parents</code> by <code>parent_rid</code>; <code>producers</code> (output only) and <code>consumed_by</code> sorted.</p>
+<ul>
+<li>[ ] <strong>Step 1: Failing tests</strong> — (a) same scenario built with shuffled insertion orders AND a dataset walked at two versions inserted in reverse → <code>_canonical(model_dump)</code> bytes identical (reuse Task 1's <code>_canonical</code>); (b) export test <code>from deriva_ml.execution import ProvenanceClosure, ArcKind, GapKind, RootType</code>; (c) <strong>gap-coverage checklist</strong>: one parametrized test asserting every one of the 12 <code>GapKind</code> members is produced by at least one scenario in this file (collect <code>{g.kind for g in closure.gaps}</code> across the suite's scenarios; a member no scenario produces = a hole in the suite, fail with its name).</li>
+<li>[ ] <strong>Step 2: Run → fail, implement finalize + exports, run → pass.</strong></li>
+<li>[ ] <strong>Step 3: Docs:</strong> new section "Complete provenance: <code>lookup_provenance</code>" in <code>docs/user-guide/executions.md</code> — closure/arcs/gaps semantics, <code>lookup_lineage</code> as the focused data-flow view, written neutrally (primary-entry-point framing = deferred spec §9.2, flagged for Carl in the PR). Verify <code>uv run mkdocs build 2&gt;&amp;1 | tail -3</code> adds no new warnings.</li>
+<li>[ ] <strong>Step 4: Commit</strong> — <code>feat(provenance): deterministic serialization, gap coverage, exports, docs (#383)</code></li>
+</ul>
+<hr />
+<h3 id="task-15-full-regression-live-reconciliation-pr">Task 15: Full regression, live reconciliation, PR</h3>
+<ul>
+<li>[ ] <strong>Step 1: Full offline suite</strong> — <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/ -q -p no:randomly -k "not live"</code> (add <code>--timeout=600</code> only if pytest-timeout is installed). Compare against the pre-branch baseline profile recorded in Task 9 (the #295 failure and no-catalog errors are pre-existing).</li>
+<li>[ ] <strong>Step 2: Lint</strong> — <code>uv run ruff check src tests &amp;&amp; uv run ruff format --check src tests</code> clean.</li>
+<li>[ ] <strong>Step 3: Live reconciliation (manual, NOT committed).</strong> Against <code>www.eye-ai.org</code>/<code>eye-ai</code>: resolve the reference VGG-19 training execution BY CATALOG LOOKUP (e.g. <code>find_executions</code> filtered on its workflow; never a RID literal in committed code), run <code>lookup_provenance</code>, reconcile against the deploy inventory ground truth (45 executions / 17 workflows / 14 datasets / 5 gaps). Acceptance: every difference explainable by a ruling (sentinel-by-identity, binding facts with evidence, snapshot-resolved ancestry versions, richer gap taxonomy). Record numbers + explanations as a dated tacit-knowledge.md entry; commit that.</li>
+<li>[ ] <strong>Step 4: Push, open the PR</strong> (<code>gh pr create</code> — body: spec link, rulings honored, golden proof, reconciliation numbers, the deferred §9.2 docs-framing question).</li>
+<li>[ ] <strong>Step 5: Codex pass</strong> — <code>codex review --base main</code>; adjudicate (fabricated-RID standing ruling applies), fix accepted findings, re-run gates, push.</li>
+</ul>
+<hr />
+<h2 id="codex-plan-review-round-2026-09-01-disposition">Codex plan-review round (2026-09-01) — disposition</h2>
+<p>20 P1 / 4 P2. <strong>Accepted 19 P1s:</strong> engine owns ALL arc traversal + seeding + memoization + queue (builders accumulate only); <code>InputRef.producer_rids</code> carries every producer; diamond = two arcs, dedup test rewritten for same-identity rediscovery; <code>identity()</code> = spec's exact tuple; <code>ArcKind.root</code> assignment specified; <code>origin_unrecorded</code>(→ per-snapshot facts)/<code>no_workflow</code>/<code>unresolved_rid</code>/<code>no_asset_producer</code> all tasked + tested + a 12-kind coverage checklist; feature-value-root tests; root-version tests (with <code>_classify_rid</code>'s live-derivation flagged for adaptation); authorship + <code>origin_recorded</code> read AT the strict snapshot; Task 7 current-behavior facts corrected (bare-id <code>catalog_snapshot</code>, not a live-instance return) + unreadable-snapshot case; <code>parent_version_then</code> mirrors <code>list_dataset_parents</code> resolution; <code>_producer_of_asset</code> keeps fetched-first (sorted-first would both break byte-compat and violate the repo's RID-ordering rule); checksum on BOTH construction paths; <code>Field(strict=True, ge=1)</code>; quarantine test asserts zero snapshot-dependent calls via harness call-recording; <code>failed_lookup</code> golden added; goldens compare canonical BYTES; evidence-merge test added. <strong>Accepted-with-amendment (1):</strong> chunked-summary ownership — closure paths chunk via <code>_execution_summaries</code>; lineage's per-node fetches preserved for byte-compat; deviation documented in Global Constraints. <strong>Accepted 4 P2s:</strong> <code>discovery_failed</code> test; nested <code>versions</code> ordering in finalize + test; <code>_rid(1)</code> not a literal; NEW Task 8 (harness extension with call recording).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
