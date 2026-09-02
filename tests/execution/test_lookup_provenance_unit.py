@@ -1051,7 +1051,7 @@ def test_authorship_memoizes_snapshot_resolution_per_dataset_version():
 
     The invariant is per-expansion memoization, not a raw seam-call count.
     ``expand_dataset`` resolves the shared snapshot exactly once via
-    ``_strict_snapshot_or_gap`` and hands it to both snapshot-dependent
+    ``read_dataset_leg`` and hands it to both snapshot-dependent
     legs; what must never happen is two EXPANSIONS, which is what the
     per-leg call counts below pin directly.
     """
@@ -4890,7 +4890,7 @@ def test_unresolvable_snapshot_in_a_pooled_leg_still_emits_the_chain_break():
 
     The failure is captured on the read side and classified on the main
     thread by ``_snapshot_from_leg``, whose wording mirrors
-    ``_strict_snapshot_or_gap`` verbatim — so moving the read onto a worker
+    the pre-#394 inline resolver's verbatim — so moving the read onto a worker
     cannot change gap text, gap identity, or gap dedup.
     """
     ml, root, walked = _many_walked_pins_scenario(count=3)

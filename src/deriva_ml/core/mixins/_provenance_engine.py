@@ -1352,42 +1352,17 @@ class WalkEngine(Generic[N]):
             return cached
         return self.read_dataset_leg(dataset_rid, version, self.ml)
 
-    def _strict_snapshot_or_gap(self, dataset_rid: str, version: str) -> Any:
-        """Resolve the strict version snapshot, or report a chain break.
-
-        Args:
-            dataset_rid: The walked dataset.
-            version: The walked version.
-
-        Returns:
-            The snapshot-bound catalog, or ``None`` when it could not be
-            resolved (a ``snapshot_chain_break`` gap has then been emitted).
-
-        Example:
-            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
-            >>> callable(engine._strict_snapshot_or_gap)
-            True
-        """
-        from deriva_ml.core.exceptions import SnapshotUnavailable
-
-        try:
-            return self.ml.lookup_dataset(dataset_rid).strict_version_snapshot_catalog(version)
-        except (SnapshotUnavailable, DerivaMLException) as exc:
-            self.visitor.on_gap(
-                GapKind.snapshot_chain_break,
-                dataset_rid,
-                f"version {version} has no resolvable catalog snapshot, so authorship read skipped "
-                f"and no snapshot-dependent provenance was walked for it: {exc}",
-            )
-            return None
-
     def _snapshot_from_leg(self, leg: DatasetLegReadout) -> Any:
-        """Apply :meth:`_strict_snapshot_or_gap`'s degrade to an ALREADY-READ leg.
+        """Classify an ALREADY-READ leg's strict-snapshot result.
 
-        The same relationship :meth:`member_producers_from` has to
-        :meth:`member_producers_or_gap`: the read happened elsewhere
-        (possibly on a worker), so the classification happens here, on the
-        main thread, with the identical gap wording.
+        The snapshot resolution itself lives in :meth:`read_dataset_leg`,
+        which is read-only and may run on a worker; this is the main-thread
+        half that turns an unresolvable snapshot into the
+        ``snapshot_chain_break`` gap — the same read/classify split
+        :meth:`member_producers_from` has against
+        :meth:`member_producers_or_gap`. The gap wording is verbatim what
+        the pre-#394 inline resolver emitted, which is what keeps gap text,
+        gap identity and gap dedup unchanged across the move.
 
         Args:
             leg: The leg readout.
@@ -2100,7 +2075,7 @@ class WalkEngine(Generic[N]):
         ``_version_snapshot_catalog``, so a recorded-but-unreadable snapshot
         (garbage-collected, or a schema shape the snaptime cannot serve) can
         raise a raw error out of the scan — before ``expand_dataset``'s
-        :meth:`_strict_snapshot_or_gap` ever gets to emit
+        :meth:`_snapshot_from_leg` ever gets to emit
         ``snapshot_chain_break``. That escapes as a crash from a method whose
         contract is "holes become gaps, never exceptions", so the scan is
         wrapped here instead: both ``SnapshotUnavailable`` and the raw errors
