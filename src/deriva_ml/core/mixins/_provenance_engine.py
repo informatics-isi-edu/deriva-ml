@@ -951,6 +951,7 @@ class WalkEngine(Generic[N]):
     _member_scan_cache: dict[tuple[str, str | None], tuple[set, BaseException | None]] = field(init=False)
     _dataset_legs: dict[tuple[str, str], DatasetLegReadout] = field(init=False)
     _worker_handle_pool: "list[Any] | None" = field(init=False, default=None)
+    _worker_handles_exhausted: bool = field(init=False, default=False)
 
     def __init__(
         self,
@@ -1016,6 +1017,9 @@ class WalkEngine(Generic[N]):
         # — the difference is what stops a failed attempt from being retried
         # on every frontier.
         self._worker_handle_pool = None
+        # Latched once the handle factory refuses (or is absent), so a
+        # failed attempt is not retried on every round.
+        self._worker_handles_exhausted = False
         self._sentinel_resolved = False
         self._sentinel_rid: RID | None = None
 
@@ -1644,7 +1648,7 @@ class WalkEngine(Generic[N]):
         """
         if not batch:
             return []
-        if len(batch) == 1 or not self._worker_handles():
+        if len(batch) == 1 or not self._worker_handles(len(batch)):
             return [worker(item, self.ml) for item in batch]
 
         from deriva_ml.core.async_helpers import run_async
@@ -1688,7 +1692,7 @@ class WalkEngine(Generic[N]):
 
         loop = asyncio.get_running_loop()
         leases: asyncio.Queue = asyncio.Queue()
-        for handle in self._worker_handles():
+        for handle in self._worker_handles(len(batch)):
             leases.put_nowait(handle)
 
         async def one(item: Any) -> Any:
@@ -2693,28 +2697,41 @@ class WalkEngine(Generic[N]):
             closure_mode=self.closure_mode,
         )
 
-    def _worker_handles(self) -> list[Any]:
-        """Build (once) the pool of per-worker catalog handles.
+    def _worker_handles(self, needed: int | None = None) -> list[Any]:
+        """Return the per-worker catalog handle pool, grown to demand.
 
-        One extra ``DerivaML`` connection per worker, constructed up front
-        from ``self.ml``'s own connection parameters and its already-parsed
-        schema (so no worker re-fetches ``/schema``). Each handle owns its
-        own ``requests.Session`` AND its own ``_snapshot_cache`` — both
-        unsynchronized, which is exactly why a handle is leased to one
-        reader at a time rather than shared.
+        One extra ``DerivaML`` connection per worker, built from ``self.ml``'s
+        own connection parameters and its already-parsed schema (so no worker
+        re-fetches ``/schema``). Each handle owns its own ``requests.Session``
+        AND its own ``_snapshot_cache`` — both unsynchronized, which is
+        exactly why a handle is leased to one reader at a time rather than
+        shared.
 
         **The pool's size IS the concurrency bound.** Every in-flight read
-        holds one handle from :meth:`_prefetch_frontier_async`'s lease queue,
-        so at most ``len(pool)`` reads run at once and "pool size >=
-        concurrency" holds by construction. Nothing else caps concurrency;
-        adding a second bound would let the two drift apart and reintroduce
-        handle sharing.
+        holds one handle from :meth:`_gather_leased`'s lease queue, so at
+        most ``len(pool)`` reads run at once and "pool size >= concurrency"
+        holds by construction. Nothing else caps concurrency; adding a second
+        bound would let the two drift apart and reintroduce handle sharing.
 
-        Returns an empty list — meaning "do not parallelize" — whenever
-        handles cannot be built: a stubbed ``ml`` in tests, an offline
+        **Sized to demand, and grown lazily.** A handle is a whole extra
+        catalog connection, so building the full worker count for a round of
+        three is a real cost paid for nothing — measured on the eye-ai
+        reference root, where #394's batching made the structural pass's
+        rounds small enough that an eagerly-built pool of 8 turned a 5.4s
+        walk into 13.5s while issuing the same 95 requests. The pool
+        therefore never exceeds what a round actually asks for, and grows
+        across rounds up to the worker count (handles are reused, never
+        rebuilt).
+
+        Handles are never built at all — meaning "do not parallelize" — when
+        ``ml`` cannot supply them: a stubbed ``ml`` in tests, an offline
         instance, a worker count of 1, or any construction failure. The
         caller then reads inline on the main thread. Failing closed here
         costs only speed.
+
+        Args:
+            needed: How many concurrent readers this round wants. ``None``
+                asks for whatever the pool already holds, building nothing.
 
         Returns:
             The handle pool, possibly empty.
@@ -2724,25 +2741,30 @@ class WalkEngine(Generic[N]):
             >>> engine._worker_handles()
             []
         """
-        if self._worker_handle_pool is not None:
-            return self._worker_handle_pool
-
-        pool: list[Any] = []
+        pool = self._worker_handle_pool
+        if pool is None:
+            pool = self._worker_handle_pool = []
         workers = _expansion_workers()
-        ml = self.ml
-        factory = getattr(ml, "_provenance_worker_handle", None)
-        if workers > 1 and callable(factory):
-            for _ in range(workers):
-                try:
-                    handle = factory()
-                except Exception:  # noqa: BLE001 — a handle we cannot build
-                    # simply means less concurrency, never a failed walk.
-                    handle = None
-                if handle is None:
-                    pool = []
-                    break
-                pool.append(handle)
-        self._worker_handle_pool = pool
+        target = min(workers, needed if needed is not None else 0)
+        if self._worker_handles_exhausted or len(pool) >= target or workers < 2:
+            return pool
+
+        factory = getattr(self.ml, "_provenance_worker_handle", None)
+        if not callable(factory):
+            self._worker_handles_exhausted = True
+            return pool
+        while len(pool) < target:
+            try:
+                handle = factory()
+            except Exception:  # noqa: BLE001 — a handle we cannot build
+                # simply means less concurrency, never a failed walk.
+                handle = None
+            if handle is None:
+                # Latch the failure so a factory that cannot produce handles
+                # is not retried on every subsequent round.
+                self._worker_handles_exhausted = True
+                break
+            pool.append(handle)
         return pool
 
     # -- execution expansion ----------------------------------------------
@@ -3213,7 +3235,7 @@ class WalkEngine(Generic[N]):
             )
             return len(frontier)
 
-        if len(frontier) < 2 or _expansion_workers() < 2 or not self._worker_handles():
+        if len(frontier) < 2 or _expansion_workers() < 2 or not self._worker_handles(len(frontier)):
             # Nothing to overlap (or no safe per-worker handles): let
             # ``_take_readout`` read inline, exactly as the pre-#391b walk
             # did. This is also the path a worker count of 1 takes, which

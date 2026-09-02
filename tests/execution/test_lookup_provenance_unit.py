@@ -5044,3 +5044,64 @@ def test_batched_input_assets_skip_non_asset_execution_tables():
     # the is_asset guard, rather than never being reached at all.
     assert "File_Execution" in host.queried
     assert "File" not in host.queried, "the non-asset table's rows were fetched before the guard ran"
+
+
+def test_handle_pool_is_sized_to_demand_not_built_eagerly():
+    """The pool never exceeds what a round actually asks for.
+
+    A handle is a whole extra catalog connection (a ``DerivaML``
+    construction with its own session), so building the full worker count
+    for a round of three is a real cost paid for nothing. The live A/B
+    measured it: after #394's batching shrank the reference root's
+    structural-pass rounds, an eagerly-built pool of 8 turned a 5.4s walk
+    into 13.5s while issuing the same 95 requests — all of the regression
+    was connection setup.
+
+    Growth is monotone across rounds and handles are reused, never rebuilt.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    _require_parallel_enabled()
+
+    ml, _root, _ = _many_walked_pins_scenario(count=24)
+    ml.enable_parallel_expansion(True)
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    # A round of three builds three handles, not eight.
+    engine._run_leased([1, 2, 3], lambda item, handle: item)
+    assert ml._handle_serial == 3, f"a 3-item round built {ml._handle_serial} handles, expected 3"
+
+    # A wider round grows the pool to the worker cap, reusing what exists.
+    engine._run_leased(list(range(24)), lambda item, handle: item)
+    assert ml._handle_serial == 8, f"pool grew to {ml._handle_serial}, expected the worker cap of 8"
+
+    # A later narrow round rebuilds nothing.
+    engine._run_leased([1, 2], lambda item, handle: item)
+    assert ml._handle_serial == 8, "a narrow round rebuilt handles instead of reusing the pool"
+
+
+def test_absent_handle_factory_is_not_retried_every_round():
+    """A factory that cannot produce a handle is asked once, then latched.
+
+    Without the latch, every round of a walk on an offline (or stubbed)
+    instance would re-attempt the construction — cheap in the harness,
+    a repeated failed connection attempt in the field.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, _ = _many_walked_pins_scenario(count=4)
+    # Parallel expansion disabled: ``_provenance_worker_handle`` returns None.
+    attempts = {"n": 0}
+    original = ml._provenance_worker_handle
+
+    def counting():
+        attempts["n"] += 1
+        return original()
+
+    ml._provenance_worker_handle = counting  # type: ignore[method-assign]
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    for _ in range(5):
+        engine._run_leased([1, 2, 3], lambda item, handle: item)
+
+    assert attempts["n"] == 1, f"a refusing handle factory was retried {attempts['n']} times, expected once"
