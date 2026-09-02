@@ -17,6 +17,7 @@ rather than human-readable shorthand.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
@@ -32,6 +33,26 @@ from deriva_ml.feature import FeatureProducerRecord
 # ---------------------------------------------------------------------------
 # Helpers — minimal stand-ins for the catalog primitives.
 # ---------------------------------------------------------------------------
+
+
+class _ThreadSafeCalls(list):
+    """A ``list`` whose ``append`` is safe to call from worker threads.
+
+    Binding scans run on a bounded worker pool (#391 C3), and every seam
+    override records into one shared call log. CPython's list append is
+    already atomic under the GIL, but the lock makes the intent explicit
+    and keeps the harness correct if a seam ever records more than one
+    entry per call. Assertions on this log must be order-insensitive
+    (membership or count), because concurrent scans interleave.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._lock = threading.Lock()
+
+    def append(self, item: Any) -> None:
+        with self._lock:
+            super().append(item)
 
 
 @dataclass
@@ -204,8 +225,12 @@ class _FakeML(ExecutionMixin):
         self._binding_scans: dict[tuple[str, Any], tuple[list[Any], list[BindingDiagnostic]]] = {}
         # Call recording: every seam override appends (method_name, args).
         # Powers the quarantine tests ("assert NO snapshot-dependent call
-        # happened").
-        self.calls: list[tuple[str, tuple]] = []
+        # happened"). Lock-guarded because binding scans run on a worker
+        # pool (#391 C3) and would otherwise race on this list; ORDER
+        # across concurrent scans is not guaranteed, so assertions on it
+        # must be order-insensitive (membership/count), which every
+        # existing assertion already is.
+        self.calls: _ThreadSafeCalls = _ThreadSafeCalls()
         # Mock model.
         self.model = MagicMock()
         self.model.is_asset = lambda table: table.name in self._asset_table_names

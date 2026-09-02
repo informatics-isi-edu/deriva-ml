@@ -1613,7 +1613,7 @@ def test_binding_sentinel_execution_emits_gap_no_arc_not_enqueued():
     independent sentinel backstop, whose detail is generic ("provenance
     terminates at..."). Asserting the leg-specific wording is what makes
     this test fail if the leg's own guard (``_provenance_engine.py``,
-    ``_expand_member_bindings``) were deleted and only the backstop caught
+    ``_apply_binding_scan``) were deleted and only the backstop caught
     the sentinel — without this assertion, a mutant that removes the guard
     is invisible: the backstop only fires once the sentinel is actually
     DEQUEUED, so the guard's real job is never consuming a queue slot for
@@ -2195,6 +2195,422 @@ def test_split_parent_enters_through_the_split_executions_consumption_arc():
 
     # Not vacuous: the containment edge is scripted and was never read.
     assert not [c for c in ml.calls if c[0] == "Dataset.list_dataset_parents"]
+
+
+# ---------------------------------------------------------------------------
+# Ruling 9 (#391) — binding evidence is monotone across dataset versions, so
+# the binding scan runs ONCE PER DATASET, at the MAXIMUM walked snaptime.
+#
+# Dataset semantics guarantee that a newer version only ADDS feature values.
+# The bindings visible at an older walked pin's snaptime are therefore a
+# subset of those at any newer walked pin's snaptime, so per-(dataset,
+# version) scans are redundant: the newest-walked scan subsumes every older
+# one. Evidence is reported "as of" that snapshot, and every
+# ``member_binding`` arc carries the SCANNED version label — older pins get
+# no separate binding arcs of their own.
+#
+# The authorship leg is unaffected: it stays per walked pin (it is bounded
+# BY the pin, not monotone in it) and is cheap.
+# ---------------------------------------------------------------------------
+
+
+def _binding_scan_calls(ml: _FakeML, dataset_rid: str | None = None):
+    """Every ``_find_feature_producers_impl`` call the harness recorded."""
+    return [
+        c
+        for c in ml.calls
+        if c[0] == "_find_feature_producers_impl" and (dataset_rid is None or c[1][0] == dataset_rid)
+    ]
+
+
+def _two_pin_consumers(ml: _FakeML, dataset_rid: str, older: str, newer: str) -> tuple[str, str]:
+    """Script two executions consuming the SAME dataset at two pins.
+
+    Both pins are walkable (resolvable strict snapshot, snapshot-scoped
+    version rows); the live version history records ``older`` before
+    ``newer`` in RCT order, which is what makes ``newer`` the maximum.
+    """
+    older_consumer, newer_consumer = _ex(31), _ex(32)
+    for consumer, pin in ((older_consumer, older), (newer_consumer, newer)):
+        ml.add_execution(
+            consumer,
+            description=f"consumer of {dataset_rid}@{pin}",
+            input_datasets=[_StubDataset(dataset_rid, "shared", pin, consumed_version=pin)],
+        )
+    ml.add_dataset(dataset_rid, description="shared input", producer=None)
+    ml.add_version_row(dataset_rid, older, None, rct="2025-01-01T00:00:00Z")
+    ml.add_version_row(dataset_rid, newer, None, rct="2025-06-01T00:00:00Z")
+    for pin in (older, newer):
+        ml.set_snapshot_available(dataset_rid, pin, True)
+        ml.set_snapshot_version_rows(dataset_rid, pin, [_snapshot_row(dataset_rid, pin, None, "2025-01-01T00:00:00Z")])
+    return older_consumer, newer_consumer
+
+
+def test_two_walked_pins_scan_once_at_the_maximum_snaptime():
+    """A dataset walked at two pins runs exactly ONE binding scan, at the
+    newer pin — the max-snaptime view (ruling 9)."""
+    ml = _FakeML()
+    ds_root, ds_shared = _ds(1), _ds(2)
+    binder, top = _ex(1), _ex(2)
+
+    ml.add_execution(binder, description="bound feature values")
+    older_consumer, newer_consumer = _two_pin_consumers(ml, ds_shared, "0.1.0", "0.2.0")
+    # Both pins have scripted scans; only the newer one may ever be read.
+    ml.set_binding_scan(ds_shared, "0.1.0", [_binding_record(binder, feature_name="Stale")], [])
+    ml.set_binding_scan(ds_shared, "0.2.0", [_binding_record(binder, feature_name="Annotation")], [])
+
+    ml.add_execution(top, description="top")
+    ml.add_dataset(ds_root, description="root", producer=top)
+    ml.set_member_producers(ds_root, {older_consumer, newer_consumer})
+
+    closure = ml.lookup_provenance(ds_root)
+
+    scans = _binding_scan_calls(ml, ds_shared)
+    assert len(scans) == 1
+    assert scans[0][1] == (ds_shared, "0.2.0")
+
+    # Both pins are still walked closure members (the authorship leg ran on
+    # each) — only the BINDING scan collapsed.
+    assert set(closure.datasets[ds_shared].versions) == {"0.1.0", "0.2.0"}
+
+    # The arc carries the SCANNED version, and there is exactly one.
+    arcs = _binding_arcs(closure, binder)
+    assert [(a.input_rid, a.input_version) for a in arcs] == [(ds_shared, "0.2.0")]
+    assert [r.feature_name for r in arcs[0].evidence] == ["Annotation"]
+
+
+def test_older_pin_gets_no_separate_binding_arc():
+    """The as-of semantics: an older walked pin contributes no binding arc
+    of its own, even when it has its own scripted scan result naming a
+    DIFFERENT execution.
+
+    Under the pre-ruling-9 per-pin behavior ``stale_binder`` would be a
+    closure member. Ruling 9 says the newest-walked scan is the
+    authoritative view of this dataset's bindings for this closure.
+    """
+    ml = _FakeML()
+    ds_root, ds_shared = _ds(1), _ds(2)
+    current_binder, stale_binder, top = _ex(1), _ex(3), _ex(2)
+
+    ml.add_execution(current_binder, description="binder visible at the newer pin")
+    ml.add_execution(stale_binder, description="only in the older pin's scripted scan")
+    older_consumer, newer_consumer = _two_pin_consumers(ml, ds_shared, "0.1.0", "0.2.0")
+    ml.set_binding_scan(ds_shared, "0.1.0", [_binding_record(stale_binder)], [])
+    ml.set_binding_scan(ds_shared, "0.2.0", [_binding_record(current_binder)], [])
+
+    ml.add_execution(top, description="top")
+    ml.add_dataset(ds_root, description="root", producer=top)
+    ml.set_member_producers(ds_root, {older_consumer, newer_consumer})
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert current_binder in closure.executions
+    assert stale_binder not in closure.executions
+    assert [a.input_version for a in _binding_arcs(closure, current_binder)] == ["0.2.0"]
+
+
+def test_max_snaptime_scan_finds_what_two_scans_would_under_monotone_data():
+    """Under genuinely monotone data — the newer scan's records are a
+    SUPERSET of the older scan's — the one max-snaptime scan discovers
+    exactly the executions two per-pin scans would have."""
+    ml = _FakeML()
+    ds_root, ds_shared = _ds(1), _ds(2)
+    early_binder, late_binder, top = _ex(1), _ex(3), _ex(2)
+
+    ml.add_execution(early_binder, description="bound values before the older pin")
+    ml.add_execution(late_binder, description="bound values between the two pins")
+    older_consumer, newer_consumer = _two_pin_consumers(ml, ds_shared, "0.1.0", "0.2.0")
+    early = _binding_record(early_binder, feature_name="Annotation")
+    late = _binding_record(late_binder, feature_name="Label")
+    ml.set_binding_scan(ds_shared, "0.1.0", [early], [])
+    # Monotone: everything the older snaptime saw, plus what came after.
+    ml.set_binding_scan(ds_shared, "0.2.0", [early, late], [])
+
+    ml.add_execution(top, description="top")
+    ml.add_dataset(ds_root, description="root", producer=top)
+    ml.set_member_producers(ds_root, {older_consumer, newer_consumer})
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert {early_binder, late_binder} <= set(closure.executions)
+    assert len(_binding_scan_calls(ml, ds_shared)) == 1
+    for binder in (early_binder, late_binder):
+        assert [a.input_version for a in _binding_arcs(closure, binder)] == ["0.2.0"]
+
+
+def test_deferred_scan_discovering_a_new_dataset_runs_a_further_round():
+    """A binding scan can discover an execution that consumes a dataset
+    nothing else walked — so scanning must run in ROUNDS until no pending
+    scan is left, not once at the end of a single drain."""
+    ml = _FakeML()
+    ds_root, ds_second = _ds(1), _ds(2)
+    binder, second_binder = _ex(1), _ex(2)
+
+    # The root's binder consumes a SECOND dataset, whose own binding scan
+    # names another execution. That second scan can only happen in a
+    # later round.
+    ml.add_execution(
+        binder,
+        description="binder that also consumes a second dataset",
+        input_datasets=[_StubDataset(ds_second, "second", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.add_execution(second_binder, description="binder of the second dataset")
+    _walkable_dataset(ml, ds_second, "1.0.0")
+    ml.set_binding_scan(ds_second, "1.0.0", [_binding_record(second_binder, feature_name="Label")], [])
+    _dataset_root_with_bindings(ml, ds_root, "1.0.0", [_binding_record(binder)])
+
+    closure = ml.lookup_provenance(ds_root, version="1.0.0")
+
+    assert {binder, second_binder} <= set(closure.executions)
+    assert [a.input_version for a in _binding_arcs(closure, second_binder)] == ["1.0.0"]
+    assert len(_binding_scan_calls(ml, ds_second)) == 1
+
+
+def test_deferred_scan_gaps_carry_the_scanned_version_context():
+    """``null_binding_execution`` and ``binding_scan_failed`` gaps from a
+    deferred, deduped scan still land — attributed to the scanned version."""
+    ml = _FakeML()
+    ds_root = _ds(1)
+    diagnostic = BindingDiagnostic(kind="ambiguous_hop", subject="Annotation", detail="ambiguous target link")
+    _dataset_root_with_bindings(
+        ml,
+        ds_root,
+        "1.0.0",
+        [_binding_record(None, feature_name="Annotation", element_type="Image")],
+        [diagnostic],
+    )
+
+    closure = ml.lookup_provenance(ds_root, version="1.0.0")
+
+    null_gaps = _gaps_for(closure, GapKind.null_binding_execution, ds_root)
+    assert len(null_gaps) == 1
+    assert "Annotation" in null_gaps[0].detail
+    scan_gaps = _gaps_for(closure, GapKind.binding_scan_failed, "Annotation")
+    assert len(scan_gaps) == 1
+    assert "ambiguous_hop" in scan_gaps[0].detail
+
+
+# ---------------------------------------------------------------------------
+# #391 C3 — the per-dataset scans in a round are independent, so they run on
+# a bounded worker pool. Every RESULT is applied to the (single-threaded)
+# ClosureBuilder afterwards, in sorted dataset order, so the closure stays
+# byte-deterministic regardless of which scan finished first.
+# ---------------------------------------------------------------------------
+
+
+def test_parallel_round_applies_every_scans_result():
+    """Three datasets scanned in one round: all three results are applied,
+    each binder entering with an arc naming its own dataset."""
+    ml = _FakeML()
+    ds_root = _ds(1)
+    inputs = [_ds(n) for n in (10, 11, 12)]
+    binders = [_ex(n) for n in (10, 11, 12)]
+    consumer = _ex(1)
+
+    for binder in binders:
+        ml.add_execution(binder, description=f"binder {binder}")
+    ml.add_execution(
+        consumer,
+        description="consumer of three inputs",
+        input_datasets=[_StubDataset(d, f"input {d}", "1.0.0", consumed_version="1.0.0") for d in inputs],
+    )
+    for dataset_rid, binder in zip(inputs, binders, strict=True):
+        _walkable_dataset(ml, dataset_rid, "1.0.0")
+        ml.set_binding_scan(dataset_rid, "1.0.0", [_binding_record(binder)], [])
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert set(binders) <= set(closure.executions)
+    for dataset_rid, binder in zip(inputs, binders, strict=True):
+        arcs = _binding_arcs(closure, binder)
+        assert [(a.input_rid, a.input_version) for a in arcs] == [(dataset_rid, "1.0.0")]
+    # Each dataset scanned exactly once, whichever order the pool ran them.
+    for dataset_rid in inputs:
+        assert len(_binding_scan_calls(ml, dataset_rid)) == 1
+
+
+def test_parallel_round_result_is_order_independent():
+    """A scan that finishes LAST must not change the closure: the same
+    scenario with the workers' completion order inverted (by making the
+    lexicographically-first dataset the slow one) is byte-identical."""
+    import time
+
+    from tests.execution.test_lineage_goldens import _canonical
+
+    def build(slow_dataset_index: int):
+        ml = _FakeML()
+        ds_root = _ds(1)
+        inputs = [_ds(n) for n in (10, 11, 12)]
+        binders = [_ex(n) for n in (10, 11, 12)]
+        consumer = _ex(1)
+        for binder in binders:
+            ml.add_execution(binder, description=f"binder {binder}")
+        ml.add_execution(
+            consumer,
+            description="consumer",
+            input_datasets=[_StubDataset(d, f"input {d}", "1.0.0", consumed_version="1.0.0") for d in inputs],
+        )
+        for dataset_rid, binder in zip(inputs, binders, strict=True):
+            _walkable_dataset(ml, dataset_rid, "1.0.0")
+            ml.set_binding_scan(dataset_rid, "1.0.0", [_binding_record(binder)], [])
+        ml.add_dataset(ds_root, description="root", producer=consumer)
+
+        slow = inputs[slow_dataset_index]
+        base = ml._find_feature_producers_impl
+
+        def delayed(dataset_rid, version=None):
+            if dataset_rid == slow:
+                time.sleep(0.05)
+            return base(dataset_rid, version)
+
+        ml._find_feature_producers_impl = delayed  # type: ignore[method-assign]
+        return ml, ds_root
+
+    ml_a, root_a = build(0)
+    ml_b, root_b = build(2)
+    dump_a = _canonical(ml_a.lookup_provenance(root_a).model_dump(mode="json"))
+    dump_b = _canonical(ml_b.lookup_provenance(root_b).model_dump(mode="json"))
+
+    assert dump_a == dump_b
+    # Not vacuous: the scenario really did produce binding arcs.
+    assert any(
+        arc.kind == ArcKind.member_binding
+        for member in ml_a.lookup_provenance(root_a).executions.values()
+        for arc in member.arcs
+    )
+
+
+def test_scan_failure_in_one_worker_does_not_lose_the_others():
+    """One dataset's scan raising must not abort the round: the other
+    datasets' results are still applied, and the failure is an honest
+    ``binding_scan_failed`` gap rather than a crash out of the walk."""
+    ml = _FakeML()
+    ds_root = _ds(1)
+    good, bad = _ds(10), _ds(11)
+    binder, consumer = _ex(10), _ex(1)
+
+    ml.add_execution(binder, description="binder of the good dataset")
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_datasets=[_StubDataset(d, f"input {d}", "1.0.0", consumed_version="1.0.0") for d in (good, bad)],
+    )
+    for dataset_rid in (good, bad):
+        _walkable_dataset(ml, dataset_rid, "1.0.0")
+    ml.set_binding_scan(good, "1.0.0", [_binding_record(binder)], [])
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    base = ml._find_feature_producers_impl
+
+    def exploding(dataset_rid, version=None):
+        if dataset_rid == bad:
+            raise RuntimeError("scan exploded")
+        return base(dataset_rid, version)
+
+    ml._find_feature_producers_impl = exploding  # type: ignore[method-assign]
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert binder in closure.executions
+    assert [a.input_rid for a in _binding_arcs(closure, binder)] == [good]
+    failures = _gaps_for(closure, GapKind.binding_scan_failed, bad)
+    assert len(failures) == 1
+    assert "scan exploded" in failures[0].detail
+
+
+# ---------------------------------------------------------------------------
+# #391 C4 — public arc gating. ``arcs=`` exposes the engine's existing gate
+# so a caller can take a fast STRUCTURAL pass, skipping the expensive
+# snapshot-dependent legs. ``None`` (the default) keeps every leg on.
+# ---------------------------------------------------------------------------
+
+
+def _arc_gating_scenario() -> tuple[_FakeML, str, str, str]:
+    """Root dataset consumed by an execution, with a binder on its input."""
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    consumer, binder, author = _ex(1), _ex(2), _ex(3)
+
+    ml.add_execution(binder, description="binder")
+    ml.add_execution(author, description="author of the input version")
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version="1.0.0")],
+    )
+    _walkable_dataset(ml, ds_input, "1.0.0", author=author)
+    ml.set_binding_scan(ds_input, "1.0.0", [_binding_record(binder)], [])
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+    return ml, ds_root, binder, author
+
+
+def test_arcs_none_is_the_full_walk():
+    """The default keeps every leg: both the binder and the version author
+    are closure members."""
+    ml, ds_root, binder, author = _arc_gating_scenario()
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert {binder, author} <= set(closure.executions)
+
+
+def test_arcs_excluding_member_binding_runs_no_binding_scan():
+    """Gating ``member_binding`` off provably skips the binding scan
+    entirely — the expensive leg — while the structural result stands."""
+    ml, ds_root, binder, author = _arc_gating_scenario()
+    structural = frozenset(
+        {
+            ArcKind.consumption,
+            ArcKind.version_authorship,
+            ArcKind.member_production,
+        }
+    )
+
+    closure = ml.lookup_provenance(ds_root, arcs=structural)
+
+    assert not _binding_scan_calls(ml)
+    assert binder not in closure.executions
+    # The structural legs still ran.
+    assert author in closure.executions
+    assert _authorship_arcs(closure, author)
+    assert closure.traversal_complete is True
+
+
+def test_arcs_root_is_always_included_even_when_omitted():
+    """``ArcKind.root`` is implicit: a caller that lists only the legs it
+    wants still gets the root arc, so the seed is never left unexplained."""
+    ml, ds_root, _binder, _author = _arc_gating_scenario()
+
+    closure = ml.lookup_provenance(ds_root, arcs=frozenset({ArcKind.consumption}))
+
+    root_arcs = [arc for member in closure.executions.values() for arc in member.arcs if arc.kind == ArcKind.root]
+    assert root_arcs
+    assert all(arc.depth == 0 for arc in root_arcs)
+
+
+def test_arcs_excluding_consumption_is_allowed_and_narrows_the_walk():
+    """Consumption may be excluded: the closure is then the root plus the
+    requested legs only. Documented, not forbidden."""
+    ml, ds_root, _binder, _author = _arc_gating_scenario()
+
+    closure = ml.lookup_provenance(ds_root, arcs=frozenset({ArcKind.version_authorship}))
+
+    # The root's producer is still the seed (root arc), but nothing is
+    # reached THROUGH a consumption edge.
+    consumption_arcs = [
+        arc for member in closure.executions.values() for arc in member.arcs if arc.kind == ArcKind.consumption
+    ]
+    assert consumption_arcs == []
+    assert closure.traversal_complete is True
+
+
+def test_arcs_rejects_an_unknown_member():
+    """Validation happens at the call boundary, via the enum."""
+    ml, ds_root, _binder, _author = _arc_gating_scenario()
+
+    with pytest.raises(ValidationError):
+        ml.lookup_provenance(ds_root, arcs=frozenset({"not_an_arc_kind"}))
 
 
 def test_multi_version_discovery_still_charges_the_dataset_budget():

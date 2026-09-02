@@ -74,7 +74,8 @@ class BindingDiagnostic:
 
     Attributes:
         kind: One of ``"ambiguous_hop"``, ``"snapshot_absent"``,
-            ``"query_failed"``, ``"discovery_failed"``.
+            ``"query_failed"``, ``"discovery_failed"``,
+            ``"membership_probe_failed"``.
         subject: The feature name, table name, or other identifier the
             diagnostic is about.
         detail: Human-readable detail, typically the stringified exception
@@ -97,6 +98,20 @@ _SUMMARY_CHUNK_SIZE = 25
 # executions must not walk unboundedly just because the execution budget is
 # untouched.
 _DATASET_BUDGET_FACTOR = 4
+
+# The full arc set a closure walks when the caller gates nothing — i.e.
+# ``lookup_provenance(..., arcs=None)``, the default. Kept as an explicit
+# constant (rather than ``set(ArcKind)``) so adding a new ArcKind is a
+# deliberate decision about whether it belongs in the default walk.
+_ALL_ARC_KINDS = frozenset(
+    {
+        ArcKind.root,
+        ArcKind.consumption,
+        ArcKind.version_authorship,
+        ArcKind.member_binding,
+        ArcKind.member_production,
+    }
+)
 
 
 def _version_row_sort_key(row: dict[str, Any]) -> tuple:
@@ -1402,6 +1417,7 @@ class ExecutionMixin:
         *,
         version: str | None = None,
         max_executions: Annotated[int, Field(strict=True, ge=1)] = 500,
+        arcs: frozenset[ArcKind] | None = None,
     ) -> ProvenanceClosure:
         """Compute the full provenance closure behind an artifact.
 
@@ -1430,6 +1446,19 @@ class ExecutionMixin:
         orthogonal to arcs: a gap documents a place the walk could not
         fully resolve, independent of which (if any) executions were found.
 
+        **Feature bindings are read as of the newest walked version**
+        (ruling 9, #391). Binding evidence is monotone across a dataset's
+        versions — a new version only adds feature values — so a dataset
+        walked at several pins is scanned **once**, at the maximum walked
+        version, and every ``member_binding`` arc carries that scanned
+        version label; older walked pins contribute no separate binding
+        arcs (their authorship facts are still per-pin and unaffected).
+        This is exact for the artifact asked about: a member removed before
+        the consumed version contributed nothing to it, and a discovered
+        execution's own input detail is *its* provenance, available from
+        ``lookup_provenance(that_rid)``. See "binding evidence is monotone"
+        in ``docs/reference/provenance-contract.md``.
+
         Args:
             rid: RID of any Dataset, Asset, Feature value, or Execution —
                 the same root typology :meth:`lookup_lineage` accepts.
@@ -1447,6 +1476,22 @@ class ExecutionMixin:
                 bounds ``datasets_visited`` the same way, so a walk reaching
                 many dataset versions but few executions cannot walk
                 unboundedly.
+            arcs: Which :class:`~deriva_ml.execution.provenance.ArcKind`
+                legs to walk. ``None`` (the default) walks all of them.
+                Passing a subset gives a **cheaper, narrower** closure —
+                most usefully a fast structural pass that omits
+                ``member_binding``, whose per-dataset binding scans
+                dominate the walk's cost; with it excluded, no binding
+                scan is issued at all. ``ArcKind.root`` is always
+                included implicitly, so the seed is never left
+                unexplained. Excluding ``consumption`` is allowed and
+                narrows what is *recorded*, not what is traversed: the
+                walk still follows producers of consumed inputs (that is
+                how it reaches anything), but records no consumption arc
+                — the closure is then the root plus the requested legs.
+                For a meaningful causal closure, keep ``consumption``.
+                Unknown members are rejected at the call boundary by the
+                enum.
 
         Returns:
             A :class:`~deriva_ml.execution.provenance.ProvenanceClosure`
@@ -1489,6 +1534,15 @@ class ExecutionMixin:
                 >>> closure.root.version  # doctest: +SKIP
                 '1.2.0'
 
+            Take a fast structural pass, skipping the binding scans::
+
+                >>> from deriva_ml.execution import ArcKind
+                >>> structural = frozenset(  # doctest: +SKIP
+                ...     {ArcKind.consumption, ArcKind.version_authorship,
+                ...      ArcKind.member_production}
+                ... )
+                >>> closure = ml.lookup_provenance(rid, arcs=structural)  # doctest: +SKIP
+
             Inspect why one execution is in the closure and what it consumed
             versus authored::
 
@@ -1500,19 +1554,16 @@ class ExecutionMixin:
 
         root_descriptor, producer_rid = self._classify_rid(rid)
 
+        # ``ArcKind.root`` is implicit: the seed's own arc is what explains
+        # why the walk started at all, so a caller listing only the legs it
+        # wants never ends up with an unexplained seed.
+        enabled_arcs = frozenset(arcs) | {ArcKind.root} if arcs is not None else _ALL_ARC_KINDS
+
         builder = ClosureBuilder()
         engine: "WalkEngine[str]" = WalkEngine(
             self,
             builder,
-            arcs=frozenset(
-                {
-                    ArcKind.root,
-                    ArcKind.consumption,
-                    ArcKind.version_authorship,
-                    ArcKind.member_binding,
-                    ArcKind.member_production,
-                }
-            ),
+            arcs=enabled_arcs,
             max_executions=max_executions,
             dataset_budget=_DATASET_BUDGET_FACTOR * max_executions,
             closure_mode=True,
@@ -1566,7 +1617,16 @@ class ExecutionMixin:
         # Executions discovered through a non-tree arc (the dataset-side legs)
         # were queued on the engine as they were found; drain them under the
         # same execution budget.
-        engine.drain(depth_remaining=None)
+        #
+        # Binding scans are deferred (ruling 9, #391) so each dataset is
+        # scanned ONCE, at its maximum walked snaptime — which is only known
+        # once the walk has finished discovering that dataset's pins. A scan
+        # can itself discover executions that walk new datasets and pins, so
+        # the two phases alternate in rounds until neither has work left.
+        while True:
+            engine.drain(depth_remaining=None)
+            if not engine.run_pending_binding_scans():
+                break
 
         # An arc recorded against a RID that never became a closure member
         # needs an explanation. Three are already accounted for:
@@ -2258,11 +2318,20 @@ class ExecutionMixin:
         querying bind to the version's snapshot (model, planner, and data),
         so schema evolution after the snapshot cannot distort the result.
 
+        Routes are pruned by a per-scan **membership probe** before any
+        feature query runs: every enumerated route starts
+        ``Dataset -> Dataset_<Member> -> ...``, so a route whose first hop
+        has no rows for this dataset can contribute no feature rows for
+        any feature on that target. Each distinct first hop is probed once
+        per scan and the answer cached, so features sharing a target share
+        the probe. Only an answered, empty probe prunes — a probe that
+        fails leaves its routes in place and records a diagnostic.
+
         A single-path feature counts server-side (grouped distinct); only
-        a feature with multiple FK routes unions row RIDs client-side so a
-        row reachable two ways counts exactly once. Ambiguous hops skip
-        with a warning; a failing feature degrades without masking the
-        rest.
+        a feature with multiple SURVIVING FK routes unions row RIDs
+        client-side so a row reachable two ways counts exactly once.
+        Ambiguous hops skip with a warning; a failing feature degrades
+        without masking the rest.
 
         Args:
             dataset_rid: RID of the dataset whose members' bindings to
@@ -2360,6 +2429,55 @@ class ExecutionMixin:
                 last = path[-1]
                 paths_by_target.setdefault((last.schema.name, last.name), []).append(path)
 
+        # Per-scan membership cache (#391 C2). Every enumerated route starts
+        # ``Dataset -> Dataset_<Member> -> ...``: that FIRST HOP *is* the
+        # dataset's membership edge, so a route whose first hop has no rows
+        # for this dataset can contribute no feature rows — for ANY feature
+        # on that target. Probing each DISTINCT first hop once per scan and
+        # caching the answer therefore prunes those routes for every feature
+        # at once, before a single feature query runs. The probe is one
+        # existence check (``limit=1``, RID only), and the routes it prunes
+        # would each have cost a full multi-hop join. On the eye-ai
+        # reference dataset this is 7 probes replacing 32 route queries,
+        # and it collapses every feature to a single surviving route — i.e.
+        # onto the cheaper server-side groupby path.
+        #
+        # Conservative by construction: only an answered, empty probe
+        # prunes. A probe that cannot be built or that raises leaves the
+        # route in place and records a diagnostic, because an unanswerable
+        # question about membership is not a "no".
+        membership_cache: dict[tuple[str, str], bool] = {}
+
+        def _route_has_members(path: list[Any]) -> bool:
+            """True unless this route's membership hop is provably empty."""
+            hop = path[1]
+            key = (hop.schema.name, hop.name)
+            cached = membership_cache.get(key)
+            if cached is not None:
+                return cached
+            try:
+                joins = planner._table_relationship(path[0], hop)
+                root_table = pb.schemas[path[0].schema.name].tables[path[0].name]
+                hop_table = pb.schemas[key[0]].tables[key[1]]
+                pred = None
+                for left_col, right_col in joins:
+                    clause = root_table.columns[left_col.name] == hop_table.columns[right_col.name]
+                    pred = clause if pred is None else (pred & clause)
+                probe = root_table.filter(root_table.RID == dataset_rid).link(hop_table, on=pred)
+                answer = bool(list(probe.attributes(hop_table.RID).fetch(limit=1)))
+            except Exception as exc:  # noqa: BLE001 — degrade, never prune
+                logger.warning("Membership probe of %s on %s failed: %s", key[1], dataset_rid, exc)
+                diagnostics.append(
+                    BindingDiagnostic(
+                        kind="membership_probe_failed",
+                        subject=f"{key[0]}:{key[1]}",
+                        detail=str(exc),
+                    )
+                )
+                answer = True
+            membership_cache[key] = answer
+            return answer
+
         records: list[FeatureProducerRecord] = []
         for feature in features:
             target_meta = feature.target_table
@@ -2388,6 +2506,14 @@ class ExecutionMixin:
 
             usable: list[tuple[list[Any], list[list[tuple[Any, Any]]]]] = []
             for path in target_paths:
+                # Membership pruning FIRST: a route this dataset has no
+                # members through cannot yield feature rows, so it is
+                # dropped before its (multi-hop, expensive) join is even
+                # built. Cached per scan, so the cost is one probe per
+                # distinct association regardless of how many features
+                # share it.
+                if not _route_has_members(path):
+                    continue
                 try:
                     joins = [planner._table_relationship(path[i], path[i + 1]) for i in range(len(path) - 1)]
                 except DerivaMLException as exc:

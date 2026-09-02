@@ -807,6 +807,19 @@ versions (e.g. consumed at an older version by one execution and at a newer
 one by another) gets two independent entries — reading `origin_recorded`
 for one version never reflects a different version's facts.
 
+**Binding evidence is reported "as of" the newest walked version.** Feature
+values are monotone across a dataset's versions — a new version only *adds*
+bindings — so when a dataset is walked at several pinned versions the
+closure reads its bindings **once, at the maximum walked version**, and
+every `member_binding` arc carries that scanned version label. Older walked
+pins still appear in `closure.datasets` (their authorship facts are per-pin
+and unaffected), but they contribute no separate binding arcs. This is
+exact for the artifact you asked about: a member removed before the version
+that artifact consumed contributed nothing to it, and any discovered
+execution's own full input detail is *its* provenance — ask for it directly
+with `lookup_provenance(that_rid)`. See the "binding evidence is monotone"
+consequence in `docs/reference/provenance-contract.md`.
+
 **Containment is structure, not provenance.** The closure does *not* walk
 `Dataset_Dataset` parents. Provenance is execution-mediated: a parent
 dataset enters the closure through the *consumption arc* of the execution
@@ -829,6 +842,31 @@ is itself an `unpinned_input` gap; an unpinned edge is walked as a closure
 member but is never expanded through any version-snapshot-dependent arc
 (no authorship, no bindings), because there is no honest snapshot to read
 those facts from.
+
+**Arc gating: a fast structural pass.** `arcs=` selects which `ArcKind`
+legs the walk runs; `None` (the default) runs all of them. The
+`member_binding` leg is by far the most expensive — it issues a binding
+scan per dataset — so excluding it gives a much faster, purely structural
+closure and issues no binding scan at all:
+
+```python
+from deriva_ml.execution import ArcKind
+
+structural = frozenset({
+    ArcKind.consumption,
+    ArcKind.version_authorship,
+    ArcKind.member_production,
+})
+closure = ml.lookup_provenance(rid, arcs=structural)
+```
+
+`ArcKind.root` is always included implicitly, so the seed is never left
+unexplained. Excluding `consumption` is allowed, but narrows what is
+*recorded* rather than what is traversed: the walk still follows producers
+of consumed inputs — that is how it reaches anything at all — it just
+records no consumption arc, leaving the root plus your requested legs.
+Keep `consumption` for a meaningful causal closure. Unknown members are
+rejected at the call boundary.
 
 **Budgets and `traversal_complete`.** `max_executions` bounds distinct
 executions expanded; a proportional internal dataset-version budget

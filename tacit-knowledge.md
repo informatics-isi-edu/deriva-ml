@@ -1086,3 +1086,113 @@ closure's causal story; and a discovered execution's own full input
 detail is ITS provenance, available via lookup_provenance(X). The
 max-snaptime scan is therefore EXACT for the question asked. To be
 codified in provenance-contract.md when implemented.
+
+**2026-09-01 — Ruling 9 + #391 implemented (PR on feat/389-ancestry-out):
+the closure is 39% faster and byte-identical, and the profile's centre of
+gravity MOVED.** Four owner-approved changes, live-A/B'd on the eye-ai
+reference training run (resolved by lookup at run time: workflow `VGG-19
+Glaucoma Diagnosis Training` + `Status=Uploaded` + newest RCT → `7-ZYY8`,
+28 candidates — note the RID and the candidate count both drift with
+catalog growth, exactly as the earlier reconciliation entry warned, which
+is why the A/B must re-resolve rather than pin).
+
+| Measure | before (#389) | after (#391) | delta |
+|---|---|---|---|
+| **executions** | 44 | **44** (same RIDs) | **0** |
+| **datasets** | 12 | **12** (same RIDs) | **0** |
+| gaps / kinds | 99 / 7 kinds | **99 / same 7** | **0** |
+| walked (dataset, version) pairs | 19 | 19 | 0 |
+| binding SCANS | 19 | **12** | −7 |
+| HTTP GETs | 1743 | **1397** | −20% |
+| **runtime** | 150.9s | **92.0s** | **−39%** |
+| structural pass (`arcs` w/o member_binding) | n/a | **7.2s / 89 GETs** | **21×** |
+
+**The zero is again the headline.** Ruling 9 predicted the max-snaptime
+scan is EXACT, not approximate, for the requested closure — and the
+execution set, dataset set, gap count AND gap taxonomy are unchanged. The
+7 collapsed scans (19→12) bought nothing but time, which is the whole
+claim. No per-pin binding gap turned into a per-dataset as-of gap on this
+run, because the multi-pin datasets' older pins had no bindings the newest
+pin lacked — monotonicity holding in the data, not just in the contract.
+
+**What each change actually bought** (measured, not assumed):
+
+1. **C1 (ruling 9, max-snaptime scans)** — 19 scans → 12. Scans are now
+   DEFERRED (`expand_dataset` registers the pin; a round-runner resolves
+   the max via `_version_row_sort_key` over the live history) because
+   which pin is the maximum is unknowable until the walk stops finding
+   pins. Rounds alternate drain/scan; the run took **3 rounds** (3, 7, 2
+   scans).
+2. **C2 (route pruning)** — the real find, and NOT what the brief
+   guessed. Every enumerated route starts `Dataset → Dataset_<Member> →
+   …`: the first hop IS the membership edge, so a route whose first hop
+   is empty for this dataset contributes nothing for ANY feature on that
+   target. Probing each distinct first hop once per scan (cached, shared
+   across features) took the reference dataset's scan from **45 GETs /
+   5.74s to 18 / 3.22s with identical records**. On eye-ai's 8 features ×
+   5 routes, **4 of 5 routes are empty** and 7 probes replace 32 route
+   queries — and every feature collapses to ONE surviving route, i.e.
+   onto the cheap server-side groupby, so the client-side multi-route
+   union mostly stops running at all. The brief's proposed whole-table
+   edge-fetch + in-memory BFS (the estimate-perf pattern) would have been
+   WRONG here: the reachable `Image` set alone is 28,107 RIDs, so both a
+   whole-table fetch and a RID-list filter are hazards. **Lesson: the
+   estimate pattern transfers only where server joins are the slow part;
+   here the cost was request COUNT, and the fix was to ask fewer
+   questions, not to stop asking the server.**
+3. **C3 (parallel scans)** — 105.1s of scan work compressed into **23.6s**
+   of wall time (4.5× overlap, 8 workers). Workers read only; results
+   apply single-threaded in sorted dataset order, so determinism is
+   structural, not lucky (pinned by a test that inverts worker completion
+   order and diffs `model_dump()`).
+4. **C4 (public arc gating)** — a structural pass is **7.2s vs 92s**. It
+   also revealed WHY the closure is expensive: gated to structure it finds
+   **2 executions, not 44**. The binding leg is what DISCOVERS the other
+   42.
+
+**The ≤20s target was NOT met, and the profile now says why.** After the
+scans stop dominating, the remaining ~70s is the **sequential execution
+walk** of the 42 binding-discovered executions: 44 `lookup_execution`
+(16.2s / 308 GETs), 31 `_producers_of_dataset_members` (15.8s / 189),
+`_input_dataset_pairs` (5.2s / 96), plus their fan-out. Binding scans are
+now only ~24s of the ~92s. So the next lever is NOT more scan
+optimization — it is **batching or parallelizing execution expansion**
+(the drain loop is strictly sequential and its per-node lookups are
+independent), or snapshot-keyed result caching. Recorded here so the next
+pass doesn't re-optimize the leg that is already fast: **the 2026-09-01
+"levers, impact order" list above is now spent — items (1) and (2) are
+done and item (3) is shipped as `arcs=`.**
+
+**2026-09-01 — Authorship history stays (Carl), and the
+worldline-vs-neighborhood distinction.** After ruling 8, Carl weighed
+dropping previous-version authors; settled on KEEPING them: each
+version-producing execution is a curation event on the artifact itself
+— execution-mediated causation, unlike ancestry. The "versions span
+snapshots" wrinkle resolves cleanly: the walk never visits old
+snapshots — Dataset_Version rows ≤ v are DATA IN v's snapshot (the
+history is carried forward as content), so one snapshot-closed read at
+v yields the whole chain. The principled in/out line: Dataset_Version
+is the WORLDLINE of one artifact (execution-attributed construction
+events on the thing itself → provenance); Dataset_Dataset is a
+RELATION between different artifacts with no reliable causal direction
+(→ structure, ruling 8). Perf consequence: historical authors are not
+trimmed for speed; the remaining runtime goes to parallel execution
+expansion instead, and the #392 arc-gating knob serves anyone wanting
+the narrow view.
+
+**2026-09-01 — Parallel expansion: reuse the deriva-py asyncio
+framework, not a third thread pool (Carl-approved design).** Codebase
+audit corrected an earlier wrong claim ("deriva-py is sync all the way
+down"): deriva-py ships `deriva.core.asyncio` — AsyncErmrestCatalog on
+httpx (retries, connection limits), AsyncErmrestSnapshot, async
+datapath, and clone.py's semaphore-bounded asyncio.gather fan-out
+(used by the bag loader deriva-ml already calls). deriva-ml also has a
+dormant notebook-safe `run_async` bridge (core/async_helpers.py) and
+two ad-hoc ThreadPoolExecutor sites (_reachability, #392 scan pool).
+Decision: orchestrate the closure's frontier expansion with the
+deriva-py async pattern (gather + Semaphore), offload existing sync
+mixin seams via executor (per-worker catalog handles — requests.Session
+is NOT thread-safe; the #392 scans solved this with per-scan handles),
+keep the public API sync via run_async, and migrate hot reads to
+native async incrementally — converging on ONE concurrency framework
+instead of three.
