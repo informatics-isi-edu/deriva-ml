@@ -1314,3 +1314,63 @@ callable — so `ml.model.name_to_table(...)` raised `AttributeError`
 inside the asset branch, which swallowed it as `resolution_failed` and
 silently dropped every asset producer. Instrument an explicit seam
 list, never a callable check, when proxying a duck-typed object.
+
+**2026-09-01 — Codex stack review round 2: ruling 9 had a latent
+correctness hole, and the second concurrency leg had the same session
+bug.** Four findings, all accepted (PR #393).
+
+**The one that matters: "scan once per dataset" was implemented as
+"scan once per dataset EVER".** `_binding_scanned` was a set, so once a
+dataset was scanned it never scanned again — but a later round can walk
+a HIGHER pin (a scan-discovered execution's inputs walk D@v2 above the
+already-scanned v1). Ruling 9 promises evidence as of the MAXIMUM
+walked snaptime; the implementation delivered evidence as of the
+*first-scanned* snaptime, silently dropping bindings that exist only at
+the higher pin. Fixed by tracking the scanned VERSION per dataset and
+rescanning when the max pin advances (compared with `max_walked_pin`'s
+own total order, so "newer" has one definition). The rescan REPLACES
+the prior arcs rather than merging: monotonicity makes the new view a
+superset, so a merge would duplicate every surviving record and leave
+one dataset's arcs carrying two different `input_version` labels —
+"evidence as of one snaptime" broken. Convergence is free: pins only
+advance, bounded by version count.
+
+**The eye-ai A/B could not have caught it — and said so only when
+asked.** Post-fix run was byte-identical (52/15/1/129, 178 binding
+evidence records unchanged). Instrumenting the run explained why: **15
+datasets, 15 scans, ZERO rescans** — no dataset's max pin advances
+after its first scan on that catalog, so the bug is latent for that
+root. Recording this because the null result is a trap: identical bytes
+after a correctness fix look like "the fix was unnecessary" and are
+actually "this root doesn't reach the broken path." Always instrument
+whether the fixed path was EXERCISED before reading a null A/B as
+reassurance.
+
+**Second finding, same shape as the round-1 lease bug:** the #392
+binding-scan `ThreadPoolExecutor` called seams on the shared `self.ml`
+concurrently — the identical unsynchronized `requests.Session` +
+`_snapshot_cache` hazard the expansion lease had just fixed, sitting
+untouched on the other leg. Both legs now draw from ONE handle queue
+(`_run_leased`), which makes pool depth the single global concurrency
+bound and retires the "two concurrency frameworks" item. **Lesson: when
+you fix a concurrency bug, grep for every other pool in the same
+module** — the fix does not generalize itself.
+
+**Harness lesson (again): a probe can only see what routes through
+it.** The first scan-lease test PASSED against a deliberately-broken
+mutant, because a worker bypassing the lease calls the seam on the
+shared `_FakeML` where no `_HandleProbe` exists. Needed a separate
+"direct concurrent use of the shared instance" tracker before the pin
+was real (then: 23 recorded violations against the mutant). Corollary
+to the round-1 rule: mutation-testing a concurrency pin has to confirm
+the harness can OBSERVE the mutant, not merely that the test fails for
+some reason.
+
+**Also: `reuse_schema_json` never pinned anything** — `_init_online`
+re-fetches `/schema` to validate it and replaces on difference. Right
+for `catalog_snapshot` (a pre-migration snapshot must not build a model
+its catalog cannot serve), wrong for worker handles on the same live
+catalog, which each re-fetched and could diverge from the caller's
+model mid-walk (one walk, two model identities). Now an explicit
+`trust_schema_json` flag used only by the worker-handle factory;
+default stays validating.
