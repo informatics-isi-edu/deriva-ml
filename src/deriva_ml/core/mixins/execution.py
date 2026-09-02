@@ -2485,7 +2485,18 @@ class ExecutionMixin:
 
             asset_rids = list(dict.fromkeys(r[asset_table_name] for r in rows))
             asset_rows: dict[RID, dict[str, Any]] = {}
-            asset_path = pb.schemas[schema_name].tables[asset_table_name]
+            # Resolve the asset table through the MODEL rather than assuming
+            # it shares its association table's schema. deriva-ml creates
+            # them together today, but a name lookup that silently depends
+            # on that is the kind of assumption a catalog eventually breaks.
+            try:
+                asset_table = self.model.name_to_table(asset_table_name)
+                asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
+            except (KeyError, AttributeError, DerivaMLException):
+                # No such asset table (or it is absent from this path
+                # builder): the per-node path degraded each ``lookup_asset``
+                # with a debug log; skip the whole group the same way.
+                continue
             for chunk in self._rid_chunks(asset_rids):
                 for row in asset_path.filter(self._rid_any(asset_path, "RID", chunk)).entities().fetch():
                     asset_rows[row["RID"]] = row
