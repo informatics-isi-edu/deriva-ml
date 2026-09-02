@@ -2516,9 +2516,17 @@ class WalkEngine(Generic[N]):
         # whole frontier ``resolution_failed``, which is a much larger loss
         # of provenance than the failure warrants.
         asset_producers: dict[str, tuple[str, ...] | list[str]] = {}
-        by_table: dict[int, list[tuple[str, Any]]] = {}
+        # Grouped by SCHEMA-QUALIFIED identity, never by bare name or object
+        # identity: same-named tables in two schemas are two groups (the
+        # P2-2 lesson), and a model that hands back equal-but-distinct table
+        # objects must still collapse into one group. Defensive rather than
+        # pinned — the failure-containment test uses distinctly-named tables,
+        # so a name-only key would still pass it; this keeps the grouping
+        # consistent with the identity rule the rest of the batch now uses.
+        by_table: dict[tuple[str, str], list[tuple[str, Any]]] = {}
         for asset_rid, asset_table in asset_items:
-            by_table.setdefault(id(asset_table), []).append((asset_rid, asset_table))
+            key = (getattr(getattr(asset_table, "schema", None), "name", ""), asset_table.name)
+            by_table.setdefault(key, []).append((asset_rid, asset_table))
         for group in by_table.values():
             try:
                 asset_producers.update(ml._producers_of_assets_batch(group))
