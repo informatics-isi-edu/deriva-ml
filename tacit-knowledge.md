@@ -1498,10 +1498,10 @@ summaries) run in a pooled round through `_gather_leased`.
 | **executions / datasets / assets / gaps** | 52 / 15 / 1 / 129 | **identical RIDs** | **0** |
 | **canonical `model_dump`** | 118,155 B `806ad64f…` | **byte-identical** | **0** |
 | **HTTP requests (full closure)** | 1,882 | **898** | **−52%** |
-| runtime (full closure) | 100.0s | 71.5s / 81.1s | −29% / −19% |
+| runtime (full closure) | 100.0s | **81.1s median** (3 runs) | **−19%** |
 
-**The request cut is double the runtime cut, and that IS the result.**
-Halving requests bought ~20-30% wall clock, which says the walk has
+**The request cut is nearly triple the runtime cut, and that IS the
+result.** Halving requests bought ~19% wall clock, which says the walk has
 moved off request COUNT and onto per-request latency down the
 dependency chain — exactly the "chain-depth × RTT without speculation"
 floor the scope note predicted. The remaining levers are the deferred
