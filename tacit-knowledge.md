@@ -1078,5 +1078,11 @@ an exception to it: a removal takes those members and their bindings
 out of the dataset's story, and the newest-walked scan is the
 authoritative view. Writers whose only bindings were on since-removed
 members do not survive; that is the intended semantics, not an
-approximation. To be codified in provenance-contract.md when
-implemented.
+approximation. Carl's sharper closing argument: from the PERSPECTIVE
+of the specific execution or dataset version whose provenance was
+requested, a member removed before the consumed version contributed
+nothing to that artifact — its writers are simply not in this
+closure's causal story; and a discovered execution's own full input
+detail is ITS provenance, available via lookup_provenance(X). The
+max-snaptime scan is therefore EXACT for the question asked. To be
+codified in provenance-contract.md when implemented.
