@@ -74,7 +74,8 @@ class BindingDiagnostic:
 
     Attributes:
         kind: One of ``"ambiguous_hop"``, ``"snapshot_absent"``,
-            ``"query_failed"``, ``"discovery_failed"``.
+            ``"query_failed"``, ``"discovery_failed"``,
+            ``"membership_probe_failed"``.
         subject: The feature name, table name, or other identifier the
             diagnostic is about.
         detail: Human-readable detail, typically the stringified exception
@@ -2280,11 +2281,20 @@ class ExecutionMixin:
         querying bind to the version's snapshot (model, planner, and data),
         so schema evolution after the snapshot cannot distort the result.
 
+        Routes are pruned by a per-scan **membership probe** before any
+        feature query runs: every enumerated route starts
+        ``Dataset -> Dataset_<Member> -> ...``, so a route whose first hop
+        has no rows for this dataset can contribute no feature rows for
+        any feature on that target. Each distinct first hop is probed once
+        per scan and the answer cached, so features sharing a target share
+        the probe. Only an answered, empty probe prunes — a probe that
+        fails leaves its routes in place and records a diagnostic.
+
         A single-path feature counts server-side (grouped distinct); only
-        a feature with multiple FK routes unions row RIDs client-side so a
-        row reachable two ways counts exactly once. Ambiguous hops skip
-        with a warning; a failing feature degrades without masking the
-        rest.
+        a feature with multiple SURVIVING FK routes unions row RIDs
+        client-side so a row reachable two ways counts exactly once.
+        Ambiguous hops skip with a warning; a failing feature degrades
+        without masking the rest.
 
         Args:
             dataset_rid: RID of the dataset whose members' bindings to
@@ -2382,6 +2392,55 @@ class ExecutionMixin:
                 last = path[-1]
                 paths_by_target.setdefault((last.schema.name, last.name), []).append(path)
 
+        # Per-scan membership cache (#391 C2). Every enumerated route starts
+        # ``Dataset -> Dataset_<Member> -> ...``: that FIRST HOP *is* the
+        # dataset's membership edge, so a route whose first hop has no rows
+        # for this dataset can contribute no feature rows — for ANY feature
+        # on that target. Probing each DISTINCT first hop once per scan and
+        # caching the answer therefore prunes those routes for every feature
+        # at once, before a single feature query runs. The probe is one
+        # existence check (``limit=1``, RID only), and the routes it prunes
+        # would each have cost a full multi-hop join. On the eye-ai
+        # reference dataset this is 7 probes replacing 32 route queries,
+        # and it collapses every feature to a single surviving route — i.e.
+        # onto the cheaper server-side groupby path.
+        #
+        # Conservative by construction: only an answered, empty probe
+        # prunes. A probe that cannot be built or that raises leaves the
+        # route in place and records a diagnostic, because an unanswerable
+        # question about membership is not a "no".
+        membership_cache: dict[tuple[str, str], bool] = {}
+
+        def _route_has_members(path: list[Any]) -> bool:
+            """True unless this route's membership hop is provably empty."""
+            hop = path[1]
+            key = (hop.schema.name, hop.name)
+            cached = membership_cache.get(key)
+            if cached is not None:
+                return cached
+            try:
+                joins = planner._table_relationship(path[0], hop)
+                root_table = pb.schemas[path[0].schema.name].tables[path[0].name]
+                hop_table = pb.schemas[key[0]].tables[key[1]]
+                pred = None
+                for left_col, right_col in joins:
+                    clause = root_table.columns[left_col.name] == hop_table.columns[right_col.name]
+                    pred = clause if pred is None else (pred & clause)
+                probe = root_table.filter(root_table.RID == dataset_rid).link(hop_table, on=pred)
+                answer = bool(list(probe.attributes(hop_table.RID).fetch(limit=1)))
+            except Exception as exc:  # noqa: BLE001 — degrade, never prune
+                logger.warning("Membership probe of %s on %s failed: %s", key[1], dataset_rid, exc)
+                diagnostics.append(
+                    BindingDiagnostic(
+                        kind="membership_probe_failed",
+                        subject=f"{key[0]}:{key[1]}",
+                        detail=str(exc),
+                    )
+                )
+                answer = True
+            membership_cache[key] = answer
+            return answer
+
         records: list[FeatureProducerRecord] = []
         for feature in features:
             target_meta = feature.target_table
@@ -2410,6 +2469,14 @@ class ExecutionMixin:
 
             usable: list[tuple[list[Any], list[list[tuple[Any, Any]]]]] = []
             for path in target_paths:
+                # Membership pruning FIRST: a route this dataset has no
+                # members through cannot yield feature rows, so it is
+                # dropped before its (multi-hop, expensive) join is even
+                # built. Cached per scan, so the cost is one probe per
+                # distinct association regardless of how many features
+                # share it.
+                if not _route_has_members(path):
+                    continue
                 try:
                     joins = [planner._table_relationship(path[i], path[i + 1]) for i in range(len(path) - 1)]
                 except DerivaMLException as exc:

@@ -48,6 +48,22 @@ class _ChainPath:
 
     def attributes(self, *cols):
         terminal = self.tables[-1]
+        # A two-table chain ``Dataset -> Dataset_X`` is the per-scan
+        # MEMBERSHIP PROBE (#391 C2), not a feature-route query: it asks
+        # whether this dataset has any members through that association.
+        # Scripted per harness via ``empty_membership``; every other
+        # association defaults to "has members", which is what keeps a
+        # route enumerated from the schema live unless a test says
+        # otherwise.
+        if len(self.tables) == 2:
+            self.harness.membership_probes.append(terminal)
+            failure = self.harness.membership_failures.get(terminal)
+            if isinstance(failure, Exception):
+                raise failure
+            has_members = terminal not in self.harness.empty_membership
+            result = MagicMock()
+            result.fetch.return_value = [{"RID": _rid(1)}] if has_members else []
+            return result
         source = self.harness.grouped_rows if self._grouped else self.harness.raw_rows
         rows = source.get(terminal)
         if isinstance(rows, Exception):
@@ -133,11 +149,22 @@ class _Harness:
         relationships=None,
         missing_tables=frozenset(),
         snapshot=None,
+        empty_membership=frozenset(),
+        membership_failures=None,
     ):
         self.grouped_rows = grouped_rows or {}
         self.raw_rows = raw_rows or {}
         self.executed = []
         self.missing_tables = set(missing_tables)
+        # (schema, name) association tables through which this dataset has
+        # NO members — every route whose first hop is one of these is
+        # pruned before any feature query runs (#391 C2). Default: every
+        # association has members.
+        self.empty_membership = set(empty_membership)
+        # (schema, name) -> Exception raised by that membership probe.
+        self.membership_failures = dict(membership_failures or {})
+        # Every membership probe the scan issued, in order.
+        self.membership_probes = []
 
         ml = ExecutionMixin.__new__(ExecutionMixin)
         ml.ml_schema = "deriva-ml"
@@ -466,6 +493,124 @@ def test_impl_discovery_failed_find_features_raises():
     records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
     assert records == []
     assert any(d.kind == "discovery_failed" for d in diagnostics)
+
+
+# --- #391 C2: per-scan membership pruning -----------------------------
+#
+# Every enumerated route starts ``Dataset -> Dataset_<Member> -> ...``:
+# the first hop IS the dataset's membership edge. A route whose first hop
+# has no rows for this dataset can contribute no feature rows at all — for
+# ANY feature on that target — so probing each distinct first hop ONCE per
+# scan (cached, shared across every feature) prunes those routes before a
+# single feature query runs. On the eye-ai reference dataset this took the
+# scan's route queries from 40 to 8 at a cost of 7 probes.
+
+
+def test_membership_probe_runs_once_per_association_across_features():
+    """Four features sharing one route set issue ONE probe per distinct
+    first hop — not one per feature."""
+    e1 = _rid(10)
+    h = _Harness(
+        paths=[
+            _p("Dataset_Image", IMG),
+            _p("Dataset_Subject", SUBJ, "Observation", IMG),
+        ],
+        features=[
+            _feature("Annotation", _tbl(IMG), _tbl(FT_IMG)),
+            _feature("Diagnosis", _tbl(IMG), _tbl("Execution_Image_Diagnosis")),
+        ],
+        grouped_rows={
+            ("domain", FT_IMG): [{"Execution": e1, "value_count": 1}],
+            ("domain", "Execution_Image_Diagnosis"): [{"Execution": e1, "value_count": 1}],
+        },
+        # Only Dataset_Image has members, so each feature keeps ONE route
+        # and lands on the single-route server-side groupby.
+        empty_membership={("domain", "Dataset_Subject")},
+    )
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+
+    assert sorted(r.feature_name for r in records) == ["Annotation", "Diagnosis"]
+    assert diagnostics == []
+    # Two distinct first hops, probed once each — NOT once per feature.
+    assert sorted(h.membership_probes) == [("domain", "Dataset_Image"), ("domain", "Dataset_Subject")]
+    # Pruned to one route each -> server-side groupby, not a raw union.
+    assert all(mode == "grouped" for _t, mode in h.executed)
+    assert len(h.executed) == 2
+
+
+def test_empty_membership_route_is_never_queried():
+    """A route whose membership hop is empty issues NO feature query."""
+    e1 = _rid(10)
+    h = _Harness(
+        paths=[
+            _p("Dataset_Image", IMG),
+            _p("Dataset_Subject", SUBJ, "Observation", IMG),
+        ],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": e1, "value_count": 1}]},
+        empty_membership={("domain", "Dataset_Subject")},
+    )
+    records, _diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+
+    assert [(r.execution_rid, r.value_count) for r in records] == [(e1, 1)]
+    executed_routes = [[n for _s, n in tables] for tables, _mode in h.executed]
+    assert executed_routes == [["Dataset", "Dataset_Image", IMG, FT_IMG]]
+    assert not any(SUBJ in route for route in executed_routes)
+
+
+def test_all_routes_pruned_yields_no_records_and_no_query():
+    """Every route's membership hop empty -> the feature contributes
+    nothing, and no feature query is issued at all."""
+    h = _Harness(
+        paths=[_p("Dataset_Image", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": _rid(10), "value_count": 9}]},
+        empty_membership={("domain", "Dataset_Image")},
+    )
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+
+    assert records == []
+    assert diagnostics == []
+    assert h.executed == []
+
+
+def test_surviving_multi_route_still_unions_client_side():
+    """Pruning does not remove the union: when TWO routes survive the
+    probe, the multi-route client-side union still runs and a feature row
+    reachable both ways counts exactly once."""
+    e1 = _rid(10)
+    shared = {"RID": _rid(100), "Execution": e1}
+    h = _Harness(
+        paths=[
+            _p("Dataset_Image", IMG),
+            _p("Dataset_Subject", SUBJ, "Observation", IMG),
+        ],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        raw_rows={("domain", FT_IMG): [shared]},
+        # Both associations have members -> both routes survive.
+    )
+    records, _diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+
+    assert [(r.execution_rid, r.value_count) for r in records] == [(e1, 1)]  # not 2
+    assert all(mode == "raw" for _t, mode in h.executed)
+    assert len(h.executed) == 2
+
+
+def test_membership_probe_failure_keeps_the_route():
+    """A probe that RAISES must not prune: an unanswerable question about
+    membership is not a "no". The route runs and the scan degrades with a
+    diagnostic naming the probe, never a silently smaller answer."""
+    e1 = _rid(10)
+    h = _Harness(
+        paths=[_p("Dataset_Image", IMG)],
+        features=[_feature("Annotation", _tbl(IMG), _tbl(FT_IMG))],
+        grouped_rows={("domain", FT_IMG): [{"Execution": e1, "value_count": 1}]},
+        membership_failures={("domain", "Dataset_Image"): RuntimeError("probe boom")},
+    )
+    records, diagnostics = h.ml._find_feature_producers_impl(_rid(500))
+
+    assert [(r.execution_rid, r.value_count) for r in records] == [(e1, 1)]
+    assert any(d.kind == "membership_probe_failed" for d in diagnostics)
 
 
 def test_impl_discovery_failed_schema_to_paths_raises():
