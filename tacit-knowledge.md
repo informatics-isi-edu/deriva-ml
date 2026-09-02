@@ -1374,3 +1374,40 @@ catalog, which each re-fetched and could diverge from the caller's
 model mid-walk (one walk, two model identities). Now an explicit
 `trust_schema_json` flag used only by the worker-handle factory;
 default stays validating.
+
+**2026-09-01 — Round 3: the rescan fix was half-done — replacing arcs
+without replacing GAPS just moves a stale-view bug into the gap
+stream.** Ruling 9's "one as-of view per dataset" has to hold across
+*every* accumulator the scan writes to, not just the one you were
+thinking about. Two reachable cases: a binding-leg `sentinel_origin`
+whose detail embedded `{dataset}@{version}` emitted TWO gaps for one
+fact on the ordinary MONOTONE rescan (the two-version-labels violation
+the arc fix's own docstring named — the fix documented the rule and
+then broke it one accumulator over); and a transient v1
+`binding_scan_failed` survived a clean v2 rescan, permanently reporting
+a failure that no longer applied.
+
+**Two complementary fixes, and it is worth knowing they are not
+redundant:** (1) tag gaps with the dataset whose scan emitted them and
+drop them on rescan — *releasing the dedup keys too*, or the fresh
+scan's identical re-emission is swallowed as "already seen" and the gap
+vanishes entirely, turning one bug into a worse one; (2) stop embedding
+the scanned pin in details that state version-INDEPENDENT facts. Each
+alone fixes the sentinel case; only (1) fixes the transient-failure
+case; (2) makes the gap dedupe naturally before any drop runs. **General
+rule: put the as-of label on the ARCS (which are the as-of view) and
+keep it out of gap details (which state facts).**
+
+**A test can pin the defect.** `test_binding_sentinel_execution_emits_gap…`
+asserted `{dataset}@{version}` appeared in the sentinel detail — it had
+been written against the buggy behaviour and was actively defending it.
+When a fix makes an existing assertion fail, check whether the
+assertion was ever *right* before changing the code back.
+
+**And: "unified" claims need reading twice.** The round-2 commit said
+both legs run through one `_run_leased`; they actually shared a handle
+POOL while duplicating the queue/acquire/release loop. Genuinely
+unified now (`_gather_leased` is the single primitive, `_run_leased`
+its sync wrapper), with the per-task exception difference pushed into
+each caller's worker so the primitive stays exception-neutral and one
+task's failure cannot cancel the gather.
