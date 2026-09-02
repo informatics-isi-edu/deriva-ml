@@ -38,7 +38,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLValidationError,
     SnapshotUnavailable,
 )
-from deriva_ml.core.mixins.execution import BindingDiagnostic
+from deriva_ml.core.mixins.execution import _ALL_ARC_KINDS, BindingDiagnostic
 from deriva_ml.execution.provenance import (
     ArcInputType,
     ArcKind,
@@ -4654,3 +4654,254 @@ def test_member_scan_failure_is_replayed_to_every_consumer_of_the_pair():
     breaks = [g for g in _gaps_for(closure, GapKind.snapshot_chain_break, _ds(2)) if "member-producer scan" in g.detail]
     assert len(breaks) == 1, f"expected one deduped member-scan chain-break gap, got {[g.detail for g in breaks]}"
     assert "scripted snapshot failure" in breaks[0].detail
+
+
+# ---------------------------------------------------------------------------
+# Pooled dataset legs (#394, change 2).
+#
+# ``expand_dataset``'s reads — the strict snapshot resolution, the
+# snapshot-scoped Dataset_Version rows, and the author-summary fetch — ran
+# strictly sequentially between frontier rounds (~24s over 43 pairs on the
+# reference root, the largest un-parallelized leg after #391b). They now go
+# through the SAME leased handle pool as the expansion reads and the binding
+# scans, applied single-threaded in sorted pair order.
+# ---------------------------------------------------------------------------
+
+
+def _many_walked_pins_scenario(*, count: int) -> tuple[_FakeML, str, list[str]]:
+    """A root whose one frontier walks ``count`` distinct ``(dataset, version)``.
+
+    Each member-producer of the root consumes its own pinned, snapshot-
+    resolvable dataset with a recorded authoring execution — so one round
+    has ``count`` independent dataset legs to read, wider than the handle
+    pool, which is the contended regime a lease has to survive.
+
+    Returns ``(ml, root_dataset_rid, walked_dataset_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    members = set()
+    walked = []
+    for index in range(count):
+        dataset = _ds(600 + index)
+        consumer = _ex(600 + index)
+        author = _ex(700 + index)
+        rct = f"2025-01-{(index % 28) + 1:02d}T00:00:00Z"
+        ml.add_execution(author, description=f"author {index}")
+        ml.add_dataset(dataset, description=f"walked {index}", producer=author)
+        ml.add_version_row(dataset, "1.0.0", author, rct=rct)
+        ml.set_snapshot_available(dataset, "1.0.0", True)
+        ml.set_snapshot_version_rows(dataset, "1.0.0", [_snapshot_row(dataset, "1.0.0", author, rct)])
+        ml.set_versioned_producer(dataset, "1.0.0", author)
+        ml.add_execution(
+            consumer,
+            description=f"consumer {index}",
+            input_datasets=[_StubDataset(dataset, f"walked {index}", "1.0.0", consumed_version="1.0.0")],
+        )
+        members.add(consumer)
+        walked.append(dataset)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(walked)
+
+
+def test_dataset_legs_never_share_a_worker_handle():
+    """Pooled dataset legs are LEASED like every other concurrent read.
+
+    The legs' reads are ``lookup_dataset(...).strict_version_snapshot_catalog``,
+    ``_dataset_version_rows_at`` and ``_execution_summaries`` — all
+    session-bound, all now running concurrently — so sharing a handle
+    between two of them is the same unsynchronized ``requests.Session`` /
+    ``_snapshot_cache`` hazard the expansion lease and the scan lease each
+    had to fix on their own leg.
+
+    The harness had to be extended for this pin to be able to FAIL: the
+    probe now instruments those three seams, and the handle travels with the
+    Dataset object ``lookup_dataset`` returns, so the snapshot resolution
+    reached through it is attributed to the leased handle rather than
+    escaping unobserved. Mutation-verified: running the legs on a plain
+    thread pool over ``self.ml`` reports concurrent unleased use.
+    """
+    _require_parallel_enabled()
+
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+
+    ml, root, walked = _many_walked_pins_scenario(count=24)
+    ml.enable_parallel_expansion(True)
+    ml._handle_hold_seconds = 0.01
+
+    leg_rounds: list[int] = []
+    original = WalkEngine.prefetch_dataset_legs
+
+    def _recording(self, pairs):
+        count = original(self, pairs)
+        if count:
+            leg_rounds.append(count)
+        return count
+
+    WalkEngine.prefetch_dataset_legs = _recording  # type: ignore[method-assign]
+    try:
+        closure = ml.lookup_provenance(root)
+    finally:
+        WalkEngine.prefetch_dataset_legs = original  # type: ignore[method-assign]
+
+    assert list(ml.handle_violations) == [], (
+        f"a handle was entered concurrently {len(ml.handle_violations)} time(s) during the dataset legs: "
+        f"{list(ml.handle_violations)[:5]} — legs are bypassing the lease"
+    )
+    # Non-vacuous on both axes: a pooled round really ran, and it was wider
+    # than the pool, so leases genuinely had to be recycled.
+    assert max(leg_rounds, default=0) > ml._handle_serial >= 2, (
+        f"widest leg round {max(leg_rounds, default=0)} vs pool {ml._handle_serial}; leases were never contended"
+    )
+    # And the legs actually produced their arcs.
+    assert len(closure.datasets) >= len(walked)
+
+
+def test_pooled_dataset_legs_equal_the_sequential_legs(monkeypatch):
+    """A pooled-leg closure is byte-identical to a ``WORKERS=1`` one.
+
+    ``DERIVA_ML_PROVENANCE_WORKERS=1`` serializes ``_run_leased``, which is
+    the single primitive the legs go through — so it is a true
+    sequential-equivalence control for this leg, not just for expansion and
+    scans.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_pooled, root_pooled, _ = _many_walked_pins_scenario(count=12)
+    ml_pooled.enable_parallel_expansion(True)
+    pooled = _canonical(ml_pooled.lookup_provenance(root_pooled).model_dump(mode="json"))
+
+    monkeypatch.setenv("DERIVA_ML_PROVENANCE_WORKERS", "1")
+    ml_serial, root_serial, _ = _many_walked_pins_scenario(count=12)
+    ml_serial.enable_parallel_expansion(True)
+    serial = _canonical(ml_serial.lookup_provenance(root_serial).model_dump(mode="json"))
+
+    assert pooled == serial
+    # Non-vacuous: the authorship leg really ran and recorded arcs.
+    authorship = [
+        arc
+        for execution in ml_pooled.lookup_provenance(root_pooled).executions.values()
+        for arc in execution.arcs
+        if arc.kind == ArcKind.version_authorship
+    ]
+    assert authorship, "no version_authorship arc was recorded, so the leg equivalence pin is vacuous"
+
+
+def test_pooled_dataset_legs_equal_the_unprefetched_legs():
+    """A prefetched leg produces the same closure as an inline-read leg.
+
+    The prefetch is a pure read-ahead: ``expand_dataset`` consumes a cached
+    leg on a hit and reads inline on a miss. Disabling the prefetch
+    entirely therefore has to leave the closure untouched — which is the
+    property that let this land without editing a single existing
+    dataset-leg test.
+    """
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_prefetched, root_prefetched, _ = _many_walked_pins_scenario(count=8)
+    prefetched = _canonical(ml_prefetched.lookup_provenance(root_prefetched).model_dump(mode="json"))
+
+    ml_inline, root_inline, _ = _many_walked_pins_scenario(count=8)
+    original = WalkEngine.prefetch_dataset_legs
+    WalkEngine.prefetch_dataset_legs = lambda self, pairs: 0  # type: ignore[method-assign]
+    try:
+        inline = _canonical(ml_inline.lookup_provenance(root_inline).model_dump(mode="json"))
+    finally:
+        WalkEngine.prefetch_dataset_legs = original  # type: ignore[method-assign]
+
+    assert prefetched == inline
+
+
+def test_dataset_leg_prefetch_skips_pins_it_must_not_read():
+    """The prefetch never reads a pin the expansion would refuse to walk.
+
+    It mirrors ``expand_dataset``'s own pre-I/O guards: unpinned edges (a
+    quarantine, never a snapshot read), already-walked pairs, and a walk
+    with no snapshot-dependent arc enabled. Reading any of those would be a
+    request bought for nothing — and, for the unpinned case, would violate
+    the §6.1 quarantine the walk exists to enforce.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, walked = _many_walked_pins_scenario(count=3)
+    builder = ClosureBuilder()
+    engine: WalkEngine = WalkEngine(ml, builder, arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    # Unpinned pairs are filtered out entirely.
+    assert engine.prefetch_dataset_legs([(walked[0], None)]) == 0
+    # Already-walked pairs are not re-read.
+    engine.datasets_expanded.add((walked[0], "1.0.0"))
+    assert engine.prefetch_dataset_legs([(walked[0], "1.0.0")]) == 0
+    # A fresh pin IS read...
+    assert engine.prefetch_dataset_legs([(walked[1], "1.0.0")]) == 1
+    # ...but only once: the second offer finds it cached.
+    assert engine.prefetch_dataset_legs([(walked[1], "1.0.0")]) == 0
+
+    # A walk with no snapshot-dependent arc reads nothing at all.
+    structural: WalkEngine = WalkEngine(
+        ml, ClosureBuilder(), arcs=frozenset({ArcKind.root, ArcKind.consumption}), closure_mode=True
+    )
+    assert structural.prefetch_dataset_legs([(walked[2], "1.0.0")]) == 0
+
+
+def test_dataset_leg_read_never_mutates_engine_or_visitor():
+    """``read_dataset_leg`` is what workers run, so it must be read-only.
+
+    Pinned structurally rather than by review, for the same reason
+    ``read_execution``'s equivalent pin exists: one stray ``visitor.on_gap``
+    on the read side would be a data race the equivalence tests could pass
+    through by luck.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, walked = _many_walked_pins_scenario(count=2)
+    builder = ClosureBuilder()
+    engine: WalkEngine = WalkEngine(ml, builder, arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    before = (
+        set(engine.visited_global),
+        set(engine.datasets_expanded),
+        engine.cap_hit,
+        dict(engine.flags),
+    )
+
+    leg = engine.read_dataset_leg(walked[0], "1.0.0", ml)
+
+    assert leg.dataset_rid == walked[0] and leg.version == "1.0.0"
+    assert leg.snapshot is not None and leg.snapshot_error is None
+    assert leg.rows, "the leg read no version rows, so the pin is vacuous"
+    assert (
+        set(engine.visited_global),
+        set(engine.datasets_expanded),
+        engine.cap_hit,
+        dict(engine.flags),
+    ) == before
+    assert builder.finalize() == ({}, {}, {}, [])
+
+
+def test_unresolvable_snapshot_in_a_pooled_leg_still_emits_the_chain_break():
+    """A leg whose snapshot does not resolve reports the SAME gap it always did.
+
+    The failure is captured on the read side and classified on the main
+    thread by ``_snapshot_from_leg``, whose wording mirrors
+    ``_strict_snapshot_or_gap`` verbatim — so moving the read onto a worker
+    cannot change gap text, gap identity, or gap dedup.
+    """
+    ml, root, walked = _many_walked_pins_scenario(count=3)
+    ml.enable_parallel_expansion(True)
+    ml.set_snapshot_available(walked[0], "1.0.0", False)
+
+    closure = ml.lookup_provenance(root)
+
+    breaks = _gaps_for(closure, GapKind.snapshot_chain_break, walked[0])
+    assert len(breaks) == 1, f"expected one chain-break gap, got {[g.detail for g in breaks]}"
+    assert "has no resolvable catalog snapshot" in breaks[0].detail
+    # The other pins are unaffected — one broken leg never poisons a round.
+    for dataset in walked[1:]:
+        assert _gaps_for(closure, GapKind.snapshot_chain_break, dataset) == []

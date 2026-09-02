@@ -102,6 +102,15 @@ class _HandleProbe:
             # reads (#391 round-2 review), so this seam must be instrumented
             # too — otherwise a scan bypassing the lease is invisible.
             "_find_feature_producers_impl",
+            # Dataset legs (#394) are the third leg leased through that
+            # pool: the strict snapshot resolution (reached through
+            # ``lookup_dataset``), the snapshot-scoped version-row read, and
+            # the author-summary fetch. Un-instrumented, a leg bypassing the
+            # lease would be invisible for exactly the reason the round-2
+            # review recorded — a probe can only see what routes through it.
+            "lookup_dataset",
+            "_dataset_version_rows_at",
+            "_execution_summaries",
         }
     )
 
@@ -129,12 +138,85 @@ class _HandleProbe:
                 # it is not what the test is measuring (the occupancy
                 # counter above is).
                 with self._shared_lock:
-                    return target(*args, **kwargs)
+                    result = target(*args, **kwargs)
             finally:
                 with self._occupancy_lock:
                     self._occupants -= 1
+            if name == "lookup_dataset":
+                # ``strict_version_snapshot_catalog`` is reached THROUGH the
+                # handle returned here, so the handle it belongs to has to
+                # travel with it — otherwise the snapshot resolution (a real
+                # catalog read on the leg's critical path) would run outside
+                # any probe and a lease bypass there would be unobservable.
+                result = _ProbedDatasetHandle(result, self)
+            return result
 
         return proxied
+
+    def _bracket(self, seam: str) -> Any:
+        """Occupancy bracket for a read reached through this handle.
+
+        Returns:
+            A context manager recording concurrent entry, holding the handle
+            for the configured interval, and serializing scripted state.
+        """
+        return _ProbeOccupancy(self, seam)
+
+
+class _ProbeOccupancy:
+    """Context manager entering one ``_HandleProbe``'s occupancy.
+
+    Extracted so a read reached INDIRECTLY through a handle (the strict
+    snapshot resolution, reached via ``lookup_dataset(...)``) is counted the
+    same way a direct seam call is. Without it a leg could bypass the lease
+    on that read and no probe would see it — the round-2 harness lesson
+    ("a probe can only see what routes through it") applied to the #394
+    dataset leg.
+    """
+
+    def __init__(self, probe: "_HandleProbe", seam: str) -> None:
+        self._probe = probe
+        self._seam = seam
+
+    def __enter__(self) -> "_ProbeOccupancy":
+        probe = self._probe
+        with probe._occupancy_lock:
+            probe._occupants += 1
+            collided = probe._occupants > 1
+        if collided:
+            probe._owner.handle_violations.append(("concurrent_entry", probe._index))
+        if probe._owner._handle_hold_seconds:
+            time.sleep(probe._owner._handle_hold_seconds)
+        probe._shared_lock.acquire()
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        probe = self._probe
+        probe._shared_lock.release()
+        with probe._occupancy_lock:
+            probe._occupants -= 1
+
+
+class _ProbedDatasetHandle:
+    """A ``_StubDatasetHandle`` whose reads run inside its probe's occupancy.
+
+    ``lookup_dataset`` through a leased handle returns this, so the strict
+    snapshot resolution it fronts is attributed to the handle that was
+    leased — making a lease bypass on the dataset leg observable.
+    """
+
+    def __init__(self, inner: "_StubDatasetHandle", probe: "_HandleProbe") -> None:
+        self._inner = inner
+        self._probe = probe
+        self.dataset_rid = inner.dataset_rid
+
+    def strict_version_snapshot_catalog(self, version: Any) -> Any:
+        with self._probe._bracket("strict_version_snapshot_catalog"):
+            return self._inner.strict_version_snapshot_catalog(version)
+
+    def list_dataset_parents(self) -> list[str]:
+        with self._probe._bracket("list_dataset_parents"):
+            return self._inner.list_dataset_parents()
 
 
 @dataclass
@@ -251,6 +333,10 @@ class _StubDatasetHandle:
 
     def strict_version_snapshot_catalog(self, version: Any) -> Any:
         self._owner.calls.append(("Dataset.strict_version_snapshot_catalog", (self.dataset_rid, str(version))))
+        # Reached directly on the shared instance rather than through a
+        # leased handle — normal on the main thread, a lease bypass when two
+        # threads are inside at once (#394 dataset legs).
+        self._owner._note_direct_seam_use("strict_version_snapshot_catalog")
         key = (self.dataset_rid, str(version))
         if not self._owner._snapshot_available.get(key, False):
             raise SnapshotUnavailable(f"Dataset {self.dataset_rid} version {version} has no recorded snapshot")
@@ -582,6 +668,7 @@ class _FakeML(ExecutionMixin):
         exactly the leak the snapshot-faithfulness pin guards against).
         """
         self.calls.append(("_dataset_version_rows_at", (dataset_rid, str(version))))
+        self._note_direct_seam_use("_dataset_version_rows_at")
         return list(self._snapshot_version_rows.get((dataset_rid, str(version)), []))
 
     def _sentinel_execution_rid_or_none(self) -> str | None:  # type: ignore[override]
