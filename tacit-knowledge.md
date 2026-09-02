@@ -1411,3 +1411,46 @@ unified now (`_gather_leased` is the single primitive, `_run_leased`
 its sync wrapper), with the per-task exception difference pushed into
 each caller's worker so the primitive stays exception-neutral and one
 task's failure cannot cancel the gather.
+
+**2026-09-02 — Live proof of the rescan, and the environment blocker
+that stopped it landing green.** Wrote
+`tests/execution/test_lookup_provenance_live.py`: the pin-advance
+scenario built on a real catalog rather than `_FakeML` — D over three
+Subject members; E1 binds a Quality feature; D released at v1 (snapshot
+cut AFTER E1's bindings, so a v1 scan sees E1 and nothing later); E2
+binds a SECOND, distinct feature; D released at v2; then the load-
+bearing edge, `e1.add_input_dataset(D, version=v2)`, which is what makes
+the maximum walked pin advance in a round *after* D was first scanned.
+Root R consumes D@v1. Five tests: exactly two scans of D (v1 then v2),
+all surviving `member_binding` arcs carry v2, E1 holds exactly ONE arc
+(replaced not merged), E2 present, and no gap detail carries the
+superseded v1 label.
+
+**Two construction notes worth keeping.** (1) The pin advance needs a
+PUBLIC API, and there is one — `Execution.add_input_dataset(rid,
+version=)` writes the `Dataset_Execution` row with the `Dataset_Version`
+FK resolved, so no hand-rolled association insert is needed; reaching
+for a raw insert here would have been a hard-coded-schema smell. (2)
+Use TWO distinct features, not two batches of one feature: E2's
+bindings have to be invisible at v1 for the control assertion
+(`find_feature_producers(D, version=v1)` lacks E2 while the closure
+contains it) to mean anything. Scan counting is a `monkeypatch` wrapper
+on `_find_feature_producers_impl` at the CLASS level — the engine leases
+separate handles, so patching the instance would miss the worker calls.
+
+**Blocker: the localhost demo stack's bearer token is expired and cannot
+be refreshed non-interactively.** `POST /ermrest/catalog` → 401 ("Access
+requires authentication"), while GETs still return 200 — exactly the
+trap the `demo-catalog-auth-and-build` memory warns about: **read
+success does not prove the token is good**, because anonymous read is
+allowed. Confirmed environmental, not code: the pre-existing
+`test_lookup_lineage_live.py` fails identically, and the 17 errors in
+`test_provenance_contract.py` reproduce on a clean tree with my file
+stashed. Also worth recording for next time: this stack now fronts
+**Keycloak** (`/authn/login` → `/auth/realms/deriva/...`), not Globus —
+there is no `/authn/session` endpoint at all (404), `/authn/discovery`
+returns `{}`, and the realm does advertise the `password` grant, so a
+refresh is *mechanically* possible but needs a human's realm
+credentials. Offline gates are green (224 passed incl. the 150-test
+provenance unit suite); the live module skips cleanly without
+`DERIVA_HOST` and is ready to run the moment a token is minted.
