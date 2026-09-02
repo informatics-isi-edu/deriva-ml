@@ -60,13 +60,6 @@ UNPINNED_VERSION_KEY = "<unpinned>"
 # (once, shared); enabling none of them means no snapshot is ever resolved.
 _SNAPSHOT_DEPENDENT_ARCS = frozenset({ArcKind.version_authorship, ArcKind.member_binding})
 
-# Worker pool size for a round's binding scans (#391 C3). Each scan is an
-# independent, snapshot-bound, HTTP-bound read, so the bound is about being
-# a polite catalog client rather than about CPU: a closure round rarely has
-# more than a handful of datasets, and a small fixed pool keeps the burst
-# predictable for the server.
-_BINDING_SCAN_WORKERS = 8
-
 # Concurrency for a frontier's execution prefetch (#391b). Deliberately an
 # internal module constant with an env override rather than a public
 # ``lookup_provenance`` parameter: it tunes *how* the walk talks to the
@@ -247,8 +240,13 @@ class WalkVisitor(Protocol[N]):
         """Observe the assembled facts for one dataset version."""
         ...
 
-    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str) -> None:
-        """Observe an honest gap the walk could not resolve."""
+    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str, *, scan_source: str | None = None) -> None:
+        """Observe an honest gap the walk could not resolve.
+
+        ``scan_source``, when given, names the dataset whose binding scan
+        emitted this gap — so a visitor that keeps an as-of view per dataset
+        can drop and re-emit it on rescan. Visitors that do not may ignore it.
+        """
         ...
 
 
@@ -333,7 +331,7 @@ class TreeBuilder:
     def on_dataset_facts(self, *, dataset_rid: str, facts: "DatasetVersionFacts") -> None:
         """No-op."""
 
-    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str) -> None:
+    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str, *, scan_source: str | None = None) -> None:
         """No-op."""
 
 
@@ -378,6 +376,10 @@ class ClosureBuilder:
         self.assets: dict[str, ProvenanceAsset] = {}
         self.gaps: list[ProvenanceGap] = []
         self._gap_keys: set[tuple] = set()
+        # dataset_rid -> [(dedup_key, gap)] for gaps emitted BY that
+        # dataset's binding scan. A rescan at an advanced pin drops these
+        # alongside the dataset's arcs, so one as-of view holds across both.
+        self._binding_scan_gaps: dict[str, list[tuple[tuple, ProvenanceGap]]] = {}
 
     # -- accumulation primitives ------------------------------------------
 
@@ -648,13 +650,71 @@ class ClosureBuilder:
             versions[version] = facts
         return facts
 
-    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str) -> None:
-        """Record an honest gap, deduped on ``(kind, subject_rid, detail)``."""
+    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str, *, scan_source: str | None = None) -> None:
+        """Record an honest gap, deduped on ``(kind, subject_rid, detail)``.
+
+        Args:
+            kind: The gap category.
+            subject_rid: The affected entity (or a scan-path identifier for
+                ``binding_scan_failed``).
+            detail: Human-readable explanation.
+            scan_source: When this gap was emitted by the binding scan of a
+                particular dataset, that dataset's RID. Gaps so tagged are
+                part of that dataset's **as-of view** and are dropped and
+                re-emitted when the dataset is rescanned at an advanced pin
+                (see :meth:`drop_binding_scan_gaps_for`). Untagged gaps —
+                everything from the authorship leg, the consumption legs, or
+                the walk itself — are never touched by a rescan.
+        """
         key = (kind, subject_rid, detail)
         if key in self._gap_keys:
             return
         self._gap_keys.add(key)
-        self.gaps.append(ProvenanceGap(kind=kind, subject_rid=subject_rid, detail=detail))
+        gap = ProvenanceGap(kind=kind, subject_rid=subject_rid, detail=detail)
+        self.gaps.append(gap)
+        if scan_source is not None:
+            self._binding_scan_gaps.setdefault(scan_source, []).append((key, gap))
+
+    def drop_binding_scan_gaps_for(self, dataset_rid: str) -> int:
+        """Remove the gaps ``dataset_rid``'s previous binding scan emitted.
+
+        The rescan counterpart of :meth:`drop_binding_arcs_for`, and needed
+        for exactly the same reason: ruling 9 reports **one** as-of view per
+        dataset, and that has to hold across gaps as well as arcs. Without
+        it the stale-view bug simply moves into the gap stream:
+
+        - a ``sentinel_origin`` gap from the binding leg embeds
+          ``{dataset}@{version}`` in its detail, so the ordinary monotone
+          case produces TWO gaps for one fact under two as-of labels — the
+          very two-version-labels violation the arc fix exists to prevent;
+        - a ``binding_scan_failed`` gap from a transient v1 failure would
+          survive a clean v2 rescan, permanently reporting a failure that no
+          longer applies.
+
+        Only gaps tagged with this dataset as their ``scan_source`` are
+        dropped, so an authorship-leg sentinel gap about some other subject
+        is untouched even when it names the same execution.
+
+        Args:
+            dataset_rid: The rescanned dataset.
+
+        Returns:
+            How many gaps were dropped.
+
+        Example:
+            >>> ClosureBuilder().drop_binding_scan_gaps_for(f"1-{1:04X}")
+            0
+        """
+        recorded = self._binding_scan_gaps.pop(dataset_rid, [])
+        if not recorded:
+            return 0
+        stale_gaps = {id(gap) for _key, gap in recorded}
+        self.gaps = [gap for gap in self.gaps if id(gap) not in stale_gaps]
+        # Un-dedupe as well, or the fresh scan's identical re-emission would
+        # be swallowed as "already seen" and the gap would vanish entirely.
+        for key, _gap in recorded:
+            self._gap_keys.discard(key)
+        return len(recorded)
 
     # -- finalize ---------------------------------------------------------
 
@@ -1334,32 +1394,63 @@ class WalkEngine(Generic[N]):
         """
         if not batch:
             return []
-        handles = self._worker_handles()
-        if len(batch) == 1 or not handles:
+        if len(batch) == 1 or not self._worker_handles():
             return [worker(item, self.ml) for item in batch]
-
-        import asyncio
-
-        async def drive() -> list:
-            loop = asyncio.get_running_loop()
-            leases: asyncio.Queue = asyncio.Queue()
-            for handle in handles:
-                leases.put_nowait(handle)
-
-            async def one(item: Any) -> Any:
-                handle = await leases.get()
-                try:
-                    return await loop.run_in_executor(None, lambda: worker(item, handle))
-                finally:
-                    # Released even on failure — a leaked lease would shrink
-                    # the pool for the rest of the walk and deadlock it.
-                    leases.put_nowait(handle)
-
-            return list(await asyncio.gather(*(one(item) for item in batch)))
 
         from deriva_ml.core.async_helpers import run_async
 
-        return run_async(drive())
+        return run_async(self._gather_leased(batch, worker))
+
+    async def _gather_leased(self, batch: list, worker: Any) -> list:
+        """Await ``worker(item, handle)`` over ``batch`` under the lease pool.
+
+        The **single** concurrency primitive in this engine: both the
+        expansion prefetch and the binding-scan round go through here, so
+        there is exactly one place that decides how a handle is acquired,
+        held, and released. :meth:`_run_leased` is just its synchronous
+        wrapper for callers that are not already in a loop.
+
+        Handles come from an :class:`asyncio.Queue`; a task cannot start
+        until it owns one and holds it exclusively until the ``finally``
+        releases it. **The queue's depth is the only concurrency bound**,
+        which makes "pool size >= concurrency" an enforced invariant and
+        means an expansion frontier and a scan round can never together
+        exceed the pool.
+
+        ``worker`` must be read-only and must not raise: callers wrap their
+        own failure handling (the prefetch returns ``None`` for a failed
+        read; the scan returns the exception in its result tuple), which
+        keeps one task's failure from cancelling the gather.
+
+        Args:
+            batch: Work items, already in deterministic (sorted) order.
+            worker: ``(item, handle) -> result``; read-only, non-raising.
+
+        Returns:
+            Results in the SAME order as ``batch``, never completion order.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._gather_leased)
+            True
+        """
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        leases: asyncio.Queue = asyncio.Queue()
+        for handle in self._worker_handles():
+            leases.put_nowait(handle)
+
+        async def one(item: Any) -> Any:
+            handle = await leases.get()
+            try:
+                return await loop.run_in_executor(None, lambda: worker(item, handle))
+            finally:
+                # Released even on failure — a leaked lease would shrink the
+                # pool for the rest of the walk and eventually deadlock it.
+                leases.put_nowait(handle)
+
+        return list(await asyncio.gather(*(one(item) for item in batch)))
 
     def run_pending_binding_scans(self) -> bool:
         """Run one ROUND of deferred binding scans; True if any scan ran.
@@ -1439,7 +1530,12 @@ class WalkEngine(Generic[N]):
         # discovery order and worker completion order.
         for (dataset_rid, version, depth), (records, diagnostics, error) in zip(batch, results, strict=True):
             if error is not None:
-                self.visitor.on_gap(
+                # Reset first: a rescan that ALSO fails must not stack a
+                # second failure gap on the previous one, and a rescan after
+                # a failure replaces that failure's view like any other.
+                self._reset_binding_view(dataset_rid)
+                self._scan_gap(
+                    dataset_rid,
                     GapKind.binding_scan_failed,
                     dataset_rid,
                     f"binding scan of {dataset_rid}@{version} failed, so its member bindings are unrecorded: {error}",
@@ -1489,16 +1585,15 @@ class WalkEngine(Generic[N]):
         # Monotonicity makes the new view a superset, so nothing real is
         # lost; what is dropped is a duplicate carrying a stale
         # ``input_version``.
-        dropper = getattr(self.visitor, "drop_binding_arcs_for", None)
-        if dropper is not None:
-            dropper(dataset_rid)
+        self._reset_binding_view(dataset_rid)
 
         for record in records:
             self.visitor.on_binding_record(dataset_rid=dataset_rid, version=version, record=record, depth=depth)
 
             author_rid = record.execution_rid
             if not author_rid:
-                self.visitor.on_gap(
+                self._scan_gap(
+                    dataset_rid,
                     GapKind.null_binding_execution,
                     dataset_rid,
                     f"feature '{record.feature_name}' on element '{record.element_type}' has bound values "
@@ -1509,11 +1604,19 @@ class WalkEngine(Generic[N]):
                 # Recorded, but recorded as unknown: an honest gap, never a
                 # closure member (sentinel discipline, §6.1) — same rule the
                 # authorship leg applies to a sentinel-authored origin.
-                self.visitor.on_gap(
+                #
+                # The detail deliberately does NOT embed the scanned version:
+                # "this feature's values are bound by the sentinel" is a fact
+                # about the dataset, not about which snaptime observed it, so
+                # pinning it to a version label would emit a second, identical
+                # gap on every rescan even in the ordinary monotone case.
+                # (The arcs carry the as-of label; the gap states the fact.)
+                self._scan_gap(
+                    dataset_rid,
                     GapKind.sentinel_origin,
                     author_rid,
                     f"feature '{record.feature_name}' on element '{record.element_type}' of "
-                    f"{dataset_rid}@{version} is bound by the unknown-provenance Execution sentinel",
+                    f"{dataset_rid} is bound by the unknown-provenance Execution sentinel",
                 )
                 continue
 
@@ -1529,11 +1632,60 @@ class WalkEngine(Generic[N]):
             self.enqueue_or_truncate(author_rid, depth=depth + 1)
 
         for diagnostic in diagnostics:
-            self.visitor.on_gap(
+            self._scan_gap(
+                dataset_rid,
                 GapKind.binding_scan_failed,
                 diagnostic.subject,
                 f"{diagnostic.kind}: {diagnostic.detail}",
             )
+
+    def _scan_gap(self, dataset_rid: str, kind: "GapKind", subject_rid: str, detail: str) -> None:
+        """Emit a gap that belongs to ``dataset_rid``'s binding as-of view.
+
+        Tags the gap with its originating scan so a rescan at an advanced
+        pin can drop it (see
+        :meth:`ClosureBuilder.drop_binding_scan_gaps_for`). Visitors that do
+        not track scan provenance — the tree builder — just receive the gap.
+
+        Args:
+            dataset_rid: The dataset whose scan emitted this gap.
+            kind: The gap category.
+            subject_rid: The affected entity.
+            detail: Human-readable explanation.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._scan_gap(f"1-{1:04X}", GapKind.no_workflow, f"1-{1:04X}", "d") is None
+            True
+        """
+        try:
+            self.visitor.on_gap(kind, subject_rid, detail, scan_source=dataset_rid)
+        except TypeError:
+            # A visitor whose on_gap predates the scan_source parameter.
+            self.visitor.on_gap(kind, subject_rid, detail)
+
+    def _reset_binding_view(self, dataset_rid: str) -> None:
+        """Drop the previous binding as-of view — arcs AND gaps — for a rescan.
+
+        Ruling 9 reports binding evidence as of ONE snaptime, the maximum
+        walked. When a dataset is rescanned at an advanced pin the whole
+        previous view has to go, not just its arcs: a surviving
+        ``binding_scan_failed`` from a transient earlier failure would
+        permanently report a failure that no longer applies, and a surviving
+        binding-leg ``sentinel_origin`` would duplicate one fact.
+
+        Args:
+            dataset_rid: The dataset being (re)scanned.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._reset_binding_view(f"1-{1:04X}") is None
+            True
+        """
+        for name in ("drop_binding_arcs_for", "drop_binding_scan_gaps_for"):
+            dropper = getattr(self.visitor, name, None)
+            if dropper is not None:
+                dropper(dataset_rid)
 
     def _facts_for(self, dataset_rid: str, version: str) -> "DatasetVersionFacts | None":
         """Return the visitor's mutable facts record, when it keeps one.
@@ -1952,14 +2104,11 @@ class WalkEngine(Generic[N]):
         over N handles, collisions are near-certain (birthday paradox), and a
         collision silently shares an unsynchronized session.
 
-        Handles are therefore taken from an :class:`asyncio.Queue` — acquired
-        before the ``run_in_executor`` call and released in a ``finally`` — so
-        possession is exclusive for the whole duration of the read. The queue
-        doubles as the concurrency bound: its depth IS the number of tasks that
-        can be in flight, which makes "pool size >= concurrency" an enforced
-        invariant rather than a comment. No separate semaphore is needed, and
-        none is used, because a second bound could drift out of step with the
-        pool and reintroduce sharing.
+        Handles are therefore leased, exclusively, for the whole duration of
+        a read. The leasing itself lives in :meth:`_gather_leased` — the
+        engine's single concurrency primitive, shared with the binding-scan
+        round — so there is exactly one place that decides how a handle is
+        acquired, held and released, and the two legs cannot drift apart.
 
         Results are stashed in :attr:`_readouts` and applied later,
         single-threaded, in the queue's own deterministic order; no worker
@@ -1978,35 +2127,20 @@ class WalkEngine(Generic[N]):
             >>> callable(engine._prefetch_frontier_async)
             True
         """
-        import asyncio
 
-        loop = asyncio.get_running_loop()
-        handles = self._worker_handles()
-        if not handles:
-            return
+        def read(rid: RID, handle: Any) -> "ExecutionReadout | None":
+            """Read one execution against a leased handle. Never raises.
 
-        # The lease pool. Its depth is the ONLY concurrency bound: a task
-        # cannot start until it owns a handle, and it owns that handle
-        # exclusively until it releases it.
-        leases: asyncio.Queue = asyncio.Queue()
-        for handle in handles:
-            leases.put_nowait(handle)
-
-        async def one(rid: RID) -> tuple[RID, ExecutionReadout | None]:
-            handle = await leases.get()
+            A failure is reported as ``None`` rather than propagating, so
+            that execution simply falls back to the inline read on the main
+            thread and its error surfaces from the historical call site.
+            """
             try:
-                worker = self._worker_view(handle)
-                return rid, await loop.run_in_executor(None, lambda: worker.read_execution(rid))
-            except Exception:  # noqa: BLE001 — an unexpected read failure
-                # is not cached; the main thread re-reads inline and the
-                # error surfaces from its historical call site.
-                return rid, None
-            finally:
-                # Released even on failure — a leaked lease would shrink the
-                # pool for the rest of the walk and eventually deadlock it.
-                leases.put_nowait(handle)
+                return self._worker_view(handle).read_execution(rid)
+            except Exception:  # noqa: BLE001 — see above.
+                return None
 
-        for rid, readout in await asyncio.gather(*(one(rid) for rid in rids)):
+        for rid, readout in zip(rids, await self._gather_leased(rids, read), strict=True):
             if readout is not None:
                 self._readouts[rid] = readout
 
@@ -2014,7 +2148,7 @@ class WalkEngine(Generic[N]):
         """Wrap one LEASED catalog handle in a read-only engine view.
 
         The caller has already acquired ``handle`` exclusively from the lease
-        queue in :meth:`_prefetch_frontier_async`; this only wraps it so
+        queue in :meth:`_gather_leased`; this only wraps it so
         :meth:`read_execution` (read-only by construction) can be called
         against it. The view holds no walk state of its own — the engine's
         sets, budget and visitor are never reachable from it.

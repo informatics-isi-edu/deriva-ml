@@ -1640,8 +1640,15 @@ def test_binding_sentinel_execution_emits_gap_no_arc_not_enqueued():
     detail = gaps[0].detail
     assert "Annotation" in detail
     assert "Image" in detail
-    assert f"{ds_root}@1.0.0" in detail
+    assert ds_root in detail
     assert "is bound by the unknown-provenance Execution sentinel" in detail
+    # The detail names the DATASET but deliberately NOT the scanned version.
+    # "this feature's values are bound by the sentinel" is a fact about the
+    # dataset, not about which snaptime observed it; embedding the pin made
+    # the ordinary monotone rescan emit a second, identical gap under a
+    # second as-of label — the two-version-labels violation the rescan fix
+    # exists to prevent. The as-of label lives on the ARCS.
+    assert "@1.0.0" not in detail
 
 
 def test_binding_sentinel_guard_frees_budget_for_the_real_binder():
@@ -4204,3 +4211,122 @@ def test_worker_handles_pin_the_callers_schema_without_refetching():
     # The default stays validating, so catalog_snapshot's safety is intact.
     assert inspect.signature(DerivaML.__init__).parameters["trust_schema_json"].default is False
     assert "trust_schema_json=True" not in inspect.getsource(DerivaML.catalog_snapshot)
+
+
+def test_rescan_replaces_binding_gaps_not_just_arcs():
+    """A rescan at an advanced pin replaces the dataset's binding GAPS too.
+
+    The arc fix alone left the stale-as-of bug alive in the gap stream: a
+    binding-leg ``sentinel_origin`` whose detail embedded ``{dataset}@{pin}``
+    produced TWO gaps for one fact under two as-of labels on the ordinary
+    monotone rescan — exactly the two-version-labels violation the arc fix
+    exists to prevent. One as-of view per dataset has to hold across arcs
+    AND gaps.
+
+    Two things are pinned here: the gap count (one fact, one gap) and the
+    absence of any pin label in a version-independent detail.
+    """
+    ml, root, ds_shared, binder, _v2_only = _pin_advance_scenario(advance=True)
+    sentinel = _ex(90)
+    ml.add_execution(sentinel, description="unknown-provenance sentinel")
+    ml._sentinel_execution_rid_or_none = lambda: sentinel  # type: ignore[method-assign]
+
+    # The sentinel binds at BOTH pins — the monotone case, where a naive
+    # implementation emits one gap per scan.
+    sentinel_record = _binding_record(sentinel, feature_name="Annotation", element_type="Image")
+    v1_record = _binding_record(binder, feature_name="Label", element_type="Image")
+    v2_extra = _binding_record(_ex(3), feature_name="Grade", element_type="Image")
+    ml.set_binding_scan(ds_shared, "1.0.0", [v1_record, sentinel_record], [])
+    ml.set_binding_scan(ds_shared, "2.0.0", [v1_record, sentinel_record, v2_extra], [])
+
+    closure = ml.lookup_provenance(root)
+
+    # The rescan really happened (otherwise this pin is vacuous).
+    scans = sorted(c[1][1] for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1][0] == ds_shared)
+    assert scans == ["1.0.0", "2.0.0"]
+
+    sentinel_gaps = _gaps_for(closure, GapKind.sentinel_origin, sentinel)
+    assert len(sentinel_gaps) == 1, (
+        f"one fact produced {len(sentinel_gaps)} gaps across two as-of views: {[g.detail for g in sentinel_gaps]}"
+    )
+    # And no gap carries a stale pin label for this dataset.
+    assert not [g for g in closure.gaps if f"{ds_shared}@1.0.0" in g.detail], (
+        "a stale as-of label survived the rescan in the gap stream"
+    )
+
+
+def test_transient_scan_failure_does_not_survive_a_clean_rescan():
+    """A ``binding_scan_failed`` from a transient earlier failure is dropped
+    when the dataset rescans cleanly at an advanced pin.
+
+    Otherwise the closure permanently reports a failure that no longer
+    applies — the walk claiming a hole it can now see through.
+    """
+    ml, root, ds_shared, binder, v2_only_binder = _pin_advance_scenario(advance=True)
+
+    # v1's scan fails transiently but STILL discovers `binder` — whose own
+    # inputs walk the higher pin, which is what triggers the rescan. (A scan
+    # that both fails and returns nothing discovers no one, so the pin never
+    # advances and there is no rescan to test.) Degrade-with-honesty: a
+    # partial scan reports both its diagnostic and what it found.
+    ml.set_binding_scan(
+        ds_shared,
+        "1.0.0",
+        [_binding_record(binder, feature_name="Label", element_type="Image")],
+        [BindingDiagnostic(kind="query_failed", subject=ds_shared, detail="transient v1 failure")],
+    )
+
+    closure = ml.lookup_provenance(root)
+
+    scans = sorted(c[1][1] for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1][0] == ds_shared)
+    assert scans == ["1.0.0", "2.0.0"], f"expected a rescan at the advanced pin, got {scans}"
+
+    failures = [g for g in _gaps_for(closure, GapKind.binding_scan_failed) if ds_shared in (g.subject_rid, g.detail)]
+    assert failures == [], (
+        f"a transient failure survived a clean rescan: {[(g.subject_rid, g.detail) for g in failures]}"
+    )
+
+    # The clean rescan's findings are present, so this is not "everything
+    # was dropped" passing by accident.
+    assert v2_only_binder in closure.executions
+    assert binder in closure.executions
+
+
+def test_rescan_gap_drop_is_scoped_to_the_rescanned_dataset():
+    """Dropping a rescanned dataset's gaps must not disturb anyone else's.
+
+    Only gaps the binding scan of THIS dataset emitted are dropped — an
+    authorship-leg sentinel gap, or another dataset's scan gaps, survive
+    even when they name the same subject.
+    """
+    ml, root, ds_shared, _binder, _v2 = _pin_advance_scenario(advance=True)
+
+    # A second, unrelated dataset whose scan reports a failure and which
+    # never rescans. Reached as a member-producer's consumed input.
+    ds_other = _ds(50)
+    other_consumer = _ex(50)
+    ml.add_dataset(ds_other, description="other", producer=None)
+    ml.add_version_row(ds_other, "1.0.0", None, rct="2025-01-01T00:00:00Z")
+    ml.set_snapshot_available(ds_other, "1.0.0", True)
+    ml.set_snapshot_version_rows(ds_other, "1.0.0", [_snapshot_row(ds_other, "1.0.0", None, "2025-01-01T00:00:00Z")])
+    ml.set_binding_scan(
+        ds_other,
+        "1.0.0",
+        [],
+        [BindingDiagnostic(kind="query_failed", subject=ds_other, detail="unrelated failure")],
+    )
+    ml.add_execution(
+        other_consumer,
+        description="other consumer",
+        input_datasets=[_StubDataset(ds_other, "other", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.set_member_producers(_ds(1), {other_consumer})
+
+    closure = ml.lookup_provenance(root)
+
+    # ds_shared rescanned...
+    scans = sorted(c[1][1] for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1][0] == ds_shared)
+    assert scans == ["1.0.0", "2.0.0"]
+    # ...and the OTHER dataset's failure gap is untouched by that drop.
+    survivors = [g for g in _gaps_for(closure, GapKind.binding_scan_failed) if g.subject_rid == ds_other]
+    assert len(survivors) == 1, "an unrelated dataset's scan gap was collaterally dropped by the rescan"
