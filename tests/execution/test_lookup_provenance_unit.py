@@ -2223,9 +2223,7 @@ def test_multi_version_discovery_still_charges_the_dataset_budget():
     ml.add_dataset(ds_root, description="root", producer=consumer)
     ml.add_version_row(ds_root, "1.0.0", consumer, rct="2025-01-01T00:00:00Z")
     ml.set_snapshot_available(ds_root, "1.0.0", True)
-    ml.set_snapshot_version_rows(
-        ds_root, "1.0.0", [_snapshot_row(ds_root, "1.0.0", consumer, "2025-01-01T00:00:00Z")]
-    )
+    ml.set_snapshot_version_rows(ds_root, "1.0.0", [_snapshot_row(ds_root, "1.0.0", consumer, "2025-01-01T00:00:00Z")])
 
     closure = ml.lookup_provenance(ds_root, version="1.0.0", max_executions=1)
 
@@ -2234,6 +2232,8 @@ def test_multi_version_discovery_still_charges_the_dataset_budget():
     assert closure.datasets_visited == 4
     # An honest stop, not a false "could not resolve".
     assert _gaps_for(closure, GapKind.unresolved_rid) == []
+
+
 # ---------------------------------------------------------------------------
 # Gap-coverage checklist (Task 14) — every GapKind member must be reachable.
 #
