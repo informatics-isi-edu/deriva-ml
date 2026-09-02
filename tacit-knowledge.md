@@ -994,3 +994,22 @@ datasets' ancestry (4-Z6K8 → 4-S42W → 2-N93J). Nothing enters
 sideways: what looks like a sibling split is either a subset-parent
 (ancestry) or an input of a binding execution (upstream consumption).
 Useful template for answering "why is dataset X in my provenance".
+
+**2026-09-01 — Ruling 8 (Carl): ancestry expansion is OUT of the
+provenance closure — provenance is execution-mediated.** Revisits
+ruling 6 with live output in hand. Carl's framing: the execution
+consumed three datasets at specific versions; other datasets sharing
+members are structure, not provenance — the question is "what did this
+execution use / what went into creating this artifact". Three
+arguments, all accepted: (1) under proper capture the ancestry leg is
+REDUNDANT — a split execution's consumption arc already records the
+parent, causally and version-pinned; (2) walking Dataset_Dataset to
+recover source linkage on legacy data is COMPENSATION, which ruling 2
+forbids ("we should not worry about legacy at all here" — Carl);
+(3) the containment edge does not reliably encode causal direction — a
+collection dataset assembled FROM existing children inverts it.
+Consequence: remove the ancestry leg from lookup_provenance (parents
+enter only via a recorded execution's consumption); Dataset_Dataset
+stays available through list_dataset_parents for structural questions.
+Side effect: most of the 31 walked (dataset, version) pairs on eye-ai
+were ancestry fan-out — this also addresses the 294s profile.
