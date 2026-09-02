@@ -1306,6 +1306,23 @@ class WalkEngine(Generic[N]):
         to make. Reads run through :meth:`_gather_leased`, the engine's
         single concurrency primitive, in SORTED pair order.
 
+        **Bounded by the remaining dataset budget**, for the same reason
+        :meth:`frontier_rids` bounds the execution frontier: once
+        ``dataset_budget`` is spent :meth:`expand_dataset` refuses every
+        further pin, and a leg is three catalog reads (strict snapshot,
+        version history, author summaries). Without the bound, a frontier
+        offering more new pins than remaining slots reads them all and
+        throws most away — hundreds of requests a tightly capped walk should
+        never issue.
+
+        Note the deliberate ASYMMETRY with the execution side: cached
+        readouts are charged against the execution budget (applying one
+        consumes a slot), but cached legs are **not** charged against the
+        dataset budget, because a cached leg is only consumed if
+        ``expand_dataset`` accepts the pair — and if it does, the pair is in
+        ``datasets_expanded``, which the bound already subtracts. Charging
+        them as well would double-count and starve later rounds.
+
         Args:
             pairs: ``(dataset_rid, version)`` pairs the round will walk.
 
@@ -1330,6 +1347,13 @@ class WalkEngine(Generic[N]):
                 and (dataset_rid, version) not in self._dataset_legs
             }
         )
+        if self.dataset_budget is not None:
+            remaining = self.dataset_budget - len(self.datasets_expanded)
+            if remaining <= 0:
+                return 0
+            # Sorted order is the walk's own deterministic pair order, so the
+            # prefix kept is the prefix the walk would reach first.
+            wanted = wanted[:remaining]
         if not wanted:
             return 0
 
@@ -2434,10 +2458,23 @@ class WalkEngine(Generic[N]):
             return {rid: self.read_execution(rid) for rid in rids}
 
         ml = self.ml
-        records = ml._execution_records_batch(list(rids))
-        resolved = [rid for rid in rids if rid in records]
-        pairs_by_execution = ml._input_dataset_pairs_batch(resolved)
-        assets_by_execution = ml._input_assets_batch(resolved)
+        try:
+            records = ml._execution_records_batch(list(rids))
+            resolved = [rid for rid in rids if rid in records]
+            pairs_by_execution = ml._input_dataset_pairs_batch(resolved)
+            assets_by_execution = ml._input_assets_batch(resolved)
+        except Exception:  # noqa: BLE001 — see below.
+            # A failed BATCH request must not abort the closure. The per-node
+            # path degraded per read: one execution's failing lookup left the
+            # rest of the walk intact. Batching made a single failed request
+            # the failure of a whole frontier — and, because the frontier is
+            # a read-AHEAD, of executions the walk had not even reached yet.
+            #
+            # Leaving the readouts unassembled sends every one of them down
+            # the historical per-node path during expansion, where whatever
+            # is genuinely broken fails (or degrades) at exactly the call
+            # site it always did, and whatever is not simply succeeds.
+            return {rid: self.read_execution(rid) for rid in rids}
 
         # One producer lookup per distinct consumed (dataset, version) and
         # one per distinct input asset, for the WHOLE frontier.
@@ -2447,7 +2484,15 @@ class WalkEngine(Generic[N]):
                 key = (ds.dataset_rid, consumed_version)
                 if key not in dataset_keys:
                     dataset_keys.append(key)
-        dataset_producers = ml._producer_of_datasets_batch(dataset_keys)
+        try:
+            dataset_producers = ml._producer_of_datasets_batch(dataset_keys)
+        except Exception:  # noqa: BLE001 — same containment as the asset
+            # groups: a failed producer batch degrades to "no recorded
+            # producer" for these pairs rather than aborting the frontier.
+            # The per-node ``_producer_of_dataset`` returning None is the
+            # historical shape for an unanswerable producer question, and the
+            # walk reports it through its own gap machinery.
+            dataset_producers = {}
 
         asset_items: list[tuple[str, Any]] = []
         asset_table_failures: set[str] = set()
@@ -2463,13 +2508,23 @@ class WalkEngine(Generic[N]):
                     # an unresolvable asset table to ``resolution_failed``;
                     # record it and do the same below.
                     asset_table_failures.add(asset.asset_rid)
-        try:
-            asset_producers = ml._producers_of_assets_batch(asset_items) if asset_items else {}
-        except Exception:  # noqa: BLE001 — a whole-batch producer failure
-            # degrades every asset in it, matching the per-node contract that
-            # one unresolvable asset producer never stops the walk.
-            asset_producers = {}
-            asset_table_failures |= {asset_rid for asset_rid, _table in asset_items}
+        # Producer lookups are issued PER ASSET TABLE, not as one batch, so
+        # one table's outage cannot cost every other table its producer
+        # facts. The per-node path degraded per READ — one asset's failing
+        # producer lookup left every other asset untouched — and batching
+        # them into a single call had made a single group's failure mark the
+        # whole frontier ``resolution_failed``, which is a much larger loss
+        # of provenance than the failure warrants.
+        asset_producers: dict[str, tuple[str, ...] | list[str]] = {}
+        by_table: dict[int, list[tuple[str, Any]]] = {}
+        for asset_rid, asset_table in asset_items:
+            by_table.setdefault(id(asset_table), []).append((asset_rid, asset_table))
+        for group in by_table.values():
+            try:
+                asset_producers.update(ml._producers_of_assets_batch(group))
+            except Exception:  # noqa: BLE001 — degrade THIS group only, the
+                # same scope the per-node path degraded at.
+                asset_table_failures |= {asset_rid for asset_rid, _table in group}
 
         # The one un-batchable leg, run concurrently and deduped.
         member_scans = self._run_member_scans(dataset_keys)

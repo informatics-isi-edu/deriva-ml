@@ -420,6 +420,12 @@ class _FakeML(ExecutionMixin):
         self._handle_hold_seconds = 0.0
         # dataset_rid -> exception raised by _producers_of_dataset_members.
         self._member_scan_failures: dict[str, BaseException] = {}
+        # Workflow RIDs referenced by an Execution row but unreadable (ACL
+        # hidden / deleted). See ``set_hidden_workflow``.
+        self._hidden_workflows: set[str] = set()
+        # Batch seam names scripted to raise, for batch-failure fallback
+        # tests. See ``set_batch_failure``.
+        self._batch_failures: dict[str, BaseException] = {}
         # Concurrent use of a seam called directly on THIS instance rather
         # than through a leased handle — see ``_note_direct_seam_use``.
         self._direct_lock = threading.Lock()
@@ -589,7 +595,24 @@ class _FakeML(ExecutionMixin):
     def lookup_execution(self, rid: str) -> _StubExecutionRecord:
         if rid not in self._executions:
             raise DerivaMLException(f"No such execution {rid}")
-        return self._executions[rid]
+        record = self._executions[rid]
+        workflow = record.workflow
+        if workflow is not None and workflow.workflow_rid in self._hidden_workflows:
+            # Production parity: ``lookup_execution`` resolves the Workflow
+            # through ``lookup_workflow``, which RAISES on a missing or
+            # ACL-hidden row — so the whole execution fails to resolve. The
+            # batched path must reach the same verdict, not substitute None.
+            raise DerivaMLException(f"Workflow with RID '{workflow.workflow_rid}' not found in the catalog")
+        return record
+
+    def set_hidden_workflow(self, workflow_rid: str) -> None:
+        """Script a Workflow row that is referenced but cannot be read.
+
+        Models an ACL-hidden or deleted Workflow row: the Execution row still
+        carries the FK, but neither ``lookup_workflow`` nor the batched
+        workflow fetch can see it.
+        """
+        self._hidden_workflows.add(workflow_rid)
 
     def lookup_dataset(self, rid: str) -> _StubDatasetHandle:  # type: ignore[override]
         """Seam consumed by ``_find_feature_producers_impl`` and by the
@@ -753,12 +776,39 @@ class _FakeML(ExecutionMixin):
         """Split a batch's RIDs into production-sized chunks."""
         return [rids[i : i + self._batch_chunk_size] for i in range(0, len(rids), self._batch_chunk_size)] or [[]]
 
+    def set_batch_failure(self, seam: str, error: BaseException) -> None:
+        """Script a batch seam to raise, for batch-failure fallback tests."""
+        self._batch_failures[seam] = error
+
+    def _raise_scripted_batch_failure(self, seam: str) -> None:
+        error = self._batch_failures.get(seam)
+        if error is not None:
+            raise error
+
     def _execution_records_batch(self, rids: list[str]) -> dict[str, Any]:  # type: ignore[override]
         distinct = list(dict.fromkeys(r for r in rids if r))
         for chunk in self._batch_chunks(distinct):
             self.calls.append(("_execution_records_batch", (tuple(chunk),)))
         self._note_direct_seam_use("_execution_records_batch")
-        return {rid: self._executions[rid] for rid in distinct if rid in self._executions}
+        self._raise_scripted_batch_failure("_execution_records_batch")
+        out = {}
+        for rid in distinct:
+            record = self._executions.get(rid)
+            if record is None:
+                continue
+            workflow = record.workflow
+            if workflow is not None and workflow.workflow_rid in self._hidden_workflows:
+                # Mirrors the production seam's guard: the Execution row
+                # resolves but its Workflow row does not, so the record is
+                # OMITTED and the engine falls back to the per-node read
+                # (which raises, yielding ``unresolved_rid``). Note this
+                # harness copy is the reason the engine-level test cannot
+                # mutation-verify the production guard — that pin lives on
+                # ``_execution_records_batch`` itself, in
+                # ``test_batched_execution_records_omit_unreadable_workflow_rows``.
+                continue
+            out[rid] = record
+        return out
 
     def _input_dataset_pairs_batch(self, rids: list[str]) -> dict[str, list[tuple[Any, str | None]]]:  # type: ignore[override]
         distinct = list(dict.fromkeys(r for r in rids if r))

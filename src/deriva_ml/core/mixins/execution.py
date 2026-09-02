@@ -2319,9 +2319,22 @@ class ExecutionMixin:
 
         out: dict[RID, "ExecutionRecord"] = {}
         for rid, row in exec_rows.items():
+            wf_rid = row.get("Workflow")
+            if wf_rid and wf_rid not in workflows:
+                # The Execution row REFERENCES a Workflow whose row this
+                # batch could not read — deleted, or hidden by ACL. The
+                # per-node ``lookup_execution`` resolves the workflow through
+                # ``lookup_workflow``, which RAISES on that shape, so the
+                # execution is reported ``unresolved_rid``. Substituting
+                # ``workflow=None`` here would instead yield a ``no_workflow``
+                # gap, which is a DIFFERENT provenance fact: "code identity is
+                # unrecorded" versus "a recorded reference could not be read".
+                # Omitting the record makes the engine fall back to the
+                # per-node read, which produces the historical verdict.
+                continue
             out[rid] = ExecutionRecord(
                 execution_rid=rid,
-                workflow=workflows.get(row.get("Workflow")) if row.get("Workflow") else None,
+                workflow=workflows.get(wf_rid) if wf_rid else None,
                 status=ExecutionStatus(row.get("Status") or "Created"),
                 description=row.get("Description"),
                 start_time=_parse_execution_timestamp(row.get("Start")),
@@ -2429,6 +2442,44 @@ class ExecutionMixin:
             out[edge["Execution"]].append((datasets[edge["Dataset"]], consumed))
         return out
 
+    def _assoc_asset_table(self, schema_name: str, assoc_table_name: str, asset_column: str) -> Any:
+        """Resolve the asset table an ``<Asset>_Execution`` association points at.
+
+        The association's own foreign key is the authority on which table it
+        associates, schema and all. Resolving by bare NAME instead
+        (``name_to_table("Image")``) searches domain schemas in sorted order
+        and returns the FIRST match, so two schemas each holding an
+        ``Image`` asset table resolve to whichever sorts first — and if that
+        is not the association's actual target, the subsequent row fetch
+        matches none of the association's RIDs and every asset in that group
+        disappears from the closure silently. Identity is
+        ``(schema, table)``, never a bare name (#385).
+
+        Falls back to the name lookup only when the association carries no
+        usable FK on ``asset_column`` — a shape deriva-ml does not create,
+        where a best-effort answer still beats no answer.
+
+        Args:
+            schema_name: Schema holding the association table.
+            assoc_table_name: The ``<Asset>_Execution`` table's name.
+            asset_column: The association's FK column naming the asset.
+
+        Returns:
+            The asset ``Table`` object the association actually references.
+
+        Raises:
+            DerivaMLTableNotFound: If neither the FK nor the name resolves.
+
+        Example:
+            >>> ml._assoc_asset_table("domain", "Image_Execution", "Image").name  # doctest: +SKIP
+            'Image'
+        """
+        assoc_table = self.model.model.schemas[schema_name].tables[assoc_table_name]
+        for fkey in assoc_table.foreign_keys:
+            if any(column.name == asset_column for column in fkey.foreign_key_columns):
+                return fkey.pk_table
+        return self.model.name_to_table(asset_column)
+
     def _input_assets_batch(self, rids: "list[RID]") -> "dict[RID, list[Any]]":
         """Input ``Asset`` objects for a whole frontier, batched per table.
 
@@ -2502,12 +2553,17 @@ class ExecutionMixin:
 
             asset_rids = list(dict.fromkeys(r[asset_table_name] for r in rows))
             asset_rows: dict[RID, dict[str, Any]] = {}
-            # Resolve the asset table through the MODEL rather than assuming
-            # it shares its association table's schema. deriva-ml creates
-            # them together today, but a name lookup that silently depends
-            # on that is the kind of assumption a catalog eventually breaks.
+            # Resolve the asset table from the ASSOCIATION'S OWN FOREIGN KEY,
+            # never by bare name. ``name_to_table`` searches domain schemas
+            # in sorted order and returns the FIRST match, so two schemas
+            # holding a same-named asset table (e.g. two domains each with an
+            # ``Image``) silently resolve to the wrong one — the row fetch
+            # then finds none of the association's RIDs and every asset in
+            # the group VANISHES from the closure with no error. The FK
+            # target is the table's true identity, schema and all (the same
+            # schema-qualified-identity lesson as #385).
             try:
-                asset_table = self.model.name_to_table(asset_table_name)
+                asset_table = self._assoc_asset_table(schema_name, table_name, asset_table_name)
                 if not self.model.is_asset(asset_table):
                     # NOT an asset table, despite having an ``_Execution``
                     # association. ``File`` on eye-ai is the live example:

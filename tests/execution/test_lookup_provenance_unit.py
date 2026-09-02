@@ -30,6 +30,8 @@ repo-wide RID discipline).
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -4912,29 +4914,76 @@ def test_unresolvable_snapshot_in_a_pooled_leg_still_emits_the_chain_break():
 # ---------------------------------------------------------------------------
 
 
-class _BatchAssetModel:
-    """Model stub for ``_input_assets_batch``: two ``*_Execution`` tables.
+class _StubFKey:
+    """One association foreign key: its columns and the table it targets."""
 
-    ``Image`` is a real asset table; ``File`` has a ``File_Execution``
-    association but is NOT asset-shaped — the eye-ai case that the live A/B
-    surfaced.
-    """
-
-    def __init__(self) -> None:
+    def __init__(self, column_name: str, pk_table: Any) -> None:
         from unittest.mock import MagicMock
 
-        self._tables = {}
-        for name, schema in (("Image", "domain"), ("File", "deriva-ml")):
+        column = MagicMock()
+        column.name = column_name
+        self.foreign_key_columns = [column]
+        self.pk_table = pk_table
+
+
+class _BatchAssetModel:
+    """Model stub for ``_input_assets_batch``.
+
+    Carries three tables and their association FKs:
+
+    - ``domain:Image`` — a real asset table;
+    - ``deriva-ml:File`` — has a ``File_Execution`` association but is NOT
+      asset-shaped (the eye-ai case the live A/B surfaced);
+    - ``other:Image`` — a SECOND, same-named asset table in another schema,
+      which is what makes bare-name resolution ambiguous.
+
+    ``name_to_table`` deliberately reproduces the real model's
+    "domain schemas in sorted order, first match wins" behavior, so a
+    name-only resolution picks ``domain:Image`` — the WRONG table when the
+    association actually targets ``other:Image``.
+    """
+
+    def __init__(self, *, ambiguous: bool = False) -> None:
+        from unittest.mock import MagicMock
+
+        self.ambiguous = ambiguous
+        self._tables: dict[tuple[str, str], Any] = {}
+        for schema, name in (("domain", "Image"), ("deriva-ml", "File"), ("other", "Image")):
             table = MagicMock()
             table.name = name
             table.schema.name = schema
-            self._tables[name] = table
+            self._tables[(schema, name)] = table
+
+        # ``model.model.schemas[s].tables[t]`` — the association lookup path.
+        self.model = MagicMock()
+        self.model.schemas = {}
+        assoc_targets = {
+            ("deriva-ml", "File_Execution"): ("deriva-ml", "File"),
+            # The association under test targets the OTHER schema's Image
+            # when ambiguous, so name-first resolution lands on the wrong one.
+            ("domain", "Image_Execution"): ("other", "Image") if ambiguous else ("domain", "Image"),
+        }
+        for (schema, assoc_name), target in assoc_targets.items():
+            assoc = MagicMock()
+            assoc.name = assoc_name
+            assoc.foreign_keys = [
+                _StubFKey(assoc_name.replace("_Execution", ""), self._tables[target]),
+                _StubFKey("Execution", MagicMock()),
+            ]
+            schema_stub = self.model.schemas.setdefault(schema, MagicMock())
+            if not isinstance(getattr(schema_stub, "tables", None), dict):
+                schema_stub.tables = {}
+            schema_stub.tables[assoc_name] = assoc
 
     def find_asset_execution_tables(self):
         return [("deriva-ml", "File_Execution"), ("domain", "Image_Execution")]
 
     def name_to_table(self, name):
-        return self._tables[name]
+        """First match in sorted-schema order — the real model's behavior."""
+        for schema in sorted({s for s, _t in self._tables}):
+            if (schema, name) in self._tables:
+                return self._tables[(schema, name)]
+        raise KeyError(name)
 
     def is_asset(self, table):
         return table.name == "Image"
@@ -4952,11 +5001,11 @@ class _AnyColumns(dict):
 class _BatchAssetPath:
     """Datapath stub recording which tables the batch actually queried."""
 
-    def __init__(self, rows, queried, key):
-
+    def __init__(self, rows, queried, key, raises: bool = False):
         self._rows = rows
         self._queried = queried
         self._key = key
+        self._raises = raises
         # ``_rid_any`` builds ``columns[name] == value`` predicates; any
         # object that supports ``==`` and ``|`` will do, since this stub
         # ignores predicates and returns its scripted rows.
@@ -4970,12 +5019,82 @@ class _BatchAssetPath:
 
     def fetch(self):
         self._queried.append(self._key)
+        if self._raises:
+            raise DerivaMLException(f"scripted catalog failure on {self._key}")
         return list(self._rows)
 
     def __getattr__(self, name):
         from unittest.mock import MagicMock
 
         return MagicMock()
+
+
+def _batch_asset_host(*, ambiguous: bool = False, failing_groups: "set[str] | None" = None) -> Any:
+    """Build an ``ExecutionMixin`` host over the batch-asset stubs.
+
+    Rows are keyed by ``(schema, table)`` — NOT by bare table name — so a
+    resolution that lands in the wrong schema fetches nothing, which is
+    exactly the production failure mode being pinned. The asset row for
+    ``Image`` lives only in whichever schema the association targets.
+
+    Args:
+        ambiguous: Point ``Image_Execution`` at ``other:Image`` while a
+            same-named ``domain:Image`` also exists.
+        failing_groups: Association table names whose asset-row fetch raises.
+    """
+    from deriva_ml.core.mixins.execution import ExecutionMixin
+
+    image_schema = "other" if ambiguous else "domain"
+    rows_by_key = {
+        ("deriva-ml", "File_Execution"): [{"Execution": "2-0001", "File": "6-FILE"}],
+        ("domain", "Image_Execution"): [{"Execution": "2-0001", "Image": "4-IMG1"}],
+        (image_schema, "Image"): [{"RID": "4-IMG1", "Filename": "x.png", "URL": "u", "Length": 1, "MD5": "m"}],
+        ("deriva-ml", "File"): [{"RID": "6-FILE", "Filename": "src.py"}],
+    }
+
+    class _Host(ExecutionMixin):
+        def __init__(self):
+            self.model = _BatchAssetModel(ambiguous=ambiguous)
+            self.ml_schema = "deriva-ml"
+            self.queried: list[str] = []
+
+        def pathBuilder(self):
+            host = self
+
+            class _Schemas(dict):
+                def __missing__(self, schema):
+                    return _Schema(schema)
+
+            class _Schema:
+                def __init__(self, schema):
+                    self.schema = schema
+                    self.tables = _Tables(schema)
+
+            class _Tables(dict):
+                def __init__(self, schema):
+                    super().__init__()
+                    self.schema = schema
+
+                def __missing__(self, table):
+                    return _BatchAssetPath(
+                        rows_by_key.get((self.schema, table), []),
+                        host.queried,
+                        table,
+                        raises=table in (failing_groups or set()),
+                    )
+
+            pb = type("PB", (), {})()
+            pb.schemas = _Schemas()
+            return pb
+
+    return _Host()
+
+
+class _BatchAssetHost:
+    """Default (non-ambiguous, non-failing) batch-asset host."""
+
+    def __new__(cls):
+        return _batch_asset_host()
 
 
 def test_batched_input_assets_skip_non_asset_execution_tables():
@@ -4994,45 +5113,7 @@ def test_batched_input_assets_skip_non_asset_execution_tables():
     asset-shaped": its ``add_asset`` registers the table as an asset by
     construction, so the divergence is invisible to it.
     """
-    from deriva_ml.core.mixins.execution import ExecutionMixin
-
-    class _Host(ExecutionMixin):
-        def __init__(self):
-            self.model = _BatchAssetModel()
-            self.ml_schema = "deriva-ml"
-            self.queried: list[str] = []
-
-        def pathBuilder(self):
-            host = self
-
-            class _Schemas(dict):
-                def __missing__(self, key):
-                    return _Schema(key)
-
-            class _Schema:
-                def __init__(self, schema):
-                    self.schema = schema
-                    self.tables = _Tables(schema)
-
-            class _Tables(dict):
-                def __init__(self, schema):
-                    super().__init__()
-                    self.schema = schema
-
-                def __missing__(self, table):
-                    rows = {
-                        "File_Execution": [{"Execution": "2-0001", "File": "6-FILE"}],
-                        "Image_Execution": [{"Execution": "2-0001", "Image": "4-IMG1"}],
-                        "Image": [{"RID": "4-IMG1", "Filename": "x.png", "URL": "u", "Length": 1, "MD5": "m"}],
-                        "File": [{"RID": "6-FILE", "Filename": "src.py"}],
-                    }.get(table, [])
-                    return _BatchAssetPath(rows, host.queried, table)
-
-            pb = type("PB", (), {})()
-            pb.schemas = _Schemas()
-            return pb
-
-    host = _Host()
+    host = _BatchAssetHost()
 
     assets = host._input_assets_batch(["2-0001"])
 
@@ -5160,3 +5241,298 @@ def test_narrow_member_scan_rounds_run_sequentially_not_pooled():
     wide: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
     wide._run_member_scans([(dataset, "1.0.0") for dataset in walked[:_MEMBER_SCAN_POOL_THRESHOLD]])
     assert ml._handle_serial > 0, "a round at the threshold did not pool"
+
+
+# ---------------------------------------------------------------------------
+# Codex review round (#394): budget-bound leg prefetch, and batched-path
+# parity on failure and cross-schema shapes.
+# ---------------------------------------------------------------------------
+
+
+def test_dataset_leg_prefetch_is_bounded_by_the_remaining_dataset_budget():
+    """The leg prefetch never reads more legs than the budget can accept.
+
+    ``expand_dataset`` refuses a new pin once ``dataset_budget`` is spent, so
+    a frontier offering more new pinned datasets than there are remaining
+    slots must not have EVERY leg read: those reads are a strict-snapshot
+    resolution plus a version-history fetch plus an author-summary batch
+    apiece, and a tightly capped walk would issue hundreds of them only to
+    throw the answers away.
+
+    The bound mirrors the execution side's ``frontier_rids`` rule — never
+    fetch past what the walk can actually spend.
+
+    Mutation-verified: restoring the unbounded comprehension reads all 12
+    legs under a budget of 3.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, walked = _many_walked_pins_scenario(count=12)
+    budget = 3
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True, dataset_budget=budget)
+
+    read = engine.prefetch_dataset_legs([(dataset, "1.0.0") for dataset in walked])
+
+    assert read <= budget, f"prefetched {read} legs with only {budget} dataset slots remaining"
+    # And it really was bounded rather than empty — the walk still gets the
+    # legs it can spend.
+    assert read == budget
+    leg_reads = [c for c in ml.calls if c[0] == "_dataset_version_rows_at"]
+    assert len(leg_reads) == budget, f"issued {len(leg_reads)} leg reads for {budget} slots"
+
+    # Slots already spent are charged: with the budget exhausted, nothing is
+    # prefetched at all.
+    engine.datasets_expanded |= {(dataset, "1.0.0") for dataset in walked[:budget]}
+    assert engine.prefetch_dataset_legs([(dataset, "2.0.0") for dataset in walked]) == 0
+
+
+def test_capped_dataset_walk_is_identical_with_and_without_the_leg_prefetch():
+    """Bounding the prefetch changes what is READ, never what is WALKED.
+
+    The budget interacts with truncation bookkeeping (``cap_hit``,
+    ``datasets_visited``), so the bound has to be provably invisible in the
+    result: a capped closure must be byte-identical to the same capped
+    closure with the prefetch disabled entirely.
+    """
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_prefetched, root_prefetched, _ = _many_walked_pins_scenario(count=12)
+    prefetched = ml_prefetched.lookup_provenance(root_prefetched, max_executions=3)
+
+    ml_inline, root_inline, _ = _many_walked_pins_scenario(count=12)
+    original = WalkEngine.prefetch_dataset_legs
+    WalkEngine.prefetch_dataset_legs = lambda self, pairs: 0  # type: ignore[method-assign]
+    try:
+        inline = ml_inline.lookup_provenance(root_inline, max_executions=3)
+    finally:
+        WalkEngine.prefetch_dataset_legs = original  # type: ignore[method-assign]
+
+    assert _canonical(prefetched.model_dump(mode="json")) == _canonical(inline.model_dump(mode="json"))
+    # Non-vacuous: the cap really did bite.
+    assert prefetched.cap_hit is True
+
+
+def test_batched_asset_table_resolves_by_fk_not_by_ambiguous_name():
+    """Two same-named asset tables: the association's FK decides, not the name.
+
+    ``name_to_table`` searches domain schemas in sorted order and returns
+    the FIRST match, so with an ``Image`` in two schemas a name-only
+    resolution picks ``domain:Image`` even when ``Image_Execution`` actually
+    targets ``other:Image``. The subsequent row fetch then matches none of
+    the association's RIDs and **every asset in the group vanishes from the
+    closure with no error at all** — a silent wrong answer, the worst kind.
+
+    Identity is ``(schema, table)``, never a bare name (#385).
+
+    Mutation-verified: resolving by name drops the asset entirely.
+    """
+    host = _batch_asset_host(ambiguous=True)
+
+    assets = host._input_assets_batch(["2-0001"])
+
+    assert [a.asset_rid for a in assets["2-0001"]] == ["4-IMG1"], (
+        "the ambiguous asset-table name resolved to the wrong schema, so the "
+        "association's assets silently vanished from the batch"
+    )
+    assert assets["2-0001"][0].filename == "x.png"
+    # It read the table the FK names, not the one the name-sort picks first.
+    assert "Image" in host.queried
+
+
+def test_batched_asset_producers_survive_a_failing_sibling_group():
+    """One asset table's failure does not poison the whole frontier's assets.
+
+    The per-node path degraded per read: one asset's producer lookup raising
+    left every other asset's producers intact. The batched path grouped all
+    asset tables into one call, so a single group's failure marked EVERY
+    asset in the frontier ``resolution_failed`` — turning one table's
+    outage into a frontier-wide loss of producer facts.
+
+    Mutation-verified: reverting to a whole-batch except-clause wipes the
+    healthy group's producers too.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml = _FakeML()
+    ds_root = _ds(1)
+    consumer, healthy_producer = _ex(1), _ex(2)
+    healthy_asset, failing_asset = _as(1), _as(2)
+
+    ml.add_execution(healthy_producer, description="produced the healthy asset")
+    ml.add_asset(healthy_asset, "Image", filename="ok.png", producer=healthy_producer)
+    ml.add_asset(failing_asset, "Broken", filename="bad.bin", producer=None)
+    ml.add_execution(
+        consumer,
+        description="consumer",
+        input_assets=[
+            _StubAsset(healthy_asset, "ok.png", "Image"),
+            _StubAsset(failing_asset, "bad.bin", "Broken"),
+        ],
+    )
+    ml.add_dataset(ds_root, description="root", producer=consumer)
+
+    # Only the Broken group's producer batch fails.
+    original = ml._producers_of_assets_batch
+
+    def failing_group(items):
+        if any(table.name == "Broken" for _rid, table in items):
+            raise DerivaMLException("scripted producer failure for the Broken table")
+        return original(items)
+
+    ml._producers_of_assets_batch = failing_group  # type: ignore[method-assign]
+
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+    readout = engine.read_frontier([consumer])[consumer]
+
+    by_rid = {asset.asset_rid: (producers, failed) for asset, producers, failed in readout.asset_inputs}
+    assert by_rid[healthy_asset] == ((healthy_producer,), False), (
+        f"a sibling group's failure wiped the healthy asset's producers: {by_rid[healthy_asset]}"
+    )
+    assert by_rid[failing_asset][1] is True, "the failing group was not marked as failed"
+
+
+def test_hidden_workflow_row_reports_unresolved_not_no_workflow():
+    """An Execution whose Workflow row is unreadable stays UNRESOLVED.
+
+    ``lookup_execution`` calls ``lookup_workflow``, which raises when the
+    Workflow row is missing or hidden by ACL — so the per-node path reports
+    the execution as ``unresolved_rid``. The batched path fetched workflow
+    rows separately, so a Workflow RID absent from the batch results simply
+    produced ``workflow=None`` and a ``no_workflow`` gap: it masked a
+    *reference the walk could not read* as a *reference that was never
+    recorded*, which are different provenance facts.
+
+    Mutation-verified: substituting None yields a ``no_workflow`` gap and no
+    ``unresolved_rid``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    hidden_workflow_user = _ex(1)
+
+    ml.add_dataset(ds_root, description="root", producer=hidden_workflow_user)
+    ml.add_execution(
+        hidden_workflow_user,
+        description="carries a Workflow RID whose row cannot be read",
+        workflow=_StubWorkflow(workflow_rid=_wf(9), name="hidden"),
+    )
+    # The Execution row references the workflow, but the batched workflow
+    # fetch cannot see it (ACL-hidden / deleted row).
+    ml.set_hidden_workflow(_wf(9))
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert _gaps_for(closure, GapKind.unresolved_rid, hidden_workflow_user), (
+        "an unreadable Workflow row was masked as a resolved execution; "
+        f"gaps were {[(g.kind, g.subject_rid) for g in closure.gaps]}"
+    )
+    assert not _gaps_for(closure, GapKind.no_workflow, hidden_workflow_user), (
+        "an unreadable Workflow reference was reported as 'no workflow recorded', which is a different provenance fact"
+    )
+    assert hidden_workflow_user not in closure.executions
+
+
+def test_batch_read_failure_falls_back_to_per_node_reads():
+    """A failed BATCH request degrades to per-node reads, never aborts.
+
+    The per-node path degraded per read: one execution's failing lookup left
+    the rest of the walk intact. Batching made a single failed request the
+    failure of a whole frontier — and, because the frontier is a read-AHEAD,
+    of executions the walk had not even reached yet. A transient 503 on one
+    chunked query would take down a closure that the sequential walk would
+    have completed.
+
+    Leaving the readouts unassembled sends them down the historical per-node
+    path during expansion, so the closure completes and equals the
+    all-per-node closure.
+
+    Mutation-verified: removing the guard propagates the exception out of
+    ``lookup_provenance``.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_failing, root_failing, _ = _wide_consumer_frontier(width=3)
+    ml_failing.set_batch_failure("_execution_records_batch", DerivaMLException("scripted batch outage"))
+
+    closure = ml_failing.lookup_provenance(root_failing)
+
+    # The per-node fallback really ran (the batch was attempted and failed).
+    assert _batch_calls(ml_failing, "_execution_records_batch"), "the batch was never attempted"
+    assert [c for c in ml_failing.calls if c[0] == "_input_dataset_pairs"], (
+        "the batch failed but no per-node fallback read was issued"
+    )
+
+    # And the result equals the all-per-node closure.
+    ml_per_node, root_per_node, _ = _wide_consumer_frontier(width=3)
+    for seam in ("_execution_records_batch", "_input_dataset_pairs_batch", "_input_assets_batch"):
+        setattr(ml_per_node, seam, None)
+    per_node = ml_per_node.lookup_provenance(root_per_node)
+
+    assert _canonical(closure.model_dump(mode="json")) == _canonical(per_node.model_dump(mode="json"))
+    assert closure.executions, "the closure came back empty, so the fallback pin is vacuous"
+
+
+def test_batched_execution_records_omit_unreadable_workflow_rows():
+    """The batch OMITS a record whose Workflow row it could not read.
+
+    Seam-level companion to
+    ``test_hidden_workflow_row_reports_unresolved_not_no_workflow``. That
+    test pins the closure-level verdict but cannot mutation-verify the
+    production guard, because ``_FakeML`` overrides
+    ``_execution_records_batch`` wholesale and mirrors the guard in the
+    harness — a probe can only see what routes through it. This exercises
+    the real implementation.
+
+    A record substituted with ``workflow=None`` would report ``no_workflow``
+    ("code identity is unrecorded") where the per-node ``lookup_execution``
+    raises and yields ``unresolved_rid`` ("a recorded reference could not be
+    read"). Omitting it routes the RID to the per-node path, which produces
+    the historical verdict.
+
+    Mutation-verified: dropping the guard returns the record with a null
+    workflow.
+    """
+    from deriva_ml.core.mixins.execution import ExecutionMixin
+
+    readable, hidden = _ex(1), _ex(2)
+    rows = {
+        "Execution": [
+            {"RID": readable, "Workflow": _wf(1), "Status": "Uploaded", "Description": "ok"},
+            # References a Workflow row the Workflow fetch cannot see.
+            {"RID": hidden, "Workflow": _wf(9), "Status": "Uploaded", "Description": "hidden wf"},
+        ],
+        "Workflow": [{"RID": _wf(1), "Name": "trainer", "URL": "u", "Version": "1", "Checksum": "c"}],
+        "Workflow_Workflow_Type": [],
+    }
+
+    class _Host(ExecutionMixin):
+        def __init__(self):
+            from unittest.mock import MagicMock
+
+            self.model = MagicMock()
+            self.ml_schema = "deriva-ml"
+            self.queried: list[str] = []
+
+        def pathBuilder(self):
+            host = self
+
+            class _Tables(dict):
+                def __missing__(self, table):
+                    return _BatchAssetPath(rows.get(table, []), host.queried, table)
+
+            class _Schema:
+                tables = _Tables()
+
+            pb = type("PB", (), {})()
+            pb.schemas = {"deriva-ml": _Schema()}
+            return pb
+
+    records = _Host()._execution_records_batch([readable, hidden])
+
+    assert readable in records, "a readable execution was dropped"
+    assert records[readable].workflow is not None
+    assert hidden not in records, (
+        "an execution whose Workflow row could not be read was returned with a "
+        "substituted workflow; it must be omitted so the per-node path reports "
+        "it unresolved rather than reporting 'no workflow recorded'"
+    )
