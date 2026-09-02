@@ -1,4 +1,4 @@
-"""Unit tests for ``Dataset.strict_version_snapshot_catalog`` / ``strict_parents_at`` (#383 Task 7).
+"""Unit tests for ``Dataset.strict_version_snapshot_catalog`` (#383 Task 7).
 
 ``_version_snapshot_catalog`` (the existing, non-strict resolver) falls back
 to a **bare-catalog-id** (i.e. live) snapshot handle when a version row's
@@ -9,21 +9,16 @@ path, and ``_version_snapshot_catalog`` still calls ``catalog_snapshot(...)``
 with that bare id rather than returning ``self._ml_instance`` directly (the
 direct-return path is only for a falsy *input* version).
 
-That live fallback is unacceptable for provenance semantics (design ruling
-6: ancestry hops resolve at snapshots, never live). ``strict_version_snapshot_catalog``
-is the snapshot-closed sibling that raises ``SnapshotUnavailable`` instead of
-ever calling ``catalog_snapshot`` with a bare id.
+That live fallback is unacceptable for provenance semantics: a pinned
+closure must never let post-snaptime state leak in through a silent live
+read. ``strict_version_snapshot_catalog`` is the snapshot-closed sibling
+that raises ``SnapshotUnavailable`` instead of ever calling
+``catalog_snapshot`` with a bare id. It gates the closure's
+version-authorship and member-binding legs.
 
-``strict_parents_at`` mirrors ``list_dataset_parents``'s existing version
-resolution (dataset.py:2363-2426): parents are discovered via one
-``Dataset_Dataset`` fetch against the snapshot-bound catalog, then hydrated
-via ``lookup_dataset`` on that same snapshot catalog. This test file adds
-``parent_version_then``: the parent's own ``current_version`` (max of its
-``dataset_history()``) as *observed from the child's pinned snapshot* — not
-an unbounded read against the parent's live history. A parent whose
-snapshot-visible version differs from its live/latest-ever version is
-scripted explicitly (see ``TestStrictParentsAtVersionResolution``) to prove
-the snapshot-scoped answer wins.
+(The ``strict_parents_at`` sibling this file used to cover was removed with
+the ancestry leg — ruling 8, #389: containment is structure, not
+provenance.)
 
 Offline: no live catalog. ``Dataset.__init__`` is ``@validate_call``-guarded
 against the ``DerivaMLCatalog`` runtime-checkable Protocol, so plain
@@ -77,41 +72,6 @@ def _fake_catalog(catalog_id: str = "1", ml_schema: str = "deriva-ml") -> MagicM
     return catalog
 
 
-def _wire_dataset_dataset(catalog: MagicMock, parents_by_nested_rid: dict[str, list[str]]) -> None:
-    """Wire ``catalog.pathBuilder()...Dataset_Dataset`` to return scripted parent rows.
-
-    Mirrors the fluent chain ``list_dataset_parents``/``strict_parents_at``
-    use: ``pb.schemas[ml_schema].Dataset_Dataset.filter(Nested_Dataset ==
-    rid).entities().fetch()``. The ``==`` comparison on the mocked
-    ``Nested_Dataset`` column returns a sentinel the mocked ``.filter()``
-    uses to pick the right fetch result for the RID that was compared.
-    """
-    pb = MagicMock()
-    dd_path = MagicMock()
-
-    class _EqSentinel:
-        def __init__(self, rid: str):
-            self.rid = rid
-
-    dd_path.Nested_Dataset.__eq__ = lambda self, rid: _EqSentinel(rid)
-
-    def _filter(sentinel: _EqSentinel):
-        parent_rids = parents_by_nested_rid.get(sentinel.rid, [])
-        result = MagicMock()
-        result.entities.return_value.fetch.return_value = [{"Dataset": p} for p in parent_rids]
-        return result
-
-    dd_path.filter.side_effect = _filter
-    schema = MagicMock()
-    schema.Dataset_Dataset = dd_path
-    pb.schemas = {catalog.ml_schema: schema}
-    catalog.pathBuilder.return_value = pb
-
-
-def _wire_lookup_dataset(catalog: MagicMock, datasets_by_rid: dict[str, Dataset]) -> None:
-    catalog.lookup_dataset.side_effect = lambda rid: datasets_by_rid[rid]
-
-
 # ---------------------------------------------------------------------------
 # strict_version_snapshot_catalog
 # ---------------------------------------------------------------------------
@@ -160,10 +120,9 @@ class TestStrictVersionSnapshotCatalog:
         """Regression pin: the discriminator must read the history row, not the id string.
 
         When ``self._ml_instance`` is ITSELF already a snapshot-bound
-        catalog (as happens while chaining hops — e.g.
-        ``strict_parents_at`` calling ``strict_version_snapshot_catalog``
-        on a parent ``Dataset`` whose ``_ml_instance`` is the child's
-        pinned snapshot), ``catalog.catalog_id`` is already of the form
+        catalog (as happens whenever a ``Dataset`` handle is obtained from
+        an already-pinned catalog and then asked to resolve one of its own
+        versions), ``catalog.catalog_id`` is already of the form
         ``"1@SNAPA"`` — it already contains ``"@"``. A version row with a
         NULL ``Snapshot`` (the normal shape of a dev row: dev rows always
         carry ``Snapshot=NULL``, and ``current_version`` can return a dev
@@ -232,96 +191,6 @@ class TestStrictVersionSnapshotCatalog:
         assert result is pinned
 
 
-# ---------------------------------------------------------------------------
-# strict_parents_at
-# ---------------------------------------------------------------------------
-
-
-class TestStrictParentsAtVersionResolution:
-    def test_happy_path_fk_pointer_wins_over_max_history_row(self):
-        """The parent's version AT the child's snaptime wins, not its max-ever version.
-
-        Scenario: child C is pinned at version 1.0.0, whose snapshot is
-        S. Parent P's history AS VISIBLE FROM SNAPSHOT S has max version
-        0.3.0. If ``strict_parents_at`` instead read the parent's LIVE
-        history (a later fact, not visible from S — scripted here as
-        advancing to 0.9.0 on the *live* mock, which is never consulted),
-        the wrong answer would leak future state into a supposedly frozen
-        closure. Only the snapshot-scoped 0.3.0 must come back.
-        """
-        live = _fake_catalog(catalog_id="1")
-        child_rid = _rid(1)
-        parent_rid = _rid(2)
-
-        child = Dataset(catalog=live, dataset_rid=child_rid)
-        child.dataset_history = MagicMock(
-            return_value=[
-                _history_row("1.0.0", snapshot="2026-01-01T00:00:00Z", dataset_rid=child_rid, version_rid_n=10)
-            ]
-        )
-
-        # The pinned snapshot's point of view: parent's history stops at 0.3.0.
-        pinned = _fake_catalog(catalog_id="1")
-        _wire_dataset_dataset(pinned, {child_rid: [parent_rid]})
-        parent_at_snapshot = Dataset(catalog=pinned, dataset_rid=parent_rid)
-        parent_at_snapshot.dataset_history = MagicMock(
-            return_value=[
-                _history_row("0.1.0", snapshot="2025-06-01T00:00:00Z", dataset_rid=parent_rid, version_rid_n=20),
-                _history_row("0.3.0", snapshot="2025-12-01T00:00:00Z", dataset_rid=parent_rid, version_rid_n=21),
-            ]
-        )
-        _wire_lookup_dataset(pinned, {parent_rid: parent_at_snapshot})
-        live.catalog_snapshot.return_value = pinned
-
-        # A LIVE-catalog Dataset for the same parent RID, wired with a
-        # newer history. strict_parents_at must never touch this — if it
-        # did, the assertion below would see "0.9.0" instead of "0.3.0".
-        parent_live = Dataset(catalog=live, dataset_rid=parent_rid)
-        parent_live.dataset_history = MagicMock(
-            return_value=[
-                _history_row("0.1.0", snapshot="2025-06-01T00:00:00Z", dataset_rid=parent_rid, version_rid_n=20),
-                _history_row("0.3.0", snapshot="2025-12-01T00:00:00Z", dataset_rid=parent_rid, version_rid_n=21),
-                _history_row("0.9.0", snapshot="2026-06-01T00:00:00Z", dataset_rid=parent_rid, version_rid_n=22),
-            ]
-        )
-        live.lookup_dataset.side_effect = lambda rid: parent_live
-
-        result = child.strict_parents_at("1.0.0")
-
-        assert result == [{"parent_rid": parent_rid, "parent_version_then": "0.3.0"}]
-
-    def test_unresolvable_parent_version_returns_none(self):
-        """A parent with no version history visible at the snaptime -> None, not a raise."""
-        live = _fake_catalog(catalog_id="1")
-        child_rid = _rid(1)
-        parent_rid = _rid(2)
-
-        child = Dataset(catalog=live, dataset_rid=child_rid)
-        child.dataset_history = MagicMock(
-            return_value=[
-                _history_row("1.0.0", snapshot="2026-01-01T00:00:00Z", dataset_rid=child_rid, version_rid_n=10)
-            ]
-        )
-
-        pinned = _fake_catalog(catalog_id="1")
-        _wire_dataset_dataset(pinned, {child_rid: [parent_rid]})
-        parent_at_snapshot = Dataset(catalog=pinned, dataset_rid=parent_rid)
-        # No history visible at this snaptime -> current_version raises
-        # DerivaMLException, which strict_parents_at must convert to None.
-        parent_at_snapshot.dataset_history = MagicMock(return_value=[])
-        _wire_lookup_dataset(pinned, {parent_rid: parent_at_snapshot})
-        live.catalog_snapshot.return_value = pinned
-
-        result = child.strict_parents_at("1.0.0")
-
-        assert result == [{"parent_rid": parent_rid, "parent_version_then": None}]
-
-
-# ---------------------------------------------------------------------------
-# Snapshot SCHEMA-shape failures (#383 live-reconciliation finding)
-# ---------------------------------------------------------------------------
-
-
 class TestSnapshotSchemaEvolutionDegradesToGap:
     """A snapshot-bound read sees the schema as it stood at that snaptime.
 
@@ -332,38 +201,9 @@ class TestSnapshotSchemaEvolutionDegradesToGap:
     converts them to ``SnapshotUnavailable`` so the engine can degrade
     them to a ``snapshot_chain_break`` gap.
 
-    Both flavors were observed live on eye-ai: ``Dataset.Deleted`` absent
-    at v0.1.0 snaptimes (AttributeError, via the snapshot-bound
-    ``lookup_dataset``), and ``Dataset_Version.Snapshot`` absent at
+    Observed live on eye-ai: ``Dataset_Version.Snapshot`` absent at
     v1.0.0-4.1.0 snaptimes (KeyError, via ``dataset_history``).
     """
-
-    def test_attribute_error_on_snapshot_read_becomes_snapshot_unavailable(self):
-        """Missing COLUMN at the snaptime (AttributeError) -> SnapshotUnavailable."""
-        live = _fake_catalog(catalog_id="1")
-        child_rid = _rid(1)
-        child = Dataset(catalog=live, dataset_rid=child_rid)
-        child.dataset_history = MagicMock(
-            return_value=[
-                _history_row("1.0.0", snapshot="2026-01-01T00:00:00Z", dataset_rid=child_rid, version_rid_n=10)
-            ]
-        )
-
-        pinned = _fake_catalog(catalog_id="1")
-        _wire_dataset_dataset(pinned, {child_rid: [_rid(2)]})
-        # The snapshot-bound lookup_dataset filters on a column the old
-        # schema never had -- exactly what deriva-py's datapath raises.
-        pinned.lookup_dataset.side_effect = AttributeError(
-            "'_TableWrapper' object for table 'Dataset' has no attribute or column 'Deleted'"
-        )
-        live.catalog_snapshot.return_value = pinned
-
-        with pytest.raises(SnapshotUnavailable) as excinfo:
-            child.strict_parents_at("1.0.0")
-
-        # The detail must NAME the missing column, so the resulting gap
-        # tells a reviewer which schema change broke the chain.
-        assert "Deleted" in str(excinfo.value)
 
     def test_key_error_reading_version_history_becomes_snapshot_unavailable(self):
         """Missing history column at the snaptime (KeyError) -> SnapshotUnavailable."""
@@ -378,32 +218,3 @@ class TestSnapshotSchemaEvolutionDegradesToGap:
             ds.strict_version_snapshot_catalog("1.0.0")
 
         assert "Snapshot" in str(excinfo.value)
-
-    def test_schema_failure_reading_ONE_parent_version_is_scoped_to_that_parent(self):
-        """A per-parent schema failure yields None for that parent, not a whole-hop raise.
-
-        The hop itself succeeded (the parent rows were read); only the
-        parent's own version lookup tripped. That is already modeled as
-        ``parent_version_then=None``, so it must not escalate.
-        """
-        live = _fake_catalog(catalog_id="1")
-        child_rid = _rid(1)
-        parent_rid = _rid(2)
-
-        child = Dataset(catalog=live, dataset_rid=child_rid)
-        child.dataset_history = MagicMock(
-            return_value=[
-                _history_row("1.0.0", snapshot="2026-01-01T00:00:00Z", dataset_rid=child_rid, version_rid_n=10)
-            ]
-        )
-
-        pinned = _fake_catalog(catalog_id="1")
-        _wire_dataset_dataset(pinned, {child_rid: [parent_rid]})
-        parent_at_snapshot = Dataset(catalog=pinned, dataset_rid=parent_rid)
-        parent_at_snapshot.dataset_history = MagicMock(side_effect=KeyError("Snapshot"))
-        _wire_lookup_dataset(pinned, {parent_rid: parent_at_snapshot})
-        live.catalog_snapshot.return_value = pinned
-
-        result = child.strict_parents_at("1.0.0")
-
-        assert result == [{"parent_rid": parent_rid, "parent_version_then": None}]

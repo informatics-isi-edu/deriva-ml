@@ -660,8 +660,9 @@ class DerivaMLReadOnlyError(DerivaMLException):
 class SnapshotUnavailable(DerivaMLException):
     """Raised when a dataset version's catalog snapshot cannot be resolved strictly.
 
-    Callers implementing snapshot-closed provenance semantics (e.g. the
-    ``lookup_provenance`` ancestry walk) must never silently read live
+    Callers implementing snapshot-closed provenance semantics (e.g.
+    ``lookup_provenance``'s version-authorship and member-binding legs)
+    must never silently read live
     catalog state when a version's pinned snapshot is missing or
     unreadable — doing so would let content that postdates the walked
     version leak into a supposedly-frozen closure. This exception is the

@@ -3133,7 +3133,8 @@ class Dataset:
         acceptable for ordinary browsing, where "give me the closest thing
         you can" is the right default. It is **not** acceptable for
         provenance semantics: a caller building a snapshot-closed closure
-        (e.g. ``lookup_provenance``'s ancestry walk, per design ruling 6)
+        (e.g. ``lookup_provenance``'s version-authorship and member-binding
+        legs)
         must never let content that postdates the walked version leak in
         through a silent live read. This method enforces that by raising
         :class:`~deriva_ml.core.exceptions.SnapshotUnavailable` instead of
@@ -3207,103 +3208,3 @@ class Dataset:
             raise SnapshotUnavailable(
                 f"Dataset {self.dataset_rid} version {version}: snapshot {snapshot_id!r} is unreadable ({e})"
             ) from e
-
-    def strict_parents_at(self, version: DatasetVersion | str) -> list[dict]:
-        """Return this dataset's parent datasets as read AT a specific version's snapshot.
-
-        Mirrors :meth:`list_dataset_parents`'s version-resolution semantics
-        exactly — parents are discovered via the same ``Dataset_Dataset``
-        association-table query, evaluated against the same snapshot-bound
-        catalog — but (a) uses the strict resolver
-        (:meth:`strict_version_snapshot_catalog`) so an unresolvable
-        snapshot raises rather than silently reading live state, and (b)
-        additionally reports each parent's **own** current version as of
-        that same snaptime (``parent_version_then``).
-
-        ``parent_version_then`` resolution: per the design's ruling 6
-        ("ancestry hops resolve at snapshots"), a ``Dataset_Dataset`` hop
-        reads the parent as of the child version's snaptime. Concretely,
-        each parent RID is looked up (``lookup_dataset``, exactly as
-        :meth:`list_dataset_parents` does) against the *child's* snapshot
-        catalog, and the parent's :attr:`current_version` is read from
-        that same snapshot-bound instance — i.e. "the parent's version-row
-        history, filtered as ERMrest naturally does at that snapshot,
-        then take the max". This is the parent's version FK/pointer as
-        observed at the child's snaptime, not an unbounded "latest ever"
-        read against live history. When the parent has no version history
-        visible at that snaptime (e.g. the parent dataset didn't exist yet,
-        or its version rows are otherwise unresolvable), ``parent_version_then``
-        is ``None`` rather than raising — that is itself a reported gap for
-        the caller, not a fatal error for the whole hop.
-
-        Args:
-            version: The version of *this* dataset whose snapshot anchors
-                the read. Must resolve to a pinned snapshot — see
-                :meth:`strict_version_snapshot_catalog`.
-
-        Returns:
-            list[dict]: One dict per parent, each with keys:
-                ``parent_rid`` (RID of the parent dataset) and
-                ``parent_version_then`` (the parent's current version as
-                of the child's snaptime, or ``None`` if unresolvable).
-
-        Raises:
-            SnapshotUnavailable: If ``version`` cannot be resolved to a
-                pinned snapshot for this dataset, or if reading parents at
-                that snapshot trips over a column the catalog schema
-                lacked at that snaptime (e.g. ``Dataset.Deleted`` on an
-                old snapshot). Schema shape at a snaptime is treated as a
-                snapshot-resolution failure, so callers building a
-                snapshot-closed closure get an honest gap rather than a
-                raw ``AttributeError``/``KeyError``.
-
-        Example:
-            >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
-            >>> ds.strict_parents_at("1.0.0")  # doctest: +SKIP
-            [{'parent_rid': '1-DEF', 'parent_version_then': '0.3.0'}]
-        """
-        version_snapshot_catalog = self.strict_version_snapshot_catalog(version)
-
-        # Every read below runs against the SNAPSHOT-BOUND catalog, whose
-        # schema is the schema as it stood at that snaptime — not today's.
-        # A column this code refers to may simply not exist back then
-        # (e.g. ``Dataset.Deleted``, added later, which
-        # ``lookup_dataset`` filters on unconditionally). deriva-py
-        # surfaces that as ``AttributeError`` from the datapath wrapper,
-        # and a missing row key as ``KeyError``; neither is a
-        # ``DerivaMLException``, so without this both would escape
-        # ``lookup_provenance`` as a hard crash instead of degrading to
-        # the ``snapshot_chain_break`` gap the design calls for. Schema
-        # shape at a snaptime is exactly as much a snapshot-resolution
-        # failure as a missing snapshot id is.
-        try:
-            pb = version_snapshot_catalog.pathBuilder()
-            atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
-            parents = [
-                version_snapshot_catalog.lookup_dataset(p["Dataset"])
-                for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
-            ]
-        except (AttributeError, KeyError) as e:
-            raise SnapshotUnavailable(
-                f"Dataset {self.dataset_rid} version {version}: the catalog schema at this "
-                f"version's snapshot does not have {_missing_name(e)} that reading parents "
-                f"requires, so the ancestry chain cannot be read here ({type(e).__name__}: {e})"
-            ) from e
-
-        results: list[dict] = []
-        for parent in parents:
-            try:
-                parent_version_then = str(parent.current_version)
-            except (DerivaMLException, AttributeError, KeyError):
-                # Same snapshot-schema hazard, but scoped to ONE parent:
-                # an unreadable parent version is already modeled as
-                # ``parent_version_then=None`` (a reported gap for the
-                # caller), not a fatal error for the whole hop.
-                parent_version_then = None
-            results.append(
-                {
-                    "parent_rid": parent.dataset_rid,
-                    "parent_version_then": parent_version_then,
-                }
-            )
-        return results

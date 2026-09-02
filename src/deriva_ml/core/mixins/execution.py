@@ -93,8 +93,9 @@ _SUMMARY_CHUNK_SIZE = 25
 
 # Proportional internal dataset budget for a provenance closure (design §5,
 # open question 1 resolved to "proportional internal default, no public
-# knob"): a large ancestry graph containing few executions must not walk
-# unboundedly just because the execution budget is untouched.
+# knob"): a walk that discovers many (dataset, version) pairs but few
+# executions must not walk unboundedly just because the execution budget is
+# untouched.
 _DATASET_BUDGET_FACTOR = 4
 
 
@@ -1443,8 +1444,9 @@ class ExecutionMixin:
                 Strictly typed: booleans, strings, and floats are rejected at
                 the call boundary, not silently coerced. A proportional
                 internal dataset-version budget (``4 * max_executions``)
-                bounds ``datasets_visited`` the same way, so a large
-                ancestry graph with few executions cannot walk unboundedly.
+                bounds ``datasets_visited`` the same way, so a walk reaching
+                many dataset versions but few executions cannot walk
+                unboundedly.
 
         Returns:
             A :class:`~deriva_ml.execution.provenance.ProvenanceClosure`
@@ -1554,9 +1556,9 @@ class ExecutionMixin:
                 root_descriptor = root_descriptor.model_copy(update={"producing_execution": producer_summary})
 
         # The root dataset's own pinned version is a walked version: its
-        # dataset-side arcs (authorship, bindings, ancestry) land in later
-        # tasks, but the gating call belongs here so the root pin is walked
-        # exactly like any consumed pin.
+        # dataset-side arcs (authorship, bindings) run through the same
+        # gating call, so the root pin is walked exactly like any consumed
+        # pin.
         if root_descriptor.type == "Dataset" and root_version is not None:
             engine.expand_dataset(rid, root_version, depth=0)
             root_descriptor = self._snapshot_faithful_root(rid, root_version, root_descriptor, builder)
