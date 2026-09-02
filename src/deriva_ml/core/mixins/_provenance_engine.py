@@ -1784,12 +1784,26 @@ class WalkEngine(Generic[N]):
         contract, and every subclass override keep working untouched, and
         the only thing that changed is who calls them and when.
 
-        **Thread safety.** ``requests.Session`` is not thread-safe, so each
-        in-flight prefetch is bound to its OWN catalog handle from
-        :meth:`_worker_ml` — never the walk's own ``self.ml``. Results are
-        stashed in :attr:`_readouts` and applied later, single-threaded, in
-        the queue's own deterministic order; no worker touches the engine's
-        sets, the budget, or the visitor.
+        **Thread safety: handles are LEASED, never routed.** ``requests.Session``
+        is not thread-safe, and neither is the ``_snapshot_cache`` dict a
+        ``DerivaML`` keeps, so two concurrent reads must never touch the same
+        handle. An earlier version picked a handle by ``hash(rid) % len(pool)``,
+        which is a *routing* scheme and not exclusion: with N concurrent tasks
+        over N handles, collisions are near-certain (birthday paradox), and a
+        collision silently shares an unsynchronized session.
+
+        Handles are therefore taken from an :class:`asyncio.Queue` — acquired
+        before the ``run_in_executor`` call and released in a ``finally`` — so
+        possession is exclusive for the whole duration of the read. The queue
+        doubles as the concurrency bound: its depth IS the number of tasks that
+        can be in flight, which makes "pool size >= concurrency" an enforced
+        invariant rather than a comment. No separate semaphore is needed, and
+        none is used, because a second bound could drift out of step with the
+        pool and reintroduce sharing.
+
+        Results are stashed in :attr:`_readouts` and applied later,
+        single-threaded, in the queue's own deterministic order; no worker
+        touches the engine's sets, the budget, or the visitor.
 
         A readout whose read raised something the seams do not normally
         raise is simply NOT cached, so that execution falls back to the
@@ -1807,57 +1821,60 @@ class WalkEngine(Generic[N]):
         import asyncio
 
         loop = asyncio.get_running_loop()
-        semaphore = asyncio.Semaphore(min(_expansion_workers(), max(len(rids), 1)))
+        handles = self._worker_handles()
+        if not handles:
+            return
+
+        # The lease pool. Its depth is the ONLY concurrency bound: a task
+        # cannot start until it owns a handle, and it owns that handle
+        # exclusively until it releases it.
+        leases: asyncio.Queue = asyncio.Queue()
+        for handle in handles:
+            leases.put_nowait(handle)
 
         async def one(rid: RID) -> tuple[RID, ExecutionReadout | None]:
-            async with semaphore:
-                worker = self._worker_ml(rid)
-                try:
-                    readout = await loop.run_in_executor(None, lambda: worker.read_execution(rid))
-                except Exception:  # noqa: BLE001 — an unexpected read failure
-                    # is not cached; the main thread re-reads inline and the
-                    # error surfaces from its historical call site.
-                    return rid, None
-                return rid, readout
+            handle = await leases.get()
+            try:
+                worker = self._worker_view(handle)
+                return rid, await loop.run_in_executor(None, lambda: worker.read_execution(rid))
+            except Exception:  # noqa: BLE001 — an unexpected read failure
+                # is not cached; the main thread re-reads inline and the
+                # error surfaces from its historical call site.
+                return rid, None
+            finally:
+                # Released even on failure — a leaked lease would shrink the
+                # pool for the rest of the walk and eventually deadlock it.
+                leases.put_nowait(handle)
 
         for rid, readout in await asyncio.gather(*(one(rid) for rid in rids)):
             if readout is not None:
                 self._readouts[rid] = readout
 
-    def _worker_ml(self, rid: RID) -> "WalkEngine[N]":
-        """Return a read-only engine view bound to a per-worker catalog handle.
+    def _worker_view(self, handle: Any) -> "WalkEngine[N]":
+        """Wrap one LEASED catalog handle in a read-only engine view.
 
-        ``requests.Session`` is not thread-safe and every sync seam runs on
-        ``self.ml``'s session, so concurrent offloaded reads must not share
-        one ``ml``. This hands each in-flight prefetch a shallow engine view
-        whose ``ml`` is a worker-local handle taken from
-        :meth:`_worker_handles`; the view exposes only
-        :meth:`read_execution`, which is read-only by construction.
+        The caller has already acquired ``handle`` exclusively from the lease
+        queue in :meth:`_prefetch_frontier_async`; this only wraps it so
+        :meth:`read_execution` (read-only by construction) can be called
+        against it. The view holds no walk state of its own — the engine's
+        sets, budget and visitor are never reachable from it.
 
-        When no per-worker handle can be constructed (a test harness, an
-        offline mode, a catalog object that cannot be cloned), this returns
-        ``self`` — and the caller's concurrency is then still correct because
-        such an ``ml`` is not a live session in the first place. A live
-        catalog either yields real per-worker handles or is not parallelized.
+        Deliberately takes the handle rather than choosing one: handle
+        selection is the lease queue's job, and any selection logic here
+        would be a second, unsynchronized allocator.
 
         Args:
-            rid: The execution about to be read (used only to spread work
-                deterministically across the handle pool).
+            handle: The leased catalog handle.
 
         Returns:
-            An engine (possibly ``self``) whose ``ml`` is safe for this
-            worker to use concurrently.
+            A read-only engine view bound to that handle.
 
         Example:
             >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
-            >>> engine._worker_ml(f"1-{1:04X}") is engine
+            >>> engine._worker_view(None).ml is None
             True
         """
-        handles = self._worker_handles()
-        if not handles:
-            return self
-        handle = handles[hash(rid) % len(handles)]
-        view: "WalkEngine[N]" = WalkEngine(
+        return WalkEngine(
             handle,
             self.visitor,
             arcs=self.arcs,
@@ -1865,7 +1882,6 @@ class WalkEngine(Generic[N]):
             dataset_budget=self.dataset_budget,
             closure_mode=self.closure_mode,
         )
-        return view
 
     def _worker_handles(self) -> list[Any]:
         """Build (once) the pool of per-worker catalog handles.
@@ -1873,13 +1889,22 @@ class WalkEngine(Generic[N]):
         One extra ``DerivaML`` connection per worker, constructed up front
         from ``self.ml``'s own connection parameters and its already-parsed
         schema (so no worker re-fetches ``/schema``). Each handle owns its
-        own ``requests.Session``, which is what makes the offloaded seam
-        calls safe to run concurrently.
+        own ``requests.Session`` AND its own ``_snapshot_cache`` — both
+        unsynchronized, which is exactly why a handle is leased to one
+        reader at a time rather than shared.
 
-        Returns an empty list — meaning "do not parallelize, share ``self.ml``"
-        — whenever handles cannot be built: a stubbed ``ml`` in tests, an
-        offline instance, a worker count of 1, or any construction failure.
-        Failing closed here costs only speed.
+        **The pool's size IS the concurrency bound.** Every in-flight read
+        holds one handle from :meth:`_prefetch_frontier_async`'s lease queue,
+        so at most ``len(pool)`` reads run at once and "pool size >=
+        concurrency" holds by construction. Nothing else caps concurrency;
+        adding a second bound would let the two drift apart and reintroduce
+        handle sharing.
+
+        Returns an empty list — meaning "do not parallelize" — whenever
+        handles cannot be built: a stubbed ``ml`` in tests, an offline
+        instance, a worker count of 1, or any construction failure. The
+        caller then reads inline on the main thread. Failing closed here
+        costs only speed.
 
         Returns:
             The handle pool, possibly empty.
@@ -2360,6 +2385,31 @@ class WalkEngine(Generic[N]):
         run_async(self._prefetch_frontier_async(frontier))
         return len(frontier)
 
+    def release_unapplied_readouts(self) -> int:
+        """Drop prefetched readouts this walk will never apply.
+
+        A readout sitting in :attr:`_readouts` is charged against the
+        remaining execution budget by :meth:`frontier_rids`, because applying
+        it will consume a slot. When the walk stops for budget, those
+        readouts are never applied — so the charge must be released, or every
+        subsequent round measures a remaining budget smaller than the real
+        one.
+
+        Safe to call at any termination point: a discarded readout is only a
+        cache entry, and :meth:`_take_readout` re-reads inline on a miss.
+
+        Returns:
+            How many readouts were released.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine.release_unapplied_readouts()
+            0
+        """
+        released = len(self._readouts)
+        self._readouts.clear()
+        return released
+
     def drain(self, *, depth_remaining: int | None) -> None:
         """Expand every queued execution, under the engine's caps.
 
@@ -2392,6 +2442,13 @@ class WalkEngine(Generic[N]):
                 self.flags["walked_complete"] = False
                 self.cap_hit = True
                 self.truncated |= {queued_rid for queued_rid, _ in self._queue}
+                # Readouts prefetched for work this walk will now never
+                # apply are DISCARDED, releasing the budget slots they were
+                # charged for in ``frontier_rids``. Without this, a walk that
+                # terminates on the cap leaves the charge standing forever,
+                # so any later round would compute a smaller remaining budget
+                # than it actually has and under-fetch (or stop fetching).
+                self.release_unapplied_readouts()
                 return
             rid, depth = self._queue.pop(0)
             if rid in self.visited_global:

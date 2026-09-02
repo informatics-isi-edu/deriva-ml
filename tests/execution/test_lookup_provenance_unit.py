@@ -33,7 +33,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from deriva_ml.core.exceptions import DerivaMLValidationError, SnapshotUnavailable
+from deriva_ml.core.exceptions import (
+    DerivaMLException,
+    DerivaMLValidationError,
+    SnapshotUnavailable,
+)
 from deriva_ml.core.mixins.execution import BindingDiagnostic
 from deriva_ml.execution.provenance import (
     ArcInputType,
@@ -3513,6 +3517,63 @@ def test_frontier_honors_the_remaining_execution_budget():
     assert len(looked_up) < len(expected), "a capped walk must not read the whole graph"
 
 
+def test_in_flight_readouts_are_charged_against_the_remaining_budget():
+    """A frontier's width never exceeds the budget slots that are actually
+    free — i.e. remaining budget MINUS readouts already fetched and not yet
+    applied.
+
+    Each in-flight readout will consume a slot when it is applied, so a
+    frontier that ignores them measures the budget as if they did not exist
+    and reads further ahead than the cap allows. This asserts the width
+    against free slots at each fetch, which is what makes the charge
+    load-bearing: deleting ``- len(self._readouts)`` from ``frontier_rids``
+    makes this test fail (verified by mutate-and-revert), where the coarser
+    "total reads <= 2*cap" bound did not bite.
+    """
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+
+    cap = 6
+    # Each seed has its OWN distinct parents, so expanding seed #1 offers a
+    # NEW parent frontier while seeds #2..#N are still sitting unapplied in
+    # the readout cache. That is the only regime where the charge matters:
+    # a scenario whose later frontiers are all already-prefetched RIDs is
+    # filtered to empty by ``_prefetchable`` and would pass either way.
+    ml, root, expected = _wide_frontier_scenario_with_parents(width=12, parents_each=4)
+    ml.enable_parallel_expansion(True)
+
+    observations: list[tuple[int, int]] = []
+    original = WalkEngine.frontier_rids
+
+    def _recording(self, candidates=None):
+        # Free slots BEFORE this fetch: what the walk may still expand,
+        # less what it has already fetched and not yet applied.
+        free = self.max_executions - len(self.visited_global) - len(self._readouts)
+        out = original(self, candidates)
+        observations.append((len(out), free))
+        return out
+
+    WalkEngine.frontier_rids = _recording  # type: ignore[method-assign]
+    try:
+        closure = ml.lookup_provenance(root, max_executions=cap)
+    finally:
+        WalkEngine.frontier_rids = original  # type: ignore[method-assign]
+
+    assert len(expected) > cap, "scenario must exceed the cap for this to bite"
+    assert closure.cap_hit is True
+
+    for taken, free in observations:
+        assert taken <= max(free, 0), (
+            f"fetched a frontier of {taken} with only {free} free budget slots — "
+            "in-flight readouts are not being charged against the budget"
+        )
+
+    # Non-vacuous: at least one fetch happened while readouts were in
+    # flight, which is the only regime where the charge matters at all.
+    assert any(free < cap for _taken, free in observations), (
+        "no fetch was observed with readouts already in flight; the charge was never exercised"
+    )
+
+
 def test_parallel_expansion_preserves_shuffled_determinism():
     """The existing shuffled-insertion determinism scenario stays
     byte-identical under concurrent expansion — including across a shuffled
@@ -3606,3 +3667,244 @@ def test_read_execution_never_mutates_engine_or_visitor():
     ) == before
     # Visitor untouched: nothing accumulated at all.
     assert builder.finalize() == ({}, {}, {}, [])
+
+
+def _wide_frontier_scenario(*, width: int) -> tuple[_FakeML, str, list[str]]:
+    """A root whose seed frontier is ``width`` independent executions.
+
+    Deliberately WIDER than the handle pool (8), so leases must be recycled
+    while other reads are still in flight — the regime where a routing
+    scheme (``hash(rid) % len(pool)``) collides and a lease queue does not.
+
+    Returns ``(ml, root_dataset_rid, expected_execution_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    members = set()
+    expected = [root_producer]
+    for index in range(width):
+        member_producer = _ex(100 + index)
+        ml.add_execution(member_producer, description=f"member producer {index}")
+        members.add(member_producer)
+        expected.append(member_producer)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(expected)
+
+
+def _wide_frontier_scenario_with_parents(*, width: int, parents_each: int) -> tuple[_FakeML, str, list[str]]:
+    """A wide seed frontier where each seed has its OWN distinct parents.
+
+    Expanding the first seed therefore offers a brand-new parent frontier
+    while the other seeds are still sitting unapplied in the readout cache
+    — the regime that exercises the in-flight budget charge. (In
+    ``_wide_frontier_scenario`` every later frontier consists of RIDs that
+    are already cached, so ``_prefetchable`` filters them to empty and the
+    charge is never consulted.)
+
+    Returns ``(ml, root_dataset_rid, expected_execution_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    members = set()
+    expected = [root_producer]
+    for index in range(width):
+        seed = _ex(100 + index)
+        parent_datasets = []
+        for parent_index in range(parents_each):
+            parent_dataset = _ds(200 + index * parents_each + parent_index)
+            parent_execution = _ex(300 + index * parents_each + parent_index)
+            ml.add_execution(parent_execution, description=f"parent {index}.{parent_index}")
+            ml.add_dataset(parent_dataset, description=f"ds {index}.{parent_index}", producer=parent_execution)
+            ml.set_versioned_producer(parent_dataset, "1.0.0", parent_execution)
+            parent_datasets.append(
+                _StubDataset(parent_dataset, f"ds {index}.{parent_index}", "1.0.0", consumed_version="1.0.0")
+            )
+            expected.append(parent_execution)
+        ml.add_execution(seed, description=f"seed {index}", input_datasets=parent_datasets)
+        members.add(seed)
+        expected.append(seed)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(expected)
+
+
+def test_no_worker_handle_is_ever_entered_concurrently():
+    """Handles are LEASED, not routed: no handle is ever in use by two
+    reads at once.
+
+    This is the pin the earlier ``hash(rid) % len(handles)`` scheme failed.
+    Hash-mod is a routing scheme, not exclusion — with N concurrent tasks
+    over N handles, collisions are near-certain — and every collision
+    silently shares an unsynchronized ``requests.Session`` and the
+    ``_snapshot_cache`` dict on that handle's ``DerivaML``.
+
+    The harness mints a DISTINCT ``_HandleProbe`` per handle, each counting
+    its own occupancy, so a shared handle is observable. Verified to FAIL
+    against the hash-mod implementation (mutate-and-revert), which is what
+    makes it a real pin rather than a tautology.
+    """
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+
+    ml, root, _ = _wide_frontier_scenario(width=24)
+    ml.enable_parallel_expansion(True)
+    # Hold each handle long enough that concurrent reads genuinely overlap.
+    # Without this the scripted seams return in microseconds and a sharing
+    # bug is missed by timing luck rather than absent by design.
+    ml._handle_hold_seconds = 0.01
+
+    widths: list[int] = []
+    original = WalkEngine.frontier_rids
+
+    def _recording(self, candidates=None):
+        out = original(self, candidates)
+        if out:
+            widths.append(len(out))
+        return out
+
+    WalkEngine.frontier_rids = _recording  # type: ignore[method-assign]
+    try:
+        ml.lookup_provenance(root)
+    finally:
+        WalkEngine.frontier_rids = original  # type: ignore[method-assign]
+
+    assert list(ml.handle_violations) == [], (
+        f"a worker handle was entered concurrently {len(ml.handle_violations)} time(s): "
+        f"{list(ml.handle_violations)[:5]} — handles are being SHARED, not leased"
+    )
+    # Non-vacuous on both axes: a real pool was built, and the frontier was
+    # wider than the pool, so leases genuinely had to be recycled (which is
+    # where a routing scheme collides and a lease does not).
+    assert ml._handle_serial >= 2, "no handle pool was built, so the pin is vacuous"
+    assert max(widths, default=0) > ml._handle_serial, (
+        f"widest frontier {max(widths, default=0)} did not exceed the pool size "
+        f"{ml._handle_serial}; leases were never contended"
+    )
+
+
+def test_worker_pool_bounds_concurrency_so_leases_never_starve():
+    """Concurrency is bounded BY the pool, so a lease is always available.
+
+    The lease queue's depth is the only concurrency bound. If any other
+    bound were larger than the pool, tasks would block forever waiting for
+    a handle; if it were smaller, the pool would be under-used. Reaching a
+    finished closure at all is the liveness half of that invariant, and the
+    peak-occupancy check is the safety half.
+    """
+    ml, root, expected = _multi_level_chain_scenario()
+    ml.enable_parallel_expansion(True)
+
+    closure = ml.lookup_provenance(root)
+
+    assert sorted(closure.executions) == expected
+    assert list(ml.handle_violations) == []
+
+
+@pytest.mark.parametrize(
+    "error, degrades",
+    [
+        (DerivaMLException("scripted deriva failure"), True),
+        (SnapshotUnavailable("scripted snapshot failure"), True),
+        (KeyError("scripted key failure"), True),
+        (ValueError("scripted value failure"), True),
+        (RuntimeError("scripted runtime failure"), False),
+    ],
+    ids=["deriva", "snapshot", "keyerror", "valueerror", "runtimeerror"],
+)
+def test_read_failures_classify_identically_parallel_and_sequential(error, degrades):
+    """A read-side failure is handled identically whether it happened on a
+    worker or inline.
+
+    The parallel path CAPTURES the exception into the readout and classifies
+    it on the main thread (``member_producers_from``); the sequential path
+    raises it from the inline read. Those are different code paths, so the
+    equivalence has to be pinned per exception KIND, not assumed:
+
+    - the four kinds a broken snapshot can produce degrade to the same
+      ``snapshot_chain_break`` gap, and the whole closure must come out
+      byte-identical to the ``workers=1`` closure;
+    - ``RuntimeError`` is NOT one of those kinds and must propagate in both
+      — a walk must not silently swallow an unexpected failure just because
+      it happened on a worker.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    def _build(parallel: bool):
+        ml, root, _ = _multi_level_chain_scenario()
+        ml.enable_parallel_expansion(parallel)
+        # Fail the scan of the shared upstream dataset, which every branch
+        # reaches — so the failure is hit from several expansions.
+        ml.set_member_scan_failure(_ds(2), error)
+        return ml, root
+
+    if not degrades:
+        ml_parallel, root_parallel = _build(True)
+        with pytest.raises(type(error)):
+            ml_parallel.lookup_provenance(root_parallel)
+        ml_sequential, root_sequential = _build(False)
+        with pytest.raises(type(error)):
+            ml_sequential.lookup_provenance(root_sequential)
+        return
+
+    ml_parallel, root_parallel = _build(True)
+    ml_sequential, root_sequential = _build(False)
+
+    closure_parallel = ml_parallel.lookup_provenance(root_parallel)
+    closure_sequential = ml_sequential.lookup_provenance(root_sequential)
+
+    assert _canonical(closure_parallel.model_dump(mode="json")) == _canonical(
+        closure_sequential.model_dump(mode="json")
+    )
+
+    # Non-vacuous: the failure really did produce the degrade gap, rather
+    # than the scenario never reaching the scripted dataset.
+    chain_breaks = _gaps_for(closure_parallel, GapKind.snapshot_chain_break, _ds(2))
+    assert chain_breaks, "scripted read failure produced no snapshot_chain_break gap"
+
+
+def test_capped_walk_releases_the_budget_charge_it_will_never_apply():
+    """When a walk stops for budget, readouts it will never apply are
+    released, so the charge they held does not outlive them.
+
+    ``frontier_rids`` charges every in-flight readout against the remaining
+    budget (it will consume a slot when applied). A readout that is never
+    applied — the capped-termination path — would otherwise hold that
+    charge forever, and any later round would compute a smaller remaining
+    budget than it actually has and under-fetch or stop fetching entirely.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, root, expected = _wide_frontier_scenario_with_parents(width=12, parents_each=4)
+    ml.enable_parallel_expansion(True)
+
+    cap = 6
+    closure = ml.lookup_provenance(root, max_executions=cap)
+
+    assert len(expected) > cap
+    assert closure.cap_hit is True
+    assert closure.traversal_complete is False
+
+    # Directly: an engine whose drain terminated on the cap holds no
+    # unapplied readouts, so the accounting is back to "visited only".
+    builder = ClosureBuilder()
+    engine: WalkEngine = WalkEngine(ml, builder, closure_mode=True, max_executions=cap)
+    engine.enqueue_execution(_ex(100), depth=0)
+    engine.enqueue_execution(_ex(101), depth=0)
+    engine._readouts[_ex(101)] = engine.read_execution(_ex(101))
+    engine.visited_global |= {_ex(900 + n) for n in range(cap)}
+
+    engine.drain(depth_remaining=None)
+
+    assert engine.cap_hit is True
+    assert engine._readouts == {}, "capped termination left an unapplied readout holding a budget charge"
+    assert engine.release_unapplied_readouts() == 0
