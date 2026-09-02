@@ -2491,17 +2491,14 @@ class ExecutionMixin:
         frontier, then one chunked row fetch per asset table, and builds the
         ``Asset`` objects directly.
 
-        **Assumption: the asset table is resolved by NAME.** The association
-        table's ``<Asset>_Execution`` name is stripped to its base table
-        name and resolved through ``model.name_to_table``, whereas
-        ``lookup_asset`` resolves the same table from the asset RID via
-        ``resolve_rid``. The two agree in every deriva-ml-shaped schema
-        (association tables are named after the asset table they associate),
-        and a name that does not resolve — or resolves to a non-asset table
-        — is skipped rather than guessed at, so the failure mode is a
-        missing group, never a wrong one. A catalog that named an
-        association table independently of its asset table would silently
-        contribute no input assets from it.
+        **The asset table is resolved from the association's own foreign
+        key** (schema-qualified), never by stripping the association's name
+        — same-named asset tables in two domain schemas resolve to the
+        association's true FK target, matching what ``lookup_asset`` derives
+        from the asset RID. An association whose FK target cannot be
+        resolved, or resolves to a non-asset table, is skipped rather than
+        guessed at, so the failure mode is a missing group, never a wrong
+        one.
 
         **Constraint: ``asset_types`` is deliberately left EMPTY**, and this
         is only safe because the provenance readout consumes exactly
