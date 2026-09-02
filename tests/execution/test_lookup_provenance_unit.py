@@ -4337,3 +4337,320 @@ def test_rescan_gap_drop_is_scoped_to_the_rescanned_dataset():
     # ...and the OTHER dataset's failure gap is untouched by that drop.
     survivors = [g for g in _gaps_for(closure, GapKind.binding_scan_failed) if g.subject_rid == ds_other]
     assert len(survivors) == 1, "an unrelated dataset's scan gap was collaterally dropped by the rescan"
+
+
+# ---------------------------------------------------------------------------
+# Batched frontier reads (#394).
+#
+# The change under test replaced the closure walk's PER-NODE frontier reads
+# with per-TABLE chunked ``RID=any(...)`` batches: one query per table for
+# the whole frontier instead of one query per execution. The readout
+# dataclass and the apply path are untouched, so these tests are of two
+# kinds — REQUEST-COUNT pins (the point of the change) and EQUIVALENCE pins
+# (that the point was reached without changing the answer).
+# ---------------------------------------------------------------------------
+
+
+def _batch_calls(ml: _FakeML, seam: str) -> list:
+    """Every recorded invocation of one batch seam, in call order."""
+    return [c for c in ml.calls if c[0] == seam]
+
+
+def _wide_consumer_frontier(*, width: int, shared_input: bool = False) -> tuple[_FakeML, str, list[str]]:
+    """A root whose seed frontier is ``width`` executions that each consume.
+
+    Every seed is a member-producer of the root dataset (so they form ONE
+    frontier) and consumes a dataset of its own — or, with
+    ``shared_input=True``, the SAME dataset as every other seed, which is
+    the fan-in shape that exercises member-scan dedup.
+
+    Returns ``(ml, root_dataset_rid, seed_execution_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    seeds = []
+    members = set()
+    for index in range(width):
+        seed = _ex(100 + index)
+        input_dataset = _ds(2) if shared_input else _ds(200 + index)
+        input_producer = _ex(300 + index)
+        ml.add_execution(input_producer, description=f"input producer {index}")
+        if input_dataset not in ml._dataset_producers:
+            ml.add_dataset(input_dataset, description=f"input {index}", producer=input_producer)
+            ml.set_versioned_producer(input_dataset, "1.0.0", input_producer)
+        ml.add_execution(
+            seed,
+            description=f"seed {index}",
+            input_datasets=[_StubDataset(input_dataset, f"input {index}", "1.0.0", consumed_version="1.0.0")],
+        )
+        members.add(seed)
+        seeds.append(seed)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(seeds)
+
+
+def test_frontier_input_rows_are_read_in_one_batched_call_not_one_per_node():
+    """A 5-wide frontier issues ONE input-rows read, not five.
+
+    This is the #394 claim in its most direct form: the walk's guiding
+    principle is that fewer queries is the win, and the per-node read side
+    asked every question once per execution. The batch seam records one
+    call per CHUNK, so a frontier well under the chunk size records exactly
+    one — and the per-node seam it replaced must not be called at all for
+    those executions.
+
+    Mutation-verified: reverting ``read_frontier`` to a per-node loop makes
+    the first assertion fail with five calls.
+    """
+    ml, root, seeds = _wide_consumer_frontier(width=5)
+
+    ml.lookup_provenance(root)
+
+    seed_batches = [c for c in _batch_calls(ml, "_input_dataset_pairs_batch") if set(seeds) <= set(c[1][0])]
+    assert len(seed_batches) == 1, (
+        f"the 5-wide seed frontier issued {len(seed_batches)} input-rows batches, expected exactly one: "
+        f"{[c[1] for c in seed_batches]}"
+    )
+    # One call carries all five seeds together (the root's own producer
+    # rides along in the same frontier, which is the point — one query).
+    assert set(seeds) <= set(seed_batches[0][1][0])
+    # The per-node seam is not used for a batched frontier at all.
+    per_node = [c for c in ml.calls if c[0] == "_input_dataset_pairs" and c[1][0] in set(seeds)]
+    assert per_node == [], f"batched frontier still issued per-node input reads: {per_node}"
+
+
+def test_frontier_execution_rows_and_asset_rows_are_batched_too():
+    """Execution rows and input-asset rows batch on the same frontier.
+
+    Batching only the dataset edges would leave the walk paying per-node
+    for the Execution row (four-ish round trips each) and for the asset
+    association scan — the two other legs #394 collapses.
+    """
+    ml, root, seeds = _wide_consumer_frontier(width=5)
+
+    ml.lookup_provenance(root)
+
+    for seam in ("_execution_records_batch", "_input_assets_batch"):
+        batches = [c for c in _batch_calls(ml, seam) if set(seeds) <= set(c[1][0])]
+        assert len(batches) == 1, f"{seam} issued {len(batches)} batches for the 5-wide frontier, expected one"
+
+    # And the per-node execution read is bypassed for those RIDs.
+    assert [c for c in ml.calls if c[0] == "lookup_execution" and c[1][0] in set(seeds)] == []
+
+
+def test_frontier_wider_than_the_chunk_size_splits_into_chunks():
+    """A frontier past ``_SUMMARY_CHUNK_SIZE`` chunks rather than issuing
+    one unbounded ``RID=any(...)``.
+
+    tk-023: an unbounded RID disjunction is a URL-length hazard, so the
+    batch is chunked at 25 exactly as ``_execution_summaries`` is. A
+    26-wide frontier must therefore show TWO chunks — not one giant query,
+    and not 26 per-node reads.
+    """
+    from deriva_ml.core.mixins.execution import _SUMMARY_CHUNK_SIZE
+
+    width = _SUMMARY_CHUNK_SIZE + 1
+    ml, root, seeds = _wide_consumer_frontier(width=width)
+
+    ml.lookup_provenance(root)
+
+    seed_chunks = [c for c in _batch_calls(ml, "_input_dataset_pairs_batch") if set(c[1][0]) & set(seeds)]
+    assert len(seed_chunks) == 2, (
+        f"a {width}-wide frontier produced {len(seed_chunks)} chunks, expected 2 "
+        f"(sizes {[len(c[1][0]) for c in seed_chunks]})"
+    )
+    assert [len(c[1][0]) for c in seed_chunks][0] == _SUMMARY_CHUNK_SIZE
+    assert all(len(c[1][0]) <= _SUMMARY_CHUNK_SIZE for c in _batch_calls(ml, "_input_dataset_pairs_batch")), (
+        "a batch exceeded the chunk size, which is the URL-length hazard tk-023 forbids"
+    )
+
+
+def test_batched_readouts_equal_per_node_readouts_field_for_field():
+    """A batch-assembled readout IS the per-node readout.
+
+    The apply path (and therefore every semantic pin over it) reads only
+    the ``ExecutionReadout``, so "the batch changed nothing" is exactly the
+    claim that the two readouts are equal field for field — record identity
+    aside, which is a fresh object either way.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, seeds = _wide_consumer_frontier(width=4)
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), closure_mode=True)
+
+    batched = engine.read_frontier(list(seeds))
+    per_node = {rid: engine.read_execution(rid) for rid in seeds}
+
+    assert sorted(batched) == sorted(per_node)
+    for rid in seeds:
+        left, right = batched[rid], per_node[rid]
+        assert left.rid == right.rid
+        assert left.lookup_error is None and right.lookup_error is None
+        assert [(d.dataset_rid, v, p, sorted(m), e) for d, v, p, m, e in left.dataset_inputs] == [
+            (d.dataset_rid, v, p, sorted(m), e) for d, v, p, m, e in right.dataset_inputs
+        ]
+        assert [(a.asset_rid, a.asset_table, a.filename, pr, f) for a, pr, f in left.asset_inputs] == [
+            (a.asset_rid, a.asset_table, a.filename, pr, f) for a, pr, f in right.asset_inputs
+        ]
+        # The record the apply path actually reads.
+        assert (left.record.description, left.record.status) == (right.record.description, right.record.status)
+
+
+def test_batched_closure_is_byte_identical_to_the_per_node_closure():
+    """Whole-closure equivalence between the batched and per-node read paths.
+
+    The per-node path is reached by hiding the batch seams from the engine
+    (the same all-or-nothing detection a stubbed ``ml`` or an older
+    subclass hits), so this compares two genuinely different read
+    implementations over the same scripted catalog.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_batched, root_batched, _ = _wide_consumer_frontier(width=6)
+    ml_per_node, root_per_node, _ = _wide_consumer_frontier(width=6)
+    for seam in ("_execution_records_batch", "_input_dataset_pairs_batch", "_input_assets_batch"):
+        setattr(ml_per_node, seam, None)
+
+    closure_batched = ml_batched.lookup_provenance(root_batched)
+    closure_per_node = ml_per_node.lookup_provenance(root_per_node)
+
+    assert _canonical(closure_batched.model_dump(mode="json")) == _canonical(closure_per_node.model_dump(mode="json"))
+    # Non-vacuous on both sides: one path batched, the other did not.
+    assert _batch_calls(ml_batched, "_input_dataset_pairs_batch")
+    assert _batch_calls(ml_per_node, "_input_dataset_pairs_batch") == []
+    assert [c for c in ml_per_node.calls if c[0] == "_input_dataset_pairs"] != []
+
+
+def test_batched_closure_equals_the_workers_one_closure(monkeypatch):
+    """``DERIVA_ML_PROVENANCE_WORKERS=1`` still produces the same closure.
+
+    The batched path's only concurrency is the member-scan round, so the
+    sequential-equivalence control has to keep working across it.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_default, root_default, _ = _wide_consumer_frontier(width=6)
+    ml_default.enable_parallel_expansion(True)
+    default = _canonical(ml_default.lookup_provenance(root_default).model_dump(mode="json"))
+
+    monkeypatch.setenv("DERIVA_ML_PROVENANCE_WORKERS", "1")
+    ml_single, root_single, _ = _wide_consumer_frontier(width=6)
+    ml_single.enable_parallel_expansion(True)
+    single = _canonical(ml_single.lookup_provenance(root_single).model_dump(mode="json"))
+
+    assert single == default
+
+
+def test_member_scan_runs_once_per_dataset_version_across_the_frontier():
+    """A ``(dataset, version)`` consumed by the whole frontier is scanned ONCE.
+
+    Member-producer scans are the one frontier leg that cannot collapse
+    into a ``RID=any(...)`` query — they are per-``(dataset, version)``
+    membership JOINs — so what #394 buys there is dedup: six executions
+    consuming the same ``dataset@version`` used to pay for six identical
+    joins.
+
+    Two mechanisms have to hold for that, and this pins both:
+
+    - WITHIN one frontier, the distinct pairs are collapsed before the
+      scan round runs (mutation: dropping the distinctness makes this
+      report six scans);
+    - ACROSS frontiers, ``_member_scan_cache`` remembers the answer, so a
+      later round that re-consumes the pair pays nothing (mutation:
+      dropping the cache lookup makes this report two).
+    """
+    ml, root, seeds = _wide_consumer_frontier(width=6, shared_input=True)
+    # A LATER frontier that re-consumes the same pair: the shared input's
+    # own producer consumes it too, so it is walked in a second round.
+    ml._executions[_ex(300)]._input_datasets = [_StubDataset(_ds(2), "input 0", "1.0.0", consumed_version="1.0.0")]
+
+    ml.lookup_provenance(root)
+
+    scans = [c for c in ml.calls if c[0] == "_producers_of_dataset_members" and c[1] == (_ds(2), "1.0.0")]
+    assert len(scans) == 1, f"the shared (dataset, version) was scanned {len(scans)} times, expected once"
+    # Non-vacuous: every seed really did consume it, and the later
+    # re-consumer was itself expanded (so its frontier really ran).
+    assert len(seeds) == 6
+
+
+def test_width_one_frontier_still_batches_without_special_casing():
+    """A frontier of one takes the batched path too.
+
+    A one-element ``any()`` disjunction is still fewer requests than the
+    per-node reads it replaces (one Execution scan instead of resolve +
+    retrieve + workflow + types), and the post-#391b profile says the
+    reference root's walk is mostly width-1 chains — so special-casing
+    width 1 back to the per-node path would forfeit the change's main
+    target.
+    """
+    ml = _FakeML()
+    ds_root, ds_input = _ds(1), _ds(2)
+    root_producer, upstream = _ex(1), _ex(2)
+    ml.add_execution(upstream, description="upstream")
+    ml.add_dataset(ds_input, description="input", producer=upstream)
+    ml.set_versioned_producer(ds_input, "1.0.0", upstream)
+    ml.add_execution(
+        root_producer,
+        description="root producer",
+        input_datasets=[_StubDataset(ds_input, "input", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+
+    closure = ml.lookup_provenance(ds_root)
+
+    assert sorted(closure.executions) == sorted([root_producer, upstream])
+    singleton = [c for c in _batch_calls(ml, "_execution_records_batch") if c[1][0] == (upstream,)]
+    assert singleton, (
+        "a width-1 frontier fell back to the per-node read; "
+        f"batches seen: {[c[1] for c in _batch_calls(ml, '_execution_records_batch')]}"
+    )
+    assert [c for c in ml.calls if c[0] == "lookup_execution" and c[1][0] == upstream] == []
+
+
+def test_unresolvable_frontier_rid_falls_back_to_the_per_node_read():
+    """A RID the batch cannot resolve keeps its historical error path.
+
+    The batch reports absence, never an error of its own — inventing one
+    would change the ``unresolved_rid`` gap text that a closure consumer
+    reads. So an absent RID falls back to ``read_execution``, which raises
+    (and captures) exactly the ``DerivaMLException`` it always did.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    ghost = _ex(99)
+    ml.add_dataset(ds_root, description="root", producer=ghost)
+    ml.add_version_row(ds_root, "1.0.0", ghost, rct="2025-01-01T00:00:00Z")
+
+    closure = ml.lookup_provenance(ds_root)
+
+    unresolved = _gaps_for(closure, GapKind.unresolved_rid, ghost)
+    assert unresolved, "an unresolvable frontier RID produced no unresolved_rid gap"
+    assert "could not be resolved" in unresolved[0].detail
+    # It really did try the batch first (and got nothing back), then fell
+    # back to the per-node read that raises the historical exception.
+    attempted = [c for c in _batch_calls(ml, "_execution_records_batch") if ghost in c[1][0]]
+    assert attempted, "the ghost RID never reached the batched reader"
+
+
+def test_member_scan_failure_is_replayed_to_every_consumer_of_the_pair():
+    """A cached member-scan failure classifies identically for each consumer.
+
+    The memo caches ``(producers, error)``, so a broken snapshot consumed
+    by several frontier executions replays the same exception to each and
+    every consumer's ``member_producers_from`` emits the gap it always
+    emitted — one deduped ``snapshot_chain_break``, not a hole for the
+    first consumer and silence for the rest.
+    """
+    ml, root, _ = _wide_consumer_frontier(width=4, shared_input=True)
+    ml.set_member_scan_failure(_ds(2), SnapshotUnavailable("scripted snapshot failure"))
+
+    closure = ml.lookup_provenance(root)
+
+    breaks = [g for g in _gaps_for(closure, GapKind.snapshot_chain_break, _ds(2)) if "member-producer scan" in g.detail]
+    assert len(breaks) == 1, f"expected one deduped member-scan chain-break gap, got {[g.detail for g in breaks]}"
+    assert "scripted snapshot failure" in breaks[0].detail
