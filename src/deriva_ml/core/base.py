@@ -950,6 +950,54 @@ class DerivaML(
         self._snapshot_cache[version_snapshot] = snapshot
         return snapshot
 
+    def _provenance_worker_handle(self) -> "DerivaML | None":
+        """Build one additional catalog handle for a provenance worker thread.
+
+        ``requests.Session`` is **not thread-safe**, and every catalog seam
+        the provenance walk calls runs on this instance's session. The walk's
+        parallel frontier expansion (#391b) therefore hands each in-flight
+        read its own handle from a small pool built with this factory, rather
+        than sharing ``self``.
+
+        The handle is a full ``DerivaML`` on the SAME live catalog, built
+        from this instance's own connection-shaping parameters and its
+        already-parsed schema — so it opens a fresh session and a fresh
+        connection pool without re-fetching ``/schema`` or re-detecting
+        domain schemas. It is used for reads only.
+
+        Returns:
+            A new handle, or ``None`` when one cannot or should not be built
+            (offline mode). ``None`` makes the walk fall back to sequential
+            reads on ``self`` — slower, never wrong.
+
+        Example:
+            >>> handle = ml._provenance_worker_handle()  # doctest: +SKIP
+            >>> handle is not ml  # doctest: +SKIP
+            True
+        """
+        if self._mode != ConnectionMode.online:
+            # Offline instances read from local SQLite, where a second
+            # handle buys nothing and could contend on the same file.
+            return None
+        return DerivaML(
+            self.host_name,
+            self.catalog_id,
+            domain_schemas=self.domain_schemas,
+            default_schema=self.default_schema,
+            project_name=self.project_name,
+            cache_dir=self.cache_dir,
+            working_dir=self.working_dir,
+            ml_schema=self.ml_schema,
+            logging_level=self._logging_level,
+            deriva_logging_level=self._deriva_logging_level,
+            credential=self.credential,
+            s3_bucket=self.s3_bucket,
+            use_minid=self.use_minid,
+            clean_execution_dir=False,
+            mode=self._mode,
+            reuse_schema_json=self._schema_json,
+        )
+
     @property
     def mode(self) -> ConnectionMode:
         """Current connection mode.

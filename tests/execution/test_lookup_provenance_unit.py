@@ -3304,3 +3304,305 @@ def test_unversioned_member_scan_uses_the_live_model():
     ml._producers_of_dataset_members(dataset_rid)
 
     assert seen["model"] is live_model
+
+
+# ---------------------------------------------------------------------------
+# Parallel frontier expansion (#391b).
+#
+# The change under test restructured the CLOSURE walk's read side: a
+# frontier of queued executions has its catalog reads fetched CONCURRENTLY
+# (asyncio.gather under a Semaphore, the existing sync mixin seams offloaded
+# via run_in_executor onto per-worker catalog handles), while every piece of
+# engine and builder mutation stays single-threaded and in queue order.
+#
+# The whole point is that NOTHING observable changed, so these tests are all
+# equivalence pins: same closure, same bytes, same cap honesty. Lineage is
+# untouched by construction (the prefetch is closure-mode only) and its
+# goldens are what pin that.
+# ---------------------------------------------------------------------------
+
+
+def _multi_level_chain_scenario() -> tuple[_FakeML, str, list[str]]:
+    """Build a chain deep and WIDE enough to produce multi-entry frontiers.
+
+    ``ds_root`` has four member-producing executions; each consumes its own
+    dataset, whose producer consumes a shared upstream dataset. That gives a
+    frontier of four at one level and a converging diamond below it — so a
+    round genuinely has several independent executions to fetch at once,
+    which a one-node-per-round chain would not.
+
+    Returns ``(ml, root_dataset_rid, expected_execution_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    ds_upstream = _ds(2)
+    root_producer = _ex(1)
+    upstream_producer = _ex(2)
+
+    ml.add_execution(upstream_producer, description="upstream producer")
+    ml.add_dataset(ds_upstream, description="upstream", producer=upstream_producer)
+    ml.set_versioned_producer(ds_upstream, "1.0.0", upstream_producer)
+
+    expected = [root_producer, upstream_producer]
+    consumers = []
+    for index in range(4):
+        mid_dataset = _ds(10 + index)
+        mid_producer = _ex(10 + index)
+        leaf_consumer = _ex(20 + index)
+        # mid_producer consumes the SHARED upstream dataset -> a diamond
+        # that converges on one execution from four independent branches.
+        ml.add_execution(
+            mid_producer,
+            description=f"mid producer {index}",
+            input_datasets=[_StubDataset(ds_upstream, "upstream", "1.0.0", consumed_version="1.0.0")],
+        )
+        ml.add_dataset(mid_dataset, description=f"mid {index}", producer=mid_producer)
+        ml.set_versioned_producer(mid_dataset, "1.0.0", mid_producer)
+        ml.add_execution(
+            leaf_consumer,
+            description=f"leaf consumer {index}",
+            input_datasets=[_StubDataset(mid_dataset, f"mid {index}", "1.0.0", consumed_version="1.0.0")],
+        )
+        consumers.append(leaf_consumer)
+        expected.extend([mid_producer, leaf_consumer])
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+    ml.set_member_producers(ds_root, set(consumers))
+    return ml, ds_root, sorted(expected)
+
+
+def test_parallel_expansion_matches_sequential_byte_for_byte():
+    """A multi-level, multi-branch closure expands IDENTICALLY with the
+    concurrent frontier prefetch on and off — same ``model_dump()`` bytes.
+
+    Built as an equivalence pin against a scenario whose expected content is
+    asserted independently below, not against a captured snapshot of the old
+    implementation.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_sequential, root_sequential, expected = _multi_level_chain_scenario()
+    ml_parallel, root_parallel, _ = _multi_level_chain_scenario()
+    ml_parallel.enable_parallel_expansion(True)
+
+    closure_sequential = ml_sequential.lookup_provenance(root_sequential)
+    closure_parallel = ml_parallel.lookup_provenance(root_parallel)
+
+    assert _canonical(closure_parallel.model_dump(mode="json")) == _canonical(
+        closure_sequential.model_dump(mode="json")
+    )
+
+    # Non-vacuous: the scenario really is multi-level and wide, and the
+    # closure really did reach every execution in the chain.
+    assert sorted(closure_parallel.executions) == expected
+    assert closure_parallel.executions_visited == len(expected)
+    assert closure_parallel.traversal_complete is True
+    # The converging upstream producer is reached from four branches and
+    # still appears exactly once, at its minimum discovery depth.
+    upstream_arcs = _arcs_of(closure_parallel, _ex(2))
+    assert min(a.depth for a in upstream_arcs) == min(a.depth for a in _arcs_of(closure_sequential, _ex(2)))
+
+
+def test_parallel_expansion_actually_prefetched_a_multi_entry_frontier():
+    """The equivalence test above would pass vacuously if the prefetch never
+    ran, so pin that a frontier of more than one execution was genuinely
+    fetched concurrently."""
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+
+    ml, root, _ = _multi_level_chain_scenario()
+    ml.enable_parallel_expansion(True)
+
+    frontier_sizes: list[int] = []
+    original = WalkEngine.prefetch_executions
+
+    def _recording(self, candidates) -> int:
+        count = original(self, candidates)
+        frontier_sizes.append(count)
+        return count
+
+    WalkEngine.prefetch_executions = _recording  # type: ignore[method-assign]
+    try:
+        ml.lookup_provenance(root)
+    finally:
+        WalkEngine.prefetch_executions = original  # type: ignore[method-assign]
+
+    assert max(frontier_sizes, default=0) >= 2, (
+        f"no multi-entry frontier was prefetched (sizes={frontier_sizes}); the equivalence pin above would be vacuous"
+    )
+
+
+def test_worker_count_one_equals_default_byte_for_byte(monkeypatch):
+    """``DERIVA_ML_PROVENANCE_WORKERS=1`` forces the fully sequential read
+    path and must produce byte-identical output to the default.
+
+    This is the cheap sequential-equivalence control: the knob tunes HOW the
+    walk talks to the catalog, never WHAT it finds, so if these two ever
+    diverge the concurrency has leaked into the semantics.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_default, root_default, _ = _multi_level_chain_scenario()
+    ml_default.enable_parallel_expansion(True)
+    closure_default = ml_default.lookup_provenance(root_default)
+
+    monkeypatch.setenv("DERIVA_ML_PROVENANCE_WORKERS", "1")
+    ml_single, root_single, _ = _multi_level_chain_scenario()
+    ml_single.enable_parallel_expansion(True)
+    closure_single = ml_single.lookup_provenance(root_single)
+
+    assert _canonical(closure_single.model_dump(mode="json")) == _canonical(closure_default.model_dump(mode="json"))
+
+
+def test_frontier_honors_the_remaining_execution_budget():
+    """A frontier is bounded by the REMAINING execution budget, and the
+    closure a capped walk produces is IDENTICAL to the sequential one.
+
+    What "no over-fetch" can and cannot mean here is worth stating
+    precisely, because the parallel walk is a read-AHEAD:
+
+    - **Guaranteed.** No frontier is larger than the remaining budget, and
+      in-flight readouts are charged against that budget, so total reads
+      stay bounded by ``max_executions`` — the walk can never run away.
+    - **Not guaranteed, by construction.** A frontier's *siblings* are
+      fetched before the first sibling's own subtree has consumed its
+      budget, so a capped walk may read a bounded handful of executions it
+      then declines to expand. That is the price of any read-ahead; the
+      alternative (fetch one, expand it fully, then decide) is exactly the
+      sequential walk this change exists to replace.
+
+    Cap honesty — which executions END UP in the closure, ``cap_hit``,
+    ``traversal_complete``, and the absence of false ``unresolved_rid``
+    gaps — is unaffected either way, and that is what this pins.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    cap = 4
+    ml_sequential, root_sequential, expected = _multi_level_chain_scenario()
+    closure_sequential = ml_sequential.lookup_provenance(root_sequential, max_executions=cap)
+
+    ml, root, _ = _multi_level_chain_scenario()
+    ml.enable_parallel_expansion(True)
+    closure = ml.lookup_provenance(root, max_executions=cap)
+
+    assert len(expected) > cap, "scenario must be bigger than the cap for this to bite"
+    assert closure.cap_hit is True
+    assert closure.traversal_complete is False
+    assert closure.executions_visited <= cap
+    assert len(closure.executions) <= cap
+
+    # The closure a capped parallel walk produces is byte-identical to the
+    # capped sequential one: read-ahead changes what is fetched, never what
+    # is expanded or recorded.
+    assert _canonical(closure.model_dump(mode="json")) == _canonical(closure_sequential.model_dump(mode="json"))
+
+    # The budget stop must not manufacture "unresolved" holes for
+    # executions that are perfectly resolvable and were merely truncated.
+    unresolved = _gaps_for(closure, GapKind.unresolved_rid)
+    assert unresolved == [], f"budget truncation reported false unresolved gaps: {unresolved}"
+
+    # Total reads stay bounded: at most one frontier's worth of speculative
+    # siblings beyond what the sequential walk read, never the whole graph.
+    # ``2 * cap`` is the bound that follows from "no frontier exceeds the
+    # remaining budget" — it is an assertion about the algorithm, not a
+    # tolerance fudged to fit the current numbers.
+    sequential_reads = {c[1][0] for c in ml_sequential.calls if c[0] == "_input_dataset_pairs"}
+    looked_up = {c[1][0] for c in ml.calls if c[0] == "_input_dataset_pairs"}
+    assert len(sequential_reads) <= cap
+    assert len(looked_up) <= 2 * cap, f"read-ahead fetched {len(looked_up)} executions under a cap of {cap}"
+    assert len(looked_up) < len(expected), "a capped walk must not read the whole graph"
+
+
+def test_parallel_expansion_preserves_shuffled_determinism():
+    """The existing shuffled-insertion determinism scenario stays
+    byte-identical under concurrent expansion — including across a shuffled
+    construction order, which is what makes it a real determinism pin rather
+    than a same-input repeat."""
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_forward, root_forward, kwargs_forward = _shuffled_determinism_scenario(reversed_order=False)
+    ml_reversed, root_reversed, kwargs_reversed = _shuffled_determinism_scenario(reversed_order=True)
+    ml_forward.enable_parallel_expansion(True)
+    ml_reversed.enable_parallel_expansion(True)
+
+    got_forward = _canonical(ml_forward.lookup_provenance(root_forward, **kwargs_forward).model_dump(mode="json"))
+    got_reversed = _canonical(ml_reversed.lookup_provenance(root_reversed, **kwargs_reversed).model_dump(mode="json"))
+
+    assert got_forward == got_reversed
+
+    # And identical to the SEQUENTIAL result for the same scenario, so the
+    # prefetch did not merely become self-consistently wrong.
+    ml_sequential, root_sequential, kwargs_sequential = _shuffled_determinism_scenario(reversed_order=False)
+    got_sequential = _canonical(
+        ml_sequential.lookup_provenance(root_sequential, **kwargs_sequential).model_dump(mode="json")
+    )
+    assert got_forward == got_sequential
+
+
+def test_prefetch_bridge_works_inside_a_running_event_loop():
+    """``lookup_provenance`` stays callable from a notebook.
+
+    The prefetch bridges async back to sync through ``run_async``, which
+    re-enters an already-running loop via ``nest_asyncio`` instead of
+    raising ``asyncio.run() cannot be called from a running event loop``.
+    Calling the sync API from inside ``asyncio.run`` is the smoke check that
+    the bridge does not deadlock — the failure mode this guards is a hang or
+    a RuntimeError, not a wrong answer.
+    """
+    import asyncio
+
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_direct, root_direct, _ = _multi_level_chain_scenario()
+    ml_direct.enable_parallel_expansion(True)
+    expected = _canonical(ml_direct.lookup_provenance(root_direct).model_dump(mode="json"))
+
+    ml_loop, root_loop, _ = _multi_level_chain_scenario()
+    ml_loop.enable_parallel_expansion(True)
+
+    async def _inside_a_loop():
+        # Deliberately the SYNC public API, called from inside a running
+        # loop — exactly what a Jupyter cell does.
+        return ml_loop.lookup_provenance(root_loop)
+
+    closure = asyncio.run(asyncio.wait_for(_inside_a_loop(), timeout=60))
+    assert _canonical(closure.model_dump(mode="json")) == expected
+
+
+def test_read_execution_never_mutates_engine_or_visitor():
+    """``read_execution`` is the method workers run concurrently, so it must
+    be provably read-only: no engine state, no visitor events.
+
+    Pinned structurally rather than by review, because a future edit that
+    slips one ``visitor.on_gap`` into the read side would be a data race the
+    equivalence tests could pass through by luck.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, _expected = _multi_level_chain_scenario()
+    builder = ClosureBuilder()
+    engine: WalkEngine = WalkEngine(ml, builder, closure_mode=True)
+
+    before = (
+        set(engine.visited_global),
+        set(engine.in_progress),
+        set(engine.truncated),
+        set(engine.datasets_expanded),
+        engine.cap_hit,
+        dict(engine.flags),
+    )
+
+    readout = engine.read_execution(_ex(1))
+
+    assert readout.rid == _ex(1)
+    assert readout.lookup_error is None
+    assert (
+        set(engine.visited_global),
+        set(engine.in_progress),
+        set(engine.truncated),
+        set(engine.datasets_expanded),
+        engine.cap_hit,
+        dict(engine.flags),
+    ) == before
+    # Visitor untouched: nothing accumulated at all.
+    assert builder.finalize() == ({}, {}, {}, [])

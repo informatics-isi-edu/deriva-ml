@@ -1588,6 +1588,10 @@ class ExecutionMixin:
         for seed in seeds:
             builder.record_arc(seed, kind=ArcKind.root, depth=0)
 
+        # The seed set is the walk's FIRST frontier — the seeds' read sides
+        # are mutually independent — so fetch them concurrently before the
+        # (unchanged, sequential, same-order) expansion loop below (#391b).
+        engine.prefetch_executions(list(seeds))
         for seed in seeds:
             engine.expand_execution(seed, depth_remaining=None, depth=0)
 

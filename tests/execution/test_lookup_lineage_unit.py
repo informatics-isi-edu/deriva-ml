@@ -231,6 +231,12 @@ class _FakeML(ExecutionMixin):
         # must be order-insensitive (membership/count), which every
         # existing assertion already is.
         self.calls: _ThreadSafeCalls = _ThreadSafeCalls()
+        # Whether ``_provenance_worker_handle`` hands out a live handle, i.e.
+        # whether the closure walk's frontier prefetch actually runs
+        # concurrently (#391b). Off by default so the bulk of the suite pins
+        # the sequential semantics; the parallel-expansion tests turn it on
+        # and assert the SAME closure comes out.
+        self._parallel_expansion_enabled = False
         # Mock model.
         self.model = MagicMock()
         self.model.is_asset = lambda table: table.name in self._asset_table_names
@@ -359,6 +365,15 @@ class _FakeML(ExecutionMixin):
         """
         self._dataset_parents[dataset_rid] = list(parents)
 
+    def enable_parallel_expansion(self, enabled: bool = True) -> None:
+        """Turn the closure walk's concurrent frontier prefetch on or off.
+
+        See ``_provenance_worker_handle``. The point of the switch is that
+        both settings must produce the SAME closure — it is the control in
+        the sequential-equivalence tests, not a feature flag anyone ships.
+        """
+        self._parallel_expansion_enabled = enabled
+
     def set_binding_scan(
         self,
         dataset_rid: str,
@@ -470,6 +485,20 @@ class _FakeML(ExecutionMixin):
 
     def _sentinel_execution_rid_or_none(self) -> str | None:  # type: ignore[override]
         return None
+
+    def _provenance_worker_handle(self) -> "_FakeML | None":
+        """Per-worker catalog handle seam for the parallel frontier (#391b).
+
+        The real ``DerivaML`` returns a SEPARATE connection here because
+        ``requests.Session`` is not thread-safe. The harness has no session
+        at all, so it returns ``self`` — which is safe precisely because
+        every scripted seam is read-only and the one mutable structure they
+        share (``self.calls``) is lock-guarded. Returning a live object
+        rather than ``None`` is what makes the harness exercise the
+        CONCURRENT path instead of silently falling back to sequential
+        reads; ``enable_parallel_expansion`` toggles it.
+        """
+        return self if self._parallel_expansion_enabled else None
 
     def _execution_summaries(self, rids: Any) -> dict[str, Any]:  # type: ignore[override]
         """Resolve scripted execution RIDs to ExecutionSummary via lookup_execution.
