@@ -1454,3 +1454,14 @@ refresh is *mechanically* possible but needs a human's realm
 credentials. Offline gates are green (224 passed incl. the 150-test
 provenance unit suite); the live module skips cleanly without
 `DERIVA_HOST` and is ready to run the moment a token is minted.
+
+**2026-09-02 — Live rescan proof OBTAINED (postscript to the Keycloak
+blocker entry).** After Carl refreshed the localhost credential, the
+committed live module ran green twice (5/5, ~80s each, idempotent):
+the demo-catalog pin-advance scenario fired exactly 2 binding scans of
+the dataset, the final closure's member_binding arcs all carry the v2
+label (v1 view replaced), the v2-only binder E2 is present, no
+binding gap carries a stale version label, and the live control
+(find_feature_producers at v1 lacks E2) proves E2 was genuinely
+invisible at the old pin. The ruling-9 rescan machinery is now
+evidence-complete: mutation-pinned offline AND exercised live.
