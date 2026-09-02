@@ -1013,3 +1013,52 @@ enter only via a recorded execution's consumption); Dataset_Dataset
 stays available through list_dataset_parents for structural questions.
 Side effect: most of the 31 walked (dataset, version) pairs on eye-ai
 were ancestry fan-out — this also addresses the 294s profile.
+
+**2026-09-01 — Ruling 8 implemented (#389/PR): live confirmation on
+eye-ai — the closure lost NOTHING, and got 48% faster.** Same root as
+the reconciliation entry above (resolved by lookup at run time: workflow
+`VGG-19 Glaucoma Diagnosis Training` + Kyle's-full-datasets description
++ `Status=Uploaded` + newest RCT → `7-H9ZT`, 18 candidates).
+
+| Measure | before (ancestry in) | after (ruling 8) | delta |
+|---|---|---|---|
+| **executions** | 44 | **44** | **0** |
+| walked (dataset, version) pairs | 31 | 19 | −12 |
+| datasets | 12 | 9 | −3 |
+| gaps | 142 | 97 | −45 |
+| **runtime** | 294s | **153.4s** | **−48%** |
+| traversal_complete / cap_hit | True / False | True / False | — |
+
+**The headline is the zero.** Ruling 8's redundancy argument predicted
+that a properly-captured split execution's consumption arc already
+carries the parent — and the execution set is byte-for-byte unchanged.
+Every execution the ancestry leg used to reach was ALREADY reachable
+execution-mediated; ancestry was buying only extra *dataset-version*
+fan-out, at 12 extra #385 binding scans. That is the empirical proof of
+argument (1), not just its restatement.
+
+The 3 dropped datasets are the ones the worked-example entry above
+attributed to "ancestry of consumed" with no execution path
+(2-277E Development, 2-1S12 LAC Complete, 4-S42W) — structure, now
+answered by `list_dataset_parents` instead. The 9 that remain include
+2-277C / 2-277J / 2-N93J / 4-Z6K8 / 5-1W26, i.e. former "ancestry-only"
+datasets that ALSO have a real consumption arc: they were never
+ancestry-dependent, which is why removing the leg did not lose them.
+
+Gaps fell 142→97 purely by walking fewer pairs; the taxonomy is
+unchanged (7 kinds, `snapshot_chain_break` still present at 5 — it now
+comes from the authorship/binding snapshot legs and the member-scan
+degrade, exactly as ruling 8 anticipated, so the GapKind is not
+orphaned). `no_version_author` (74) still dominates: legacy version rows
+without authors, reported not compensated (ruling 2).
+
+Perf note, refining the 294s profile entry above: the remaining 153s is
+still 19 sequential binding scans. Ancestry removal took the *pair
+multiplier* down (31→19) but not the per-pair cost, so the levers named
+there — reuse FK-path discovery across versions of one dataset, batch
+per-feature queries, expose arc gating for a fast structural pass — are
+all still on the table and are now the whole remaining story. Note four
+datasets still walk at 3-4 versions each (2-277G, 2-277M, 2-39FY,
+2-277J): multi-version fan-out survives ruling 8 because it is
+execution-mediated (different executions consumed different pins), which
+is exactly why the internal dataset budget is still meaningful.
