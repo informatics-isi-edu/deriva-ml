@@ -1465,3 +1465,16 @@ binding gap carries a stale version label, and the live control
 (find_feature_producers at v1 lacks E2) proves E2 was genuinely
 invisible at the old pin. The ruling-9 rescan machinery is now
 evidence-complete: mutation-pinned offline AND exercised live.
+
+**2026-09-02 — Perf round 2 approved (Carl): batched frontier reads +
+pooled dataset legs; guiding principle "anything that reduces the
+number of queries is a win."** Levers chosen from the post-#393
+profile (~100s on the reference root: ~70s width-1 dependency chains,
+~24s sequential dataset legs): (1) per-frontier chunked RID=any()
+queries per TABLE (the tk-023 chunked-summary pattern) replacing
+per-node reads — 42-wide frontier: ~150 requests → a handful; (4)
+expand_dataset snapshot/authorship legs routed through the leased
+pool rounds like the binding scans. Deferred by choice: intra-read
+concurrency (2) and speculative prefetch from authorship rows (3) —
+revisit only if the measured result still disappoints. Target
+~35-45s cold; floor is chain-depth × RTT without speculation.
