@@ -1583,3 +1583,13 @@ parentless wide frontier now issues no concurrent read at all), so it
 had to move to a scenario with dataset inputs. **When you change WHICH
 leg is concurrent, re-check every concurrency pin for vacuity — a
 passing test on a leg that no longer runs concurrently proves nothing.**
+
+**2026-09-02 — Ruling 10 (Carl): execution-associated `File` rows are
+NOT closure assets.** Settles the open question the #394 live A/B
+surfaced (the batched reader initially reported an extra asset + gap
+for File rows the per-node path refuses via lookup_asset's is_asset
+guard). The historical behavior is now the ruled behavior: File rows
+are source-data registrations by reference, not asset-shaped artifacts
+(no Hatrac-backed asset contract), so they don't enter
+ProvenanceClosure.assets. The is_asset guard in the batch path is the
+enforcement point; its seam-level pin is the regression coverage.
