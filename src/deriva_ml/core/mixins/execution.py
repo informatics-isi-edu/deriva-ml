@@ -1430,6 +1430,19 @@ class ExecutionMixin:
         orthogonal to arcs: a gap documents a place the walk could not
         fully resolve, independent of which (if any) executions were found.
 
+        **Feature bindings are read as of the newest walked version**
+        (ruling 9, #391). Binding evidence is monotone across a dataset's
+        versions — a new version only adds feature values — so a dataset
+        walked at several pins is scanned **once**, at the maximum walked
+        version, and every ``member_binding`` arc carries that scanned
+        version label; older walked pins contribute no separate binding
+        arcs (their authorship facts are still per-pin and unaffected).
+        This is exact for the artifact asked about: a member removed before
+        the consumed version contributed nothing to it, and a discovered
+        execution's own input detail is *its* provenance, available from
+        ``lookup_provenance(that_rid)``. See "binding evidence is monotone"
+        in ``docs/reference/provenance-contract.md``.
+
         Args:
             rid: RID of any Dataset, Asset, Feature value, or Execution —
                 the same root typology :meth:`lookup_lineage` accepts.
@@ -1566,7 +1579,16 @@ class ExecutionMixin:
         # Executions discovered through a non-tree arc (the dataset-side legs)
         # were queued on the engine as they were found; drain them under the
         # same execution budget.
-        engine.drain(depth_remaining=None)
+        #
+        # Binding scans are deferred (ruling 9, #391) so each dataset is
+        # scanned ONCE, at its maximum walked snaptime — which is only known
+        # once the walk has finished discovering that dataset's pins. A scan
+        # can itself discover executions that walk new datasets and pins, so
+        # the two phases alternate in rounds until neither has work left.
+        while True:
+            engine.drain(depth_remaining=None)
+            if not engine.run_pending_binding_scans():
+                break
 
         # An arc recorded against a RID that never became a closure member
         # needs an explanation. Three are already accounted for:

@@ -485,7 +485,7 @@ class ClosureBuilder:
 
     def on_binding_record(self, *, dataset_rid: str, version: str, record: "FeatureProducerRecord", depth: int) -> None:
         """No-op: the closure builder records binding arcs directly (see
-        ``WalkEngine._expand_member_bindings``), so this hook has nothing
+        ``WalkEngine._apply_binding_scan``), so this hook has nothing
         additional to accumulate."""
 
     def on_dataset_walked(self, *, dataset_rid: str, version: str) -> None:
@@ -714,6 +714,8 @@ class WalkEngine(Generic[N]):
     truncated: set[RID] = field(init=False)
     _queue: list[tuple[RID, int]] = field(init=False)
     _unpinned_quarantined: set[tuple[str, str | None]] = field(init=False)
+    _pending_binding_pins: dict[str, dict[str, int]] = field(init=False)
+    _binding_scanned: set[str] = field(init=False)
 
     def __init__(
         self,
@@ -741,6 +743,12 @@ class WalkEngine(Generic[N]):
         self.truncated = set()
         self._queue = []
         self._unpinned_quarantined = set()
+        # Ruling 9: binding scans are DEFERRED, not run inline. Each walked
+        # pin registers here as ``dataset_rid -> {version: shallowest depth}``;
+        # ``run_pending_binding_scans`` then scans each dataset ONCE at its
+        # maximum walked snaptime.
+        self._pending_binding_pins = {}
+        self._binding_scanned = set()
         self._sentinel_resolved = False
         self._sentinel_rid: RID | None = None
 
@@ -826,6 +834,13 @@ class WalkEngine(Generic[N]):
         the closure through the consumption arc of the execution that authored
         the child version — never through the structural containment edge.
 
+        The authorship leg runs HERE, per walked pin (it is bounded *by* the
+        pin, so each pin's answer differs). The member-binding leg does not:
+        ruling 9 (#391) makes binding evidence monotone across a dataset's
+        versions, so this only REGISTERS the pin and
+        :meth:`run_pending_binding_scans` later scans the dataset once, at
+        its maximum walked snaptime.
+
         Args:
             dataset_rid: RID of the consumed dataset.
             version: The version actually consumed, or ``None`` when the edge
@@ -899,7 +914,14 @@ class WalkEngine(Generic[N]):
             self._expand_version_authorship(dataset_rid, version, snapshot_catalog, depth=depth)
 
         if ArcKind.member_binding in self.arcs:
-            self._expand_member_bindings(dataset_rid, version, depth=depth)
+            # Ruling 9: DEFERRED, never inline. Binding evidence is monotone
+            # across a dataset's versions, so only the maximum walked pin's
+            # scan is run — and which pin that is cannot be known until the
+            # walk has finished discovering pins. Register and move on;
+            # ``run_pending_binding_scans`` resolves the maximum and scans.
+            pins = self._pending_binding_pins.setdefault(dataset_rid, {})
+            if version not in pins or depth < pins[version]:
+                pins[version] = depth
 
     def _strict_snapshot_or_gap(self, dataset_rid: str, version: str) -> Any:
         """Resolve the strict version snapshot, or report a chain break.
@@ -1049,33 +1071,139 @@ class WalkEngine(Generic[N]):
         if facts is not None:
             self.visitor.on_dataset_facts(dataset_rid=dataset_rid, facts=facts)
 
-    def _expand_member_bindings(self, dataset_rid: str, version: str, *, depth: int) -> None:
-        """Attribute the executions that bound feature values onto a walked
-        dataset version's members (spec §6.4).
+    # -- deferred binding scans (ruling 9) ---------------------------------
 
-        Runs the internal diagnostic-returning binding scan
-        (``ml._find_feature_producers_impl``) exactly once per walked
-        ``(dataset_rid, version)`` — the caller (``expand_dataset``) already
-        memoizes on that key, so this method is never invoked twice for the
-        same pair. Each record naming an execution becomes a
-        ``member_binding`` arc carrying the record as evidence; a record with
-        no execution is a ``null_binding_execution`` gap; each diagnostic
-        collected during the scan is a ``binding_scan_failed`` gap. Neither
-        kind of hole suppresses the other records' arcs (degrade-with-honesty
-        — a partial scan still reports what it found).
+    def max_walked_pin(self, dataset_rid: str, versions: "set[str] | frozenset[str]") -> str:
+        """Pick the maximum-snaptime version among a dataset's walked pins.
+
+        Ruling 9 (#391) makes ONE binding scan per dataset — at the newest
+        walked pin — exact for the requested closure, because new dataset
+        versions only ADD feature values. "Newest" is decided by the
+        catalog's own version-history order, not by parsing the label and
+        not by assuming anything about snaptime string formats:
+        ``_version_row_sort_key`` (RCT-primary, #367) is the total order the
+        rest of the library already uses for "which version was recorded
+        later", and under the monotone contract a later-recorded version's
+        snaptime is later. A walked pin the live history has no row for (a
+        row rewritten or removed since) falls back to its raw label and is
+        grouped AFTER every row-backed pin, so a pin the history does not
+        know about never silently outranks one it does.
 
         Args:
-            dataset_rid: The walked dataset.
-            version: The walked version the scan is scoped to.
-            depth: Walk depth of the consuming execution (or 0 for the root).
+            dataset_rid: The dataset whose walked pins to compare.
+            versions: The walked version labels to choose among.
+
+        Returns:
+            The label of the maximum-snaptime walked pin.
 
         Example:
             >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
-            >>> callable(engine._expand_member_bindings)
+            >>> engine.max_walked_pin(f"1-{1:04X}", {"1.0.0"})
+            '1.0.0'
+        """
+        from deriva_ml.core.mixins.execution import _version_row_sort_key
+
+        labels = sorted(versions)
+        if len(labels) == 1:
+            # One pin: no history read is needed to know which is newest.
+            return labels[0]
+
+        keys: dict[str, tuple] = {}
+        try:
+            for row in self.ml._dataset_version_rows(dataset_rid):
+                label = row.get("Version")
+                if label in versions and label not in keys:
+                    keys[label] = _version_row_sort_key(row)
+        except Exception:  # noqa: BLE001 — a history read failure must not
+            # break the walk; the label fallback below still yields a total,
+            # deterministic order.
+            keys = {}
+
+        def order(label: str) -> tuple:
+            row_key = keys.get(label)
+            # (row-backed flag, row key, label): a pin the history knows
+            # about is compared by its recorded order; an unknown pin is
+            # grouped separately (flag 1, i.e. after) and broken by label.
+            return (0, row_key, "") if row_key is not None else (1, (), label)
+
+        return max(labels, key=order)
+
+    def run_pending_binding_scans(self) -> bool:
+        """Run one ROUND of deferred binding scans; True if any scan ran.
+
+        Ruling 9 (#391): binding evidence is monotone across a dataset's
+        versions, so the scan runs once per DATASET — at the maximum walked
+        snaptime — rather than once per walked ``(dataset, version)`` pin.
+        Older walked pins get no binding arcs of their own; what the newest
+        scan reports is the closure's as-of view of that dataset's bindings.
+
+        Because a scan can discover executions that walk NEW datasets and
+        pins, the caller runs this in rounds (drain, scan, repeat) until it
+        returns False.
+
+        Returns:
+            True when at least one dataset was scanned this round, meaning
+            more work may now be queued.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine.run_pending_binding_scans()
+            False
+        """
+        pending = {
+            dataset_rid: pins
+            for dataset_rid, pins in self._pending_binding_pins.items()
+            if dataset_rid not in self._binding_scanned and pins
+        }
+        if not pending:
+            return False
+
+        # Applied in sorted dataset order so recorded depths (and therefore
+        # every downstream ordering the closure derives) are independent of
+        # discovery order.
+        for dataset_rid in sorted(pending):
+            pins = pending[dataset_rid]
+            self._binding_scanned.add(dataset_rid)
+            version = self.max_walked_pin(dataset_rid, set(pins))
+            records, diagnostics = self.ml._find_feature_producers_impl(dataset_rid, version=version)
+            self._apply_binding_scan(dataset_rid, version, records, diagnostics, depth=pins[version])
+        return True
+
+    def _apply_binding_scan(
+        self,
+        dataset_rid: str,
+        version: str,
+        records: "list[FeatureProducerRecord]",
+        diagnostics: list[Any],
+        *,
+        depth: int,
+    ) -> None:
+        """Attribute the executions that bound feature values onto a walked
+        dataset's members (spec §6.4), as of ``version``'s snapshot.
+
+        Each record naming an execution becomes a ``member_binding`` arc
+        carrying the record as evidence and the SCANNED version label; a
+        record with no execution is a ``null_binding_execution`` gap; each
+        diagnostic collected during the scan is a ``binding_scan_failed``
+        gap. Neither kind of hole suppresses the other records' arcs
+        (degrade-with-honesty — a partial scan still reports what it found).
+
+        Kept separate from the scan call itself so the (read-only, possibly
+        concurrent) scan and the (strictly single-threaded) mutation of the
+        visitor never interleave.
+
+        Args:
+            dataset_rid: The scanned dataset.
+            version: The maximum walked pin the scan was scoped to.
+            records: The scan's binding records.
+            diagnostics: The scan's degrade diagnostics.
+            depth: Shallowest walk depth at which that pin was reached.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._apply_binding_scan(f"1-{1:04X}", "1.0.0", [], [], depth=0) is None
             True
         """
-        records, diagnostics = self.ml._find_feature_producers_impl(dataset_rid, version=version)
-
         for record in records:
             self.visitor.on_binding_record(dataset_rid=dataset_rid, version=version, record=record, depth=depth)
 

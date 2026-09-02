@@ -275,6 +275,31 @@ defined in that section.
      under-documented — an incomplete triple. Contract-era writes carry
      the execution by construction; legacy null-execution rows are
      reported as gaps and never repaired by guessing.
+  4. **Binding evidence is monotone across a dataset's versions**
+     (ruling 9, #391). A new dataset version only *adds* feature
+     values; it never removes them. The bindings visible at an older
+     version's snaptime are therefore a **subset** of those visible at
+     any newer version's snaptime. `delete_dataset_members` is governed
+     by this rule rather than an exception to it: a removal takes those
+     members and their bindings out of the dataset's story, and the
+     newest view is the authoritative one — a writer whose only
+     bindings were on since-removed members does not survive, which is
+     the intended semantics, not an approximation.
+
+     **As-of evidence semantics.** A consumer computing a provenance
+     closure over a dataset walked at several pinned versions reads
+     that dataset's bindings **once, at the maximum walked snaptime**,
+     and reports the result *as of* that snapshot: each
+     `member_binding` arc carries the **scanned** version label, and
+     older walked pins contribute no separate binding arcs. This is
+     exact for the question the closure asks, from the perspective of
+     the specific artifact whose provenance was requested — a member
+     removed before the consumed version contributed nothing to that
+     artifact, and a discovered execution's own full input detail is
+     *its* provenance, available by asking for it directly
+     (`lookup_provenance(X)`). Per-pin scanning would be strictly more
+     expensive and would answer a different, unasked question.
+     `lookup_provenance` implements exactly this.
 
 - **Driven execution** — an execution that left `Created` for `Running`;
   i.e. its lifecycle was actually started (`__enter__` / `execution_start()`

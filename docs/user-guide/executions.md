@@ -807,6 +807,19 @@ versions (e.g. consumed at an older version by one execution and at a newer
 one by another) gets two independent entries — reading `origin_recorded`
 for one version never reflects a different version's facts.
 
+**Binding evidence is reported "as of" the newest walked version.** Feature
+values are monotone across a dataset's versions — a new version only *adds*
+bindings — so when a dataset is walked at several pinned versions the
+closure reads its bindings **once, at the maximum walked version**, and
+every `member_binding` arc carries that scanned version label. Older walked
+pins still appear in `closure.datasets` (their authorship facts are per-pin
+and unaffected), but they contribute no separate binding arcs. This is
+exact for the artifact you asked about: a member removed before the version
+that artifact consumed contributed nothing to it, and any discovered
+execution's own full input detail is *its* provenance — ask for it directly
+with `lookup_provenance(that_rid)`. See the "binding evidence is monotone"
+consequence in `docs/reference/provenance-contract.md`.
+
 **Containment is structure, not provenance.** The closure does *not* walk
 `Dataset_Dataset` parents. Provenance is execution-mediated: a parent
 dataset enters the closure through the *consumption arc* of the execution
