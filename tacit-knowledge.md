@@ -1265,3 +1265,52 @@ CAPTURED into the readout and classified on the main thread
 (`member_producers_from` mirrors `member_producers_or_gap`'s exception
 taxonomy verbatim), so gap text, gap dedup and gap order are unchanged
 by construction rather than by luck.
+
+**2026-09-01 — Review correction to #391b: `hash(rid) % len(pool)` is
+ROUTING, not isolation — and a byte-identical A/B cannot detect the
+difference.** The first parallel-expansion build handed each read a
+handle by hashing the RID into the pool. With `min(workers, len(rids))`
+tasks over exactly `workers` handles, that collides constantly
+(birthday paradox; ~100% at frontier width ≥ 8), and every collision
+silently shares an unsynchronized `requests.Session` **and** the
+unguarded `_snapshot_cache` dict on that `DerivaML`. Fixed by LEASING:
+handles live in an `asyncio.Queue`, acquired before `run_in_executor`
+and released in a `finally`, with the queue depth serving as the *only*
+concurrency bound so "pool ≥ concurrency" is enforced rather than
+asserted. The separate `Semaphore` was deleted — a second bound can
+drift out of step with the pool and reintroduce sharing.
+
+**The lesson that generalizes: a byte-identical live A/B is evidence
+about SEMANTICS, not about TRANSPORT SAFETY.** The 118,155-byte
+identical dump was produced by the racy build. It proves the apply side
+is single-threaded; it says nothing about whether the reads underneath
+were safe, because a session race can return a correct answer on any
+given run. Thread-safety claims need a test that can observe sharing,
+not a diff that can't.
+
+**Corollary: a test harness that returns `self` as its "per-worker
+handle" cannot detect handle sharing** — the pool becomes N references
+to one object and every collision looks like ordinary reuse. The
+harness now mints a DISTINCT probe per handle, each counting its own
+occupancy and *holding* it for a configurable interval so concurrent
+reads genuinely overlap. Mutate-and-revert is what proved the pin real:
+the collision test fails against the hash-mod build with **33 recorded
+concurrent entries** and passes against the lease. Two other pins in
+that PR turned out to be similarly vacuous until mutation-tested — the
+in-flight budget charge (deleting it passed the entire suite, because
+the coarse `≤ 2*cap` bound never bit; and the obvious scenario ALSO
+can't exercise it, since `_prefetchable` filters already-cached RIDs to
+empty — you need each seed to have its OWN parents so a new frontier is
+offered while other readouts are still unapplied), and read-failure
+equivalence (needed pinning per exception KIND, including that
+`RuntimeError` still PROPAGATES rather than being swallowed because it
+happened on a worker). **Standing rule: for any concurrency or
+budget-accounting invariant, mutate the implementation and confirm the
+test fails before believing it.**
+
+**And a bug the probe itself surfaced:** proxying handle attributes by
+"is it callable" wrapped `_FakeML.model` — a `MagicMock`, hence
+callable — so `ml.model.name_to_table(...)` raised `AttributeError`
+inside the asset branch, which swallowed it as `resolution_failed` and
+silently dropped every asset producer. Instrument an explicit seam
+list, never a callable check, when proxying a duck-typed object.
