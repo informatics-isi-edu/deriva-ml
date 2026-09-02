@@ -1459,6 +1459,21 @@ class ExecutionMixin:
         ``lookup_provenance(that_rid)``. See "binding evidence is monotone"
         in ``docs/reference/provenance-contract.md``.
 
+        **The walk fetches concurrently but decides sequentially.** A
+        closure is HTTP-bound, so each *frontier* of independent executions
+        — the seed set, a node's parent set, the drain queue's prefix — has
+        its catalog reads issued in parallel (bounded, each on its own
+        catalog handle). Only reads are concurrent: every decision derived
+        from them (closure membership, arc depths, gap emission, budget
+        accounting) is applied single-threaded in unchanged walk order, so
+        the result is byte-identical to a sequential walk and independent of
+        which read finished first. This method remains ordinary and
+        synchronous, and works inside a notebook's running event loop.
+        Concurrency is set by the ``DERIVA_ML_PROVENANCE_WORKERS``
+        environment variable (default 8); ``1`` forces sequential reads.
+        It is deliberately not a parameter of this method: it tunes how the
+        walk talks to the catalog, never what the closure contains.
+
         Args:
             rid: RID of any Dataset, Asset, Feature value, or Execution —
                 the same root typology :meth:`lookup_lineage` accepts.

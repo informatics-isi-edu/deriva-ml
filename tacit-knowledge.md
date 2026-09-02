@@ -1196,3 +1196,72 @@ is NOT thread-safe; the #392 scans solved this with per-scan handles),
 keep the public API sync via run_async, and migrate hot reads to
 native async incrementally — converging on ONE concurrency framework
 instead of three.
+
+**2026-09-01 — Parallel expansion implemented (#391b): byte-identical,
+147s → 99s, and the bottleneck moved AGAIN — to `expand_dataset`.** The
+approved design shipped as specified: frontier rounds, `asyncio.gather`
+under an `asyncio.Semaphore` (the deriva-py `clone.py` pattern), the
+existing sync mixin seams offloaded via `loop.run_in_executor`, public
+API kept sync through `run_async`, and per-worker `DerivaML` handles
+(`_provenance_worker_handle`) because `requests.Session` is not
+thread-safe. Live A/B on `lookup_provenance("7-ZW3P")`, www.eye-ai.org:
+
+| Measure | before | after | delta |
+|---|---|---|---|
+| **executions** | 52 | **52** (same RIDs) | **0** |
+| **datasets** | 15 | **15** (same RIDs) | **0** |
+| assets | 1 | 1 | 0 |
+| gap multiset | 129 | **129 (identical strings)** | **0** |
+| full `model_dump` | — | **byte-identical, 118,155 B** | **0** |
+| **runtime** | 147.3s | **99.2s** | **−33%** |
+
+**The overlap is excellent; the coverage is not.** Instrumented:
+**149.3s of `read_execution` work compressed into ~29.6s of wall time
+(5.4× overlap)** across 48 of 52 reads. That leg is now essentially
+solved. But the ≤50s target was still missed, and the profile says why:
+
+- `expand_dataset` — **24.1s over 43 calls, fully sequential.** This is
+  the strict-snapshot resolution per walked pin, and it is now the
+  single largest un-parallelized leg. **Next lever.**
+- binding scans — 26.6s (already pooled by #392; 4 rounds).
+- inline reads — 16.0s over just **4** reads that missed the prefetch.
+
+**The finding worth carrying forward: frontier WIDTH, not frontier
+existence, is what pays.** Measured widths were `{1: 44 frontiers, 6: 1,
+42: 1}`. One width-42 frontier (the seed set) did essentially all the
+work; **44 of 46 frontiers were width 1** and correctly fell back to an
+inline read. The walk's shape is one wide fan-out at the seeds and then
+long serial chains — so "parallelize the expansion" bought a one-shot
+33%, not a uniform speedup, and further gains must come from
+parallelizing a *different* leg (`expand_dataset`), not from tuning
+worker count. Raising `DERIVA_ML_PROVENANCE_WORKERS` above 8 cannot help
+a width-1 frontier.
+
+**A cap-honesty subtlety that cost a test rewrite.** "No over-fetch past
+the cap" cannot mean "reads ≤ cap" for any read-AHEAD: a frontier's
+siblings are fetched before the first sibling's own subtree has spent
+its budget, so a capped walk reads a bounded handful it then declines to
+expand (measured: 6 reads under a cap of 4, vs 4 sequential). What IS
+guaranteed, and what the test now pins, is (a) no frontier exceeds the
+remaining budget, (b) in-flight readouts are CHARGED against that budget
+— without which nested frontiers each measure the budget as if the
+others did not exist and the read-ahead runs away — and (c) the capped
+closure is byte-identical to the capped sequential closure. Cap honesty
+is about what ends up in the closure, never about how many rows were
+read to decide that.
+
+**Design note that made this cheap: split read from apply, don't
+restructure the walk.** Rather than converting the recursive DFS into an
+explicit BFS-by-frontier state machine, `expand_execution` was split
+into `read_execution` (pure I/O, returns an immutable `ExecutionReadout`,
+touches no engine or visitor state) and the unchanged apply half. The
+prefetch is then a pure read-ahead that fills a cache the apply path
+consumes; an empty cache degrades to the historical inline read. That is
+why **zero existing tests needed editing** — 194 provenance/lineage
+tests and 8/8 goldens passed untouched on the first run — and why
+`DERIVA_ML_PROVENANCE_WORKERS=1` is a true sequential-equivalence
+control rather than a second code path. Failures the read side hits are
+CAPTURED into the readout and classified on the main thread
+(`member_producers_from` mirrors `member_producers_or_gap`'s exception
+taxonomy verbatim), so gap text, gap dedup and gap order are unchanged
+by construction rather than by luck.

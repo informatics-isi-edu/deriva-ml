@@ -868,6 +868,29 @@ records no consumption arc, leaving the root plus your requested legs.
 Keep `consumption` for a meaningful causal closure. Unknown members are
 rejected at the call boundary.
 
+**Concurrency.** A closure walk is almost entirely HTTP-bound, so the
+walk fetches each *frontier* of independent executions concurrently: the
+seed set, each node's parent set, and the drain queue's prefix. Only the
+reads are parallel — every decision the walk makes (what enters the
+closure, at what depth, which gaps are recorded) is applied
+single-threaded, in unchanged walk order, so the result is byte-identical
+to a sequential walk and does not depend on which read finished first.
+
+This is transparent: `lookup_provenance` stays an ordinary synchronous
+method and works unchanged inside a Jupyter notebook's event loop. On the
+eye-ai reference closure (52 executions), 149s of catalog reads compress
+into ~30s of wall time and the whole call goes from 147s to 99s, with a
+byte-identical result. Concurrency is tuned by
+`DERIVA_ML_PROVENANCE_WORKERS` (default 8); set it to `1` to force
+sequential reads, which is the first thing to try if you ever suspect the
+concurrency itself. It is an environment knob rather than a parameter
+because it changes only *how* the walk talks to the catalog, never *what*
+the closure contains.
+
+The single biggest lever is still `arcs=` above: a structural pass avoids
+the binding scans entirely and is an order of magnitude faster than any
+amount of parallelism on the full walk.
+
 **Budgets and `traversal_complete`.** `max_executions` bounds distinct
 executions expanded; a proportional internal dataset-version budget
 (`4 * max_executions`) bounds `datasets_visited` the same way, so a walk
