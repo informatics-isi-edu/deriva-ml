@@ -1478,3 +1478,99 @@ pool rounds like the binding scans. Deferred by choice: intra-read
 concurrency (2) and speculative prefetch from authorship rows (3) —
 revisit only if the measured result still disappoints. Target
 ~35-45s cold; floor is chain-depth × RTT without speculation.
+
+**2026-09-02 — Perf round 2 implemented (#394, PR): the closure issues
+HALF the requests and is byte-identical — and the live A/B earned its
+keep twice.** Both approved levers shipped. (1) Frontier reads are
+BATCHED per TABLE: five new `ExecutionMixin` seams
+(`_execution_records_batch`, `_input_dataset_pairs_batch`,
+`_input_assets_batch`, `_producer_of_datasets_batch`,
+`_producers_of_assets_batch`) answer each question once for the whole
+frontier with chunked `RID=any(...)` queries (tk-023 chunk 25), and
+`WalkEngine.read_frontier` assembles the SAME `ExecutionReadout` the
+per-node path produced — so the apply path never changed and every
+semantic pin over it stayed valid. (2) `expand_dataset`'s legs
+(strict-snapshot resolve + `_dataset_version_rows_at` + author
+summaries) run in a pooled round through `_gather_leased`.
+
+| Measure | main | #394 | delta |
+|---|---|---|---|
+| **executions / datasets / assets / gaps** | 52 / 15 / 1 / 129 | **identical RIDs** | **0** |
+| **canonical `model_dump`** | 118,155 B `806ad64f…` | **byte-identical** | **0** |
+| **HTTP requests (full closure)** | 1,882 | **898** | **−52%** |
+| runtime (full closure) | 100.0s | 71.5s / 81.1s | −29% / −19% |
+
+**The request cut is double the runtime cut, and that IS the result.**
+Halving requests bought ~20-30% wall clock, which says the walk has
+moved off request COUNT and onto per-request latency down the
+dependency chain — exactly the "chain-depth × RTT without speculation"
+floor the scope note predicted. The remaining levers are the deferred
+ones (intra-read concurrency, speculative prefetch), not more batching.
+
+**Finding 1 — a closure divergence the offline suite could not
+produce.** The first A/B came back 2 assets / 130 gaps against main's
+1 / 129. The extra was `File` row `6-0B3G`: `File` carries a
+`File_Execution` association (source files registered BY REFERENCE via
+`add_files`) so `find_asset_execution_tables()` returns it, but
+`model.is_asset(File)` is **False** — so `lookup_asset` refuses it
+("RID X is not an asset") and the per-node `list_assets` path drops the
+row with a debug log. The batched reader never calls `lookup_asset`, so
+it had no equivalent guard. **The harness cannot express this case at
+all** — `_FakeML.add_asset` registers the table as an asset by
+construction — so a green offline suite was not evidence, and the pin
+had to go at the seam with a hand-built model stub. Whether `File` rows
+*should* be closure assets is a real question with a defensible "yes";
+it is a semantics change and belongs in its own issue, not in a perf PR
+whose acceptance criterion is a byte-identical closure. **General rule:
+when a batched reader replaces a per-node one, enumerate the per-node
+path's SILENT DEGRADES — they are behavior, and the batch inherits none
+of them for free.**
+
+**Finding 2 — "fewer requests" is not "faster", and concurrency can be
+NEGATIVE on expensive joins.** The narrow structural pass
+(`arcs=` without `member_binding`) got *slower* on the branch at
+unchanged request count (93 → 95). Per-URL profiling of both trees put
+the entire difference in three `Image_Execution …/Asset_Role=Output/
+Execution` member-producer joins — the same three queries on both:
+**main 3 × 2,140ms sequential (6.4s); branch 3 × 5,728ms concurrent
+(17.2s of work, ~11s wall)**. The server does not parallelize them;
+under contention each becomes ~2.7× slower, so pooling a leg of three
+very expensive joins converts 6.4s of sequential work into ~11s of
+contended wall time. Everything else on the branch got cheaper (~7s →
+~4s), and on the profiled pair the branch still won overall (11.3s vs
+13.6s) — but these are the highest-variance queries on the catalog
+(2.1-5.7s each), which is why one A/B pair read 5.4s vs 12.8s and
+another read 13.6s vs 11.3s. **Corollary to the #391 C3 result: pooling
+paid 4.5× for the BINDING scans and is at best neutral for the
+member-producer scans on a narrow round. "Independent reads" is not
+sufficient justification for concurrency — the server-side cost of the
+individual query decides, and a leg of few-but-huge joins wants
+sequencing, not a pool.** Recorded rather than fixed: the full closure
+is unaffected (984 requests saved dominate) and the closure is
+byte-identical either way, so tuning the member-scan round's
+concurrency is a follow-up with its own measurement, not a change to
+smuggle into this PR.
+
+**Finding 3 — a handle is a whole connection, so size the pool to
+demand.** Chasing finding 2 surfaced a real (if smaller) cost:
+`_worker_handles` eagerly built the full worker count on first use, so
+#394's batching — which shrank the narrow pass's rounds to a handful of
+items — meant 8 `DerivaML` constructions to serve 3 dataset legs. Now
+grown lazily to `min(workers, needed)`, reused across rounds, with a
+latch so a refusing factory is asked once. Did not explain finding 2,
+but worth keeping on its own.
+
+**Harness lesson (third time on this stack): a probe can only see what
+routes through it — including what it HANDS OUT.** Two of the new
+concurrency pins were vacuous until the harness was extended. The
+member-scan seam needed `_note_direct_seam_use` (mutant then showed 23
+unleased concurrent uses). The dataset leg was worse: its snapshot read
+is reached *through* the object `lookup_dataset` returns, so the leased
+handle had to TRAVEL WITH that object (`_ProbedDatasetHandle`) or the
+read escaped every probe — with that, the mutant showed 47 violations;
+without it, zero. Also: the pre-existing wide-frontier lease pin went
+vacuous the moment the row reads were batched onto the main thread (a
+parentless wide frontier now issues no concurrent read at all), so it
+had to move to a scenario with dataset inputs. **When you change WHICH
+leg is concurrent, re-check every concurrency pin for vacuity — a
+passing test on a leg that no longer runs concurrently proves nothing.**

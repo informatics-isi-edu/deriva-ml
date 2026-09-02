@@ -72,6 +72,17 @@ _SNAPSHOT_DEPENDENT_ARCS = frozenset({ArcKind.version_authorship, ArcKind.member
 _EXPANSION_WORKERS_DEFAULT = 8
 _EXPANSION_WORKERS_ENV = "DERIVA_ML_PROVENANCE_WORKERS"
 
+# Minimum member-producer scans in one round before the round is worth
+# pooling (#394). Unlike the binding scans — where the same pool measured a
+# 4.5x win (#391 C3) — a member scan is a server-side membership JOIN that
+# the server does not parallelize: on eye-ai the ``Image_Execution`` join
+# costs ~2.1s alone and ~5.7s when three run at once, so a narrow round
+# LOSES by pooling (measured: 5.5s -> 12.1s median on the structural pass).
+# Set to the default worker count, i.e. "pool only with at least a full
+# pool's worth of work", which is the regime where overlap can actually
+# outrun contention. See ``WalkEngine._member_scans_should_pool``.
+_MEMBER_SCAN_POOL_THRESHOLD = 8
+
 
 def _expansion_workers() -> int:
     """Resolve the frontier prefetch concurrency for this process.
@@ -2516,7 +2527,10 @@ class WalkEngine(Generic[N]):
 
         Uncached pairs go through :meth:`_gather_leased`, the engine's single
         concurrency primitive: one leased handle per scan, results applied in
-        input order, ``DERIVA_ML_PROVENANCE_WORKERS=1`` serializing.
+        input order, ``DERIVA_ML_PROVENANCE_WORKERS=1`` serializing —
+        **but only once the round is wide enough to be worth it**
+        (:data:`_MEMBER_SCAN_POOL_THRESHOLD`); see
+        :meth:`_member_scans_should_pool`.
 
         Args:
             keys: The distinct pairs the frontier consumes, in walk order.
@@ -2530,13 +2544,55 @@ class WalkEngine(Generic[N]):
         """
         pending = [key for key in keys if key not in self._member_scan_cache]
         if pending:
-            results = self._run_leased(
-                pending,
-                lambda key, handle: self._member_scan(key[0], key[1], handle),
-            )
+            if self._member_scans_should_pool(len(pending)):
+                results = self._run_leased(
+                    pending,
+                    lambda key, handle: self._member_scan(key[0], key[1], handle),
+                )
+            else:
+                # Sequential, on the caller's own handle — the pre-#394
+                # behavior for a narrow round, and measurably the right one.
+                results = [self._member_scan(key[0], key[1], self.ml) for key in pending]
             for key, result in zip(pending, results, strict=True):
                 self._member_scan_cache[key] = result
         return {key: self._member_scan_cache[key] for key in keys}
+
+    def _member_scans_should_pool(self, count: int) -> bool:
+        """Whether a member-scan round of ``count`` pairs is worth pooling.
+
+        **Concurrency is not free for this leg, and can be strongly
+        negative.** A member-producer scan is a server-side membership JOIN
+        over an asset table — on the eye-ai reference catalog the
+        ``Image_Execution`` join costs ~2.1s run alone and ~5.7s when three
+        run at once, because the server does not parallelize them and they
+        contend. Measured on the structural pass (`arcs=` without
+        ``member_binding``), which walks exactly three such pairs: pooling
+        turned a 5.5s median walk into 12.1s at an unchanged request count.
+
+        So this leg pools only when the round is wide enough that overlap
+        beats contention. Below the threshold the scans run sequentially on
+        the caller's handle — which is also what the pre-#394 walk did for a
+        width-1 frontier, so the narrow case is restored rather than newly
+        invented.
+
+        This is deliberately NOT the same judgment the binding scans make:
+        those measured a 4.5× win from the same pool (#391 C3). "Independent
+        reads" is not sufficient justification for concurrency — the
+        server-side cost of the individual query decides, and a leg of
+        few-but-huge joins wants sequencing.
+
+        Args:
+            count: How many uncached pairs this round must scan.
+
+        Returns:
+            Whether to run them on the leased pool.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._member_scans_should_pool(1)
+            False
+        """
+        return count >= _MEMBER_SCAN_POOL_THRESHOLD
 
     def _take_readout(self, rid: RID) -> ExecutionReadout:
         """Return ``rid``'s prefetched readout, or read it inline on a miss.

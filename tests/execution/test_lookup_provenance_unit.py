@@ -5105,3 +5105,50 @@ def test_absent_handle_factory_is_not_retried_every_round():
         engine._run_leased([1, 2, 3], lambda item, handle: item)
 
     assert attempts["n"] == 1, f"a refusing handle factory was retried {attempts['n']} times, expected once"
+
+
+def test_narrow_member_scan_rounds_run_sequentially_not_pooled():
+    """A small member-scan round is NOT pooled — concurrency loses there.
+
+    A member-producer scan is a server-side membership JOIN the server does
+    not parallelize. Measured on eye-ai: the ``Image_Execution`` join costs
+    ~2.1s run alone and ~5.7s when three run at once, so pooling a round of
+    three turned the structural pass from a 5.5s median walk into 12.1s at
+    an unchanged request count (93 vs 95).
+
+    So the leg pools only at ``_MEMBER_SCAN_POOL_THRESHOLD`` or above.
+    Pinned by handle construction, which is the observable consequence:
+    a narrow round leases nothing and reads on the caller's own handle.
+
+    This is deliberately a DIFFERENT judgment from the binding scans, which
+    measured a 4.5x win from the same pool (#391 C3) — see
+    ``_member_scans_should_pool``.
+    """
+    from deriva_ml.core.mixins._provenance_engine import (
+        _MEMBER_SCAN_POOL_THRESHOLD,
+        ClosureBuilder,
+        WalkEngine,
+    )
+
+    _require_parallel_enabled()
+
+    narrow = _MEMBER_SCAN_POOL_THRESHOLD - 1
+    ml, _root, walked = _many_walked_pins_scenario(count=_MEMBER_SCAN_POOL_THRESHOLD + 4)
+    ml.enable_parallel_expansion(True)
+    engine: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+
+    engine._run_member_scans([(walked[i], "1.0.0") for i in range(narrow)])
+    assert ml._handle_serial == 0, (
+        f"a {narrow}-pair member-scan round leased {ml._handle_serial} handles; "
+        "narrow rounds must run sequentially on the caller's handle"
+    )
+    # It really did scan them — sequentially, not by skipping the work.
+    scans = [c for c in ml.calls if c[0] == "_producers_of_dataset_members"]
+    assert len(scans) == narrow
+
+    # At the threshold the round DOES pool. Fresh engine so every pair is
+    # uncached — ``pending`` is what the threshold is measured against, and
+    # re-offering already-scanned pairs would leave it below the line.
+    wide: WalkEngine = WalkEngine(ml, ClosureBuilder(), arcs=_ALL_ARC_KINDS, closure_mode=True)
+    wide._run_member_scans([(dataset, "1.0.0") for dataset in walked[:_MEMBER_SCAN_POOL_THRESHOLD]])
+    assert ml._handle_serial > 0, "a round at the threshold did not pool"
