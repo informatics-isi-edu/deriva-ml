@@ -46,10 +46,19 @@ fact-finding over deriva-ml's own schema — belongs upstream too.
    and `lookup_provenance` share a single traversal core; neither calls the
    other; the engine walks only the arcs its caller requests (no cost
    inversion); `lookup_lineage`'s observable contract stays byte-identical.
-6. **Ancestry hops resolve at snapshots, unbounded to source.** Each
-   `Dataset_Dataset` hop reads the parent as of the child version's snaptime,
-   chained; snapshot-chain breaks are reported gaps. Depth runs to source
-   under the global execution cap — no dedicated depth knob.
+6. **[SUPERSEDED by ruling 8 — see below]** Ancestry hops resolve at
+   snapshots, unbounded to source. (The snapshot-resolution discipline this
+   ruling established still governs every remaining snapshot read.)
+7. **(post-final-review) `member_production`** — fifth arc kind; see §10.
+8. **Ancestry expansion is OUT (Carl, 2026-09-01, issue #389).** Provenance
+   is execution-mediated: consumed inputs, version authors, binding writers,
+   and their recursive inputs. `Dataset_Dataset` containment is structure,
+   not causation — redundant under proper capture (a split execution's
+   consumption arc records the parent), compensation on legacy data
+   (forbidden by ruling 2), and directionally unreliable (collections
+   invert it). The closure does not walk parents; `list_dataset_parents`
+   remains the structural query. §6.5's leg, `ParentLink`, `AncestryState`,
+   and the ancestry fields of `DatasetVersionFacts` are removed.
 
 ## 3. Public API
 
