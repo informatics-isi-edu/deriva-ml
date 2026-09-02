@@ -330,20 +330,22 @@ carried verbatim as arc evidence; null-execution rows become
 docstring still says "provenance candidates" — stale against ruling 3;
 reword to binding-fact language.
 
-### 6.5 Ancestry — dataset discovery, not an execution arc
-Ancestry hops discover **datasets**, not executions, so there is no
-execution-level "ancestry" arc kind: a parent dataset's contribution enters
-through its own `version_authorship` and `member_binding` arcs, and
-`ParentLink` records the hop itself. Resolution per ruling 6: parents are
-read at the child version's snaptime via a **strict snapshot resolver** —
-a new internal `_strict_version_snapshot(dataset, version)` that raises
-(rather than falling back to the live catalog) when the version row's
-`Snapshot` is NULL or the snapshot is unreadable. (The existing
-`_version_snapshot_catalog()` live-fallback behavior is unusable here and
-must not be called by the engine.) Unresolvable hops emit
-`snapshot_chain_break`, set `ancestry_state="chain_break"` /
-`is_source=None`, and stop that branch. `is_source=True` requires
-`ancestry_state="resolved"` with zero parents.
+### 6.5 Ancestry — REMOVED (see ruling 8, §2)
+This section previously specified a `Dataset_Dataset` ancestry leg.
+**Ruling 8 (Carl, 2026-09-01, issue #389) removed it**: provenance is
+execution-mediated, so a parent dataset enters the closure only through
+the consumption arc of the execution that authored the child version.
+Containment is structure, not causation — see ruling 8 in §2 for the three
+accepted arguments (redundancy under proper capture, forbidden legacy
+compensation, unreliable causal direction). `ParentLink`, `AncestryState`,
+and `DatasetVersionFacts.{parents, ancestry_state, is_source}` are gone
+from the result model; `list_dataset_parents` remains the structural query.
+The strict snapshot resolver this section introduced
+(`strict_version_snapshot_catalog`) **stays** — it now gates only §6.3
+(version authorship) and §6.4 (member bindings), which is where the
+remaining `snapshot_chain_break` gaps come from.
+
+The section number is retained so §6.6 and later references keep numbering.
 
 ### 6.6 Workflow identity
 `WorkflowSummary` today carries name/url/**version**, and version is

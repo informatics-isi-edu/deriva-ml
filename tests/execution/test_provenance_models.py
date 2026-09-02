@@ -25,7 +25,6 @@ def _rid(n: int, prefix: str = "1") -> str:
 
 def test_enums_are_strenums_with_string_equality():
     from deriva_ml.execution.provenance import (
-        AncestryState,
         ArcInputType,
         ArcKind,
         GapKind,
@@ -48,10 +47,9 @@ def test_enums_are_strenums_with_string_equality():
     assert ArcInputType.dataset == "dataset"
     assert ArcInputType.asset == "asset"
 
-    assert AncestryState.resolved == "resolved"
-    assert AncestryState.chain_break == "chain_break"
-    assert AncestryState.not_walked == "not_walked"
-
+    # ``snapshot_chain_break`` survives ruling 8 — it still fires for the
+    # authorship/binding snapshot legs and the member-scan degrade.
+    assert GapKind.snapshot_chain_break == "snapshot_chain_break"
     assert len(GapKind) == 12
 
 
@@ -74,44 +72,53 @@ def test_arc_identity_is_spec_tuple():
     assert a.model_copy(update={"input_version": "2.0.0"}).identity() != a.identity()
 
 
-def test_is_source_requires_resolved_ancestry():
-    from deriva_ml.execution.provenance import AncestryState, DatasetVersionFacts
-
-    resolved = DatasetVersionFacts(
-        version="1.0.0",
-        parents=[],
-        ancestry_state=AncestryState.resolved,
-        is_source=True,
-        origin_recorded=True,
-        version_authors=[],
-    )
-    assert resolved.is_source is True
-
-    not_walked = DatasetVersionFacts(
-        version="1.0.0",
-        parents=[],
-        ancestry_state=AncestryState.not_walked,
-        is_source=None,
-        origin_recorded=None,
-        version_authors=[],
-    )
-    assert not_walked.is_source is None
-
-    # is_source True/False is only meaningful when ancestry_state is
-    # "resolved" — anything else must carry None, enforced by a
-    # model validator.
+def test_ancestry_fields_are_gone_from_the_model():
+    """Ruling 8 (#389): containment is not provenance, so the ancestry
+    fields and their vocabulary no longer exist on the result model."""
     import pytest
     from pydantic import ValidationError
 
+    import deriva_ml.execution.provenance as prov
+    from deriva_ml.execution.provenance import DatasetVersionFacts
+
+    # The vocabulary and the link model are gone from the module and from
+    # the package's public export surface.
+    for name in ("AncestryState", "ParentLink"):
+        assert not hasattr(prov, name), f"{name} should have been removed"
+        assert name not in prov.__all__
+
+    import deriva_ml.execution as execution_pkg
+
+    for name in ("AncestryState", "ParentLink"):
+        assert not hasattr(execution_pkg, name), f"{name} still exported from deriva_ml.execution"
+
+    # The facts record no longer carries them, and (extra="forbid") rejects
+    # anyone still passing them.
+    facts = DatasetVersionFacts(version="1.0.0", origin_recorded=True, version_authors=[])
+    for name in ("parents", "ancestry_state", "is_source"):
+        assert not hasattr(facts, name), f"DatasetVersionFacts.{name} should have been removed"
+        assert name not in DatasetVersionFacts.model_fields
+
     with pytest.raises(ValidationError):
-        DatasetVersionFacts(
-            version="1.0.0",
-            parents=[],
-            ancestry_state=AncestryState.chain_break,
-            is_source=True,
-            origin_recorded=None,
-            version_authors=[],
-        )
+        DatasetVersionFacts(version="1.0.0", parents=[], origin_recorded=True)
+    with pytest.raises(ValidationError):
+        DatasetVersionFacts(version="1.0.0", is_source=True, origin_recorded=True)
+    with pytest.raises(ValidationError):
+        DatasetVersionFacts(version="1.0.0", ancestry_state="resolved", origin_recorded=True)
+
+
+def test_dataset_version_facts_dump_is_byte_stable():
+    """Determinism: the trimmed facts record still dumps identically on
+    repeated calls, with no ancestry keys in the envelope."""
+    import json
+
+    from deriva_ml.execution.provenance import DatasetVersionFacts
+
+    facts = DatasetVersionFacts(version="1.0.0", origin_recorded=False, version_authors=[])
+    first = json.dumps(facts.model_dump(mode="json"), sort_keys=True)
+    second = json.dumps(facts.model_dump(mode="json"), sort_keys=True)
+    assert first == second
+    assert set(json.loads(first)) == {"version", "origin_recorded", "version_authors"}
 
 
 def test_closure_dumps_to_plain_json():

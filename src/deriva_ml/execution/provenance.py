@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.execution.lineage import (
@@ -45,9 +45,7 @@ __all__ = [
     "RootType",
     "ArcKind",
     "ArcInputType",
-    "AncestryState",
     "GapKind",
-    "ParentLink",
     "ProvenanceArc",
     "ProvenanceExecution",
     "DatasetVersionFacts",
@@ -105,28 +103,6 @@ class ArcInputType(StrEnum):
     asset = "asset"
 
 
-class AncestryState(StrEnum):
-    """How completely a dataset version's parent ancestry was resolved.
-
-    Attributes:
-        resolved: The version's parents were fully walked; ``is_source``
-            on the owning :class:`DatasetVersionFacts` is meaningful.
-        chain_break: Walking the parent chain hit a gap (e.g. an
-            unresolvable snapshot); ``is_source`` is unknown.
-        not_walked: The version's ancestry was never examined (e.g. it
-            fell outside the traversal bound).
-
-    Example:
-        >>> from deriva_ml.execution.provenance import AncestryState
-        >>> AncestryState.not_walked == "not_walked"
-        True
-    """
-
-    resolved = "resolved"
-    chain_break = "chain_break"
-    not_walked = "not_walked"
-
-
 class GapKind(StrEnum):
     """First-class honest-gap categories surfaced by a provenance walk.
 
@@ -155,36 +131,6 @@ class GapKind(StrEnum):
     multiple_asset_producers = "multiple_asset_producers"
     unresolved_rid = "unresolved_rid"
     binding_scan_failed = "binding_scan_failed"
-
-
-class ParentLink(BaseModel):
-    """One snapshot-resolved parent hop of a dataset version.
-
-    Attributes:
-        parent_rid: RID of the parent dataset.
-        child_version: The child version whose snaptime resolved this
-            hop (parent ancestry is always resolved AT a specific child
-            snapshot, never conflated across versions).
-        parent_version_then: The parent's then-current version at that
-            snaptime, or None when that itself is a gap (the parent's
-            version could not be resolved at the child's snaptime).
-
-    Example:
-        >>> from deriva_ml.execution.provenance import ParentLink
-        >>> link = ParentLink(
-        ...     parent_rid=f"1-{1:04X}",
-        ...     child_version="1.0.0",
-        ...     parent_version_then="0.3.0",
-        ... )
-        >>> link.parent_version_then
-        '0.3.0'
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    parent_rid: RID
-    child_version: str
-    parent_version_then: str | None = None
 
 
 class ProvenanceArc(BaseModel):
@@ -292,64 +238,40 @@ class DatasetVersionFacts(BaseModel):
     """Facts observed AT one dataset version's snapshot.
 
     Never merged across versions — the same dataset at two versions can
-    have different parents, different ancestry resolution, and
-    different recorded authors, so each version's facts are kept in
-    its own record (see :attr:`ProvenanceDataset.versions`).
+    have different recorded authors and different binding writers, so
+    each version's facts are kept in its own record (see
+    :attr:`ProvenanceDataset.versions`).
+
+    ``Dataset_Dataset`` containment is deliberately absent: per ruling 8
+    (#389) provenance is execution-mediated, so a parent dataset enters
+    the closure through the consumption arc of the execution that
+    authored the child version, never through the structural containment
+    edge. Query containment with
+    :meth:`~deriva_ml.DerivaML.list_dataset_parents`.
 
     Attributes:
         version: The version label these facts describe.
-        parents: Snapshot-resolved parent links (per the design's
-            ruling 6), sorted by ``parent_rid``.
-        ancestry_state: How completely this version's ancestry was
-            resolved — see :class:`AncestryState`.
-        is_source: Whether this version has no parents (True), has
-            parents (False), or is unknown (None). Meaningful (True or
-            False) only when ``ancestry_state == AncestryState.resolved``;
-            must be None otherwise, enforced by a validator.
         origin_recorded: Tri-state flag for whether a real (non-sentinel)
             origin execution is recorded, as observed at this snapshot.
         version_authors: Version-attribution entries bounded at this
             version (per the design §6.3).
 
     Example:
-        >>> from deriva_ml.execution.provenance import AncestryState, DatasetVersionFacts
+        >>> from deriva_ml.execution.provenance import DatasetVersionFacts
         >>> facts = DatasetVersionFacts(
         ...     version="1.0.0",
-        ...     parents=[],
-        ...     ancestry_state=AncestryState.resolved,
-        ...     is_source=True,
         ...     origin_recorded=True,
         ...     version_authors=[],
         ... )
-        >>> facts.is_source
+        >>> facts.origin_recorded
         True
     """
 
     model_config = ConfigDict(extra="forbid")
 
     version: str
-    parents: list[ParentLink] = Field(default_factory=list)
-    ancestry_state: AncestryState
-    is_source: bool | None = None
     origin_recorded: bool | None = None
     version_authors: list[VersionAttribution] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def _is_source_requires_resolved_ancestry(self) -> DatasetVersionFacts:
-        """Reject a non-None ``is_source`` unless ancestry was resolved.
-
-        ``is_source`` is only meaningful once the version's parent
-        ancestry has actually been walked; any other ``ancestry_state``
-        means "unknown," which must be spelled ``None``, not a guessed
-        True/False.
-        """
-        if self.ancestry_state != AncestryState.resolved and self.is_source is not None:
-            raise ValueError(
-                "is_source must be None unless ancestry_state is "
-                f"'resolved' (got ancestry_state={self.ancestry_state!r}, "
-                f"is_source={self.is_source!r})"
-            )
-        return self
 
 
 class ProvenanceDataset(BaseModel):
@@ -366,7 +288,7 @@ class ProvenanceDataset(BaseModel):
 
     Example:
         >>> from deriva_ml.execution.provenance import (
-        ...     AncestryState, DatasetVersionFacts, ProvenanceDataset,
+        ...     DatasetVersionFacts, ProvenanceDataset,
         ... )
         >>> ds = ProvenanceDataset(
         ...     rid=f"1-{1:04X}",
@@ -374,15 +296,12 @@ class ProvenanceDataset(BaseModel):
         ...     versions={
         ...         "1.0.0": DatasetVersionFacts(
         ...             version="1.0.0",
-        ...             parents=[],
-        ...             ancestry_state=AncestryState.resolved,
-        ...             is_source=True,
         ...             origin_recorded=True,
         ...             version_authors=[],
         ...         )
         ...     },
         ... )
-        >>> ds.versions["1.0.0"].is_source
+        >>> ds.versions["1.0.0"].origin_recorded
         True
     """
 

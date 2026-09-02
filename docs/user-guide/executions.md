@@ -801,12 +801,23 @@ unresolved = [g for g in closure.gaps if g.kind == "unresolved_rid"]
 **Dataset facts are per-version, never merged across versions.**
 `closure.datasets[rid].versions` is keyed by version label; each
 `DatasetVersionFacts` records what was true **at that version's snapshot**
-— its authors (bounded at that version, later authors never leak in), its
-ancestry (`parents`, `ancestry_state`, `is_source`), and whether its origin
-was recorded. The same dataset walked at two different versions (e.g. once
-as a consumed input pinned at an older version, once as an ancestry parent
-at a newer one) gets two independent entries — reading `origin_recorded` or
-`parents` for one version never reflects a different version's facts.
+— its authors (bounded at that version, later authors never leak in) and
+whether its origin was recorded. The same dataset walked at two different
+versions (e.g. consumed at an older version by one execution and at a newer
+one by another) gets two independent entries — reading `origin_recorded`
+for one version never reflects a different version's facts.
+
+**Containment is structure, not provenance.** The closure does *not* walk
+`Dataset_Dataset` parents. Provenance is execution-mediated: a parent
+dataset enters the closure through the *consumption arc* of the execution
+that produced the child — a split execution's `Dataset_Execution` input row
+records the parent causally and version-pinned, which is the fact the
+closure follows. Walking containment instead would compensate for missing
+executions on legacy data (which the closure never does — it reports gaps),
+and the containment edge cannot tell "child carved from parent" from
+"parent assembled from children" (collection datasets invert it). To ask
+the structural question directly, use `ml.list_dataset_parents(rid)` /
+`ml.list_dataset_children(rid)`.
 
 **Version pinning.** For a Dataset root, `version` pins the closure to
 `dataset@version`; omitted, the root resolves to the dataset's latest
@@ -816,13 +827,13 @@ Every arc that names a dataset input carries its own `input_version` —
 `None` means the consuming execution's edge carried no version pin, which
 is itself an `unpinned_input` gap; an unpinned edge is walked as a closure
 member but is never expanded through any version-snapshot-dependent arc
-(no authorship, no bindings, no ancestry), because there is no honest
-snapshot to read those facts from.
+(no authorship, no bindings), because there is no honest snapshot to read
+those facts from.
 
 **Budgets and `traversal_complete`.** `max_executions` bounds distinct
 executions expanded; a proportional internal dataset-version budget
-(`4 * max_executions`) bounds `datasets_visited` the same way, so a wide
-ancestry graph with few executions cannot walk unboundedly.
+(`4 * max_executions`) bounds `datasets_visited` the same way, so a walk
+reaching many dataset versions but few executions cannot walk unboundedly.
 `traversal_complete=False` means one of the two budgets was hit — the
 closure is a **partial but honest** answer, not a false completeness claim.
 `cap_hit` is the same signal exposed under the name the budget machinery

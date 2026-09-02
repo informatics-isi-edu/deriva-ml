@@ -120,13 +120,19 @@ class _StubDatasetHandle:
     """Minimal ``Dataset`` stand-in for ``lookup_dataset(rid)`` (Task 8).
 
     Carries ONLY what the closure-tests engine calls on the object returned
-    by ``ExecutionMixin.lookup_dataset``: ``dataset_rid``,
-    ``strict_version_snapshot_catalog(version)``, and
-    ``strict_parents_at(version)``. Both methods record their invocation
-    into the OWNING ``_FakeML.calls`` list (passed in as ``calls``), so a
-    quarantine test can assert "no snapshot-dependent call happened" even
-    though the call physically happens on this handle, not on ``_FakeML``
-    itself.
+    by ``ExecutionMixin.lookup_dataset``: ``dataset_rid`` and
+    ``strict_version_snapshot_catalog(version)``. The method records its
+    invocation into the OWNING ``_FakeML.calls`` list, so a quarantine test
+    can assert "no snapshot-dependent call happened" even though the call
+    physically happens on this handle, not on ``_FakeML`` itself.
+
+    ``list_dataset_parents`` is a deliberate TRIPWIRE, not a supported seam:
+    ruling 8 (#389) took ``Dataset_Dataset`` containment out of the closure,
+    so the walk must never call it. Scripting parents via
+    ``set_dataset_parents`` and asserting the call never lands is what makes
+    the "containment is not walked" pin non-vacuous — without a scriptable
+    containment edge, the assertion would hold trivially on a catalog that
+    simply has no parents.
 
     Default-unavailable: a ``(dataset_rid, version)`` pair that was never
     scripted via ``set_snapshot_available`` raises ``SnapshotUnavailable``
@@ -147,30 +153,10 @@ class _StubDatasetHandle:
             raise SnapshotUnavailable(f"Dataset {self.dataset_rid} version {version} has no recorded snapshot")
         return self._owner._snapshot_markers.get(key, f"<snapshot:{self.dataset_rid}@{version}>")
 
-    def strict_parents_at(self, version: Any) -> list[dict[str, Any]]:
-        self._owner.calls.append(("Dataset.strict_parents_at", (self.dataset_rid, str(version))))
-        # strict_parents_at calls strict_version_snapshot_catalog internally
-        # on the real Dataset; mirror that so scripted-unavailable snapshots
-        # raise here too, matching the real contract.
-        self.strict_version_snapshot_catalog(version)
-        key = (self.dataset_rid, str(version))
-        # Mirror the real method's schema-shape guard: a snapshot-bound read
-        # can trip over a column the schema lacked at that snaptime, which
-        # deriva-py raises as AttributeError/KeyError. The real
-        # ``strict_parents_at`` converts those to ``SnapshotUnavailable``;
-        # the stub must convert them identically or the harness would let a
-        # regression in that conversion pass unnoticed.
-        schema_error = self._owner._schema_failure_at.get(key)
-        if schema_error is not None:
-            try:
-                raise schema_error
-            except (AttributeError, KeyError) as e:
-                raise SnapshotUnavailable(
-                    f"Dataset {self.dataset_rid} version {version}: the catalog schema at this "
-                    f"version's snapshot does not have a column that reading parents requires "
-                    f"({type(e).__name__}: {e})"
-                ) from e
-        return list(self._owner._parents_at.get(key, []))
+    def list_dataset_parents(self) -> list[str]:
+        """Structural containment tripwire — see the class docstring."""
+        self._owner.calls.append(("Dataset.list_dataset_parents", (self.dataset_rid,)))
+        return list(self._owner._dataset_parents.get(self.dataset_rid, []))
 
 
 class _FakeML(ExecutionMixin):
@@ -208,12 +194,11 @@ class _FakeML(ExecutionMixin):
         # Snapshot availability: (dataset_rid, version) -> bool. Absent key
         # means "not scripted" -> strict_version_snapshot_catalog raises
         # SnapshotUnavailable (default-unavailable is the safe default).
+        self._dataset_parents: dict[str, list[str]] = {}
         self._snapshot_available: dict[tuple[str, str], bool] = {}
         # Optional marker object returned by a scripted-available snapshot.
         self._snapshot_markers: dict[tuple[str, str], Any] = {}
         # (dataset_rid, version) -> [{"parent_rid": ..., "parent_version_then": ...}].
-        self._parents_at: dict[tuple[str, str], list[dict[str, Any]]] = {}
-        self._schema_failure_at: dict[tuple[str, str], BaseException] = {}
         # (dataset_rid, version) -> (records, diagnostics) for
         # _find_feature_producers_impl.
         self._binding_scans: dict[tuple[str, Any], tuple[list[Any], list[BindingDiagnostic]]] = {}
@@ -340,22 +325,14 @@ class _FakeML(ExecutionMixin):
         """
         self._snapshot_available[(dataset_rid, str(version))] = ok
 
-    def set_parents_at(self, dataset_rid: str, version: str, parents: list[dict[str, Any]]) -> None:
-        """Script ``lookup_dataset(dataset_rid).strict_parents_at(version)``'s
-        return value: a list of ``{"parent_rid": ..., "parent_version_then": ...}``.
-        """
-        self._parents_at[(dataset_rid, str(version))] = list(parents)
+    def set_dataset_parents(self, dataset_rid: str, parents: list[str]) -> None:
+        """Script ``lookup_dataset(dataset_rid).list_dataset_parents()``.
 
-    def set_schema_failure_at(self, dataset_rid: str, version: str, error: BaseException) -> None:
-        """Script a SNAPSHOT-SCHEMA failure for ``strict_parents_at(version)``.
-
-        Models the case where the catalog schema at that snaptime lacks a
-        column today's code references — deriva-py raises ``AttributeError``
-        (datapath attribute access) or ``KeyError`` (row indexing). Distinct
-        from ``set_snapshot_available(..., False)``, which models a missing
-        SNAPSHOT rather than a missing COLUMN within a resolvable one.
+        Structural ``Dataset_Dataset`` containment. The closure walk must
+        NEVER read this (ruling 8, #389); it exists so a test can prove the
+        edge was present and still ignored.
         """
-        self._schema_failure_at[(dataset_rid, str(version))] = error
+        self._dataset_parents[dataset_rid] = list(parents)
 
     def set_binding_scan(
         self,
@@ -1516,31 +1493,6 @@ def test_add_version_row_with_snapshot_makes_it_available():
     assert result == "catalog@2026-01-01T00:00:00Z"
 
 
-def test_set_parents_at_round_trips_through_stub_dataset():
-    ml = _FakeML()
-    ml.set_snapshot_available(_gen_rid(260), "1.0.0", True)
-    parents = [{"parent_rid": _gen_rid(261), "parent_version_then": "0.3.0"}]
-    ml.set_parents_at(_gen_rid(260), "1.0.0", parents)
-
-    handle = ml.lookup_dataset(_gen_rid(260))
-    result = handle.strict_parents_at("1.0.0")
-
-    assert result == parents
-    assert ("Dataset.strict_parents_at", (_gen_rid(260), "1.0.0")) in ml.calls
-
-
-def test_set_parents_at_propagates_snapshot_unavailable():
-    """strict_parents_at calls strict_version_snapshot_catalog internally on
-    the real Dataset; the stub mirrors that, so an unavailable snapshot
-    raises from strict_parents_at too, not just from the direct call."""
-    ml = _FakeML()
-    ml.set_parents_at(_gen_rid(262), "1.0.0", [{"parent_rid": _gen_rid(263), "parent_version_then": None}])
-
-    handle = ml.lookup_dataset(_gen_rid(262))
-    with pytest.raises(SnapshotUnavailable):
-        handle.strict_parents_at("1.0.0")
-
-
 def test_set_binding_scan_round_trips_through_find_feature_producers_impl():
     ml = _FakeML()
     record = FeatureProducerRecord(
@@ -1618,10 +1570,10 @@ def test_call_recording_captures_seam_invocations_during_a_real_walk():
 
 def test_quarantine_snapshot_seams_untouched_by_ordinary_lineage_walk():
     """An ordinary (non-snapshot-scoped) lookup_lineage walk must NEVER touch
-    the strict-snapshot seams (lookup_dataset / strict_version_snapshot_catalog
-    / strict_parents_at) — those are reserved for the version-anchored
-    closure walk (Tasks 10-13). This is the quarantine assertion the call
-    log exists to support."""
+    the strict-snapshot seams (lookup_dataset /
+    strict_version_snapshot_catalog) — those are reserved for the
+    version-anchored closure walk. This is the quarantine assertion the
+    call log exists to support."""
     ml = _FakeML()
     ml.add_dataset(_gen_rid(310), producer=None)
     ml.add_execution(_gen_rid(311), input_datasets=[_StubDataset(_gen_rid(310))])
@@ -1632,5 +1584,7 @@ def test_quarantine_snapshot_seams_untouched_by_ordinary_lineage_walk():
     recorded_methods = {name for name, _ in ml.calls}
     assert "lookup_dataset" not in recorded_methods
     assert "Dataset.strict_version_snapshot_catalog" not in recorded_methods
-    assert "Dataset.strict_parents_at" not in recorded_methods
     assert "_find_feature_producers_impl" not in recorded_methods
+    # Structural containment is never a walk seam, in either mode
+    # (ruling 8, #389).
+    assert "Dataset.list_dataset_parents" not in recorded_methods
