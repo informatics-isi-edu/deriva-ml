@@ -1196,3 +1196,272 @@ is NOT thread-safe; the #392 scans solved this with per-scan handles),
 keep the public API sync via run_async, and migrate hot reads to
 native async incrementally — converging on ONE concurrency framework
 instead of three.
+
+**2026-09-01 — Parallel expansion implemented (#391b): byte-identical,
+147s → 99s, and the bottleneck moved AGAIN — to `expand_dataset`.** The
+approved design shipped as specified: frontier rounds, `asyncio.gather`
+under an `asyncio.Semaphore` (the deriva-py `clone.py` pattern), the
+existing sync mixin seams offloaded via `loop.run_in_executor`, public
+API kept sync through `run_async`, and per-worker `DerivaML` handles
+(`_provenance_worker_handle`) because `requests.Session` is not
+thread-safe. Live A/B on `lookup_provenance("7-ZW3P")`, www.eye-ai.org:
+
+| Measure | before | after | delta |
+|---|---|---|---|
+| **executions** | 52 | **52** (same RIDs) | **0** |
+| **datasets** | 15 | **15** (same RIDs) | **0** |
+| assets | 1 | 1 | 0 |
+| gap multiset | 129 | **129 (identical strings)** | **0** |
+| full `model_dump` | — | **byte-identical, 118,155 B** | **0** |
+| **runtime** | 147.3s | **99.2s** | **−33%** |
+
+**The overlap is excellent; the coverage is not.** Instrumented:
+**149.3s of `read_execution` work compressed into ~29.6s of wall time
+(5.4× overlap)** across 48 of 52 reads. That leg is now essentially
+solved. But the ≤50s target was still missed, and the profile says why:
+
+- `expand_dataset` — **24.1s over 43 calls, fully sequential.** This is
+  the strict-snapshot resolution per walked pin, and it is now the
+  single largest un-parallelized leg. **Next lever.**
+- binding scans — 26.6s (already pooled by #392; 4 rounds).
+- inline reads — 16.0s over just **4** reads that missed the prefetch.
+
+**The finding worth carrying forward: frontier WIDTH, not frontier
+existence, is what pays.** Measured widths were `{1: 44 frontiers, 6: 1,
+42: 1}`. One width-42 frontier (the seed set) did essentially all the
+work; **44 of 46 frontiers were width 1** and correctly fell back to an
+inline read. The walk's shape is one wide fan-out at the seeds and then
+long serial chains — so "parallelize the expansion" bought a one-shot
+33%, not a uniform speedup, and further gains must come from
+parallelizing a *different* leg (`expand_dataset`), not from tuning
+worker count. Raising `DERIVA_ML_PROVENANCE_WORKERS` above 8 cannot help
+a width-1 frontier.
+
+**A cap-honesty subtlety that cost a test rewrite.** "No over-fetch past
+the cap" cannot mean "reads ≤ cap" for any read-AHEAD: a frontier's
+siblings are fetched before the first sibling's own subtree has spent
+its budget, so a capped walk reads a bounded handful it then declines to
+expand (measured: 6 reads under a cap of 4, vs 4 sequential). What IS
+guaranteed, and what the test now pins, is (a) no frontier exceeds the
+remaining budget, (b) in-flight readouts are CHARGED against that budget
+— without which nested frontiers each measure the budget as if the
+others did not exist and the read-ahead runs away — and (c) the capped
+closure is byte-identical to the capped sequential closure. Cap honesty
+is about what ends up in the closure, never about how many rows were
+read to decide that.
+
+**Design note that made this cheap: split read from apply, don't
+restructure the walk.** Rather than converting the recursive DFS into an
+explicit BFS-by-frontier state machine, `expand_execution` was split
+into `read_execution` (pure I/O, returns an immutable `ExecutionReadout`,
+touches no engine or visitor state) and the unchanged apply half. The
+prefetch is then a pure read-ahead that fills a cache the apply path
+consumes; an empty cache degrades to the historical inline read. That is
+why **zero existing tests needed editing** — 194 provenance/lineage
+tests and 8/8 goldens passed untouched on the first run — and why
+`DERIVA_ML_PROVENANCE_WORKERS=1` is a true sequential-equivalence
+control rather than a second code path. Failures the read side hits are
+CAPTURED into the readout and classified on the main thread
+(`member_producers_from` mirrors `member_producers_or_gap`'s exception
+taxonomy verbatim), so gap text, gap dedup and gap order are unchanged
+by construction rather than by luck.
+
+**2026-09-01 — Review correction to #391b: `hash(rid) % len(pool)` is
+ROUTING, not isolation — and a byte-identical A/B cannot detect the
+difference.** The first parallel-expansion build handed each read a
+handle by hashing the RID into the pool. With `min(workers, len(rids))`
+tasks over exactly `workers` handles, that collides constantly
+(birthday paradox; ~100% at frontier width ≥ 8), and every collision
+silently shares an unsynchronized `requests.Session` **and** the
+unguarded `_snapshot_cache` dict on that `DerivaML`. Fixed by LEASING:
+handles live in an `asyncio.Queue`, acquired before `run_in_executor`
+and released in a `finally`, with the queue depth serving as the *only*
+concurrency bound so "pool ≥ concurrency" is enforced rather than
+asserted. The separate `Semaphore` was deleted — a second bound can
+drift out of step with the pool and reintroduce sharing.
+
+**The lesson that generalizes: a byte-identical live A/B is evidence
+about SEMANTICS, not about TRANSPORT SAFETY.** The 118,155-byte
+identical dump was produced by the racy build. It proves the apply side
+is single-threaded; it says nothing about whether the reads underneath
+were safe, because a session race can return a correct answer on any
+given run. Thread-safety claims need a test that can observe sharing,
+not a diff that can't.
+
+**Corollary: a test harness that returns `self` as its "per-worker
+handle" cannot detect handle sharing** — the pool becomes N references
+to one object and every collision looks like ordinary reuse. The
+harness now mints a DISTINCT probe per handle, each counting its own
+occupancy and *holding* it for a configurable interval so concurrent
+reads genuinely overlap. Mutate-and-revert is what proved the pin real:
+the collision test fails against the hash-mod build with **33 recorded
+concurrent entries** and passes against the lease. Two other pins in
+that PR turned out to be similarly vacuous until mutation-tested — the
+in-flight budget charge (deleting it passed the entire suite, because
+the coarse `≤ 2*cap` bound never bit; and the obvious scenario ALSO
+can't exercise it, since `_prefetchable` filters already-cached RIDs to
+empty — you need each seed to have its OWN parents so a new frontier is
+offered while other readouts are still unapplied), and read-failure
+equivalence (needed pinning per exception KIND, including that
+`RuntimeError` still PROPAGATES rather than being swallowed because it
+happened on a worker). **Standing rule: for any concurrency or
+budget-accounting invariant, mutate the implementation and confirm the
+test fails before believing it.**
+
+**And a bug the probe itself surfaced:** proxying handle attributes by
+"is it callable" wrapped `_FakeML.model` — a `MagicMock`, hence
+callable — so `ml.model.name_to_table(...)` raised `AttributeError`
+inside the asset branch, which swallowed it as `resolution_failed` and
+silently dropped every asset producer. Instrument an explicit seam
+list, never a callable check, when proxying a duck-typed object.
+
+**2026-09-01 — Codex stack review round 2: ruling 9 had a latent
+correctness hole, and the second concurrency leg had the same session
+bug.** Four findings, all accepted (PR #393).
+
+**The one that matters: "scan once per dataset" was implemented as
+"scan once per dataset EVER".** `_binding_scanned` was a set, so once a
+dataset was scanned it never scanned again — but a later round can walk
+a HIGHER pin (a scan-discovered execution's inputs walk D@v2 above the
+already-scanned v1). Ruling 9 promises evidence as of the MAXIMUM
+walked snaptime; the implementation delivered evidence as of the
+*first-scanned* snaptime, silently dropping bindings that exist only at
+the higher pin. Fixed by tracking the scanned VERSION per dataset and
+rescanning when the max pin advances (compared with `max_walked_pin`'s
+own total order, so "newer" has one definition). The rescan REPLACES
+the prior arcs rather than merging: monotonicity makes the new view a
+superset, so a merge would duplicate every surviving record and leave
+one dataset's arcs carrying two different `input_version` labels —
+"evidence as of one snaptime" broken. Convergence is free: pins only
+advance, bounded by version count.
+
+**The eye-ai A/B could not have caught it — and said so only when
+asked.** Post-fix run was byte-identical (52/15/1/129, 178 binding
+evidence records unchanged). Instrumenting the run explained why: **15
+datasets, 15 scans, ZERO rescans** — no dataset's max pin advances
+after its first scan on that catalog, so the bug is latent for that
+root. Recording this because the null result is a trap: identical bytes
+after a correctness fix look like "the fix was unnecessary" and are
+actually "this root doesn't reach the broken path." Always instrument
+whether the fixed path was EXERCISED before reading a null A/B as
+reassurance.
+
+**Second finding, same shape as the round-1 lease bug:** the #392
+binding-scan `ThreadPoolExecutor` called seams on the shared `self.ml`
+concurrently — the identical unsynchronized `requests.Session` +
+`_snapshot_cache` hazard the expansion lease had just fixed, sitting
+untouched on the other leg. Both legs now draw from ONE handle queue
+(`_run_leased`), which makes pool depth the single global concurrency
+bound and retires the "two concurrency frameworks" item. **Lesson: when
+you fix a concurrency bug, grep for every other pool in the same
+module** — the fix does not generalize itself.
+
+**Harness lesson (again): a probe can only see what routes through
+it.** The first scan-lease test PASSED against a deliberately-broken
+mutant, because a worker bypassing the lease calls the seam on the
+shared `_FakeML` where no `_HandleProbe` exists. Needed a separate
+"direct concurrent use of the shared instance" tracker before the pin
+was real (then: 23 recorded violations against the mutant). Corollary
+to the round-1 rule: mutation-testing a concurrency pin has to confirm
+the harness can OBSERVE the mutant, not merely that the test fails for
+some reason.
+
+**Also: `reuse_schema_json` never pinned anything** — `_init_online`
+re-fetches `/schema` to validate it and replaces on difference. Right
+for `catalog_snapshot` (a pre-migration snapshot must not build a model
+its catalog cannot serve), wrong for worker handles on the same live
+catalog, which each re-fetched and could diverge from the caller's
+model mid-walk (one walk, two model identities). Now an explicit
+`trust_schema_json` flag used only by the worker-handle factory;
+default stays validating.
+
+**2026-09-01 — Round 3: the rescan fix was half-done — replacing arcs
+without replacing GAPS just moves a stale-view bug into the gap
+stream.** Ruling 9's "one as-of view per dataset" has to hold across
+*every* accumulator the scan writes to, not just the one you were
+thinking about. Two reachable cases: a binding-leg `sentinel_origin`
+whose detail embedded `{dataset}@{version}` emitted TWO gaps for one
+fact on the ordinary MONOTONE rescan (the two-version-labels violation
+the arc fix's own docstring named — the fix documented the rule and
+then broke it one accumulator over); and a transient v1
+`binding_scan_failed` survived a clean v2 rescan, permanently reporting
+a failure that no longer applied.
+
+**Two complementary fixes, and it is worth knowing they are not
+redundant:** (1) tag gaps with the dataset whose scan emitted them and
+drop them on rescan — *releasing the dedup keys too*, or the fresh
+scan's identical re-emission is swallowed as "already seen" and the gap
+vanishes entirely, turning one bug into a worse one; (2) stop embedding
+the scanned pin in details that state version-INDEPENDENT facts. Each
+alone fixes the sentinel case; only (1) fixes the transient-failure
+case; (2) makes the gap dedupe naturally before any drop runs. **General
+rule: put the as-of label on the ARCS (which are the as-of view) and
+keep it out of gap details (which state facts).**
+
+**A test can pin the defect.** `test_binding_sentinel_execution_emits_gap…`
+asserted `{dataset}@{version}` appeared in the sentinel detail — it had
+been written against the buggy behaviour and was actively defending it.
+When a fix makes an existing assertion fail, check whether the
+assertion was ever *right* before changing the code back.
+
+**And: "unified" claims need reading twice.** The round-2 commit said
+both legs run through one `_run_leased`; they actually shared a handle
+POOL while duplicating the queue/acquire/release loop. Genuinely
+unified now (`_gather_leased` is the single primitive, `_run_leased`
+its sync wrapper), with the per-task exception difference pushed into
+each caller's worker so the primitive stays exception-neutral and one
+task's failure cannot cancel the gather.
+
+**2026-09-02 — Live proof of the rescan, and the environment blocker
+that stopped it landing green.** Wrote
+`tests/execution/test_lookup_provenance_live.py`: the pin-advance
+scenario built on a real catalog rather than `_FakeML` — D over three
+Subject members; E1 binds a Quality feature; D released at v1 (snapshot
+cut AFTER E1's bindings, so a v1 scan sees E1 and nothing later); E2
+binds a SECOND, distinct feature; D released at v2; then the load-
+bearing edge, `e1.add_input_dataset(D, version=v2)`, which is what makes
+the maximum walked pin advance in a round *after* D was first scanned.
+Root R consumes D@v1. Five tests: exactly two scans of D (v1 then v2),
+all surviving `member_binding` arcs carry v2, E1 holds exactly ONE arc
+(replaced not merged), E2 present, and no gap detail carries the
+superseded v1 label.
+
+**Two construction notes worth keeping.** (1) The pin advance needs a
+PUBLIC API, and there is one — `Execution.add_input_dataset(rid,
+version=)` writes the `Dataset_Execution` row with the `Dataset_Version`
+FK resolved, so no hand-rolled association insert is needed; reaching
+for a raw insert here would have been a hard-coded-schema smell. (2)
+Use TWO distinct features, not two batches of one feature: E2's
+bindings have to be invisible at v1 for the control assertion
+(`find_feature_producers(D, version=v1)` lacks E2 while the closure
+contains it) to mean anything. Scan counting is a `monkeypatch` wrapper
+on `_find_feature_producers_impl` at the CLASS level — the engine leases
+separate handles, so patching the instance would miss the worker calls.
+
+**Blocker: the localhost demo stack's bearer token is expired and cannot
+be refreshed non-interactively.** `POST /ermrest/catalog` → 401 ("Access
+requires authentication"), while GETs still return 200 — exactly the
+trap the `demo-catalog-auth-and-build` memory warns about: **read
+success does not prove the token is good**, because anonymous read is
+allowed. Confirmed environmental, not code: the pre-existing
+`test_lookup_lineage_live.py` fails identically, and the 17 errors in
+`test_provenance_contract.py` reproduce on a clean tree with my file
+stashed. Also worth recording for next time: this stack now fronts
+**Keycloak** (`/authn/login` → `/auth/realms/deriva/...`), not Globus —
+there is no `/authn/session` endpoint at all (404), `/authn/discovery`
+returns `{}`, and the realm does advertise the `password` grant, so a
+refresh is *mechanically* possible but needs a human's realm
+credentials. Offline gates are green (224 passed incl. the 150-test
+provenance unit suite); the live module skips cleanly without
+`DERIVA_HOST` and is ready to run the moment a token is minted.
+
+**2026-09-02 — Live rescan proof OBTAINED (postscript to the Keycloak
+blocker entry).** After Carl refreshed the localhost credential, the
+committed live module ran green twice (5/5, ~80s each, idempotent):
+the demo-catalog pin-advance scenario fired exactly 2 binding scans of
+the dataset, the final closure's member_binding arcs all carry the v2
+label (v1 view replaced), the v2-only binder E2 is present, no
+binding gap carries a stale version label, and the live control
+(find_feature_producers at v1 lacks E2) proves E2 was genuinely
+invisible at the old pin. The ruling-9 rescan machinery is now
+evidence-complete: mutation-pinned offline AND exercised live.

@@ -33,7 +33,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from deriva_ml.core.exceptions import DerivaMLValidationError, SnapshotUnavailable
+from deriva_ml.core.exceptions import (
+    DerivaMLException,
+    DerivaMLValidationError,
+    SnapshotUnavailable,
+)
 from deriva_ml.core.mixins.execution import BindingDiagnostic
 from deriva_ml.execution.provenance import (
     ArcInputType,
@@ -1636,8 +1640,15 @@ def test_binding_sentinel_execution_emits_gap_no_arc_not_enqueued():
     detail = gaps[0].detail
     assert "Annotation" in detail
     assert "Image" in detail
-    assert f"{ds_root}@1.0.0" in detail
+    assert ds_root in detail
     assert "is bound by the unknown-provenance Execution sentinel" in detail
+    # The detail names the DATASET but deliberately NOT the scanned version.
+    # "this feature's values are bound by the sentinel" is a fact about the
+    # dataset, not about which snaptime observed it; embedding the pin made
+    # the ordinary monotone rescan emit a second, identical gap under a
+    # second as-of label — the two-version-labels violation the rescan fix
+    # exists to prevent. The as-of label lives on the ARCS.
+    assert "@1.0.0" not in detail
 
 
 def test_binding_sentinel_guard_frees_budget_for_the_real_binder():
@@ -3304,3 +3315,1018 @@ def test_unversioned_member_scan_uses_the_live_model():
     ml._producers_of_dataset_members(dataset_rid)
 
     assert seen["model"] is live_model
+
+
+# ---------------------------------------------------------------------------
+# Parallel frontier expansion (#391b).
+#
+# The change under test restructured the CLOSURE walk's read side: a
+# frontier of queued executions has its catalog reads fetched CONCURRENTLY
+# (asyncio.gather under a Semaphore, the existing sync mixin seams offloaded
+# via run_in_executor onto per-worker catalog handles), while every piece of
+# engine and builder mutation stays single-threaded and in queue order.
+#
+# The whole point is that NOTHING observable changed, so these tests are all
+# equivalence pins: same closure, same bytes, same cap honesty. Lineage is
+# untouched by construction (the prefetch is closure-mode only) and its
+# goldens are what pin that.
+# ---------------------------------------------------------------------------
+
+
+def _multi_level_chain_scenario() -> tuple[_FakeML, str, list[str]]:
+    """Build a chain deep and WIDE enough to produce multi-entry frontiers.
+
+    ``ds_root`` has four member-producing executions; each consumes its own
+    dataset, whose producer consumes a shared upstream dataset. That gives a
+    frontier of four at one level and a converging diamond below it — so a
+    round genuinely has several independent executions to fetch at once,
+    which a one-node-per-round chain would not.
+
+    Returns ``(ml, root_dataset_rid, expected_execution_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    ds_upstream = _ds(2)
+    root_producer = _ex(1)
+    upstream_producer = _ex(2)
+
+    ml.add_execution(upstream_producer, description="upstream producer")
+    ml.add_dataset(ds_upstream, description="upstream", producer=upstream_producer)
+    ml.set_versioned_producer(ds_upstream, "1.0.0", upstream_producer)
+
+    expected = [root_producer, upstream_producer]
+    consumers = []
+    for index in range(4):
+        mid_dataset = _ds(10 + index)
+        mid_producer = _ex(10 + index)
+        leaf_consumer = _ex(20 + index)
+        # mid_producer consumes the SHARED upstream dataset -> a diamond
+        # that converges on one execution from four independent branches.
+        ml.add_execution(
+            mid_producer,
+            description=f"mid producer {index}",
+            input_datasets=[_StubDataset(ds_upstream, "upstream", "1.0.0", consumed_version="1.0.0")],
+        )
+        ml.add_dataset(mid_dataset, description=f"mid {index}", producer=mid_producer)
+        ml.set_versioned_producer(mid_dataset, "1.0.0", mid_producer)
+        ml.add_execution(
+            leaf_consumer,
+            description=f"leaf consumer {index}",
+            input_datasets=[_StubDataset(mid_dataset, f"mid {index}", "1.0.0", consumed_version="1.0.0")],
+        )
+        consumers.append(leaf_consumer)
+        expected.extend([mid_producer, leaf_consumer])
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+    ml.set_member_producers(ds_root, set(consumers))
+    return ml, ds_root, sorted(expected)
+
+
+def test_parallel_expansion_matches_sequential_byte_for_byte():
+    """A multi-level, multi-branch closure expands IDENTICALLY with the
+    concurrent frontier prefetch on and off — same ``model_dump()`` bytes.
+
+    Built as an equivalence pin against a scenario whose expected content is
+    asserted independently below, not against a captured snapshot of the old
+    implementation.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_sequential, root_sequential, expected = _multi_level_chain_scenario()
+    ml_parallel, root_parallel, _ = _multi_level_chain_scenario()
+    ml_parallel.enable_parallel_expansion(True)
+
+    closure_sequential = ml_sequential.lookup_provenance(root_sequential)
+    closure_parallel = ml_parallel.lookup_provenance(root_parallel)
+
+    assert _canonical(closure_parallel.model_dump(mode="json")) == _canonical(
+        closure_sequential.model_dump(mode="json")
+    )
+
+    # Non-vacuous: the scenario really is multi-level and wide, and the
+    # closure really did reach every execution in the chain.
+    assert sorted(closure_parallel.executions) == expected
+    assert closure_parallel.executions_visited == len(expected)
+    assert closure_parallel.traversal_complete is True
+    # The converging upstream producer is reached from four branches and
+    # still appears exactly once, at its minimum discovery depth.
+    upstream_arcs = _arcs_of(closure_parallel, _ex(2))
+    assert min(a.depth for a in upstream_arcs) == min(a.depth for a in _arcs_of(closure_sequential, _ex(2)))
+
+
+def _require_parallel_enabled() -> None:
+    """Skip a test that is only meaningful when concurrency is enabled.
+
+    ``DERIVA_ML_PROVENANCE_WORKERS=1`` deliberately disables the frontier
+    prefetch entirely, so tests that assert a frontier WAS fetched (or that
+    handles were leased concurrently) have nothing to observe. That is the
+    knob working, not a failure — but the assertions would read as one, so
+    they skip instead.
+    """
+    import os
+
+    if os.environ.get("DERIVA_ML_PROVENANCE_WORKERS") == "1":
+        pytest.skip("concurrency disabled by DERIVA_ML_PROVENANCE_WORKERS=1; nothing to observe")
+
+
+def test_parallel_expansion_actually_prefetched_a_multi_entry_frontier():
+    """The equivalence test above would pass vacuously if the prefetch never
+    ran, so pin that a frontier of more than one execution was genuinely
+    fetched concurrently."""
+    _require_parallel_enabled()
+
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+
+    ml, root, _ = _multi_level_chain_scenario()
+    ml.enable_parallel_expansion(True)
+
+    frontier_sizes: list[int] = []
+    original = WalkEngine.prefetch_executions
+
+    def _recording(self, candidates) -> int:
+        count = original(self, candidates)
+        frontier_sizes.append(count)
+        return count
+
+    WalkEngine.prefetch_executions = _recording  # type: ignore[method-assign]
+    try:
+        ml.lookup_provenance(root)
+    finally:
+        WalkEngine.prefetch_executions = original  # type: ignore[method-assign]
+
+    assert max(frontier_sizes, default=0) >= 2, (
+        f"no multi-entry frontier was prefetched (sizes={frontier_sizes}); the equivalence pin above would be vacuous"
+    )
+
+
+def test_worker_count_one_equals_default_byte_for_byte(monkeypatch):
+    """``DERIVA_ML_PROVENANCE_WORKERS=1`` forces the fully sequential read
+    path and must produce byte-identical output to the default.
+
+    This is the cheap sequential-equivalence control: the knob tunes HOW the
+    walk talks to the catalog, never WHAT it finds, so if these two ever
+    diverge the concurrency has leaked into the semantics.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_default, root_default, _ = _multi_level_chain_scenario()
+    ml_default.enable_parallel_expansion(True)
+    closure_default = ml_default.lookup_provenance(root_default)
+
+    monkeypatch.setenv("DERIVA_ML_PROVENANCE_WORKERS", "1")
+    ml_single, root_single, _ = _multi_level_chain_scenario()
+    ml_single.enable_parallel_expansion(True)
+    closure_single = ml_single.lookup_provenance(root_single)
+
+    assert _canonical(closure_single.model_dump(mode="json")) == _canonical(closure_default.model_dump(mode="json"))
+
+
+def test_frontier_honors_the_remaining_execution_budget():
+    """A frontier is bounded by the REMAINING execution budget, and the
+    closure a capped walk produces is IDENTICAL to the sequential one.
+
+    What "no over-fetch" can and cannot mean here is worth stating
+    precisely, because the parallel walk is a read-AHEAD:
+
+    - **Guaranteed.** No frontier is larger than the remaining budget, and
+      in-flight readouts are charged against that budget, so total reads
+      stay bounded by ``max_executions`` — the walk can never run away.
+    - **Not guaranteed, by construction.** A frontier's *siblings* are
+      fetched before the first sibling's own subtree has consumed its
+      budget, so a capped walk may read a bounded handful of executions it
+      then declines to expand. That is the price of any read-ahead; the
+      alternative (fetch one, expand it fully, then decide) is exactly the
+      sequential walk this change exists to replace.
+
+    Cap honesty — which executions END UP in the closure, ``cap_hit``,
+    ``traversal_complete``, and the absence of false ``unresolved_rid``
+    gaps — is unaffected either way, and that is what this pins.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    cap = 4
+    ml_sequential, root_sequential, expected = _multi_level_chain_scenario()
+    closure_sequential = ml_sequential.lookup_provenance(root_sequential, max_executions=cap)
+
+    ml, root, _ = _multi_level_chain_scenario()
+    ml.enable_parallel_expansion(True)
+    closure = ml.lookup_provenance(root, max_executions=cap)
+
+    assert len(expected) > cap, "scenario must be bigger than the cap for this to bite"
+    assert closure.cap_hit is True
+    assert closure.traversal_complete is False
+    assert closure.executions_visited <= cap
+    assert len(closure.executions) <= cap
+
+    # The closure a capped parallel walk produces is byte-identical to the
+    # capped sequential one: read-ahead changes what is fetched, never what
+    # is expanded or recorded.
+    assert _canonical(closure.model_dump(mode="json")) == _canonical(closure_sequential.model_dump(mode="json"))
+
+    # The budget stop must not manufacture "unresolved" holes for
+    # executions that are perfectly resolvable and were merely truncated.
+    unresolved = _gaps_for(closure, GapKind.unresolved_rid)
+    assert unresolved == [], f"budget truncation reported false unresolved gaps: {unresolved}"
+
+    # Total reads stay bounded: at most one frontier's worth of speculative
+    # siblings beyond what the sequential walk read, never the whole graph.
+    # ``2 * cap`` is the bound that follows from "no frontier exceeds the
+    # remaining budget" — it is an assertion about the algorithm, not a
+    # tolerance fudged to fit the current numbers.
+    sequential_reads = {c[1][0] for c in ml_sequential.calls if c[0] == "_input_dataset_pairs"}
+    looked_up = {c[1][0] for c in ml.calls if c[0] == "_input_dataset_pairs"}
+    assert len(sequential_reads) <= cap
+    assert len(looked_up) <= 2 * cap, f"read-ahead fetched {len(looked_up)} executions under a cap of {cap}"
+    assert len(looked_up) < len(expected), "a capped walk must not read the whole graph"
+
+
+def test_in_flight_readouts_are_charged_against_the_remaining_budget():
+    """A frontier's width never exceeds the budget slots that are actually
+    free — i.e. remaining budget MINUS readouts already fetched and not yet
+    applied.
+
+    Each in-flight readout will consume a slot when it is applied, so a
+    frontier that ignores them measures the budget as if they did not exist
+    and reads further ahead than the cap allows. This asserts the width
+    against free slots at each fetch, which is what makes the charge
+    load-bearing: deleting ``- len(self._readouts)`` from ``frontier_rids``
+    makes this test fail (verified by mutate-and-revert), where the coarser
+    "total reads <= 2*cap" bound did not bite.
+    """
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+
+    cap = 6
+    # Each seed has its OWN distinct parents, so expanding seed #1 offers a
+    # NEW parent frontier while seeds #2..#N are still sitting unapplied in
+    # the readout cache. That is the only regime where the charge matters:
+    # a scenario whose later frontiers are all already-prefetched RIDs is
+    # filtered to empty by ``_prefetchable`` and would pass either way.
+    ml, root, expected = _wide_frontier_scenario_with_parents(width=12, parents_each=4)
+    ml.enable_parallel_expansion(True)
+
+    observations: list[tuple[int, int]] = []
+    original = WalkEngine.frontier_rids
+
+    def _recording(self, candidates=None):
+        # Free slots BEFORE this fetch: what the walk may still expand,
+        # less what it has already fetched and not yet applied.
+        free = self.max_executions - len(self.visited_global) - len(self._readouts)
+        out = original(self, candidates)
+        observations.append((len(out), free))
+        return out
+
+    WalkEngine.frontier_rids = _recording  # type: ignore[method-assign]
+    try:
+        closure = ml.lookup_provenance(root, max_executions=cap)
+    finally:
+        WalkEngine.frontier_rids = original  # type: ignore[method-assign]
+
+    assert len(expected) > cap, "scenario must exceed the cap for this to bite"
+    assert closure.cap_hit is True
+
+    for taken, free in observations:
+        assert taken <= max(free, 0), (
+            f"fetched a frontier of {taken} with only {free} free budget slots — "
+            "in-flight readouts are not being charged against the budget"
+        )
+
+    # Non-vacuous: at least one fetch happened while readouts were in
+    # flight, which is the only regime where the charge matters at all.
+    assert any(free < cap for _taken, free in observations), (
+        "no fetch was observed with readouts already in flight; the charge was never exercised"
+    )
+
+
+def test_parallel_expansion_preserves_shuffled_determinism():
+    """The existing shuffled-insertion determinism scenario stays
+    byte-identical under concurrent expansion — including across a shuffled
+    construction order, which is what makes it a real determinism pin rather
+    than a same-input repeat."""
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_forward, root_forward, kwargs_forward = _shuffled_determinism_scenario(reversed_order=False)
+    ml_reversed, root_reversed, kwargs_reversed = _shuffled_determinism_scenario(reversed_order=True)
+    ml_forward.enable_parallel_expansion(True)
+    ml_reversed.enable_parallel_expansion(True)
+
+    got_forward = _canonical(ml_forward.lookup_provenance(root_forward, **kwargs_forward).model_dump(mode="json"))
+    got_reversed = _canonical(ml_reversed.lookup_provenance(root_reversed, **kwargs_reversed).model_dump(mode="json"))
+
+    assert got_forward == got_reversed
+
+    # And identical to the SEQUENTIAL result for the same scenario, so the
+    # prefetch did not merely become self-consistently wrong.
+    ml_sequential, root_sequential, kwargs_sequential = _shuffled_determinism_scenario(reversed_order=False)
+    got_sequential = _canonical(
+        ml_sequential.lookup_provenance(root_sequential, **kwargs_sequential).model_dump(mode="json")
+    )
+    assert got_forward == got_sequential
+
+
+def test_prefetch_bridge_works_inside_a_running_event_loop():
+    """``lookup_provenance`` stays callable from a notebook.
+
+    The prefetch bridges async back to sync through ``run_async``, which
+    re-enters an already-running loop via ``nest_asyncio`` instead of
+    raising ``asyncio.run() cannot be called from a running event loop``.
+    Calling the sync API from inside ``asyncio.run`` is the smoke check that
+    the bridge does not deadlock — the failure mode this guards is a hang or
+    a RuntimeError, not a wrong answer.
+    """
+    import asyncio
+
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_direct, root_direct, _ = _multi_level_chain_scenario()
+    ml_direct.enable_parallel_expansion(True)
+    expected = _canonical(ml_direct.lookup_provenance(root_direct).model_dump(mode="json"))
+
+    ml_loop, root_loop, _ = _multi_level_chain_scenario()
+    ml_loop.enable_parallel_expansion(True)
+
+    async def _inside_a_loop():
+        # Deliberately the SYNC public API, called from inside a running
+        # loop — exactly what a Jupyter cell does.
+        return ml_loop.lookup_provenance(root_loop)
+
+    closure = asyncio.run(asyncio.wait_for(_inside_a_loop(), timeout=60))
+    assert _canonical(closure.model_dump(mode="json")) == expected
+
+
+def test_read_execution_never_mutates_engine_or_visitor():
+    """``read_execution`` is the method workers run concurrently, so it must
+    be provably read-only: no engine state, no visitor events.
+
+    Pinned structurally rather than by review, because a future edit that
+    slips one ``visitor.on_gap`` into the read side would be a data race the
+    equivalence tests could pass through by luck.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, _root, _expected = _multi_level_chain_scenario()
+    builder = ClosureBuilder()
+    engine: WalkEngine = WalkEngine(ml, builder, closure_mode=True)
+
+    before = (
+        set(engine.visited_global),
+        set(engine.in_progress),
+        set(engine.truncated),
+        set(engine.datasets_expanded),
+        engine.cap_hit,
+        dict(engine.flags),
+    )
+
+    readout = engine.read_execution(_ex(1))
+
+    assert readout.rid == _ex(1)
+    assert readout.lookup_error is None
+    assert (
+        set(engine.visited_global),
+        set(engine.in_progress),
+        set(engine.truncated),
+        set(engine.datasets_expanded),
+        engine.cap_hit,
+        dict(engine.flags),
+    ) == before
+    # Visitor untouched: nothing accumulated at all.
+    assert builder.finalize() == ({}, {}, {}, [])
+
+
+def _wide_frontier_scenario(*, width: int) -> tuple[_FakeML, str, list[str]]:
+    """A root whose seed frontier is ``width`` independent executions.
+
+    Deliberately WIDER than the handle pool (8), so leases must be recycled
+    while other reads are still in flight — the regime where a routing
+    scheme (``hash(rid) % len(pool)``) collides and a lease queue does not.
+
+    Returns ``(ml, root_dataset_rid, expected_execution_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    members = set()
+    expected = [root_producer]
+    for index in range(width):
+        member_producer = _ex(100 + index)
+        ml.add_execution(member_producer, description=f"member producer {index}")
+        members.add(member_producer)
+        expected.append(member_producer)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(expected)
+
+
+def _wide_frontier_scenario_with_parents(*, width: int, parents_each: int) -> tuple[_FakeML, str, list[str]]:
+    """A wide seed frontier where each seed has its OWN distinct parents.
+
+    Expanding the first seed therefore offers a brand-new parent frontier
+    while the other seeds are still sitting unapplied in the readout cache
+    — the regime that exercises the in-flight budget charge. (In
+    ``_wide_frontier_scenario`` every later frontier consists of RIDs that
+    are already cached, so ``_prefetchable`` filters them to empty and the
+    charge is never consulted.)
+
+    Returns ``(ml, root_dataset_rid, expected_execution_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    members = set()
+    expected = [root_producer]
+    for index in range(width):
+        seed = _ex(100 + index)
+        parent_datasets = []
+        for parent_index in range(parents_each):
+            parent_dataset = _ds(200 + index * parents_each + parent_index)
+            parent_execution = _ex(300 + index * parents_each + parent_index)
+            ml.add_execution(parent_execution, description=f"parent {index}.{parent_index}")
+            ml.add_dataset(parent_dataset, description=f"ds {index}.{parent_index}", producer=parent_execution)
+            ml.set_versioned_producer(parent_dataset, "1.0.0", parent_execution)
+            parent_datasets.append(
+                _StubDataset(parent_dataset, f"ds {index}.{parent_index}", "1.0.0", consumed_version="1.0.0")
+            )
+            expected.append(parent_execution)
+        ml.add_execution(seed, description=f"seed {index}", input_datasets=parent_datasets)
+        members.add(seed)
+        expected.append(seed)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(expected)
+
+
+def test_no_worker_handle_is_ever_entered_concurrently():
+    """Handles are LEASED, not routed: no handle is ever in use by two
+    reads at once.
+
+    This is the pin the earlier ``hash(rid) % len(handles)`` scheme failed.
+    Hash-mod is a routing scheme, not exclusion — with N concurrent tasks
+    over N handles, collisions are near-certain — and every collision
+    silently shares an unsynchronized ``requests.Session`` and the
+    ``_snapshot_cache`` dict on that handle's ``DerivaML``.
+
+    The harness mints a DISTINCT ``_HandleProbe`` per handle, each counting
+    its own occupancy, so a shared handle is observable. Verified to FAIL
+    against the hash-mod implementation (mutate-and-revert), which is what
+    makes it a real pin rather than a tautology.
+    """
+    _require_parallel_enabled()
+
+    from deriva_ml.core.mixins._provenance_engine import WalkEngine
+
+    ml, root, _ = _wide_frontier_scenario(width=24)
+    ml.enable_parallel_expansion(True)
+    # Hold each handle long enough that concurrent reads genuinely overlap.
+    # Without this the scripted seams return in microseconds and a sharing
+    # bug is missed by timing luck rather than absent by design.
+    ml._handle_hold_seconds = 0.01
+
+    widths: list[int] = []
+    original = WalkEngine.frontier_rids
+
+    def _recording(self, candidates=None):
+        out = original(self, candidates)
+        if out:
+            widths.append(len(out))
+        return out
+
+    WalkEngine.frontier_rids = _recording  # type: ignore[method-assign]
+    try:
+        ml.lookup_provenance(root)
+    finally:
+        WalkEngine.frontier_rids = original  # type: ignore[method-assign]
+
+    assert list(ml.handle_violations) == [], (
+        f"a worker handle was entered concurrently {len(ml.handle_violations)} time(s): "
+        f"{list(ml.handle_violations)[:5]} — handles are being SHARED, not leased"
+    )
+    # Non-vacuous on both axes: a real pool was built, and the frontier was
+    # wider than the pool, so leases genuinely had to be recycled (which is
+    # where a routing scheme collides and a lease does not).
+    assert ml._handle_serial >= 2, "no handle pool was built, so the pin is vacuous"
+    assert max(widths, default=0) > ml._handle_serial, (
+        f"widest frontier {max(widths, default=0)} did not exceed the pool size "
+        f"{ml._handle_serial}; leases were never contended"
+    )
+
+
+def test_worker_pool_bounds_concurrency_so_leases_never_starve():
+    """Concurrency is bounded BY the pool, so a lease is always available.
+
+    The lease queue's depth is the only concurrency bound. If any other
+    bound were larger than the pool, tasks would block forever waiting for
+    a handle; if it were smaller, the pool would be under-used. Reaching a
+    finished closure at all is the liveness half of that invariant, and the
+    peak-occupancy check is the safety half.
+    """
+    ml, root, expected = _multi_level_chain_scenario()
+    ml.enable_parallel_expansion(True)
+
+    closure = ml.lookup_provenance(root)
+
+    assert sorted(closure.executions) == expected
+    assert list(ml.handle_violations) == []
+
+
+@pytest.mark.parametrize(
+    "error, degrades",
+    [
+        (DerivaMLException("scripted deriva failure"), True),
+        (SnapshotUnavailable("scripted snapshot failure"), True),
+        (KeyError("scripted key failure"), True),
+        (ValueError("scripted value failure"), True),
+        (RuntimeError("scripted runtime failure"), False),
+    ],
+    ids=["deriva", "snapshot", "keyerror", "valueerror", "runtimeerror"],
+)
+def test_read_failures_classify_identically_parallel_and_sequential(error, degrades):
+    """A read-side failure is handled identically whether it happened on a
+    worker or inline.
+
+    The parallel path CAPTURES the exception into the readout and classifies
+    it on the main thread (``member_producers_from``); the sequential path
+    raises it from the inline read. Those are different code paths, so the
+    equivalence has to be pinned per exception KIND, not assumed:
+
+    - the four kinds a broken snapshot can produce degrade to the same
+      ``snapshot_chain_break`` gap, and the whole closure must come out
+      byte-identical to the ``workers=1`` closure;
+    - ``RuntimeError`` is NOT one of those kinds and must propagate in both
+      — a walk must not silently swallow an unexpected failure just because
+      it happened on a worker.
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    def _build(parallel: bool):
+        ml, root, _ = _multi_level_chain_scenario()
+        ml.enable_parallel_expansion(parallel)
+        # Fail the scan of the shared upstream dataset, which every branch
+        # reaches — so the failure is hit from several expansions.
+        ml.set_member_scan_failure(_ds(2), error)
+        return ml, root
+
+    if not degrades:
+        ml_parallel, root_parallel = _build(True)
+        with pytest.raises(type(error)):
+            ml_parallel.lookup_provenance(root_parallel)
+        ml_sequential, root_sequential = _build(False)
+        with pytest.raises(type(error)):
+            ml_sequential.lookup_provenance(root_sequential)
+        return
+
+    ml_parallel, root_parallel = _build(True)
+    ml_sequential, root_sequential = _build(False)
+
+    closure_parallel = ml_parallel.lookup_provenance(root_parallel)
+    closure_sequential = ml_sequential.lookup_provenance(root_sequential)
+
+    assert _canonical(closure_parallel.model_dump(mode="json")) == _canonical(
+        closure_sequential.model_dump(mode="json")
+    )
+
+    # Non-vacuous: the failure really did produce the degrade gap, rather
+    # than the scenario never reaching the scripted dataset.
+    chain_breaks = _gaps_for(closure_parallel, GapKind.snapshot_chain_break, _ds(2))
+    assert chain_breaks, "scripted read failure produced no snapshot_chain_break gap"
+
+
+def test_capped_walk_releases_the_budget_charge_it_will_never_apply():
+    """When a walk stops for budget, readouts it will never apply are
+    released, so the charge they held does not outlive them.
+
+    ``frontier_rids`` charges every in-flight readout against the remaining
+    budget (it will consume a slot when applied). A readout that is never
+    applied — the capped-termination path — would otherwise hold that
+    charge forever, and any later round would compute a smaller remaining
+    budget than it actually has and under-fetch or stop fetching entirely.
+    """
+    from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    ml, root, expected = _wide_frontier_scenario_with_parents(width=12, parents_each=4)
+    ml.enable_parallel_expansion(True)
+
+    cap = 6
+    closure = ml.lookup_provenance(root, max_executions=cap)
+
+    assert len(expected) > cap
+    assert closure.cap_hit is True
+    assert closure.traversal_complete is False
+
+    # Directly: an engine whose drain terminated on the cap holds no
+    # unapplied readouts, so the accounting is back to "visited only".
+    builder = ClosureBuilder()
+    engine: WalkEngine = WalkEngine(ml, builder, closure_mode=True, max_executions=cap)
+    engine.enqueue_execution(_ex(100), depth=0)
+    engine.enqueue_execution(_ex(101), depth=0)
+    engine._readouts[_ex(101)] = engine.read_execution(_ex(101))
+    engine.visited_global |= {_ex(900 + n) for n in range(cap)}
+
+    engine.drain(depth_remaining=None)
+
+    assert engine.cap_hit is True
+    assert engine._readouts == {}, "capped termination left an unapplied readout holding a budget charge"
+    assert engine.release_unapplied_readouts() == 0
+
+
+# ---------------------------------------------------------------------------
+# Codex stack review (#391 round 2).
+# ---------------------------------------------------------------------------
+
+
+def _pin_advance_scenario(*, advance: bool) -> tuple[_FakeML, str, str, str, str]:
+    """A dataset whose MAXIMUM walked pin advances in a LATER round.
+
+    Round 1 walks ``ds_shared@1.0.0`` (the root's consumed input) and scans
+    it there. That scan discovers ``binder``, whose expansion consumes
+    ``ds_shared`` at ``2.0.0`` — a HIGHER pin than the one already scanned.
+    Ruling 9 promises evidence as of the MAXIMUM walked snaptime, so the
+    dataset must be rescanned at ``2.0.0``.
+
+    With ``advance=False`` the discovered execution consumes the SAME pin,
+    so no rescan is warranted and exactly one scan must happen.
+
+    Returns ``(ml, root_dataset, ds_shared, binder, v2_only_binder)``.
+    """
+    ml = _FakeML()
+    ds_root, ds_shared = _ds(1), _ds(2)
+    root_producer, binder, v2_only_binder = _ex(1), _ex(2), _ex(3)
+
+    later_pin = "2.0.0" if advance else "1.0.0"
+
+    # binder is discovered BY the v1 scan, and itself consumes ds_shared at
+    # the later pin — which is what advances the maximum walked pin.
+    ml.add_execution(
+        binder,
+        description="binder discovered by the first scan",
+        input_datasets=[_StubDataset(ds_shared, "shared", later_pin, consumed_version=later_pin)],
+    )
+    ml.add_execution(v2_only_binder, description="binds only at the higher pin")
+
+    ml.add_dataset(ds_shared, description="shared", producer=None)
+    for version, rct in (("1.0.0", "2025-01-01T00:00:00Z"), ("2.0.0", "2025-02-01T00:00:00Z")):
+        ml.add_version_row(ds_shared, version, None, rct=rct)
+        ml.set_snapshot_available(ds_shared, version, True)
+        ml.set_snapshot_version_rows(ds_shared, version, [_snapshot_row(ds_shared, version, None, rct)])
+
+    # v1 sees only `binder`; v2 additionally sees `v2_only_binder` — the
+    # monotone superset ruling 9 relies on.
+    v1_record = _binding_record(binder, feature_name="Label", element_type="Image")
+    v2_extra = _binding_record(v2_only_binder, feature_name="Grade", element_type="Image")
+    ml.set_binding_scan(ds_shared, "1.0.0", [v1_record], [])
+    ml.set_binding_scan(ds_shared, "2.0.0", [v1_record, v2_extra], [])
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(
+        root_producer,
+        description="root producer",
+        input_datasets=[_StubDataset(ds_shared, "shared", "1.0.0", consumed_version="1.0.0")],
+    )
+    return ml, ds_root, ds_shared, binder, v2_only_binder
+
+
+def test_binding_rescan_when_the_max_walked_pin_advances():
+    """A dataset whose maximum walked pin ADVANCES in a later round is
+    rescanned at the new maximum, and the older as-of view is REPLACED.
+
+    Ruling 9 reports binding evidence as of the maximum walked snaptime. The
+    first implementation marked a dataset scanned FOREVER, so when a
+    scan-discovered execution walked a higher pin the closure kept reporting
+    the older view — silently missing bindings that exist only at the higher
+    pin, while claiming the max-snaptime contract.
+
+    Replacement (not merge) is the other half: monotonicity makes the newer
+    view a superset, so two as-of views would duplicate every surviving
+    record and leave arcs carrying two different ``input_version`` labels
+    for one dataset.
+    """
+    ml, root, ds_shared, binder, v2_only_binder = _pin_advance_scenario(advance=True)
+
+    closure = ml.lookup_provenance(root)
+
+    scans = [c for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1][0] == ds_shared]
+    scanned_versions = sorted(c[1][1] for c in scans)
+    assert scanned_versions == ["1.0.0", "2.0.0"], (
+        f"expected exactly two scans (v1 then a rescan at the advanced pin), got {scanned_versions}"
+    )
+
+    # The execution that binds ONLY at the higher pin is now in the closure
+    # — it was invisible to the v1-only scan.
+    assert v2_only_binder in closure.executions, "a binding visible only at the advanced pin was missed"
+
+    # Every surviving member_binding arc for this dataset carries the HIGHER
+    # version: the older as-of view was replaced, not kept alongside.
+    binding_arcs = [
+        arc
+        for execution in closure.executions.values()
+        for arc in execution.arcs
+        if arc.kind == ArcKind.member_binding and arc.input_rid == ds_shared
+    ]
+    assert binding_arcs, "no member_binding arcs survived the rescan"
+    assert {arc.input_version for arc in binding_arcs} == {"2.0.0"}, (
+        f"stale as-of view survived the rescan: {sorted({a.input_version for a in binding_arcs})}"
+    )
+
+    # And replaced, not duplicated: the binder present in BOTH scans has
+    # exactly one arc for this dataset.
+    binder_arcs = [
+        a for a in _arcs_of(closure, binder) if a.kind == ArcKind.member_binding and a.input_rid == ds_shared
+    ]
+    assert len(binder_arcs) == 1, f"rescan duplicated the arc instead of replacing it: {binder_arcs}"
+
+
+def test_no_rescan_when_the_max_walked_pin_does_not_advance():
+    """The control: a discovered execution consuming the SAME pin warrants
+    no rescan, so the dataset is scanned exactly once.
+
+    Without this, "rescan on advance" could degenerate into "rescan every
+    round", which would be a silent performance regression and would defeat
+    ruling 9's whole purpose.
+    """
+    ml, root, ds_shared, binder, _ = _pin_advance_scenario(advance=False)
+
+    closure = ml.lookup_provenance(root)
+
+    scans = [c for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1][0] == ds_shared]
+    assert len(scans) == 1, f"dataset was rescanned without a pin advance: {[c[1] for c in scans]}"
+    assert binder in closure.executions
+
+
+def _many_scanned_datasets_scenario(*, count: int) -> tuple[_FakeML, str, list[str]]:
+    """A root whose single round scans ``count`` distinct datasets.
+
+    Each member-producing execution consumes its own bindable dataset, so
+    one binding-scan round has ``count`` independent scans to run — wider
+    than the handle pool, which is the regime that exposes handle sharing.
+
+    Returns ``(ml, root_dataset_rid, scanned_dataset_rids)``.
+    """
+    ml = _FakeML()
+    ds_root = _ds(1)
+    root_producer = _ex(1)
+
+    ml.add_dataset(ds_root, description="root", producer=root_producer)
+    ml.add_execution(root_producer, description="root producer")
+
+    members = set()
+    scanned = []
+    for index in range(count):
+        dataset = _ds(400 + index)
+        consumer = _ex(400 + index)
+        binder = _ex(500 + index)
+        ml.add_execution(binder, description=f"binder {index}")
+        ml.add_dataset(dataset, description=f"bindable {index}", producer=None)
+        ml.add_version_row(dataset, "1.0.0", None, rct="2025-01-01T00:00:00Z")
+        ml.set_snapshot_available(dataset, "1.0.0", True)
+        ml.set_snapshot_version_rows(dataset, "1.0.0", [_snapshot_row(dataset, "1.0.0", None, "2025-01-01T00:00:00Z")])
+        ml.set_binding_scan(dataset, "1.0.0", [_binding_record(binder, feature_name="Label", element_type="Image")], [])
+        ml.add_execution(
+            consumer,
+            description=f"consumer {index}",
+            input_datasets=[_StubDataset(dataset, f"bindable {index}", "1.0.0", consumed_version="1.0.0")],
+        )
+        members.add(consumer)
+        scanned.append(dataset)
+
+    ml.set_member_producers(ds_root, members)
+    return ml, ds_root, sorted(scanned)
+
+
+def test_binding_scan_workers_also_lease_handles():
+    """Binding scans go through the SAME leased pool as expansion reads.
+
+    The scan pool (#392) called seams on ``self.ml`` from a
+    ``ThreadPoolExecutor`` — the identical unsynchronized
+    ``requests.Session`` / ``_snapshot_cache`` hazard the expansion lease
+    eliminated, just on the other leg. Both legs now draw from one queue of
+    handles, so the pool depth is the single global concurrency bound.
+
+    Verified by mutate-and-revert: reverting the scan runner to a shared-
+    ``self.ml`` ThreadPoolExecutor makes this fail.
+    """
+    ml, root, scanned = _many_scanned_datasets_scenario(count=24)
+    ml.enable_parallel_expansion(True)
+    ml._handle_hold_seconds = 0.01
+
+    closure = ml.lookup_provenance(root)
+
+    assert list(ml.handle_violations) == [], (
+        f"a handle was entered concurrently {len(ml.handle_violations)} time(s) during binding scans: "
+        f"{list(ml.handle_violations)[:5]} — scans are bypassing the lease"
+    )
+    # Non-vacuous: the scans really ran, and there were more of them than
+    # handles, so leases genuinely had to be recycled.
+    scans = [c for c in ml.calls if c[0] == "_find_feature_producers_impl"]
+    assert len(scans) == len(scanned) > ml._handle_serial
+    assert len(closure.executions) > len(scanned)
+
+
+def test_workers_one_serializes_binding_scans_too(monkeypatch):
+    """``DERIVA_ML_PROVENANCE_WORKERS=1`` serializes BOTH legs.
+
+    The knob is documented as a sequential-equivalence control; that claim
+    is only true if it covers binding scans as well as expansion. Pins both
+    that the closure is byte-identical and that no handle is ever shared
+    (trivially true when nothing runs concurrently).
+    """
+    from tests.execution.test_lineage_goldens import _canonical
+
+    ml_default, root_default, _ = _many_scanned_datasets_scenario(count=8)
+    ml_default.enable_parallel_expansion(True)
+    closure_default = ml_default.lookup_provenance(root_default)
+
+    monkeypatch.setenv("DERIVA_ML_PROVENANCE_WORKERS", "1")
+    ml_single, root_single, _ = _many_scanned_datasets_scenario(count=8)
+    ml_single.enable_parallel_expansion(True)
+    closure_single = ml_single.lookup_provenance(root_single)
+
+    assert _canonical(closure_single.model_dump(mode="json")) == _canonical(closure_default.model_dump(mode="json"))
+    assert list(ml_single.handle_violations) == []
+
+
+def test_consumption_gated_closure_still_carries_dataset_descriptions():
+    """Excluding ``ArcKind.consumption`` narrows what is RECORDED, not what
+    the closure knows about its members.
+
+    The gated branch registered assets but not datasets, so a
+    consumption-gated closure reported every consumed dataset with
+    ``description=None``. A description is a property of the dataset being
+    a member — which it still is — not of the consumption arc.
+    """
+    ml, root, ds_shared, _binder, _ = _pin_advance_scenario(advance=False)
+
+    gated = frozenset({ArcKind.version_authorship, ArcKind.member_binding, ArcKind.member_production})
+    closure = ml.lookup_provenance(root, arcs=gated)
+
+    assert ds_shared in closure.datasets, "consumed dataset is still a closure member when the arc is gated"
+    assert closure.datasets[ds_shared].description == "shared", (
+        "consumption-gated closure blanked the consumed dataset's description"
+    )
+    # The gate really was applied: no consumption arc was recorded.
+    consumption_arcs = [
+        arc for execution in closure.executions.values() for arc in execution.arcs if arc.kind == ArcKind.consumption
+    ]
+    assert consumption_arcs == []
+
+
+def test_worker_handles_pin_the_callers_schema_without_refetching():
+    """Worker handles reuse the caller's parsed schema VERBATIM.
+
+    ``reuse_schema_json`` alone does not pin anything: ``_init_online``
+    re-fetches ``/schema`` to validate it, and on any difference replaces it.
+    That is right for ``catalog_snapshot`` (a pre-migration snapshot must not
+    build a model its catalog cannot serve) but wrong for a worker handle on
+    the SAME live catalog: every handle would re-fetch, and a catalog that
+    changed mid-walk would leave workers reading against a different model
+    than the caller — one walk, two model identities.
+
+    ``_provenance_worker_handle`` therefore passes ``trust_schema_json=True``.
+    This pins that it does, and that the flag actually suppresses the fetch.
+    """
+    import inspect
+
+    from deriva_ml.core.base import DerivaML
+
+    source = inspect.getsource(DerivaML._provenance_worker_handle)
+    assert "trust_schema_json=True" in source, (
+        "worker handles must pin the caller's schema, or they can diverge from its model mid-walk"
+    )
+
+    # And the flag is honored: with it set, the validating getCatalogSchema()
+    # call is skipped entirely.
+    init_source = inspect.getsource(DerivaML._init_online)
+    assert "if reuse_schema_json is not None and trust_schema_json:" in init_source
+    trusted_branch = init_source.split("if reuse_schema_json is not None and trust_schema_json:")[1].split("elif")[0]
+    assert "getCatalogSchema" not in trusted_branch, (
+        "the trusted branch must not re-fetch /schema; that is the whole point of the pin"
+    )
+
+    # The default stays validating, so catalog_snapshot's safety is intact.
+    assert inspect.signature(DerivaML.__init__).parameters["trust_schema_json"].default is False
+    assert "trust_schema_json=True" not in inspect.getsource(DerivaML.catalog_snapshot)
+
+
+def test_rescan_replaces_binding_gaps_not_just_arcs():
+    """A rescan at an advanced pin replaces the dataset's binding GAPS too.
+
+    The arc fix alone left the stale-as-of bug alive in the gap stream: a
+    binding-leg ``sentinel_origin`` whose detail embedded ``{dataset}@{pin}``
+    produced TWO gaps for one fact under two as-of labels on the ordinary
+    monotone rescan — exactly the two-version-labels violation the arc fix
+    exists to prevent. One as-of view per dataset has to hold across arcs
+    AND gaps.
+
+    Two things are pinned here: the gap count (one fact, one gap) and the
+    absence of any pin label in a version-independent detail.
+    """
+    ml, root, ds_shared, binder, _v2_only = _pin_advance_scenario(advance=True)
+    sentinel = _ex(90)
+    ml.add_execution(sentinel, description="unknown-provenance sentinel")
+    ml._sentinel_execution_rid_or_none = lambda: sentinel  # type: ignore[method-assign]
+
+    # The sentinel binds at BOTH pins — the monotone case, where a naive
+    # implementation emits one gap per scan.
+    sentinel_record = _binding_record(sentinel, feature_name="Annotation", element_type="Image")
+    v1_record = _binding_record(binder, feature_name="Label", element_type="Image")
+    v2_extra = _binding_record(_ex(3), feature_name="Grade", element_type="Image")
+    ml.set_binding_scan(ds_shared, "1.0.0", [v1_record, sentinel_record], [])
+    ml.set_binding_scan(ds_shared, "2.0.0", [v1_record, sentinel_record, v2_extra], [])
+
+    closure = ml.lookup_provenance(root)
+
+    # The rescan really happened (otherwise this pin is vacuous).
+    scans = sorted(c[1][1] for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1][0] == ds_shared)
+    assert scans == ["1.0.0", "2.0.0"]
+
+    sentinel_gaps = _gaps_for(closure, GapKind.sentinel_origin, sentinel)
+    assert len(sentinel_gaps) == 1, (
+        f"one fact produced {len(sentinel_gaps)} gaps across two as-of views: {[g.detail for g in sentinel_gaps]}"
+    )
+    # And no gap carries a stale pin label for this dataset.
+    assert not [g for g in closure.gaps if f"{ds_shared}@1.0.0" in g.detail], (
+        "a stale as-of label survived the rescan in the gap stream"
+    )
+
+
+def test_transient_scan_failure_does_not_survive_a_clean_rescan():
+    """A ``binding_scan_failed`` from a transient earlier failure is dropped
+    when the dataset rescans cleanly at an advanced pin.
+
+    Otherwise the closure permanently reports a failure that no longer
+    applies — the walk claiming a hole it can now see through.
+    """
+    ml, root, ds_shared, binder, v2_only_binder = _pin_advance_scenario(advance=True)
+
+    # v1's scan fails transiently but STILL discovers `binder` — whose own
+    # inputs walk the higher pin, which is what triggers the rescan. (A scan
+    # that both fails and returns nothing discovers no one, so the pin never
+    # advances and there is no rescan to test.) Degrade-with-honesty: a
+    # partial scan reports both its diagnostic and what it found.
+    ml.set_binding_scan(
+        ds_shared,
+        "1.0.0",
+        [_binding_record(binder, feature_name="Label", element_type="Image")],
+        [BindingDiagnostic(kind="query_failed", subject=ds_shared, detail="transient v1 failure")],
+    )
+
+    closure = ml.lookup_provenance(root)
+
+    scans = sorted(c[1][1] for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1][0] == ds_shared)
+    assert scans == ["1.0.0", "2.0.0"], f"expected a rescan at the advanced pin, got {scans}"
+
+    failures = [g for g in _gaps_for(closure, GapKind.binding_scan_failed) if ds_shared in (g.subject_rid, g.detail)]
+    assert failures == [], (
+        f"a transient failure survived a clean rescan: {[(g.subject_rid, g.detail) for g in failures]}"
+    )
+
+    # The clean rescan's findings are present, so this is not "everything
+    # was dropped" passing by accident.
+    assert v2_only_binder in closure.executions
+    assert binder in closure.executions
+
+
+def test_rescan_gap_drop_is_scoped_to_the_rescanned_dataset():
+    """Dropping a rescanned dataset's gaps must not disturb anyone else's.
+
+    Only gaps the binding scan of THIS dataset emitted are dropped — an
+    authorship-leg sentinel gap, or another dataset's scan gaps, survive
+    even when they name the same subject.
+    """
+    ml, root, ds_shared, _binder, _v2 = _pin_advance_scenario(advance=True)
+
+    # A second, unrelated dataset whose scan reports a failure and which
+    # never rescans. Reached as a member-producer's consumed input.
+    ds_other = _ds(50)
+    other_consumer = _ex(50)
+    ml.add_dataset(ds_other, description="other", producer=None)
+    ml.add_version_row(ds_other, "1.0.0", None, rct="2025-01-01T00:00:00Z")
+    ml.set_snapshot_available(ds_other, "1.0.0", True)
+    ml.set_snapshot_version_rows(ds_other, "1.0.0", [_snapshot_row(ds_other, "1.0.0", None, "2025-01-01T00:00:00Z")])
+    ml.set_binding_scan(
+        ds_other,
+        "1.0.0",
+        [],
+        [BindingDiagnostic(kind="query_failed", subject=ds_other, detail="unrelated failure")],
+    )
+    ml.add_execution(
+        other_consumer,
+        description="other consumer",
+        input_datasets=[_StubDataset(ds_other, "other", "1.0.0", consumed_version="1.0.0")],
+    )
+    ml.set_member_producers(_ds(1), {other_consumer})
+
+    closure = ml.lookup_provenance(root)
+
+    # ds_shared rescanned...
+    scans = sorted(c[1][1] for c in ml.calls if c[0] == "_find_feature_producers_impl" and c[1][0] == ds_shared)
+    assert scans == ["1.0.0", "2.0.0"]
+    # ...and the OTHER dataset's failure gap is untouched by that drop.
+    survivors = [g for g in _gaps_for(closure, GapKind.binding_scan_failed) if g.subject_rid == ds_other]
+    assert len(survivors) == 1, "an unrelated dataset's scan gap was collaterally dropped by the rescan"

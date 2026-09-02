@@ -262,6 +262,7 @@ class DerivaML(
         clean_execution_dir: bool = True,
         mode: ConnectionMode | str = ConnectionMode.online,
         reuse_schema_json: dict | None = None,
+        trust_schema_json: bool = False,
     ) -> None:
         """Initializes a DerivaML instance.
 
@@ -304,6 +305,16 @@ class DerivaML(
                 schema already held in memory (a snapshot's schema is
                 structurally identical to the live catalog's). Not for
                 general use.
+            trust_schema_json: Internal. When True, ``reuse_schema_json``
+                is used verbatim with **no** validating ``/schema`` fetch.
+                Only correct when the caller guarantees this handle targets
+                the same live catalog the schema came from AND must share
+                that caller's model identity — the provenance walk's worker
+                handles, which would otherwise each re-fetch ``/schema`` and
+                could diverge from the caller's model if the catalog changed
+                mid-walk. Leave False everywhere else: the default validates,
+                which is what keeps a pre-migration snapshot from building a
+                model its catalog cannot serve. Not for general use.
         """
         # Store connection mode (see spec §2.1).
         # Done before catalog connection so subclasses/mixins can read
@@ -344,6 +355,7 @@ class DerivaML(
                 domain_schemas=domain_schemas,
                 default_schema=default_schema,
                 reuse_schema_json=reuse_schema_json,
+                trust_schema_json=trust_schema_json,
             )
         else:
             self._init_offline(
@@ -439,6 +451,7 @@ class DerivaML(
         domain_schemas: "str | set[str] | None",
         default_schema: "str | None",
         reuse_schema_json: dict | None = None,
+        trust_schema_json: bool = False,
     ) -> None:
         """Online init: connect to server, fetch the live schema, build the model.
 
@@ -473,7 +486,16 @@ class DerivaML(
         )
         self.catalog = server.connect_ermrest(catalog_id)
 
-        if reuse_schema_json is not None:
+        if reuse_schema_json is not None and trust_schema_json:
+            # PINNED reuse: the caller guarantees this handle targets the very
+            # same live catalog it was cloned from and must share the caller's
+            # MODEL IDENTITY for the whole operation. Used by the provenance
+            # walk's worker handles: validating here would re-fetch /schema
+            # per handle and, if the live catalog changed mid-walk, leave
+            # workers reading against a different model than the caller —
+            # so the pin is the correctness requirement, not an optimization.
+            schema_json = reuse_schema_json
+        elif reuse_schema_json is not None:
             # Caller (catalog_snapshot) handed us a schema parsed by the live
             # instance. It is USUALLY identical to this catalog's schema, but
             # NOT always: a snapshot pinned to a snaptime that predates a
@@ -949,6 +971,63 @@ class DerivaML(
         )
         self._snapshot_cache[version_snapshot] = snapshot
         return snapshot
+
+    def _provenance_worker_handle(self) -> "DerivaML | None":
+        """Build one additional catalog handle for a provenance worker thread.
+
+        ``requests.Session`` is **not thread-safe**, and every catalog seam
+        the provenance walk calls runs on this instance's session. The walk's
+        parallel frontier expansion (#391b) therefore hands each in-flight
+        read its own handle from a small pool built with this factory, rather
+        than sharing ``self``.
+
+        The handle is a full ``DerivaML`` on the SAME live catalog, built
+        from this instance's own connection-shaping parameters and its
+        already-parsed schema — so it opens a fresh session and a fresh
+        connection pool without re-fetching ``/schema`` or re-detecting
+        domain schemas. It is used for reads only.
+
+        The schema is passed with ``trust_schema_json=True`` so it is used
+        VERBATIM. This is a correctness requirement, not a saving: the
+        validating path re-fetches ``/schema`` per handle, and if the live
+        catalog changed mid-walk the workers would build a different model
+        than the caller — so a walk could mix two model identities. Pinning
+        every handle to the caller's model keeps one model identity for the
+        whole operation.
+
+        Returns:
+            A new handle, or ``None`` when one cannot or should not be built
+            (offline mode). ``None`` makes the walk fall back to sequential
+            reads on ``self`` — slower, never wrong.
+
+        Example:
+            >>> handle = ml._provenance_worker_handle()  # doctest: +SKIP
+            >>> handle is not ml  # doctest: +SKIP
+            True
+        """
+        if self._mode != ConnectionMode.online:
+            # Offline instances read from local SQLite, where a second
+            # handle buys nothing and could contend on the same file.
+            return None
+        return DerivaML(
+            self.host_name,
+            self.catalog_id,
+            domain_schemas=self.domain_schemas,
+            default_schema=self.default_schema,
+            project_name=self.project_name,
+            cache_dir=self.cache_dir,
+            working_dir=self.working_dir,
+            ml_schema=self.ml_schema,
+            logging_level=self._logging_level,
+            deriva_logging_level=self._deriva_logging_level,
+            credential=self.credential,
+            s3_bucket=self.s3_bucket,
+            use_minid=self.use_minid,
+            clean_execution_dir=False,
+            mode=self._mode,
+            reuse_schema_json=self._schema_json,
+            trust_schema_json=True,
+        )
 
     @property
     def mode(self) -> ConnectionMode:

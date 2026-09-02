@@ -18,6 +18,7 @@ rather than human-readable shorthand.
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
@@ -53,6 +54,87 @@ class _ThreadSafeCalls(list):
     def append(self, item: Any) -> None:
         with self._lock:
             super().append(item)
+
+
+class _HandleProbe:
+    """One DISTINCT stand-in for a per-worker ``DerivaML`` catalog handle.
+
+    The real ``DerivaML._provenance_worker_handle`` returns a separate
+    connection whose ``requests.Session`` and ``_snapshot_cache`` are
+    unsynchronized, so the walk must lease each handle to ONE reader at a
+    time. A harness that hands out the same object N times cannot observe a
+    violation of that rule — every collision looks like normal reuse — so
+    each probe is its own object and records its own occupancy.
+
+    ``enter``/``exit`` bracket every attribute access routed through this
+    handle. If two threads are ever inside the same probe at once, the
+    probe records a ``concurrent_entry`` violation (rather than raising, so
+    the walk still finishes and the test reports how many collisions
+    happened, not just the first).
+
+    Attribute reads delegate to the ONE shared ``_FakeML`` that owns the
+    scripted state, guarded by a shared lock — the probe models the handle's
+    isolation, not a second copy of the catalog.
+    """
+
+    def __init__(self, owner: "_FakeML", index: int, shared_lock: threading.Lock) -> None:
+        self._owner = owner
+        self._index = index
+        self._shared_lock = shared_lock
+        self._occupancy_lock = threading.Lock()
+        self._occupants = 0
+
+    # The seams a read side calls. Only these are instrumented; everything
+    # else (``model``, plain attributes, dunder lookups) passes through
+    # untouched. Wrapping by "is it callable" was WRONG: ``_FakeML.model``
+    # is a MagicMock, which is callable, so it got wrapped into a function
+    # and the asset branch's ``ml.model.name_to_table(...)`` raised
+    # AttributeError — swallowed as ``resolution_failed``, silently losing
+    # every asset producer. An explicit list cannot drift that way.
+    _PROXIED_SEAMS = frozenset(
+        {
+            "lookup_execution",
+            "_input_dataset_pairs",
+            "_producer_of_dataset",
+            "_producers_of_dataset_members",
+            "_producers_of_asset",
+            # Binding scans are leased through the SAME pool as expansion
+            # reads (#391 round-2 review), so this seam must be instrumented
+            # too — otherwise a scan bypassing the lease is invisible.
+            "_find_feature_producers_impl",
+        }
+    )
+
+    def __getattr__(self, name: str) -> Any:
+        target = getattr(self._owner, name)
+        if name not in self._PROXIED_SEAMS:
+            return target
+
+        def proxied(*args: Any, **kwargs: Any) -> Any:
+            with self._occupancy_lock:
+                self._occupants += 1
+                collided = self._occupants > 1
+            if collided:
+                self._owner.handle_violations.append(("concurrent_entry", self._index))
+            # Hold the handle briefly so concurrent reads genuinely OVERLAP.
+            # Without this the scripted seams return in microseconds and a
+            # sharing bug is invisible by luck rather than absent by design —
+            # which is exactly how the hash-mod scheme passed review.
+            if self._owner._handle_hold_seconds:
+                time.sleep(self._owner._handle_hold_seconds)
+            try:
+                # The scripted state behind every probe is one dict-based
+                # _FakeML, so serialize access to it. This models a real
+                # handle's OWN session being used by one reader at a time;
+                # it is not what the test is measuring (the occupancy
+                # counter above is).
+                with self._shared_lock:
+                    return target(*args, **kwargs)
+            finally:
+                with self._occupancy_lock:
+                    self._occupants -= 1
+
+        return proxied
 
 
 @dataclass
@@ -231,6 +313,31 @@ class _FakeML(ExecutionMixin):
         # must be order-insensitive (membership/count), which every
         # existing assertion already is.
         self.calls: _ThreadSafeCalls = _ThreadSafeCalls()
+        # Whether ``_provenance_worker_handle`` hands out a live handle, i.e.
+        # whether the closure walk's frontier prefetch actually runs
+        # concurrently (#391b). Off by default so the bulk of the suite pins
+        # the sequential semantics; the parallel-expansion tests turn it on
+        # and assert the SAME closure comes out.
+        self._parallel_expansion_enabled = False
+        # Per-worker handle bookkeeping (#391b lease fix). Each
+        # ``_provenance_worker_handle`` call mints a DISTINCT ``_HandleProbe``
+        # with its own occupancy counter; a probe entered by two threads at
+        # once appends here, which is what lets a test prove the lease is a
+        # lease and not a hash-mod routing scheme.
+        self._handle_serial = 0
+        self._scripted_state_lock = threading.Lock()
+        self.handle_violations: _ThreadSafeCalls = _ThreadSafeCalls()
+        # How long each proxied seam holds its handle. Zero by default so
+        # the bulk of the suite stays fast; the lease test raises it so
+        # concurrent reads genuinely overlap and a sharing bug is DETECTED
+        # rather than missed by timing luck.
+        self._handle_hold_seconds = 0.0
+        # dataset_rid -> exception raised by _producers_of_dataset_members.
+        self._member_scan_failures: dict[str, BaseException] = {}
+        # Concurrent use of a seam called directly on THIS instance rather
+        # than through a leased handle — see ``_note_direct_seam_use``.
+        self._direct_lock = threading.Lock()
+        self._direct_occupants = 0
         # Mock model.
         self.model = MagicMock()
         self.model.is_asset = lambda table: table.name in self._asset_table_names
@@ -359,6 +466,15 @@ class _FakeML(ExecutionMixin):
         """
         self._dataset_parents[dataset_rid] = list(parents)
 
+    def enable_parallel_expansion(self, enabled: bool = True) -> None:
+        """Turn the closure walk's concurrent frontier prefetch on or off.
+
+        See ``_provenance_worker_handle``. The point of the switch is that
+        both settings must produce the SAME closure — it is the control in
+        the sequential-equivalence tests, not a feature flag anyone ships.
+        """
+        self._parallel_expansion_enabled = enabled
+
     def set_binding_scan(
         self,
         dataset_rid: str,
@@ -471,6 +587,25 @@ class _FakeML(ExecutionMixin):
     def _sentinel_execution_rid_or_none(self) -> str | None:  # type: ignore[override]
         return None
 
+    def _provenance_worker_handle(self) -> "_HandleProbe | None":
+        """Per-worker catalog handle seam for the parallel frontier (#391b).
+
+        The real ``DerivaML`` returns a SEPARATE connection here because
+        ``requests.Session`` (and the instance's ``_snapshot_cache``) are
+        unsynchronized. Each call therefore returns a DISTINCT
+        ``_HandleProbe``, never ``self``: a pool of N references to one
+        object could not detect two readers sharing a handle, which is
+        precisely the bug the lease exists to prevent.
+
+        Each probe records its own occupancy, so a test can assert that no
+        handle is ever entered concurrently. ``enable_parallel_expansion``
+        toggles whether handles are offered at all.
+        """
+        if not self._parallel_expansion_enabled:
+            return None
+        self._handle_serial += 1
+        return _HandleProbe(self, self._handle_serial, self._scripted_state_lock)
+
     def _execution_summaries(self, rids: Any) -> dict[str, Any]:  # type: ignore[override]
         """Resolve scripted execution RIDs to ExecutionSummary via lookup_execution.
 
@@ -515,9 +650,47 @@ class _FakeML(ExecutionMixin):
 
     def _producers_of_dataset_members(self, dataset_rid: str, version: Any = None) -> set[str]:  # type: ignore[override]
         self.calls.append(("_producers_of_dataset_members", (dataset_rid, version)))
+        scripted = self._member_scan_failures.get(dataset_rid)
+        if scripted is not None:
+            # Scripted read-side failure (#391b). Raised from the SAME seam
+            # whether the read happens on a worker or inline, so the
+            # parallel and sequential paths must classify it identically.
+            raise scripted
         if version is not None and (dataset_rid, str(version)) in self._versioned_member_producers:
             return set(self._versioned_member_producers[(dataset_rid, str(version))])
         return set(self._dataset_member_producers.get(dataset_rid, set()))
+
+    def set_member_scan_failure(self, dataset_rid: str, error: BaseException) -> None:
+        """Script ``_producers_of_dataset_members`` to raise for a dataset.
+
+        Used to pin that a read-side failure is classified identically
+        whether it happened on a worker (captured into the readout and
+        applied on the main thread) or inline — same gap, same text, same
+        propagation for the kinds that are not supposed to degrade.
+        """
+        self._member_scan_failures[dataset_rid] = error
+
+    def _note_direct_seam_use(self, seam: str) -> None:
+        """Record a seam called on ``self`` (not through a leased handle).
+
+        A worker that bypasses the lease calls the seam on the shared
+        ``_FakeML`` directly, where no ``_HandleProbe`` can observe it — so
+        occupancy counting alone cannot catch it. Tracking direct concurrent
+        use here closes that blind spot: on the main thread it is normal, but
+        two threads inside a seam on ``self`` at once means the lease was
+        bypassed.
+        """
+        with self._direct_lock:
+            self._direct_occupants += 1
+            collided = self._direct_occupants > 1
+        try:
+            if collided:
+                self.handle_violations.append(("unleased_concurrent_use", seam))
+            if self._handle_hold_seconds:
+                time.sleep(self._handle_hold_seconds)
+        finally:
+            with self._direct_lock:
+                self._direct_occupants -= 1
 
     def _find_feature_producers_impl(  # type: ignore[override]
         self, dataset_rid: str, version: Any = None
@@ -529,6 +702,9 @@ class _FakeML(ExecutionMixin):
         features.
         """
         self.calls.append(("_find_feature_producers_impl", (dataset_rid, version)))
+        # Detects a scan worker that bypassed the lease and called this on
+        # the shared instance — invisible to _HandleProbe by construction.
+        self._note_direct_seam_use("_find_feature_producers_impl")
         return self._binding_scans.get((dataset_rid, version), ([], []))
 
 

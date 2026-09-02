@@ -60,12 +60,85 @@ UNPINNED_VERSION_KEY = "<unpinned>"
 # (once, shared); enabling none of them means no snapshot is ever resolved.
 _SNAPSHOT_DEPENDENT_ARCS = frozenset({ArcKind.version_authorship, ArcKind.member_binding})
 
-# Worker pool size for a round's binding scans (#391 C3). Each scan is an
-# independent, snapshot-bound, HTTP-bound read, so the bound is about being
-# a polite catalog client rather than about CPU: a closure round rarely has
-# more than a handful of datasets, and a small fixed pool keeps the burst
-# predictable for the server.
-_BINDING_SCAN_WORKERS = 8
+# Concurrency for a frontier's execution prefetch (#391b). Deliberately an
+# internal module constant with an env override rather than a public
+# ``lookup_provenance`` parameter: it tunes *how* the walk talks to the
+# catalog, never *what* the closure contains, and adding it to the public
+# signature would imply the answer can depend on it (it cannot — see
+# ``test_worker_count_one_equals_default``). Set
+# ``DERIVA_ML_PROVENANCE_WORKERS=1`` to force fully sequential prefetch,
+# which is also the cheapest way to bisect a suspected concurrency
+# problem in the field.
+_EXPANSION_WORKERS_DEFAULT = 8
+_EXPANSION_WORKERS_ENV = "DERIVA_ML_PROVENANCE_WORKERS"
+
+
+def _expansion_workers() -> int:
+    """Resolve the frontier prefetch concurrency for this process.
+
+    Reads :data:`_EXPANSION_WORKERS_ENV`, falling back to
+    :data:`_EXPANSION_WORKERS_DEFAULT`. A value that is not a positive
+    integer is ignored rather than raising: a malformed tuning knob must
+    never break a provenance query.
+
+    Returns:
+        The number of concurrent execution prefetches to allow, at least 1.
+
+    Example:
+        >>> _expansion_workers() >= 1
+        True
+    """
+    import os
+
+    raw = os.environ.get(_EXPANSION_WORKERS_ENV)
+    if raw is None:
+        return _EXPANSION_WORKERS_DEFAULT
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return _EXPANSION_WORKERS_DEFAULT
+    return value if value >= 1 else _EXPANSION_WORKERS_DEFAULT
+
+
+@dataclass(frozen=True)
+class ExecutionReadout:
+    """Everything one execution's expansion needs, read off the catalog.
+
+    The read side of an expansion — ``lookup_execution``, its input-dataset
+    pairs and each pair's producer / member-producer scans, its input assets
+    and each asset's producers — is pure I/O against a snapshot of catalog
+    state. Bundling it into one immutable record is what lets a frontier of
+    executions be fetched CONCURRENTLY while every piece of engine and
+    builder mutation stays on the main thread, applied in sorted-RID order.
+
+    A readout is produced by :meth:`WalkEngine.read_execution` (which never
+    touches engine or visitor state) and consumed by
+    :meth:`WalkEngine.expand_execution` (which does all the mutating).
+
+    Attributes:
+        rid: The execution the readout describes.
+        record: The ``ExecutionRecord``, or ``None`` when lookup failed.
+        lookup_error: The exception ``lookup_execution`` raised, if any.
+        dataset_inputs: One entry per input-dataset edge, in fetch order:
+            ``(dataset, consumed_version, producer_rid, member_producers,
+            member_scan_error)``. ``member_scan_error`` is the exception a
+            member-producer scan raised, deferred so the gap is emitted on
+            the main thread by the same wrapper that always emitted it.
+        asset_inputs: One entry per input asset, in fetch order:
+            ``(asset, producer_rids, resolution_failed)``.
+
+    Example:
+        >>> readout = ExecutionReadout(rid=f"1-{1:04X}", record=None)
+        >>> readout.dataset_inputs
+        ()
+    """
+
+    rid: RID
+    record: Any = None
+    lookup_error: BaseException | None = None
+    dataset_inputs: tuple[tuple[Any, str | None, str | None, set, BaseException | None], ...] = ()
+    asset_inputs: tuple[tuple[Any, tuple[str, ...], bool], ...] = ()
+
 
 N = TypeVar("N")
 
@@ -167,8 +240,13 @@ class WalkVisitor(Protocol[N]):
         """Observe the assembled facts for one dataset version."""
         ...
 
-    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str) -> None:
-        """Observe an honest gap the walk could not resolve."""
+    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str, *, scan_source: str | None = None) -> None:
+        """Observe an honest gap the walk could not resolve.
+
+        ``scan_source``, when given, names the dataset whose binding scan
+        emitted this gap — so a visitor that keeps an as-of view per dataset
+        can drop and re-emit it on rescan. Visitors that do not may ignore it.
+        """
         ...
 
 
@@ -253,7 +331,7 @@ class TreeBuilder:
     def on_dataset_facts(self, *, dataset_rid: str, facts: "DatasetVersionFacts") -> None:
         """No-op."""
 
-    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str) -> None:
+    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str, *, scan_source: str | None = None) -> None:
         """No-op."""
 
 
@@ -298,6 +376,10 @@ class ClosureBuilder:
         self.assets: dict[str, ProvenanceAsset] = {}
         self.gaps: list[ProvenanceGap] = []
         self._gap_keys: set[tuple] = set()
+        # dataset_rid -> [(dedup_key, gap)] for gaps emitted BY that
+        # dataset's binding scan. A rescan at an advanced pin drops these
+        # alongside the dataset's arcs, so one as-of view holds across both.
+        self._binding_scan_gaps: dict[str, list[tuple[tuple, ProvenanceGap]]] = {}
 
     # -- accumulation primitives ------------------------------------------
 
@@ -354,6 +436,45 @@ class ClosureBuilder:
         for record in arc.evidence:
             if record not in existing.evidence:
                 existing.evidence.append(record)
+
+    def drop_binding_arcs_for(self, dataset_rid: str) -> int:
+        """Remove every ``member_binding`` arc recorded against ``dataset_rid``.
+
+        Ruling 9 reports binding evidence **as of the maximum walked
+        snaptime**. When a later round walks a higher pin of an
+        already-scanned dataset, the dataset is rescanned at the new maximum
+        and the previous, lower as-of view must be REPLACED — not merged.
+        Monotonicity guarantees the newer view is a superset, so keeping both
+        would duplicate every surviving record and leave arcs carrying two
+        different ``input_version`` labels for one dataset, which is exactly
+        the "evidence as of one snaptime" contract broken.
+
+        Only arcs whose ``input_rid`` is this dataset are dropped: an
+        execution that also has consumption or authorship arcs keeps them,
+        and an execution that had ONLY the dropped arc is re-recorded by the
+        rescan if it still binds (and correctly disappears if it does not).
+
+        Args:
+            dataset_rid: The rescanned dataset.
+
+        Returns:
+            How many arcs were dropped.
+
+        Example:
+            >>> ClosureBuilder().drop_binding_arcs_for(f"1-{1:04X}")
+            0
+        """
+        dropped = 0
+        for bucket in self.arcs.values():
+            stale = [
+                identity
+                for identity, arc in bucket.items()
+                if arc.kind == ArcKind.member_binding and arc.input_rid == dataset_rid
+            ]
+            for identity in stale:
+                del bucket[identity]
+                dropped += 1
+        return dropped
 
     def arcs_for(self, execution_rid: str) -> list[ProvenanceArc]:
         """Return the deterministic arc list recorded for ``execution_rid``.
@@ -529,13 +650,71 @@ class ClosureBuilder:
             versions[version] = facts
         return facts
 
-    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str) -> None:
-        """Record an honest gap, deduped on ``(kind, subject_rid, detail)``."""
+    def on_gap(self, kind: "GapKind", subject_rid: str, detail: str, *, scan_source: str | None = None) -> None:
+        """Record an honest gap, deduped on ``(kind, subject_rid, detail)``.
+
+        Args:
+            kind: The gap category.
+            subject_rid: The affected entity (or a scan-path identifier for
+                ``binding_scan_failed``).
+            detail: Human-readable explanation.
+            scan_source: When this gap was emitted by the binding scan of a
+                particular dataset, that dataset's RID. Gaps so tagged are
+                part of that dataset's **as-of view** and are dropped and
+                re-emitted when the dataset is rescanned at an advanced pin
+                (see :meth:`drop_binding_scan_gaps_for`). Untagged gaps —
+                everything from the authorship leg, the consumption legs, or
+                the walk itself — are never touched by a rescan.
+        """
         key = (kind, subject_rid, detail)
         if key in self._gap_keys:
             return
         self._gap_keys.add(key)
-        self.gaps.append(ProvenanceGap(kind=kind, subject_rid=subject_rid, detail=detail))
+        gap = ProvenanceGap(kind=kind, subject_rid=subject_rid, detail=detail)
+        self.gaps.append(gap)
+        if scan_source is not None:
+            self._binding_scan_gaps.setdefault(scan_source, []).append((key, gap))
+
+    def drop_binding_scan_gaps_for(self, dataset_rid: str) -> int:
+        """Remove the gaps ``dataset_rid``'s previous binding scan emitted.
+
+        The rescan counterpart of :meth:`drop_binding_arcs_for`, and needed
+        for exactly the same reason: ruling 9 reports **one** as-of view per
+        dataset, and that has to hold across gaps as well as arcs. Without
+        it the stale-view bug simply moves into the gap stream:
+
+        - a ``sentinel_origin`` gap from the binding leg embeds
+          ``{dataset}@{version}`` in its detail, so the ordinary monotone
+          case produces TWO gaps for one fact under two as-of labels — the
+          very two-version-labels violation the arc fix exists to prevent;
+        - a ``binding_scan_failed`` gap from a transient v1 failure would
+          survive a clean v2 rescan, permanently reporting a failure that no
+          longer applies.
+
+        Only gaps tagged with this dataset as their ``scan_source`` are
+        dropped, so an authorship-leg sentinel gap about some other subject
+        is untouched even when it names the same execution.
+
+        Args:
+            dataset_rid: The rescanned dataset.
+
+        Returns:
+            How many gaps were dropped.
+
+        Example:
+            >>> ClosureBuilder().drop_binding_scan_gaps_for(f"1-{1:04X}")
+            0
+        """
+        recorded = self._binding_scan_gaps.pop(dataset_rid, [])
+        if not recorded:
+            return 0
+        stale_gaps = {id(gap) for _key, gap in recorded}
+        self.gaps = [gap for gap in self.gaps if id(gap) not in stale_gaps]
+        # Un-dedupe as well, or the fresh scan's identical re-emission would
+        # be swallowed as "already seen" and the gap would vanish entirely.
+        for key, _gap in recorded:
+            self._gap_keys.discard(key)
+        return len(recorded)
 
     # -- finalize ---------------------------------------------------------
 
@@ -722,7 +901,9 @@ class WalkEngine(Generic[N]):
     _queue: list[tuple[RID, int]] = field(init=False)
     _unpinned_quarantined: set[tuple[str, str | None]] = field(init=False)
     _pending_binding_pins: dict[str, dict[str, int]] = field(init=False)
-    _binding_scanned: set[str] = field(init=False)
+    _binding_scanned: dict[str, str] = field(init=False)
+    _readouts: dict[RID, ExecutionReadout] = field(init=False)
+    _worker_handle_pool: "list[Any] | None" = field(init=False, default=None)
 
     def __init__(
         self,
@@ -755,7 +936,24 @@ class WalkEngine(Generic[N]):
         # ``run_pending_binding_scans`` then scans each dataset ONCE at its
         # maximum walked snaptime.
         self._pending_binding_pins = {}
-        self._binding_scanned = set()
+        # ``dataset_rid -> the version its binding scan was run AT``. Not a
+        # bare "scanned" set: a later round can walk a HIGHER pin of an
+        # already-scanned dataset, and ruling 9 promises evidence as of the
+        # MAXIMUM walked snaptime — so the dataset must be rescanned when
+        # its max pin advances past what was scanned.
+        self._binding_scanned = {}
+        # Frontier prefetch cache (#391b): ``rid -> ExecutionReadout`` for
+        # executions whose read side has already been fetched (concurrently)
+        # but not yet applied. ``expand_execution`` consumes and removes an
+        # entry; a miss falls back to reading inline, so every code path
+        # works with an empty cache.
+        self._readouts = {}
+        # Per-worker catalog handles, built lazily on the first frontier
+        # wide enough to be worth parallelizing. ``None`` means "not built
+        # yet"; an empty list means "tried, and this ml cannot supply them"
+        # — the difference is what stops a failed attempt from being retried
+        # on every frontier.
+        self._worker_handle_pool = None
         self._sentinel_resolved = False
         self._sentinel_rid: RID | None = None
 
@@ -1135,6 +1333,125 @@ class WalkEngine(Generic[N]):
 
         return max(labels, key=order)
 
+    def _pin_advanced(self, dataset_rid: str, scanned: str, candidate: str) -> bool:
+        """True when ``candidate`` is a strictly NEWER pin than ``scanned``.
+
+        Decided by the same total order :meth:`max_walked_pin` uses, so
+        "which pin is newer" has exactly one definition in the engine.
+        Implemented by asking that method to choose between the two: if it
+        picks ``candidate`` over ``scanned``, the pin advanced.
+
+        Args:
+            dataset_rid: The dataset whose pins to compare.
+            scanned: The version its binding scan was last run at.
+            candidate: The maximum currently-walked pin.
+
+        Returns:
+            Whether a rescan is required.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._pin_advanced(f"1-{1:04X}", "1.0.0", "1.0.0")
+            False
+        """
+        if scanned == candidate:
+            return False
+        return self.max_walked_pin(dataset_rid, {scanned, candidate}) == candidate
+
+    def _run_leased(self, batch: list, worker: Any) -> list:
+        """Run ``worker(item, handle)`` over ``batch``, one leased handle each.
+
+        The shared execution path for every concurrent READ the walk makes.
+        Binding scans used to run on their own ``ThreadPoolExecutor`` calling
+        seams on ``self.ml``, which is the same unsynchronized
+        ``requests.Session`` / ``_snapshot_cache`` hazard the expansion lease
+        eliminated; routing both legs through this one runner closes that and
+        retires the deferred "two concurrency frameworks" item at the same
+        time.
+
+        Handles are leased from the SAME pool the expansion prefetch uses, so
+        the pool's depth remains the single global concurrency bound: an
+        expansion frontier and a scan round can never together exceed it,
+        because both draw from one queue.
+
+        Falls back to running the batch sequentially, in order, whenever no
+        handle pool can be built — which is also what
+        ``DERIVA_ML_PROVENANCE_WORKERS=1`` produces, so that knob now
+        serializes scans as well as expansion and is a true
+        sequential-equivalence control for BOTH legs.
+
+        Args:
+            batch: Work items, already in deterministic (sorted) order.
+            worker: ``(item, handle) -> result``; must be read-only.
+
+        Returns:
+            Results in the SAME order as ``batch``, never completion order.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._run_leased([], lambda item, handle: item)
+            []
+        """
+        if not batch:
+            return []
+        if len(batch) == 1 or not self._worker_handles():
+            return [worker(item, self.ml) for item in batch]
+
+        from deriva_ml.core.async_helpers import run_async
+
+        return run_async(self._gather_leased(batch, worker))
+
+    async def _gather_leased(self, batch: list, worker: Any) -> list:
+        """Await ``worker(item, handle)`` over ``batch`` under the lease pool.
+
+        The **single** concurrency primitive in this engine: both the
+        expansion prefetch and the binding-scan round go through here, so
+        there is exactly one place that decides how a handle is acquired,
+        held, and released. :meth:`_run_leased` is just its synchronous
+        wrapper for callers that are not already in a loop.
+
+        Handles come from an :class:`asyncio.Queue`; a task cannot start
+        until it owns one and holds it exclusively until the ``finally``
+        releases it. **The queue's depth is the only concurrency bound**,
+        which makes "pool size >= concurrency" an enforced invariant and
+        means an expansion frontier and a scan round can never together
+        exceed the pool.
+
+        ``worker`` must be read-only and must not raise: callers wrap their
+        own failure handling (the prefetch returns ``None`` for a failed
+        read; the scan returns the exception in its result tuple), which
+        keeps one task's failure from cancelling the gather.
+
+        Args:
+            batch: Work items, already in deterministic (sorted) order.
+            worker: ``(item, handle) -> result``; read-only, non-raising.
+
+        Returns:
+            Results in the SAME order as ``batch``, never completion order.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._gather_leased)
+            True
+        """
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        leases: asyncio.Queue = asyncio.Queue()
+        for handle in self._worker_handles():
+            leases.put_nowait(handle)
+
+        async def one(item: Any) -> Any:
+            handle = await leases.get()
+            try:
+                return await loop.run_in_executor(None, lambda: worker(item, handle))
+            finally:
+                # Released even on failure — a leaked lease would shrink the
+                # pool for the rest of the walk and eventually deadlock it.
+                leases.put_nowait(handle)
+
+        return list(await asyncio.gather(*(one(item) for item in batch)))
+
     def run_pending_binding_scans(self) -> bool:
         """Run one ROUND of deferred binding scans; True if any scan ran.
 
@@ -1171,45 +1488,54 @@ class WalkEngine(Generic[N]):
             >>> engine.run_pending_binding_scans()
             False
         """
-        from concurrent.futures import ThreadPoolExecutor
+        batch = []
+        for dataset_rid in sorted(self._pending_binding_pins):
+            pins = self._pending_binding_pins[dataset_rid]
+            if not pins:
+                continue
+            version = self.max_walked_pin(dataset_rid, set(pins))
+            scanned = self._binding_scanned.get(dataset_rid)
+            if scanned is not None and not self._pin_advanced(dataset_rid, scanned, version):
+                # Already scanned at this pin (or at a newer one): the
+                # existing as-of view already covers what is walked.
+                continue
+            self._binding_scanned[dataset_rid] = version
+            batch.append((dataset_rid, version, pins[version]))
 
-        pending = {
-            dataset_rid: pins
-            for dataset_rid, pins in self._pending_binding_pins.items()
-            if dataset_rid not in self._binding_scanned and pins
-        }
-        if not pending:
+        if not batch:
             return False
 
-        batch = []
-        for dataset_rid in sorted(pending):
-            self._binding_scanned.add(dataset_rid)
-            version = self.max_walked_pin(dataset_rid, set(pending[dataset_rid]))
-            batch.append((dataset_rid, version, pending[dataset_rid][version]))
+        def scan(item: tuple[str, str, int], handle: Any) -> tuple[Any, list[Any], Exception | None]:
+            """Read-only worker: never touches the visitor or engine state.
 
-        def scan(item: tuple[str, str, int]) -> tuple[Any, list[Any], Exception | None]:
-            """Read-only worker: never touches the visitor or engine state."""
+            Runs against a LEASED handle, never ``self.ml``: the scan calls
+            the same session-bound seams the expansion reads do, so sharing
+            one ``DerivaML`` across concurrent scans is the identical
+            unsynchronized-``requests.Session`` / ``_snapshot_cache`` hazard
+            the expansion lease exists to prevent (#391b review).
+            """
             dataset_rid, version, _depth = item
             try:
-                records, diagnostics = self.ml._find_feature_producers_impl(dataset_rid, version=version)
+                records, diagnostics = handle._find_feature_producers_impl(dataset_rid, version=version)
                 return records, list(diagnostics), None
             except Exception as exc:  # noqa: BLE001 — one dataset's failure
                 # must not abort the round; it becomes that dataset's gap.
                 return [], [], exc
 
-        if len(batch) == 1:
-            results = [scan(batch[0])]
-        else:
-            with ThreadPoolExecutor(max_workers=_BINDING_SCAN_WORKERS) as pool:
-                results = list(pool.map(scan, batch))
+        results = self._run_leased(batch, scan)
 
         # SINGLE-THREADED apply, in sorted dataset order (``batch`` is built
-        # sorted and ``pool.map`` preserves input order), so recorded depths
+        # sorted and the runner preserves input order), so recorded depths
         # and every ordering derived from them are independent of both
         # discovery order and worker completion order.
         for (dataset_rid, version, depth), (records, diagnostics, error) in zip(batch, results, strict=True):
             if error is not None:
-                self.visitor.on_gap(
+                # Reset first: a rescan that ALSO fails must not stack a
+                # second failure gap on the previous one, and a rescan after
+                # a failure replaces that failure's view like any other.
+                self._reset_binding_view(dataset_rid)
+                self._scan_gap(
+                    dataset_rid,
                     GapKind.binding_scan_failed,
                     dataset_rid,
                     f"binding scan of {dataset_rid}@{version} failed, so its member bindings are unrecorded: {error}",
@@ -1253,12 +1579,21 @@ class WalkEngine(Generic[N]):
             >>> engine._apply_binding_scan(f"1-{1:04X}", "1.0.0", [], [], depth=0) is None
             True
         """
+        # RESCAN at an advanced pin REPLACES the previous as-of view. Ruling
+        # 9 reports bindings as of ONE snaptime — the maximum walked — so a
+        # lower pin's arcs must not survive alongside the newer scan's.
+        # Monotonicity makes the new view a superset, so nothing real is
+        # lost; what is dropped is a duplicate carrying a stale
+        # ``input_version``.
+        self._reset_binding_view(dataset_rid)
+
         for record in records:
             self.visitor.on_binding_record(dataset_rid=dataset_rid, version=version, record=record, depth=depth)
 
             author_rid = record.execution_rid
             if not author_rid:
-                self.visitor.on_gap(
+                self._scan_gap(
+                    dataset_rid,
                     GapKind.null_binding_execution,
                     dataset_rid,
                     f"feature '{record.feature_name}' on element '{record.element_type}' has bound values "
@@ -1269,11 +1604,19 @@ class WalkEngine(Generic[N]):
                 # Recorded, but recorded as unknown: an honest gap, never a
                 # closure member (sentinel discipline, §6.1) — same rule the
                 # authorship leg applies to a sentinel-authored origin.
-                self.visitor.on_gap(
+                #
+                # The detail deliberately does NOT embed the scanned version:
+                # "this feature's values are bound by the sentinel" is a fact
+                # about the dataset, not about which snaptime observed it, so
+                # pinning it to a version label would emit a second, identical
+                # gap on every rescan even in the ordinary monotone case.
+                # (The arcs carry the as-of label; the gap states the fact.)
+                self._scan_gap(
+                    dataset_rid,
                     GapKind.sentinel_origin,
                     author_rid,
                     f"feature '{record.feature_name}' on element '{record.element_type}' of "
-                    f"{dataset_rid}@{version} is bound by the unknown-provenance Execution sentinel",
+                    f"{dataset_rid} is bound by the unknown-provenance Execution sentinel",
                 )
                 continue
 
@@ -1289,11 +1632,60 @@ class WalkEngine(Generic[N]):
             self.enqueue_or_truncate(author_rid, depth=depth + 1)
 
         for diagnostic in diagnostics:
-            self.visitor.on_gap(
+            self._scan_gap(
+                dataset_rid,
                 GapKind.binding_scan_failed,
                 diagnostic.subject,
                 f"{diagnostic.kind}: {diagnostic.detail}",
             )
+
+    def _scan_gap(self, dataset_rid: str, kind: "GapKind", subject_rid: str, detail: str) -> None:
+        """Emit a gap that belongs to ``dataset_rid``'s binding as-of view.
+
+        Tags the gap with its originating scan so a rescan at an advanced
+        pin can drop it (see
+        :meth:`ClosureBuilder.drop_binding_scan_gaps_for`). Visitors that do
+        not track scan provenance — the tree builder — just receive the gap.
+
+        Args:
+            dataset_rid: The dataset whose scan emitted this gap.
+            kind: The gap category.
+            subject_rid: The affected entity.
+            detail: Human-readable explanation.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._scan_gap(f"1-{1:04X}", GapKind.no_workflow, f"1-{1:04X}", "d") is None
+            True
+        """
+        try:
+            self.visitor.on_gap(kind, subject_rid, detail, scan_source=dataset_rid)
+        except TypeError:
+            # A visitor whose on_gap predates the scan_source parameter.
+            self.visitor.on_gap(kind, subject_rid, detail)
+
+    def _reset_binding_view(self, dataset_rid: str) -> None:
+        """Drop the previous binding as-of view — arcs AND gaps — for a rescan.
+
+        Ruling 9 reports binding evidence as of ONE snaptime, the maximum
+        walked. When a dataset is rescanned at an advanced pin the whole
+        previous view has to go, not just its arcs: a surviving
+        ``binding_scan_failed`` from a transient earlier failure would
+        permanently report a failure that no longer applies, and a surviving
+        binding-leg ``sentinel_origin`` would duplicate one fact.
+
+        Args:
+            dataset_rid: The dataset being (re)scanned.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._reset_binding_view(f"1-{1:04X}") is None
+            True
+        """
+        for name in ("drop_binding_arcs_for", "drop_binding_scan_gaps_for"):
+            dropper = getattr(self.visitor, name, None)
+            if dropper is not None:
+                dropper(dataset_rid)
 
     def _facts_for(self, dataset_rid: str, version: str) -> "DatasetVersionFacts | None":
         """Return the visitor's mutable facts record, when it keeps one.
@@ -1350,6 +1742,20 @@ class WalkEngine(Generic[N]):
                 register = getattr(self.visitor, "register_asset", None)
                 if register is not None:
                     register(input_ref, consumer_rid)
+            else:
+                # Datasets need the SAME treatment as assets here. Only the
+                # asset half was handled, so a consumption-gated closure
+                # reported its consumed datasets with ``description=None``
+                # — the description is a property of the dataset being a
+                # member, not of the consumption ARC, so gating the arc must
+                # not blank it. Mirrors ``ClosureBuilder.on_consumption``'s
+                # dataset branch exactly.
+                descriptions = getattr(self.visitor, "dataset_descriptions", None)
+                if descriptions is not None:
+                    descriptions.setdefault(
+                        input_ref.rid,
+                        getattr(input_ref.summary, "description", None),
+                    )
             return
         self.visitor.on_consumption(consumer_rid=consumer_rid, input_ref=input_ref, depth=depth)
 
@@ -1456,6 +1862,55 @@ class WalkEngine(Generic[N]):
             )
             return set()
 
+    def member_producers_from(
+        self,
+        dataset_rid: str,
+        version: str | None,
+        producers: set[RID],
+        error: BaseException | None,
+    ) -> set[RID]:
+        """Apply :meth:`member_producers_or_gap`'s degrade to an ALREADY-READ scan.
+
+        The scan itself now happens on the read side (:meth:`read_execution`,
+        possibly on a worker), which defers whatever it raised instead of
+        reporting it. This applies exactly the classification
+        :meth:`member_producers_or_gap` applies — the same exception types
+        degrade to the same ``snapshot_chain_break`` gap with the same
+        wording, and anything else propagates — on the main thread, so gap
+        text and gap dedup are unchanged from the inline era.
+
+        Args:
+            dataset_rid: The dataset whose members were scanned.
+            version: The version pin the scan was scoped to.
+            producers: The producer set the scan returned (empty on failure).
+            error: The exception the scan raised, or ``None``.
+
+        Returns:
+            The producer set, or an empty set when the scan degraded.
+
+        Raises:
+            BaseException: ``error`` itself, when it is not one of the kinds
+                a broken snapshot is expected to raise.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine.member_producers_from(f"1-{1:04X}", "1.0.0", set(), None)
+            set()
+        """
+        from deriva_ml.core.exceptions import SnapshotUnavailable
+
+        if error is None:
+            return producers
+        if isinstance(error, (SnapshotUnavailable, DerivaMLException, AttributeError, KeyError, ValueError)):
+            self.visitor.on_gap(
+                GapKind.snapshot_chain_break,
+                dataset_rid,
+                f"member-producer scan of version {version} could not be performed at its "
+                f"catalog snapshot, so member production for it is unrecorded: {error}",
+            )
+            return set()
+        raise error
+
     # -- asset facts ------------------------------------------------------
 
     def report_asset_producers(
@@ -1504,6 +1959,276 @@ class WalkEngine(Generic[N]):
                 "with this asset; exactly one is expected",
             )
 
+    # -- execution read side (concurrency-safe) ----------------------------
+
+    def read_execution(self, rid: RID) -> ExecutionReadout:
+        """Read everything one execution's expansion needs. **Read-only.**
+
+        Performs the whole HTTP-bound half of an expansion —
+        ``lookup_execution``, the input-dataset pairs and each pair's
+        ``_producer_of_dataset`` / ``_producers_of_dataset_members`` scans,
+        the input assets and each asset's ``_producers_of_asset`` — and
+        returns the answers as an immutable :class:`ExecutionReadout`.
+
+        **This method must never touch engine or visitor state**, because it
+        is what a frontier's prefetch runs concurrently (#391b). Every
+        failure it encounters is *captured* into the readout rather than
+        reported: gaps are emitted by :meth:`expand_execution` on the main
+        thread, at the exact point they were emitted before, so gap identity,
+        order, and dedup are unchanged.
+
+        Note that ``member_producers`` is captured RAW here — the ``- {rid}``
+        self-subtraction and the closure/lineage wrapper choice both stay in
+        :meth:`expand_execution`, since those are semantics, not I/O.
+
+        Args:
+            rid: The execution to read.
+
+        Returns:
+            The readout; ``lookup_error`` is set (and every input list empty)
+            when the execution itself did not resolve.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine.read_execution)
+            True
+        """
+        ml = self.ml
+        try:
+            record = ml.lookup_execution(rid)
+        except DerivaMLException as exc:
+            return ExecutionReadout(rid=rid, lookup_error=exc)
+
+        dataset_inputs: list[tuple[Any, str | None, str | None, set, BaseException | None]] = []
+        for ds, consumed_version in ml._input_dataset_pairs(rid):
+            producer = ml._producer_of_dataset(ds.dataset_rid, version=consumed_version)
+            member_producers: set = set()
+            member_error: BaseException | None = None
+            try:
+                member_producers = ml._producers_of_dataset_members(ds.dataset_rid, version=consumed_version)
+            except Exception as exc:  # noqa: BLE001 — deferred verbatim to the
+                # main thread, where ``member_producers_or_gap``'s existing
+                # catch decides whether it degrades to a gap or re-raises.
+                member_error = exc
+            dataset_inputs.append((ds, consumed_version, producer, member_producers, member_error))
+
+        asset_inputs: list[tuple[Any, tuple[str, ...], bool]] = []
+        for asset in record.list_assets(asset_role="Input"):
+            producer_rids: tuple[str, ...] = ()
+            resolution_failed = False
+            try:
+                asset_table_obj = ml.model.name_to_table(asset.asset_table)
+                producer_rids = tuple(ml._producers_of_asset(asset.asset_rid, asset_table_obj))
+            except Exception:  # noqa: BLE001 — same degrade the inline path
+                # applied: one unresolvable asset producer never stops the
+                # rest of the inputs.
+                resolution_failed = True
+            asset_inputs.append((asset, producer_rids, resolution_failed))
+
+        return ExecutionReadout(
+            rid=rid,
+            record=record,
+            dataset_inputs=tuple(dataset_inputs),
+            asset_inputs=tuple(asset_inputs),
+        )
+
+    def _take_readout(self, rid: RID) -> ExecutionReadout:
+        """Return ``rid``'s prefetched readout, or read it inline on a miss.
+
+        The cache is a pure optimization: an entry is consumed exactly once,
+        and an empty cache degrades to the historical inline read. That is
+        what keeps the sequential and prefetched paths byte-identical (and
+        what makes ``DERIVA_ML_PROVENANCE_WORKERS=1`` meaningful).
+
+        Args:
+            rid: The execution being expanded.
+
+        Returns:
+            Its readout.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._take_readout)
+            True
+        """
+        cached = self._readouts.pop(rid, None)
+        return cached if cached is not None else self.read_execution(rid)
+
+    def _prefetchable(self, rid: RID) -> bool:
+        """True when ``rid`` may be prefetched for the coming frontier.
+
+        Mirrors the guards :meth:`expand_execution` applies BEFORE it does
+        any I/O — sentinel, in-progress cycle, already-visited diamond — so
+        the prefetch never issues a request for an execution the expansion
+        would have refused to read. Anything the guards would let through is
+        prefetchable; the budget check is applied by the caller, which is
+        where the remaining-slot arithmetic lives.
+
+        Args:
+            rid: A queued execution RID.
+
+        Returns:
+            Whether prefetching ``rid`` is both safe and useful.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._prefetchable(f"1-{1:04X}")
+            True
+        """
+        if rid in self._readouts:
+            return False
+        if rid in self.visited_global or rid in self.in_progress:
+            return False
+        return not self.is_sentinel(rid)
+
+    async def _prefetch_frontier_async(self, rids: list[RID]) -> None:
+        """Fetch ``rids``' read sides concurrently into :attr:`_readouts`.
+
+        Follows the deriva-py asyncio pattern (``asyncio.gather`` under an
+        ``asyncio.Semaphore``, as in
+        ``deriva.core.asyncio.clone``'s concurrent table copy): a bounded
+        number of tasks are in flight at once, and the whole frontier is
+        awaited as one gather.
+
+        The per-execution work itself is the EXISTING synchronous mixin
+        seams, offloaded with ``loop.run_in_executor``. Keeping the seams
+        synchronous is deliberate: the ``_FakeML`` harness, every seam
+        contract, and every subclass override keep working untouched, and
+        the only thing that changed is who calls them and when.
+
+        **Thread safety: handles are LEASED, never routed.** ``requests.Session``
+        is not thread-safe, and neither is the ``_snapshot_cache`` dict a
+        ``DerivaML`` keeps, so two concurrent reads must never touch the same
+        handle. An earlier version picked a handle by ``hash(rid) % len(pool)``,
+        which is a *routing* scheme and not exclusion: with N concurrent tasks
+        over N handles, collisions are near-certain (birthday paradox), and a
+        collision silently shares an unsynchronized session.
+
+        Handles are therefore leased, exclusively, for the whole duration of
+        a read. The leasing itself lives in :meth:`_gather_leased` — the
+        engine's single concurrency primitive, shared with the binding-scan
+        round — so there is exactly one place that decides how a handle is
+        acquired, held and released, and the two legs cannot drift apart.
+
+        Results are stashed in :attr:`_readouts` and applied later,
+        single-threaded, in the queue's own deterministic order; no worker
+        touches the engine's sets, the budget, or the visitor.
+
+        A readout whose read raised something the seams do not normally
+        raise is simply NOT cached, so that execution falls back to the
+        inline read on the main thread and fails (or degrades) exactly where
+        it always did.
+
+        Args:
+            rids: The frontier's execution RIDs, already budget-limited.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> callable(engine._prefetch_frontier_async)
+            True
+        """
+
+        def read(rid: RID, handle: Any) -> "ExecutionReadout | None":
+            """Read one execution against a leased handle. Never raises.
+
+            A failure is reported as ``None`` rather than propagating, so
+            that execution simply falls back to the inline read on the main
+            thread and its error surfaces from the historical call site.
+            """
+            try:
+                return self._worker_view(handle).read_execution(rid)
+            except Exception:  # noqa: BLE001 — see above.
+                return None
+
+        for rid, readout in zip(rids, await self._gather_leased(rids, read), strict=True):
+            if readout is not None:
+                self._readouts[rid] = readout
+
+    def _worker_view(self, handle: Any) -> "WalkEngine[N]":
+        """Wrap one LEASED catalog handle in a read-only engine view.
+
+        The caller has already acquired ``handle`` exclusively from the lease
+        queue in :meth:`_gather_leased`; this only wraps it so
+        :meth:`read_execution` (read-only by construction) can be called
+        against it. The view holds no walk state of its own — the engine's
+        sets, budget and visitor are never reachable from it.
+
+        Deliberately takes the handle rather than choosing one: handle
+        selection is the lease queue's job, and any selection logic here
+        would be a second, unsynchronized allocator.
+
+        Args:
+            handle: The leased catalog handle.
+
+        Returns:
+            A read-only engine view bound to that handle.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._worker_view(None).ml is None
+            True
+        """
+        return WalkEngine(
+            handle,
+            self.visitor,
+            arcs=self.arcs,
+            max_executions=self.max_executions,
+            dataset_budget=self.dataset_budget,
+            closure_mode=self.closure_mode,
+        )
+
+    def _worker_handles(self) -> list[Any]:
+        """Build (once) the pool of per-worker catalog handles.
+
+        One extra ``DerivaML`` connection per worker, constructed up front
+        from ``self.ml``'s own connection parameters and its already-parsed
+        schema (so no worker re-fetches ``/schema``). Each handle owns its
+        own ``requests.Session`` AND its own ``_snapshot_cache`` — both
+        unsynchronized, which is exactly why a handle is leased to one
+        reader at a time rather than shared.
+
+        **The pool's size IS the concurrency bound.** Every in-flight read
+        holds one handle from :meth:`_prefetch_frontier_async`'s lease queue,
+        so at most ``len(pool)`` reads run at once and "pool size >=
+        concurrency" holds by construction. Nothing else caps concurrency;
+        adding a second bound would let the two drift apart and reintroduce
+        handle sharing.
+
+        Returns an empty list — meaning "do not parallelize" — whenever
+        handles cannot be built: a stubbed ``ml`` in tests, an offline
+        instance, a worker count of 1, or any construction failure. The
+        caller then reads inline on the main thread. Failing closed here
+        costs only speed.
+
+        Returns:
+            The handle pool, possibly empty.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine._worker_handles()
+            []
+        """
+        if self._worker_handle_pool is not None:
+            return self._worker_handle_pool
+
+        pool: list[Any] = []
+        workers = _expansion_workers()
+        ml = self.ml
+        factory = getattr(ml, "_provenance_worker_handle", None)
+        if workers > 1 and callable(factory):
+            for _ in range(workers):
+                try:
+                    handle = factory()
+                except Exception:  # noqa: BLE001 — a handle we cannot build
+                    # simply means less concurrency, never a failed walk.
+                    handle = None
+                if handle is None:
+                    pool = []
+                    break
+                pool.append(handle)
+        self._worker_handle_pool = pool
+        return pool
+
     # -- execution expansion ----------------------------------------------
 
     def expand_execution(
@@ -1543,7 +2268,10 @@ class WalkEngine(Generic[N]):
             WorkflowSummary,
         )
 
-        ml = self.ml
+        # NOTE: no ``ml = self.ml`` binding here any more. Every catalog read
+        # this method used to make inline now lives in ``read_execution``
+        # (#391b), which is what makes this method safe to run purely on the
+        # main thread while the reads happen concurrently elsewhere.
 
         # Sentinel discipline (closure only): the unknown-provenance sentinel
         # is never a closure member and is never expanded — encountering it
@@ -1576,12 +2304,13 @@ class WalkEngine(Generic[N]):
             self.truncated.add(rid)
             return None
 
-        # Look up the execution and its inputs. Deliberately per-node (not
-        # batched): the walk discovers parents one node at a time, so there
-        # is no batch to fetch until the node is expanded.
-        try:
-            record = ml.lookup_execution(rid)
-        except DerivaMLException as exc:
+        # Read side of the expansion. Prefetched concurrently for a closure
+        # frontier (#391b) and read inline otherwise; either way the answers
+        # arrive as one immutable ``ExecutionReadout`` and every decision
+        # made from them below happens here, on the main thread.
+        readout = self._take_readout(rid)
+        record = readout.record
+        if readout.lookup_error is not None:
             # An input pointed at an Execution that no longer exists;
             # treat as missing rather than failing the whole walk. The tree
             # path stays silent (byte-compat); the closure reports the hole.
@@ -1589,7 +2318,7 @@ class WalkEngine(Generic[N]):
                 self.visitor.on_gap(
                     GapKind.unresolved_rid,
                     rid,
-                    f"recorded execution RID could not be resolved: {exc}",
+                    f"recorded execution RID could not be resolved: {readout.lookup_error}",
                 )
             return None
 
@@ -1630,14 +2359,13 @@ class WalkEngine(Generic[N]):
             # state, so lineage reflects the inputs as they were at consumption.
             inputs: list[InputRef] = []
             parent_rids: set[RID] = set()
-            for ds, consumed_version in ml._input_dataset_pairs(rid):
+            for ds, consumed_version, producer, raw_member_producers, member_error in readout.dataset_inputs:
                 version_str = consumed_version
                 if version_str is None:
                     try:
                         version_str = str(ds.current_version)
                     except Exception:
                         version_str = None
-                producer = ml._producer_of_dataset(ds.dataset_rid, version=consumed_version)
                 input_ref = InputRef(
                     kind=ArcInputType.dataset,
                     rid=ds.dataset_rid,
@@ -1667,9 +2395,15 @@ class WalkEngine(Generic[N]):
                 # not an exception escaping mid-walk. Lineage keeps the bare
                 # call so its observable behavior stays byte-identical.
                 if self.closure_mode:
-                    member_producers = self.member_producers_or_gap(ds.dataset_rid, consumed_version)
+                    member_producers = self.member_producers_from(
+                        ds.dataset_rid, consumed_version, raw_member_producers, member_error
+                    )
+                elif member_error is not None:
+                    # Lineage never swallowed this: raise it from the same
+                    # place the bare call used to raise from.
+                    raise member_error
                 else:
-                    member_producers = ml._producers_of_dataset_members(ds.dataset_rid, version=consumed_version)
+                    member_producers = raw_member_producers
                 member_producers = member_producers - {rid}
                 parent_rids |= member_producers
                 if ArcKind.member_production in self.arcs:
@@ -1692,12 +2426,8 @@ class WalkEngine(Generic[N]):
                         )
                 self.expand_dataset(ds.dataset_rid, consumed_version, depth=depth)
 
-            for asset in record.list_assets(asset_role="Input"):
-                producer_rids: tuple[str, ...] = ()
-                resolution_failed = False
-                try:
-                    asset_table_obj = ml.model.name_to_table(asset.asset_table)
-                    producer_rids = tuple(ml._producers_of_asset(asset.asset_rid, asset_table_obj))
+            for asset, producer_rids, resolution_failed in readout.asset_inputs:
+                if not resolution_failed:
                     producer = producer_rids[0] if producer_rids else None
                     if producer:
                         parent_rids.add(producer)
@@ -1707,10 +2437,6 @@ class WalkEngine(Generic[N]):
                         # single-producer display choice (`producer` above)
                         # untouched.
                         parent_rids |= set(producer_rids) - {rid}
-                except Exception:
-                    # If we can't resolve the producer of one asset,
-                    # keep walking the rest of the inputs.
-                    resolution_failed = True
                 if self.closure_mode:
                     self.report_asset_producers(
                         asset.asset_rid,
@@ -1746,6 +2472,15 @@ class WalkEngine(Generic[N]):
             ordered_parents = sorted(parent_rids) if self.closure_mode else parent_rids
             if depth_remaining is None or depth_remaining > 0:
                 next_depth = None if depth_remaining is None else depth_remaining - 1
+                # #391b: this node's sorted parent set IS a frontier — every
+                # parent's read side is independent of every other's — so
+                # fetch them CONCURRENTLY before recursing. The recursion
+                # below is unchanged and still strictly sequential, in the
+                # same sorted order, so which parent is applied when (and
+                # therefore every recorded depth) is untouched; the reads
+                # have simply already happened.
+                if self.closure_mode:
+                    self.prefetch_executions(ordered_parents)
                 for pr in ordered_parents:
                     child = self.expand_execution(pr, depth_remaining=next_depth, depth=depth + 1)
                     if child is not None:
@@ -1826,6 +2561,149 @@ class WalkEngine(Generic[N]):
                 return
         self._queue.append((rid, depth))
 
+    def frontier_rids(self, candidates: "list[RID] | None" = None) -> list[RID]:
+        """The frontier's prefetchable RIDs, in order, budget-limited.
+
+        A **frontier** is a set of executions whose read sides are mutually
+        independent, so they can be fetched together. The walk has two:
+
+        - one node's SORTED PARENT SET, fetched before the recursion over it;
+        - the closure QUEUE's prefix, fetched before a drain round.
+
+        Both are filtered and bounded by the same two rules, and both matter:
+
+        - **Never past the cap.** At most ``max_executions - len(visited)``
+          entries are taken, so a frontier can never fetch an execution the
+          walk would then refuse for budget. Under a cap the *same* prefix
+          the sequential walk would have expanded is the prefix that gets
+          fetched, and everything beyond it is left for the cap logic to
+          move into ``truncated`` exactly as before. The cap is therefore
+          honest in the strict sense: never exceeded *within* a batch, not
+          merely reported afterwards.
+        - **Walk order, not completion order.** The frontier is a PREFIX of
+          the very order the walk will apply things in, so which executions
+          happen to be in flight together cannot change which execution is
+          applied when.
+
+        Executions the expansion would refuse to read anyway (sentinel,
+        cycle, diamond, already prefetched) are filtered by
+        :meth:`_prefetchable`.
+
+        Args:
+            candidates: The frontier's RIDs in walk order. ``None`` uses the
+                closure queue's own order.
+
+        Returns:
+            The RIDs to prefetch, in walk order; empty when nothing is
+            eligible (which correctly disables the prefetch entirely).
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine.frontier_rids()
+            []
+        """
+        if candidates is None:
+            candidates = [rid for rid, _depth in self._queue]
+        # Every already-prefetched-but-not-yet-applied readout is an
+        # execution that will consume a budget slot when it is applied, so
+        # it is charged against the remaining budget HERE. Without that,
+        # nested frontiers (a parent set prefetched inside an expansion that
+        # was itself prefetched) would each measure the budget as if the
+        # others did not exist, and the walk would read further ahead than
+        # the sequential walk ever would — which is exactly the over-fetch
+        # the cap is supposed to forbid.
+        remaining = self.max_executions - len(self.visited_global) - len(self._readouts)
+        if remaining <= 0:
+            return []
+        frontier: list[RID] = []
+        seen: set[RID] = set()
+        for rid in candidates:
+            if len(frontier) >= remaining:
+                break
+            if rid in seen or not self._prefetchable(rid):
+                continue
+            seen.add(rid)
+            frontier.append(rid)
+        return frontier
+
+    def prefetch_frontier(self) -> int:
+        """Concurrently prefetch the QUEUE's next frontier. Sync entry point.
+
+        Returns:
+            How many executions were prefetched.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine.prefetch_frontier()
+            0
+        """
+        return self.prefetch_executions(None)
+
+    def prefetch_executions(self, candidates: "list[RID] | None") -> int:
+        """Concurrently prefetch one frontier's read side. Sync entry point.
+
+        Bridges the async driver (:meth:`_prefetch_frontier_async`) back to
+        this synchronous walk with
+        :func:`~deriva_ml.core.async_helpers.run_async`, which is
+        notebook-safe: inside a running event loop (Jupyter, papermill) it
+        re-enters that loop via ``nest_asyncio`` instead of raising
+        ``asyncio.run() cannot be called from a running event loop``. That
+        is why ``lookup_provenance`` stays an ordinary sync method.
+
+        A frontier of one is fetched inline, with no loop and no executor:
+        there is nothing to overlap, and paying for a loop per singleton
+        would make the common shallow walk slower, not faster.
+
+        Args:
+            candidates: The frontier in walk order, or ``None`` for the
+                closure queue's own frontier.
+
+        Returns:
+            How many executions were prefetched.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine.prefetch_executions([])
+            0
+        """
+        frontier = self.frontier_rids(candidates)
+        if len(frontier) < 2 or _expansion_workers() < 2 or not self._worker_handles():
+            # Nothing to overlap (or no safe per-worker handles): let
+            # ``_take_readout`` read inline, exactly as the pre-#391b walk
+            # did. This is also the path a worker count of 1 takes, which
+            # is what makes it a true sequential-equivalence control.
+            return 0
+
+        from deriva_ml.core.async_helpers import run_async
+
+        run_async(self._prefetch_frontier_async(frontier))
+        return len(frontier)
+
+    def release_unapplied_readouts(self) -> int:
+        """Drop prefetched readouts this walk will never apply.
+
+        A readout sitting in :attr:`_readouts` is charged against the
+        remaining execution budget by :meth:`frontier_rids`, because applying
+        it will consume a slot. When the walk stops for budget, those
+        readouts are never applied — so the charge must be released, or every
+        subsequent round measures a remaining budget smaller than the real
+        one.
+
+        Safe to call at any termination point: a discarded readout is only a
+        cache entry, and :meth:`_take_readout` re-reads inline on a miss.
+
+        Returns:
+            How many readouts were released.
+
+        Example:
+            >>> engine = WalkEngine(ml=None, visitor=TreeBuilder())
+            >>> engine.release_unapplied_readouts()
+            0
+        """
+        released = len(self._readouts)
+        self._readouts.clear()
+        return released
+
     def drain(self, *, depth_remaining: int | None) -> None:
         """Expand every queued execution, under the engine's caps.
 
@@ -1844,6 +2722,13 @@ class WalkEngine(Generic[N]):
             >>> engine.drain(depth_remaining=0)
         """
         while self._queue:
+            if self.closure_mode:
+                # #391b: prefetch the next FRONTIER concurrently before
+                # expanding it. Purely a read-ahead — the loop below still
+                # pops and applies one execution at a time, in queue order,
+                # so nothing about what gets expanded (or in what order)
+                # depends on the prefetch having happened.
+                self.prefetch_frontier()
             if len(self.visited_global) >= self.max_executions:
                 # Budget exhausted with real work still queued: the
                 # traversal is provably incomplete, and everything still
@@ -1851,6 +2736,13 @@ class WalkEngine(Generic[N]):
                 self.flags["walked_complete"] = False
                 self.cap_hit = True
                 self.truncated |= {queued_rid for queued_rid, _ in self._queue}
+                # Readouts prefetched for work this walk will now never
+                # apply are DISCARDED, releasing the budget slots they were
+                # charged for in ``frontier_rids``. Without this, a walk that
+                # terminates on the cap leaves the charge standing forever,
+                # so any later round would compute a smaller remaining budget
+                # than it actually has and under-fetch (or stop fetching).
+                self.release_unapplied_readouts()
                 return
             rid, depth = self._queue.pop(0)
             if rid in self.visited_global:
