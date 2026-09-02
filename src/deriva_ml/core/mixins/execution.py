@@ -2440,12 +2440,29 @@ class ExecutionMixin:
         frontier, then one chunked row fetch per asset table, and builds the
         ``Asset`` objects directly.
 
-        Note the deliberate omission: ``asset_types`` is left empty. The
-        provenance readout consumes only ``asset_rid`` / ``filename`` /
-        ``asset_table`` (see ``WalkEngine.expand_execution``'s
-        ``AssetSummary``), so fetching type terms would be a request per
-        asset table bought for nothing. Any caller that needs types must use
-        ``lookup_asset``.
+        **Assumption: the asset table is resolved by NAME.** The association
+        table's ``<Asset>_Execution`` name is stripped to its base table
+        name and resolved through ``model.name_to_table``, whereas
+        ``lookup_asset`` resolves the same table from the asset RID via
+        ``resolve_rid``. The two agree in every deriva-ml-shaped schema
+        (association tables are named after the asset table they associate),
+        and a name that does not resolve — or resolves to a non-asset table
+        — is skipped rather than guessed at, so the failure mode is a
+        missing group, never a wrong one. A catalog that named an
+        association table independently of its asset table would silently
+        contribute no input assets from it.
+
+        **Constraint: ``asset_types`` is deliberately left EMPTY**, and this
+        is only safe because the provenance readout consumes exactly
+        ``asset_rid`` / ``filename`` / ``asset_table`` — the three fields
+        ``WalkEngine.expand_execution`` copies into an ``AssetSummary``.
+        Fetching type terms would be a request per asset table bought for
+        nothing. **If ``AssetSummary`` ever grows a field this method does
+        not populate, this method must populate it too** — otherwise the
+        batched path ships empty values where the per-node path shipped real
+        ones, which is precisely the class of silent divergence the #394
+        live A/B caught once already (the ``is_asset`` guard below). Any
+        caller needing full ``Asset`` fidelity must use ``lookup_asset``.
 
         Args:
             rids: Execution RIDs whose input assets to read.

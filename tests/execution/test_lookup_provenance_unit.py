@@ -5086,8 +5086,16 @@ def test_absent_handle_factory_is_not_retried_every_round():
     Without the latch, every round of a walk on an offline (or stubbed)
     instance would re-attempt the construction — cheap in the harness,
     a repeated failed connection attempt in the field.
+
+    Skipped under ``DERIVA_ML_PROVENANCE_WORKERS=1``, like every sibling
+    concurrency pin: that path returns from ``_worker_handles`` at the
+    ``workers < 2`` guard *before* the factory is ever consulted, so there
+    is no construction attempt to latch and nothing for this test to
+    observe. Asking for a pool at all is what the knob turns off.
     """
     from deriva_ml.core.mixins._provenance_engine import ClosureBuilder, WalkEngine
+
+    _require_parallel_enabled()
 
     ml, _root, _ = _many_walked_pins_scenario(count=4)
     # Parallel expansion disabled: ``_provenance_worker_handle`` returns None.
