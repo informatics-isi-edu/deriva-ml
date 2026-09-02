@@ -1162,3 +1162,20 @@ independent), or snapshot-keyed result caching. Recorded here so the next
 pass doesn't re-optimize the leg that is already fast: **the 2026-09-01
 "levers, impact order" list above is now spent — items (1) and (2) are
 done and item (3) is shipped as `arcs=`.**
+
+**2026-09-01 — Authorship history stays (Carl), and the
+worldline-vs-neighborhood distinction.** After ruling 8, Carl weighed
+dropping previous-version authors; settled on KEEPING them: each
+version-producing execution is a curation event on the artifact itself
+— execution-mediated causation, unlike ancestry. The "versions span
+snapshots" wrinkle resolves cleanly: the walk never visits old
+snapshots — Dataset_Version rows ≤ v are DATA IN v's snapshot (the
+history is carried forward as content), so one snapshot-closed read at
+v yields the whole chain. The principled in/out line: Dataset_Version
+is the WORLDLINE of one artifact (execution-attributed construction
+events on the thing itself → provenance); Dataset_Dataset is a
+RELATION between different artifacts with no reliable causal direction
+(→ structure, ruling 8). Perf consequence: historical authors are not
+trimmed for speed; the remaining runtime goes to parallel execution
+expansion instead, and the #392 arc-gating knob serves anyone wanting
+the narrow view.
