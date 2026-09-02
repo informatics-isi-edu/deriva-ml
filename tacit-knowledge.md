@@ -1062,3 +1062,21 @@ datasets still walk at 3-4 versions each (2-277G, 2-277M, 2-39FY,
 2-277J): multi-version fan-out survives ruling 8 because it is
 execution-mediated (different executions consumed different pins), which
 is exactly why the internal dataset budget is still meaningful.
+
+**2026-09-01 — Ruling 9 (Carl): binding evidence is monotone across
+dataset versions — scan once per dataset at the maximum walked
+snaptime.** Carl, twice, as dataset SEMANTICS: "new dataset versions
+will only add feature values, not remove them." Bindings at an older
+version's snaptime are a subset of bindings at any newer version's
+snaptime, so per-(dataset, version) binding scans are redundant: ONE
+scan per dataset at the max walked snaptime subsumes every older
+walked pin (19 scans → 9 on the eye-ai reference run, before other
+optimizations). Evidence counts are reported "as of" that snapshot.
+The one API that could violate monotonicity — delete_dataset_members
+(curation, flips to dev per ADR-0003) — is governed by the ruling, not
+an exception to it: a removal takes those members and their bindings
+out of the dataset's story, and the newest-walked scan is the
+authoritative view. Writers whose only bindings were on since-removed
+members do not survive; that is the intended semantics, not an
+approximation. To be codified in provenance-contract.md when
+implemented.
