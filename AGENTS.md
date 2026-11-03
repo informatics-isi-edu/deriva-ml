@@ -4,13 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-DerivaML is a Python library (requires Python ≥3.12) for creating and executing reproducible machine learning workflows using a Deriva catalog. It provides:
-- Dataset versioning and management with BDBag support
-- Execution tracking with provenance
-- Feature management for ML experiments
-- Controlled vocabulary management
-- Asset tracking and upload
-- Catalog cloning with partial data subsetting
+DerivaML is a Python library for reproducible machine-learning workflows on a Deriva catalog.
 
 ## Environment Setup
 
@@ -54,65 +48,11 @@ override for testing" for the rule rationale; full suite is
 > call, e.g. `cd /Users/carl/GitHub/DerivaML/deriva-ml && uv run pytest`.
 > See the workspace-level `AGENTS.md` ("CWD discipline") for the rule.
 
-```bash
-# Install dependencies
-uv sync
-
-# Run all tests
-DERIVA_ML_ALLOW_DIRTY=true uv run pytest
-
-# Run a single test file
-DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_datasets.py
-
-# Run a specific test
-DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_datasets.py::test_function_name -v
-
-# Run tests with coverage
-DERIVA_ML_ALLOW_DIRTY=true uv run pytest --cov=deriva_ml --cov-report=term-missing
-
-# Lint and format
-uv run ruff check src/
-uv run ruff format src/
-
-# Build documentation
-uv run mkdocs serve
-```
+Standard `uv sync` / `uv run pytest` / `uv run ruff` invocations; prefix
+test runs with `DERIVA_ML_ALLOW_DIRTY=true` (see Environment Setup).
+Docs: `uv run mkdocs serve`.
 
 ## Architecture
-
-### Core Classes
-
-**DerivaML** (`src/deriva_ml/core/base.py`): Main entry point for catalog operations. Uses mixin composition:
-- `VocabularyMixin`, `FeatureMixin`, `DatasetMixin`, `AssetMixin`, `ExecutionMixin`
-- `WorkflowMixin`, `FileMixin`, `AnnotationMixin`, `RidResolutionMixin`, `PathBuilderMixin`
-
-Each mixin lives in `src/deriva_ml/core/mixins/` and handles one concern.
-
-**Execution** (`src/deriva_ml/execution/execution.py`): Manages ML workflow lifecycle:
-- Downloads/materializes datasets specified in configuration
-- Tracks execution status and provenance
-- Handles asset upload after execution completes
-- Used as context manager: `with ml.create_execution(config) as exe:`
-
-**Dataset** (`src/deriva_ml/dataset/dataset.py`): Versioned dataset management:
-- Semantic versioning (major.minor.patch)
-- BDBag export with optional MINID creation
-- Nested dataset support
-- Version history tracking via catalog snapshots
-
-**DatasetBag** (`src/deriva_ml/dataset/dataset_bag.py`): Downloaded dataset representation:
-- Provides same interface as Dataset via `DatasetLike` protocol
-- Works with local BDBag directories (no catalog connection needed)
-- Supports nested dataset traversal and member listing
-- Use `as_torch_dataset()` / `as_tf_dataset()` to feed the bag to PyTorch / TensorFlow / Keras training loops
-- Use `restructure_assets()` to reorganize files by dataset type/features for `ImageFolder`-style third-party trainers
-- All three share the same `targets` / `target_transform` / `missing` vocabulary; lazy import of torch/tensorflow inside each adapter so the base library stays importable without either framework
-
-**ExecutionConfiguration** (`src/deriva_ml/execution/execution_configuration.py`): Pydantic model for execution setup:
-- Dataset specifications with version and materialization options
-- Input asset RIDs
-- Workflow reference
-- Execution parameters
 
 ### Key Patterns
 
@@ -258,76 +198,13 @@ Example annotation pattern:
         True
 ```
 
-## Schema Structure
-
-The library uses two schemas:
-- **deriva-ml** (`ML_SCHEMA`): Core ML tables (Dataset, Execution, Workflow, Feature_Name, etc.)
-- **Domain schema**: Application-specific tables created by users
-
-Controlled vocabularies: Dataset_Type, Asset_Type, Workflow_Type, Asset_Role, Feature_Name
-
-## Exception Hierarchy
-
-DerivaML uses a structured exception hierarchy for error handling:
-
-```
-DerivaMLException (base class)
-├── DerivaMLConfigurationError (configuration/initialization)
-│   ├── DerivaMLSchemaError (schema structure issues)
-│   └── DerivaMLAuthenticationError (auth failures)
-├── DerivaMLDataError (data access/validation)
-│   ├── DerivaMLNotFoundError (entity not found)
-│   │   ├── DerivaMLDatasetNotFound
-│   │   ├── DerivaMLTableNotFound
-│   │   └── DerivaMLInvalidTerm
-│   ├── DerivaMLTableTypeError (wrong table type)
-│   ├── DerivaMLValidationError (validation failures)
-│   └── DerivaMLCycleError (relationship cycles)
-├── DerivaMLExecutionError (execution lifecycle)
-│   ├── DerivaMLWorkflowError
-│   └── DerivaMLUploadError
-└── DerivaMLReadOnlyError (writes on read-only)
-```
-
-Import from: `from deriva_ml.core.exceptions import ...`
-
-## Protocol Hierarchy
-
-The library uses protocols for type-safe polymorphism:
-
-**Dataset Protocols:**
-- `DatasetLike`: Read-only operations (Dataset and DatasetBag)
-- `WritableDataset`: Write operations (Dataset only)
-
-**Catalog Protocols:**
-- `DerivaMLCatalogReader`: Read-only catalog operations
-- `DerivaMLCatalog`: Full catalog operations with writes
-
-Import from: `from deriva_ml.interfaces import ...`
-
-## Shared Utilities
-
-**Validation** (`deriva_ml.core.validation`):
-- `VALIDATION_CONFIG`: Standard ConfigDict for `@validate_call`
-- `STRICT_VALIDATION_CONFIG`: ConfigDict that forbids extra fields
-
-**Logging** (`deriva_ml.core.logging_config`):
-- `get_logger(name)`: Get a deriva_ml logger
-- `configure_logging(level)`: Configure logging for all components
-
 ## Catalog Cloning
 
 **`clone_via_bag`** (`src/deriva_ml/catalog/clone_via_bag.py`): The current catalog-clone path. Builds a BDBag from the source catalog (using the export pipeline + an explicit traversal policy), then loads the bag into a schema-ready destination catalog via deriva-py's `BagCatalogLoader`. The legacy three-stage approach (schema without FKs → async data copy → FK application) was retired in v1.36.0 in favor of this single-call pipeline.
 
-Key parameters:
-- `root_rid` — anchor for the bag's content slice. Translated to a `RIDAnchor` and merged with the policy's existing anchors.
-- `policy` — `FKTraversalPolicy` controlling traversal scope and per-table behaviour. The caller's policy is merged with deriva-ml defaults (vocab export FULL, terminal tables {Execution, Workflow}, dangling FK strategy DELETE) — caller-provided non-default values win.
-- `asset_mode` — `AssetMode.UPLOAD` (default) copies asset bytes into the destination Hatrac; `AssetMode.ROWS_ONLY` skips asset upload (rows are still inserted with their source-Hatrac URLs); `AssetMode.REFERENCES` preserves source URLs for later localization.
-- `dangling_fk_strategy` — `FAIL` (refuse), `DELETE` (drop the row), or `NULLIFY` (set the FK column NULL).
-
-**`create_ml_workspace`** (`src/deriva_ml/catalog/clone.py`): Legacy wrapper preserved for callers that haven't migrated. Routes to `clone_via_bag` under the hood; several historical parameters (e.g., `reinitialize_dataset_versions`, `prune_hidden_fkeys`, `truncate_oversized`, `table_concurrency`, `copy_annotations`) are accepted-but-ignored and logged as deprecation warnings. New code should call `clone_via_bag` directly.
-
-**`localize_assets`** (`src/deriva_ml/catalog/localize.py`): Phase-2 leg of the split-phase clone. After a `clone_via_bag(asset_mode=REFERENCES)` (or `ROWS_ONLY`) leaves the destination with source-Hatrac URLs, `localize_assets` copies the bytes server-to-server (download from source, upload to dest) and rewrites the catalog rows to point at the destination Hatrac. Records phase-2 stats on the catalog provenance annotation.
+New code calls `clone_via_bag` directly; `create_ml_workspace` is a legacy
+wrapper around it, and `localize_assets` is the phase-2 byte copy after a
+`REFERENCES`/`ROWS_ONLY` clone.
 
 ### create_ml_schema CASCADE Warning
 
@@ -335,58 +212,11 @@ Key parameters:
 
 ## Hydra-zen Configuration
 
-DerivaML integrates with hydra-zen for reproducible configuration. Key config classes:
+Full documentation: `docs/configuration/overview.md`. Use `builds()` with
+`populate_full_signature=True`, and `zen_partial=True` for model functions
+that receive execution context at runtime.
 
-**DerivaMLConfig** (`deriva_ml.core.config`): Main connection configuration
-```python
-from deriva_ml import DerivaMLConfig
-config = DerivaMLConfig(hostname="example.org", catalog_id="42")
-ml = DerivaML.instantiate(config)
-```
-
-**DatasetSpecConfig** (`deriva_ml.dataset`): Dataset specification for executions
-```python
-from deriva_ml.dataset import DatasetSpecConfig
-spec = DatasetSpecConfig(rid="XXXX", version="1.0.0", materialize=True)
-```
-
-**AssetSpec / AssetSpecConfig** (`deriva_ml.execution`): Input asset specification. Use
-`AssetSpec` in regular Python code and `AssetSpecConfig` (the hydra-zen interface) inside
-hydra-zen stores. Bare RID strings are accepted where a list of assets is expected.
-```python
-from deriva_ml.execution import AssetSpec, AssetSpecConfig
-asset = AssetSpec(rid="YYYY", cache=True)
-cfg = AssetSpecConfig(rid="YYYY", cache=True)
-```
-
-**ExecutionConfiguration** (`deriva_ml.execution`): Full execution setup
-```python
-from deriva_ml.execution import ExecutionConfiguration
-config = ExecutionConfiguration(
-    datasets=[DatasetSpecConfig(rid="DATA", version="1.0.0")],
-    assets=["WGTS"],
-    description="Training run"
-)
-```
-
-Use `builds()` with `populate_full_signature=True` for hydra-zen integration.
-Use `zen_partial=True` for model functions that receive execution context at runtime.
-
-See `docs/configuration/overview.md` for complete documentation.
-
-## User Preferences
-
-### Opening markdown files for review
-
-When the user asks to open a spec, plan, or other markdown file for review, use MarkEdit:
-```bash
-open -a MarkEdit /absolute/path/to/file.md
-```
-This applies to spec/plan reviews during the brainstorming → spec → plan cycle as well as ad-hoc markdown review requests.
-
-### Input-required notifications
-
-When Codex needs user input to proceed, prefix the question with `⏸ NEED INPUT:` on its own line so it stands out in long sessions. One question at a time is preferred over batched lists.
+## Code Conventions
 
 ### Class idiom choice — Pydantic vs `@dataclass`
 
@@ -539,12 +369,6 @@ Assets use a manifest-first design (`asset-manifest.json`):
 - Metadata directory order must match `sorted(metadata_columns)` — both `asset_table_upload_spec()` and `_build_upload_staging()` sort alphabetically
 - Per-asset status tracking enables upload resume after crashes
 
-### Upload Network Configuration
-
-`upload_directory()` has two network configuration parameters:
-- `timeout`: HTTP session timeout (connect, read) - passed to session config
-- `chunk_size`: Hatrac chunk upload size in bytes - passed through upload spec
-
 ### Workflow Deduplication
 
 Workflows are deduplicated by checksum. When the same script runs multiple times, `add_workflow()` returns the existing workflow's RID rather than creating a new one. Tests that need distinct workflows must account for this.
@@ -612,31 +436,6 @@ traversal policy.
 all FK paths to each table and computes `set.union()` for exact counts.
 This handles the case where the same table is reachable via multiple
 FK paths with overlapping or disjoint rows.
-
-The previous `CatalogGraph` (`src/deriva_ml/dataset/catalog_graph.py`)
-that owned this logic was retired in the 2026-05 bag-client cutover —
-see `docs/archive/2026-05-bag-cutover/dataset-bag-cutover-2026-05.md`
-for the design that drove the replacement.
-
-### Dataset Download Flow
-
-`download_dataset_bag` → `get_dataset_minid` → (free-function pipeline
-in `dataset/bag_download.py`):
-1. Creates a bag directory structure
-2. Processes query_processors from the export spec (env, json, csv, fetch)
-3. Writes remote file manifest for assets (passed to `make_bag(remote_file_manifest=...)`)
-4. Archives the bag as a zip
-5. `materialize_dataset_bag` then calls `bdb.materialize()` to fetch remote assets
-
-(`get_dataset_minid` and `materialize_dataset_bag` are the
-free-function successors to the Dataset-method versions
-`_get_dataset_minid` / `_materialize_dataset_bag`, extracted in the
-2026-05 audit cycle.)
-
-### restructure_assets Return Type
-
-`DatasetBag.restructure_assets()` returns `dict[Path, Path]` (manifest mapping source → dest),
-not a `Path`. Tests should assert `isinstance(result, dict)`.
 
 ### ExecutionConfiguration Assets
 
