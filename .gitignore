@@ -166,3 +166,5 @@ cython_debug/
 # Local agent session context (e.g. codex-session-id)
 .context/
 
+# Personal Claude Code preferences
+CLAUDE.local.md
