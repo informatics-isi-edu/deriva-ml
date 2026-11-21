@@ -21,24 +21,22 @@ the workspace-level [`AGENTS.md`](../AGENTS.md) "Dirty-tree
 override for testing" for the rule rationale; full suite is
 30–90 minutes.
 
-**Running long test suites from Codex**: The full test suite exceeds Codex's default 2-minute Bash timeout. Use these strategies:
+**Running long test suites**: The full suite takes 30–90 minutes, longer than one foreground command allows. Run it in the subsets below, and run the integration subsets in the background rather than as one bare `uv run pytest tests/`:
 1. **Run test subsets incrementally** rather than the full suite at once:
    ```bash
    # Unit tests (fast, no catalog needed, ~3 seconds)
    DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q
    
    # Dataset integration tests (needs DERIVA_HOST, ~10-30 minutes)
-   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/ -q --timeout=600
+   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/ -q
    
    # Execution tests (needs DERIVA_HOST, ~10-20 minutes)  
-   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/ -q --timeout=600
+   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/ -q
    
    # Remaining integration tests
-   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/catalog/ tests/feature/ tests/schema/ tests/core/ -q --timeout=600
+   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/catalog/ tests/feature/ tests/schema/ tests/core/ -q
    ```
-2. **Use the Monitor tool** for streaming test output on long runs, or **Bash with `run_in_background=true`** and check progress via Read on the output file.
-3. **Never use a bare `uv run pytest tests/`** with a 2-minute timeout — it will be killed mid-run. Always set `timeout` on the Bash call (up to 600000ms / 10 minutes) or break into subsets.
-4. **Per-test timeout**: Install `pytest-timeout` and use `--timeout=300` to prevent individual tests from hanging.
+2. **Per-test timeout**: `pytest-timeout` is not a dev dependency. To stop a hanging test, add it with `uv add --dev pytest-timeout`, then pass `--timeout=300`.
 
 ## Build and Development Commands
 
@@ -89,7 +87,7 @@ means you don't have to guess which method to reach for:
 - `find_*` — schema-introspection / discovery that walks the
   catalog model with filtering or traversal logic.
   Examples: `find_features`, `find_datasets`, `find_workflows`,
-  `find_executions`, `find_assets`, `find_associations`. These do
+  `find_executions`, `find_assets`. These do
   non-trivial work to identify matching entities (predicates,
   association detection, FK traversal).
 - `list_*` — straightforward enumeration of "what's there" inside
@@ -125,11 +123,7 @@ e.g. `4CY`, `BR0`) is a server implementation detail. In particular:
   written by a human. The failure mode is silent: a literal like
   `"1-IMG1"` round-trips through a test that mocks the layer
   where the RID matters, the test passes, and production breaks
-  the first time a real RID flows through the same code path
-  (see the 2026-05-19 torch-adapter bag-layout bug for an
-  illustrative case — every adapter test stubbed the path
-  argument so the wrong on-disk layout went undetected for
-  three weeks).
+  the first time a real RID flows through the same code path.
 - **Never parse, slice, regex, or `startswith`** on a RID. The
   format is not stable contract.
 - **RID ordering is server-internal mechanics, not semantics.**
@@ -200,7 +194,7 @@ Example annotation pattern:
 
 ## Catalog Cloning
 
-**`clone_via_bag`** (`src/deriva_ml/catalog/clone_via_bag.py`): The current catalog-clone path. Builds a BDBag from the source catalog (using the export pipeline + an explicit traversal policy), then loads the bag into a schema-ready destination catalog via deriva-py's `BagCatalogLoader`. The legacy three-stage approach (schema without FKs → async data copy → FK application) was retired in v1.36.0 in favor of this single-call pipeline.
+**`clone_via_bag`** (`src/deriva_ml/catalog/clone_via_bag.py`): The current catalog-clone path. Builds a BDBag from the source catalog (using the export pipeline + an explicit traversal policy), then loads the bag into a schema-ready destination catalog via deriva-py's `BagCatalogLoader`.
 
 New code calls `clone_via_bag` directly; `create_ml_workspace` is a legacy
 wrapper around it, and `localize_assets` is the phase-2 byte copy after a
@@ -227,7 +221,7 @@ Use **Pydantic `BaseModel`** when ANY of these apply — the goal is a single se
 3. **Public method parameters**. Use `@validate_call` (or `@pydantic.validate_call`) so bad args fail with a clear message at the call boundary.
 4. **The class may be serialized or cross a boundary** (JSON I/O, logs, cache, API, bag metadata). Users should reach for one API (`.model_dump()`) rather than juggling `dataclasses.asdict()` depending on type.
 
-Use **`@dataclass`** only when NONE of those apply — purely internal value objects with no user-facing surface. Examples in this codebase: `catalog/clone.py` internal orchestration records, `tools/validate_schema_doc.py` parse results.
+Use **`@dataclass`** only when NONE of those apply — purely internal value objects with no user-facing surface. Example in this codebase: `tools/validate_schema_doc.py` parse results.
 
 When in doubt, pick Pydantic — "too many interfaces" is the failure mode to avoid. A user-facing return type that's `@dataclass` forces every serialization caller to know its exact type.
 
@@ -279,14 +273,9 @@ fix the bug **and** pin the contract at the layer that promises it:
   lives upstream; whatever downstream tests remain are
   consumer-integration coverage and should be framed that way.
 
-Reference case: bag-cache multi-anchor erasure (issue #142). Fix
-landed in deriva-py PR #254 with upstream tests
-(`test_cache_index_record_accumulates_anchors`,
-`test_cache_index_record_dedupes_repeated_anchor`); deriva-ml PR #146
-bumped the pin and the downstream coverage at
-`tests/dataset/test_multi_anchor_bag_cache.py` reframed as
-integration. See that file's module docstring for the consumer-side
-framing.
+Example: `tests/dataset/test_multi_anchor_bag_cache.py` — its module
+docstring shows how the downstream tests read once the contract test
+lives upstream.
 
 ### Version Bumping
 
@@ -299,12 +288,10 @@ Don't use `bump-my-version` directly as it doesn't push changes.
 
 Run `bump-version` only on `main`, after the feature PR has merged.
 
-**ALWAYS verify the deriva-py pin is current BEFORE bumping** (see
-"Updating the deriva-py pin" below). A release that ships a stale pin
-silently freezes every downstream consumer on an old deriva-py — the
-2026-06-16 eye-ai bag over-fetch (a fixed deriva-py bug reappearing
-because the consumer's lock was behind the pin) is the failure mode
-this prevents.
+Verify the deriva-py pin is current before bumping (see "Updating the
+deriva-py pin" below). A release with a stale pin freezes every
+downstream consumer on an old deriva-py, which can bring back deriva-py
+bugs that are already fixed.
 
 ### Updating the deriva-py pin
 
@@ -366,7 +353,7 @@ Assets use a manifest-first design (`asset-manifest.json`):
 - Files stored in flat `assets/{Table}/` directories, metadata in the manifest JSON
 - Write-through + fsync on every mutation for crash safety
 - Upload builds ephemeral symlinks into the regex-expected tree at upload time
-- Metadata directory order must match `sorted(metadata_columns)` — both `asset_table_upload_spec()` and `_build_upload_staging()` sort alphabetically
+- Metadata directory order must match `sorted(metadata_columns)` — `upload_layout.asset_table_upload_spec()` and `bag_commit._add_asset_rows_to_bag()` both read columns through `model.asset_metadata_sorted()`
 - Per-asset status tracking enables upload resume after crashes
 
 ### Workflow Deduplication
